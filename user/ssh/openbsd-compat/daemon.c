@@ -53,7 +53,7 @@ daemon(int nochdir, int noclose)
 {
 	int fd;
 
-	switch (fork()) {
+	switch (vfork()) {
 	case -1:
 		return (-1);
 	case 0:

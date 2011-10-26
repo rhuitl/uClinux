@@ -1278,7 +1278,11 @@ ssh_local_cmd(const char *args)
 		shell = _PATH_BSHELL;
 
 	osighand = signal(SIGCHLD, SIG_DFL);
+#ifdef __uClinux__
+	pid = vfork();
+#else
 	pid = fork();
+#endif
 	if (pid == 0) {
 		signal(SIGPIPE, SIG_DFL);
 		debug3("Executing %s -c \"%s\"", shell, args);
