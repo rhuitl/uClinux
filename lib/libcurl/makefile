@@ -5,6 +5,8 @@ CONFOPTS :=	--enable-dependency-tracking \
 		--enable-gopher \
 		--enable-file \
 		--disable-ldap \
+		--enable-static\
+		--disable-shared\ 
 		--enable-dict \
 		--enable-telnet \
 		--enable-manual \
