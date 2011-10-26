@@ -67,26 +67,24 @@ ARCH          = armnommu
 endif
 ENDIAN        ?= little
 
-ifneq ($(shell which arm-linux-20070808-gcc),)
-ifeq ($(UCLINUX_BUILD_BOOT),1)
-CROSS_COMPILE  = arm-linux-20061213-
-else
-CROSS_COMPILE  = arm-linux-20070808-
-endif
-else
-CROSS_COMPILE  = arm-linux-
-endif
+#CROSS_COMPILE  = arm-elf-
+#CROSS_COMPILE  = arm-linux-
+CROSS_COMPILE = arm-uclinuxeabi-
 
-ifeq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
-ifneq ($(shell which arm-linux-20061213-gcc),)
-KERNEL_CROSS_COMPILE = arm-linux-20061213-
-else
+ifeq ($(filter-out linux-2.0% linux-2.2% linux-2.4% linux-2.6%, $(LINUXDIR)),)
+
+# Kernel compiled with arm-uclinuxeabi- (gcc version 4.5.2 (Sourcery G++ Lite 2011.03-46))
+# didn't boot, so use arm-linux- for now (gcc version 4.2.4 (arm-linux-tools-20080623))
 KERNEL_CROSS_COMPILE = arm-linux-
-endif
+#KERNEL_CROSS_COMPILE = arm-uclinuxeabi-
+
 endif
 
 CROSS         = $(CROSS_COMPILE)
-CONFIGURE_HOST = arm-linux
+
+#CONFIGURE_HOST = arm-elf
+#CONFIGURE_HOST = arm-linux
+CONFIGURE_HOST = arm-uclinuxeabi
 
 CONFIG_UCLINUX=y
 
@@ -113,7 +111,11 @@ endif
 # Either configure $(CONFIGURE_OPTS)
 # or     configure --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
 #
-TARGETARCH    := arm-linux
+
+#TARGETARCH    := arm-elf
+#TARGETARCH    := arm-linux
+TARGETARCH    := arm-uclinuxeabi
+
 HOSTARCH      := $(shell sh $(ROOTDIR)/tools/config.guess)
 CONFIGURE_OPTS := --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
 
