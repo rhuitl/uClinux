@@ -718,8 +718,8 @@ static void process_args(int argc, char **argv)
 							(mode == MODE_LINK) ? "crtbegin.o" : "crtbeginS.o");
 				if (startfile)
 					args_add_prefix(stripped_args, startfile);
-				x_asprintf(&startfile, "%s/crti.o", libc_libdir);
-				args_add_prefix(stripped_args, startfile);
+				//x_asprintf(&startfile, "%s/crti.o", libc_libdir);//zswan add it
+				//args_add_prefix(stripped_args, startfile);
 				if (mode == MODE_LINK) {
 					x_asprintf(&startfile, "%s/crt1.o", libc_libdir);
 					args_add_prefix(stripped_args, startfile);
@@ -787,8 +787,8 @@ static void process_args(int argc, char **argv)
 						(mode == MODE_LINK) ? "crtend.o" : "crtendS.o");
 			if (startfile)
 				args_add(stripped_args, startfile);
-			x_asprintf(&startfile, "%s/crtn.o", libc_libdir);
-			args_add(stripped_args, startfile);
+			//x_asprintf(&startfile, "%s/crtn.o", libc_libdir);//ZSWAN ADD IT
+			//args_add(stripped_args, startfile);
 		}
 
 		/*sh-linux-gcc -m4 -ml crt1.o crti.o <orig>/crtbegin.o -o discard discard.o <orig>/crtend.o crtn.o*/
