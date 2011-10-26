@@ -1,14 +1,16 @@
 
 SHELL=/bin/sh
-
+UCFRONT = ../../tools/ucfront-gcc
 # To assist in cross-compiling
-CC=gcc
-AR=ar
-RANLIB=ranlib
-LDFLAGS=
+CC=$(UCFRONT) arm-elf-gcc
+AR=arm-elf-ar
+RANLIB=arm-elf-ranlib
+LDFLAGS= -Wl,-elf2flt
+LIBC =../uClibc/lib
+LIBCINC =../uClibc/include
 
 BIGFILES=-D_FILE_OFFSET_BITS=64
-CFLAGS=-Wall -Winline -O -g $(BIGFILES)
+CFLAGS=-Wall -Winline -O -g -I$(LIBCINC)  $(BIGFILES) -msoft-float -D__PIC__ -fpic -msingle-pic-base -static
 
 # Where you want it installed when you do 'make install'
 PREFIX=/usr
@@ -22,13 +24,13 @@ OBJS= blocksort.o  \
       decompress.o \
       bzlib.o
 
-all: libbz2.a bzip2 bzip2recover test
+all: libbz2.a bzip2 bzip2recover copy 
 
 bzip2: libbz2.a bzip2.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o bzip2 bzip2.o -L. -lbz2
+	$(CC) $(CFLAGS) $(LDFLAGS) -I$(LIBCINC) -o bzip2 bzip2.o -L. -L$(LIBC) -lbz2
 
 bzip2recover: bzip2recover.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o bzip2recover bzip2recover.o
+	$(CC) $(CFLAGS) $(LDFLAGS)  -I$(LIBCINC) -o bzip2recover bzip2recover.o -L$(LIBC)
 
 libbz2.a: $(OBJS)
 	rm -f libbz2.a
@@ -38,6 +40,9 @@ libbz2.a: $(OBJS)
 		echo $(RANLIB) libbz2.a ; \
 		$(RANLIB) libbz2.a ; \
 	fi
+
+copy: 	
+	#ln -s libbz2.a ../../staging/lib/libbz2.a
 
 check: test
 test: bzip2
