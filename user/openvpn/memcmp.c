@@ -26,6 +26,7 @@
 
 #include "memdbg.h"
 
+#if 0 /* already have memcmp() */
 int
 memcmp (const void *s1, const void *s2, size_t n)
 {
@@ -41,3 +42,4 @@ memcmp (const void *s1, const void *s2, size_t n)
       }
   return 0;
 }
+#endif

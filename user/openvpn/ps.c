@@ -748,7 +748,7 @@ port_share_open (const char *host, const int port)
   /*
    * Fork off background proxy process.
    */
-  pid = fork ();
+  pid = vfork ();
 
   if (pid)
     {
