@@ -16,7 +16,7 @@ Copyright (C) 1999 Lars Brinkhoff.  See COPYING for terms and conditions.
 int
 daemon (int nochdir, int noclose)
 {
-  if (fork () != 0)
+  if (vfork () != 0)
     exit (0);
 
   if (!nochdir)
