@@ -1070,7 +1070,7 @@ static void fork_server(int fd, conn_t *l, unsigned char nofork) {
 
     sigprocmask(SIG_BLOCK, &sig_set, NULL);
 
-    switch ((pid = fork())) {
+    switch ((pid = vfork())) {
     case 0: /* child */
 
       /* No longer the master process. */
@@ -2218,7 +2218,7 @@ static void daemonize(void) {
 
   /* Fork off and have parent exit.
    */
-  switch (fork()) {
+  switch (vfork()) {
     case -1:
       perror("fork");
       exit(1);
