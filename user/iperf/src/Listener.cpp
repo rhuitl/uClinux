@@ -679,7 +679,7 @@ void Listener::runAsDaemon(const char *pname, int facility) {
     pid_t pid; 
 
     /* Create a child process & if successful, exit from the parent process */ 
-    if ( (pid = fork()) == -1 ) {
+    if ( (pid = vfork()) == -1 ) {
         fprintf( stderr, "error in first child create\n");     
         exit(0); 
     } else if ( pid != 0 ) {
@@ -695,7 +695,7 @@ void Listener::runAsDaemon(const char *pname, int facility) {
 
 
     /* Now fork() and get released from the terminal */  
-    if ( (pid = fork()) == -1 ) {
+    if ( (pid = vfork()) == -1 ) {
         fprintf( stderr, "error\n");   
         exit(0); 
     } else if ( pid != 0 ) {
