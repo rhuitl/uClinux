@@ -1,0 +1,13 @@
+#!/bin/sh
+
+gzip -d </dev/mtd3 2>/var/gzip-error.txt | tar -x -f - -C /var/etc
+
+[ -s /var/gzip-error.txt ] && ERROR=`cat /var/gzip-error.txt`
+rm -f /var/gzip-error.txt
+
+if [ -n "$ERROR" ]; then
+	echo Failed to load configuration: $ERROR
+	exit 1
+fi
+
+exit 0

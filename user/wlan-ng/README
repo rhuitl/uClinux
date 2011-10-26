@@ -1,0 +1,321 @@
+* README
+*
+* Copyright (C) 2001 AbsoluteValue Systems, Inc.  All Rights Reserved.
+* --------------------------------------------------------------------
+*
+* linux-wlan
+*
+*   The contents of this file are subject to the Mozilla Public
+*   License Version 1.1 (the "License"); you may not use this file
+*   except in compliance with the License. You may obtain a copy of
+*   the License at http://www.mozilla.org/MPL/
+*
+*   Software distributed under the License is distributed on an "AS
+*   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+*   implied. See the License for the specific language governing
+*   rights and limitations under the License.
+*
+*   Alternatively, the contents of this file may be used under the
+*   terms of the GNU Public License version 2 (the "GPL"), in which
+*   case the provisions of the GPL are applicable instead of the
+*   above.  If you wish to allow the use of your version of this file
+*   only under the terms of the GPL and not to allow others to use
+*   your version of this file under the MPL, indicate your decision
+*   by deleting the provisions above and replace them with the notice
+*   and other provisions required by the GPL.  If you do not delete
+*   the provisions above, a recipient may use your version of this
+*   file under either the MPL or the GPL.
+*
+* --------------------------------------------------------------------
+*
+* Inquiries regarding the linux-wlan Open Source project can be
+* made directly to:
+*
+* AbsoluteValue Systems Inc.
+* info@linux-wlan.com
+* http://www.linux-wlan.com
+*
+* --------------------------------------------------------------------
+*
+* Portions of the development of this software were funded by 
+* Intersil Corporation as part of PRISM(R) chipset product development.
+*
+* --------------------------------------------------------------------
+
+=======================================================================
+Description:
+The linux-wlan package is a linux device driver and subsystem
+package that is intended to provide the full range of IEEE 802.11 MAC
+management capabilities for use in user-mode utilities and scripts.
+The package currently supports the Intersil 802.11b Prism2, Prism2.5, 
+and Prism3 reference designs for PCMCIA, PCI, and USB.  Additionally,
+the package includes support for PLX9052 based PCI to PCMCIA adapter
+with a few different PCMCIA cards.
+
+For a list of elements that are still undone, see the TODO file in 
+this directory
+
+=======================================================================
+License:
+See the COPYING and LICENSE files.
+
+=======================================================================
+Top level directory for linux-wlan-ng:
+./add-ons	- additional programs that are not build from the 
+                  top level make file
+./doc		- source distribution documentation
+./etc		- scripts used at run-time
+./man		- man pages
+./scripts	- contributed scripts that may do useful things
+./src		- source code for various components
+
+=======================================================================
+Build Instructions:
+
+NOTE: You may not need to build at all.  Binary packages are
+available for various distributions.  See the FAQ for where to go.
+
+NOTE: This release supports building four different drivers:
+
+   prism2_cs	Driver for Prism2.x & Prism3  PCMCIA cards.
+   prism2_pci	Driver for Prism2.5 (ISL3874) based _native_ PCI cards.
+   prism2_plx	Driver for Prism2.x PCMCIA cards when used with 
+		a PLX9052 PCI/PCMCIA adapter.
+   prism2_usb   Driver for Prism2.x USB adapters.
+
+
+Prerequisites:
+
+To build linux-wlan-ng you will need:
+   - Configured kernel source code for the kernel you are running.  
+     Ideally, this will be the resulting tree after building your own 
+     kernel.  Configured means that you have at least run 'make config',
+     'make menuconfig', or 'make xconfig'.  If you are trying to build
+     linux-wlan-ng for a previously existing kernel binary (one you did 
+     not build yourself), look for help on the mailing lists because it 
+     can be tricky.  I always run against kernels I've built myself, so I'm 
+     not much help in this area.
+   - The good David Leffler identified that if you are having difficulty
+     with *_netlink_* symbols, you may have a problem with 'make clean' in
+     the kernel tree.  Do a 'make mrproper' followed by 'make config' 
+     and the rest of the kernel build process.  'make mrproper' does
+     a more thorough cleaning of the kernel tree.  For more info, look
+     for David's comments in the linux-wlan-user mailing list.
+   - If you are building a driver for a PCMCIA card, you will also need
+     the configured PCMCIA source code for the pcmcia_cs subsystem you
+     are currently running.
+
+Building linux-wlan-ng:
+
+1)  untar the package using the command:
+
+    tar zxvf linux-wlan-ng-X.Y.Z.tar.gz
+
+2)  Make sure you have configured kernel and (optionally) pcmcia sources on 
+    your system.  Note that if you are _only_ building the prism2_pci,
+    prism2_plx, or prism2_usb drivers you don't need the pcmcia-cs 
+    source tree.
+
+3)  To configure the linux-wlan-ng package, run 'make config'.  The 
+    following set of questions will be asked. The default answer is in
+    braces (e.g. []).  Just press <Enter> to select the default answer:
+
+   - "Build Prism2.x PCMCIA Card Services (_cs) driver? (y/n) [y]: "
+        Select "y" if you want to build the Prism PCMCIA driver.
+        If you select "n", the PCMCIA related questions below
+        will not be asked.
+
+   - Build Prism2 PLX9052 based PCI (_plx) adapter driver? (y/n) [y]: 
+        Select "y" if you want to build the Prism driver for 
+        PLX PCI9052 PCI/PCMCIA adapter based solutions.
+
+   - Build Prism2.5 native PCI (_pci) driver? (y/n) [y]: 
+        Select "y" if you want to build the Prism driver for 
+        Prism2.5 ISL3874 based native PCI cards.  This includes
+        PCI add-in cards and the mini-pci modules included in some
+        notebook computers (but not all, some use internal USB modules).
+
+   - Build Prism2.5 USB (_usb) driver? (y/n) [y]: 
+        Select "y" if you want to build the Prism driver for 
+        Prism2.5 ISL3873 based USB adapters.  This includes
+        USB add-on modules and the internal modules included in some
+        notebook computers.
+
+   - Linux source directory [/usr/src/linux]: 
+        The config script will attempt to automagically find your kernel
+        source directory.  If found, the kernel source source directory
+        will be presented as the default selection.  If the default
+        selection is wrong, you may correct it here.
+
+   - pcmcia-cs source dir [/usr/src/pcmcia-cs-3.1.29]: 
+        If the "_cs" driver is selected above, the configure script will
+        attempt to present a reasonable default for the pcmcia source
+        directory.  If the presented directory is incorrect, you may
+        change it here.  If the "_cs" driver is not selected, this
+        prompt will not appear.
+
+   - PCMCIA script directory [/etc/pcmcia]: 
+        If the "_cs" driver is selected, this prompt allows you to 
+        change the location where the pcmcia scripts will be installed.
+        Only do this if you have installed the rest of the pcmcia_cs
+        scripts to a non-default location.
+
+   - Alternate target install root directory on host []:   
+        This prompt allows you to specify an alternative root directory
+        for the install process.
+
+   - Module install directory [/lib/modules/2.2.20]: 
+        Select where you want the driver modules to be installed.  The
+        script constructs a default location using the output of uname.
+        If you have not yet installed the kernel you will run linux-wlan
+        with, and the new kernel has a different version string, you will
+        need to change this value.
+
+   - Prefix for build host compiler? (rarely needed) []: 
+        When cross-compiling or using different compilers for kernel and
+        user-mode software, it is sometimes (but rarely) necessary to 
+        specify a different compiler prefix to use when compiling the 
+        _tools_ that are built to run on the build host during the 
+        linux-wlan-ng build process.
+
+   - Build for debugging (see doc/config.debug) (y/n) [y]: 
+        This option enables the inclusion of debug output generating
+        statements in the driver code.  Note that enabling those statements
+        requires the inclusion of insmod/modprobe command line arguments
+        when loading the modules.  See the document doc/config.debug
+        for more information.
+
+
+5)  To build the package, run 'make all'
+
+6)  To install the package, run 'make install' (as root).
+
+=======================================================================
+Configuring:
+
+NOTE:  linux-wlan-ng does not fully implement the wireless extensions
+       interface.  This means that you can't use iwconfig and its kin to 
+       set things up.  Instead, read on!
+
+As of linux-wlan-ng 0.1.16-pre5, the configuration and launch scripts have
+been largely re-written.  pcmcia/rc/hotplug now all use a common library 
+of routines and use the same set of configuration files.
+
+Now, everything relevant exists in /etc/wlan/*
+
+/etc/wlan/wlan.conf:
+
+	This file maps between wlan devices and network IDs, and contains
+	the names of all devices that should be initialized by the hotplug
+	and rc scripts.
+
+/etc/wlan/wlancfg-*
+
+	These files are per-network configurations.  This makes it easy to 
+	switch between different SSIDs and the various settings they may
+	require, like WEP keys and whatnot.
+
+The bare minimum you need to do to configure your system after a fresh driver
+install:
+
+0)  Nothing whatsoever.  out-of-the-box, the driver will attempt to associate
+    with any access point within range.
+
+However, we highly recommend setting up a configuration specifically for
+your network, using the following method:
+
+0)  This example assumes your network name/SSID is "MyHomeNetwork"
+1)  cp /etc/wlan/wlancfg-DEFAULT /etc/wlan/wlancfg-MyHomeNetwork
+2)  edit /etc/wlan/wlan.conf and change the SSID_wlan0 line to:
+	SSID_wlan0="MyHomeNetwork"
+3)  edit /etc/wlan/wlancfg-MyHomeNetwork, and make any necessary changes 
+    necessary to support your network, such as WEP and whatnot.
+
+------------------------------
+FOR PCMCIA USERS:
+A)  Edit /etc/pcmcia/network.opts file to set up your IP settings. 
+    Note: for a station, the SSID you're connecting to will be appended to the 
+    current pcmcia scheme name.  You can use this to have different
+    IP setups for different wireless LANs you connect to (e.g. home vs. work).
+
+    Note2:  This only applies if you are using a stock pcmcia-cs 
+    package.  Most (if not all) distros use their own mechanisms for 
+    configuring pcmcia network interfaces, and thus 
+    /etc/pcmcia/network.opts may not even be present.
+
+B)  Restart pcmcia-cs with the command:
+
+    /etc/rc.d/init.d/pcmcia restart
+
+C) Insert the card.  For most cards, a solid LED indicates that the 
+    SSID you specified was found, a bss was joined, and the firmware 
+    completed the authenticate and associate processes.
+
+D) Run ifconfig and route to determine if your IP and route settings are
+    listed as you wanted them.  It's also a good idea to look at the file
+    /etc/resolv.conf to see if your nameserver address has been set up 
+    correctly.
+
+------------------------------
+FOR PCI, PLX, OR USB USERS:
+A) You must make sure that the drivers get loaded at boot time and that the 
+   necessary initialization takes place.  The simplest way to do this is
+   to add the following commands to your rc.local file:
+
+     modprobe prism2_pci   [or prism2_usb/prism2_plx]
+     wlanctl-ng wlan0 lnxreq_ifstate ifstate=enable
+     wlanctl-ng wlan0 lnxreq_autojoin ssid=<your APs SSID> authtype=opensystem
+     ifconfig wlan0 <yourIP> netmask <yourNetmask> broadcast <yourBroadcast>
+     route add default gw <yourGateway>
+
+   Also, don't forget to set up your resolv.conf to point at your DNS server.
+
+B) Alternatively, you can use the rc.wlan script, which ties into the 
+   /etc/wlan/* configuration files mentioned above.
+
+   We currently don't create the softlink from the runlevel directories to
+   the wlan startup script due to differences in distributions, but the
+   scripts are redhat-aware, and can be extended to hook into other tools
+   easily.  (patches welcome!)  Just make sure it is brought up early in 
+   the process, namely, before the the network interfaces are brought up. 
+
+C) Add an alias for wlan0 in /etc/modules.conf.  For example, a usb 
+   interface on wlan0 would be set up as:
+
+   alias wlan0 prism2_usb
+
+   Substitute prism2_plx or prism2_pci as appropriate.
+
+------------------------------
+FOR USB USERS:
+
+A) Make sure your kernel usb support is running
+B) Plug in the Prism2.x USB device
+C) Run 'modprobe prism2_usb prism2_doreset=1' to load the driver into memory.
+D) Run 'wlanctl-ng wlan0 lnxreq_ifstate ifstate=enable' to initialize the
+   driver+MAC functions.
+E) Run 'wlanctl-ng wlan0 lnxreq_autojoin ssid=<your ssid> authtype=opensystem'
+   to enable the MAC in Infrastructure Station mode.
+F) Run 'ifconfig wlan0 <your IP address>'
+
+Or, you can use the provided hotplug scripts, if your distribution has
+hotplug support.  :) 
+
+IMPORTANT: Due to an issue with some versions of the Prism USB firmware,
+the driver usually needs to perform a port reset.  
+
+Some combinations of usb low-level drivers, kernel releases, and
+hardware don't like this, and usually end up generating a kernel OOPS.
+newer kernels are much better in this regard.  In particular, Intel usb
+controllers are the most trouble-prone.
+
+The OOPS is due to bugs in the linux USB core, and newer kernels
+(2.4.19 and later) behave much better in this regard.
+
+However, the good news is that primary firmware 1.1.2 seems to resolve
+the need for the port reset to begin with.  Contact your vendor to
+request this update.
+
+Also, using the 'Alt. UHCI' controller driver (uhci.o) is broken with 
+kernels older than 2.4.22 due to a bug in the controller driver.
+

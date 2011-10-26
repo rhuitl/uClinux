@@ -1,0 +1,146 @@
+This is a replacement for NEXTSTEP's /bin/login. It has been patched by
+Ingo Paschke <ipaschke@xlan.hil.de> to provide 8-bit clean login's with
+mgetty's sgtty NEXTSTEP port.
+
+To use, just "make install". This will install modem-login in /usr/local/bin.
+Then, in mgetty's login.config, replace `/bin/login' with
+`/usr/local/bin/modem-login' or change DEFAULT_LOGIN_PROGRAM in policy.h
+to `/usr/local/bin/modem-login'.
+
+
+For more information on NEXTSTEP and mgetty, consult the `Operating Systems'
+section on NEXTSTEP in the mgetty manual.
+
+	Gregor Hoffleit <flight@mathi.uni-heidelberg.de>
+
+
+
+
+
+This is the README of the original jsh-login as found on peanuts.leo.org
+as Patches/jsh-login.s.tar.gz:
+
+---
+This is a replacement for /bin/login in NeXT Software Release 2.0
+and 2.1 that enables job control for /bin/sh users.
+
+/bin/sh and /bin/jsh are hard links to the same file; job control
+is enabled if argv[0][0]=='j' or the -J flag is set.  Shells
+started from login have a '-' prepended to their basename to
+indicate that .profile should be sourced, so if you specify
+/bin/jsh as your login shell, its sees its name as -jsh, and
+doesn't activate job control.  This has been reported to
+BUG_NEXT.
+
+This version of login passes the "-J" flag if the login shell
+is /bin/sh.  Everything else still thinks you're running
+"regular" sh, so you don't have to muck with /etc/shells or
+anything.  Inferior shells will *not* have job control
+enabled; use jsh instead if that's what you want (most of the
+time it isn't).
+---
+
+
+
+This is Ingo's patch:
+
+---
+Sun, 14 Apr 1996 23:23:25       de.comp.sys.next            Thread   12 of   15
+Lines 92             mgetty fuer NSfIP? - Teilerfolg...     No responses
+ipaschke@xlan.hil.de                                    Ingo Paschke at private
+
+Hallo!
+
+ipaschke@xlan.hil.de (Ingo Paschke) writes:
+
+>Das Problem ist nur, dass /bin/login offenbar die Verbindung wieder auf
+>7-Bit, gerade Paritaet zuruecksetzt: Issue und login-Prompt werden von
+>mgetty korrekt in 8-Bit ausgegeben, das Passwort-Prompt ist dann nicht mehr
+>lesbar, weil es in 7-Bit ausgegeben wird.
+
+Man nehme jsh-login.s.tar.gz von peanuts (/Patches), wende folgendes diff
+an (NeXT_repair_line ist von mgetty-0.99 geklaut):
+
+-------------------------------------------------------------------
+diff -burN jsh-login.orig/Makefile jsh-login/Makefile
+--- jsh-login.orig/Makefile     Fri Apr 26 11:51:56 1991
++++ jsh-login/Makefile  Sun Apr 14 22:43:42 1996
+@@ -17,11 +17,12 @@
+ # from @(#)Makefile    5.3 (Berkeley) 5/9/89
+ #
+
+-CFLAGS=        -O -bsd
++CFLAGS=        -O -bsd -DORIGINAL -DFIX8BIT
+ LIBC=  /lib/libsys_s.a
+ SRCS=  login.c setenv.c
+ OBJS=  login.o setenv.o
+ MAN=   login.0
++DESTDIR= /usr/local
+
+ all: login
+
+@@ -40,9 +41,8 @@
+ depend: ${SRCS}
+        mkdep -p ${CFLAGS} ${SRCS}
+
+-install: ${MAN}
+-       install -s -o root -g bin -m 4755 login ${DESTDIR}/bin/login
+-       install -c -o bin -g bin -m 444 login.0 ${DESTDIR}/usr/man/cat1
++install:
++       install -s -o root -g bin -m 4755 login ${DESTDIR}/bin/modem-login
+
+ lint: ${SRCS}
+        lint ${CFLAGS} ${SRCS}
+diff -burN jsh-login.orig/login.c jsh-login/login.c
+--- jsh-login.orig/login.c      Fri Apr 26 12:00:26 1991
++++ jsh-login/login.c   Sun Apr 14 22:37:10 1996
+@@ -180,6 +180,10 @@
+        (void)ioctl(0, TIOCSETC, &tc);
+
+
+
+        (void)ioctl(0, TIOCSETP, &sgttyb);
+
++#if defined(NeXT) && defined(FIX8BIT)
++       NeXT_repair_line(0);
++#endif
++
+        for (cnt = getdtablesize(); cnt > 2; cnt--)
+                close(cnt);
+
+@@ -705,5 +709,16 @@
+                (void)write(fd, (char *)ut, sizeof(struct utmp));
+                (void)close(fd);
+        }
++}
++#endif
++
++#if defined(NeXT) && defined(FIX8BIT)
++NeXT_repair_line(int fd)
++{
++    int             bitset = LPASS8 | LPASS8OUT;
++    int             bitclr = LNOHANG;
++
++    ioctl(fd, TIOCLBIS, &bitset);
++    ioctl(fd, TIOCLBIC, &bitclr);
+ }
+ #endif
+--------------------------------------------------------------
+
+... und kann sich ganz auf das naechste Problem konzentrieren.
+
+Dummerweise funktioniert naemlich das "LNOHANG"-Bit-Loeschen nicht (d.h. ich
+denke schon, dass das Loeschen funktioniert, das scheint NEXTSTEP jedoch
+wenig zu stoeren). Legt der Anrufer also einfach auf, haengt die Kiste
+ewiglich :(.
+
+Ideen?
+
+Aaargh! Jemand erwecke mich bitte aus diesem NEXTSTEP-tty-Alptraum! ;).
+
+Ciao,
+Ingo.
+--
+Ingo Paschke
+Braunschweig, Germany
+[MIME, Nextmail welcome.]

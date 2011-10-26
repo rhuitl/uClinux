@@ -1,0 +1,192 @@
+dnl
+dnl $Id: configure.in,v 1.14 2004/04/17 11:28:07 andrew_belov Exp $
+dnl --------------------------------------------------------------------------
+dnl This file performs setup of GNU-style makefiles.
+dnl
+
+AC_INIT([arj])
+AC_PREREQ(2.53)
+AC_CONFIG_SRCDIR([../arj.c])
+
+dnl Installation script (let it be, temporarily...)
+AC_PROG_INSTALL([e:/os2apps/autoconf/install-sh])
+
+dnl Configuration parameters
+AC_CONFIG_HEADER([../c_defs.h:config.h.in])
+
+dnl Checks for the canonical system name
+AC_CANONICAL_HOST
+
+dnl Checks for programs.
+AC_PROG_CC
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS([fcntl.h limits.h malloc.h])
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_STRUCT_TM
+AC_C_BIGENDIAN
+
+dnl Checks for library functions.
+AC_PROG_GCC_TRADITIONAL
+AC_FUNC_MEMCMP
+AC_FUNC_SETVBUF_REVERSED
+AC_TYPE_SIGNAL
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS([getcwd min max mkdir mkdtemp rmdir fcloseall strcasecmp setpriority strdup strerror strstr strupr strlwr strtol strtoul])
+
+dnl Platform-specific tuning
+PROG_EXT=
+DLL_EXT=".so"
+DLL_FLAGS="-shared"
+REQUIRES_DEF=
+OS_ID="UNIX"
+OS_DEF="-D_UNIX"
+DLL_CFLAGS="-fPIC"
+
+case $host_os in
+linux*)
+	AC_DEFINE(ELF_EXECUTABLES, 1, [Define if executables use ELF format])
+        DYN_LIBS="-ldl"
+        LD_STRIP="gnu/stripgcc.lnk"
+	;;
+*bsd*)
+	AC_DEFINE(ELF_EXECUTABLES)
+        DLL_FLAGS="-shared -export-dynamic"
+        LD_STRIP="gnu/stripgcc.lnk"
+	;;
+*qnx*)
+	AC_DEFINE(ELF_EXECUTABLES)
+        DLL_FLAGS="-shared -fPIC"
+        DLL_CFLAGS="-shared -fPIC"
+        LD_STRIP="gnu/stripgcc.lnk"
+	;;
+*solaris*)
+	AC_DEFINE(ELF_EXECUTABLES)
+        CFLAGS="-DSUNOS -D_UNIX"
+        DLL_FLAGS="-shared -fPIC"
+        DLL_CFLAGS="-shared -fPIC"
+        LD_STRIP="gnu/stripgcc.lnk"
+	;;
+os2*)
+	PROG_EXT=".exe"
+	DLL_EXT=".dll"
+	LDFLAGS="-s"
+	DLL_FLAGS="-Zdll -s"
+        DLL_CFLAGS=""
+	REQUIRES_DEF=1
+	OS_ID="OS2"
+	OS_DEF="-D_OS2"
+	;;
+esac
+
+case $host_cpu in
+alpha*)
+	AC_DEFINE(ALIGN_POINTERS)
+	;;
+sparc*)
+	AC_DEFINE(ALIGN_POINTERS)
+	;;
+ia64*)
+	AC_DEFINE(ALIGN_POINTERS)
+	;;
+arm*)
+	AC_DEFINE(ALIGN_POINTERS)
+	;;
+hppa*)
+	AC_DEFINE(ALIGN_POINTERS)
+	;;
+esac
+
+dnl Registration wizard is named "arj-register" under UNIX-like platforms, to
+dnl give it a unique name
+
+case $host_os in
+os2*)
+	REGISTER=register
+	;;
+*)
+	REGISTER=arj-register
+esac
+
+dnl Initial setup
+
+test -z "$CONFIG_SHELL" && CONFIG_SHELL=/bin/sh
+AC_SUBST(CONFIG_SHELL)
+
+AC_MSG_CHECKING([if dynamic C library may be used])
+AC_ARG_ENABLE(libc,
+[  --disable-libc          Disable linking with dynamic C library],
+	[enable_libc=no],
+	[enable_libc=yes
+	 case $host_os in
+	 os2*)
+		LDFLAGS="-Zcrtdll $LDFLAGS"
+		DLL_FLAGS="-Zcrtdll $DLL_FLAGS"
+	 esac
+	])
+AC_MSG_RESULT($enable_libc)
+test "$enable_libc" != "no" && AC_DEFINE(LIBC, 1, [Define if dynamic C library may be used])
+
+AC_MSG_CHECKING([if SFX executables may be packed])
+AC_ARG_ENABLE(packsfx,
+[  --disable-packsfx       Force disable packing of SFX modules],
+	[packsfx=no],
+	[packsfx=yes])
+AC_MSG_RESULT($packsfx)
+test "$packsfx" != "yes" && AC_DEFINE(NP_SFX, 1, [Define if SFX executables may be packed])
+
+AC_MSG_CHECKING([what to use as a dedicated output directory])
+AC_ARG_ENABLE(outdir,
+[  --enable-outdir         Specify a dedicated output directory],
+	[OUT_DIR=$enableval],
+	[OUT_DIR=$host_os])
+AC_MSG_RESULT($OUT_DIR)
+AC_SUBST(OUT_DIR)
+
+AC_MSG_CHECKING([fnmatch() tolerance to incomplete patterns acting as filenames])
+AC_RUN_IFELSE([
+#include <fnmatch.h>
+int main()
+{
+ return(fnmatch("@<:@", "@<:@", 0)); /* Must return 0 for a valid match */
+}
+], [TOLERANT_FNMATCH=yes], [TOLERANT_FNMATCH=no], [TOLERANT_FNMATCH=cross])
+if test x$TOLERANT_FNMATCH = xyes ; then
+  AC_DEFINE(TOLERANT_FNMATCH, 1, [Trust fnmatch() when supplying incomplete patterns])
+fi
+AC_MSG_RESULT([$TOLERANT_FNMATCH])
+
+dnl Experimental feature(s)
+AC_MSG_CHECKING([if color output is demanded])
+AC_ARG_ENABLE(color-output,
+[  --enable-color-output   Enable JAR-style color output (EXPERIMENTAL)],
+        [color_output=yes],
+        [color_output=no])
+AC_MSG_RESULT($color_output)
+test "$color_output" = "yes" && AC_DEFINE(USE_COLORS)
+
+AC_SUBST(HAVE_MKDTEMP)
+AC_SUBST(HAVE_FCLOSEALL)
+AC_SUBST(HAVE_STRCASECMP)
+AC_SUBST(HAVE_SETPRIORITY)
+AC_SUBST(HAVE_STRUPR)
+AC_SUBST(HAVE_STRLWR)
+
+AC_SUBST(PROG_EXT)
+AC_SUBST(DLL_EXT)
+AC_SUBST(DLL_FLAGS)
+AC_SUBST(DLL_CFLAGS)
+AC_SUBST(REQUIRES_DEF)
+AC_SUBST(OS_ID)
+AC_SUBST(OS_DEF)
+AC_SUBST(LIBS)
+AC_SUBST(DYN_LIBS)
+AC_SUBST(LD_STRIP)
+AC_SUBST(REGISTER)
+AC_SUBST(TOLERANT_FNMATCH)
+
+AC_CONFIG_FILES([../Makefile.gnu:makefile.in])
+AC_OUTPUT

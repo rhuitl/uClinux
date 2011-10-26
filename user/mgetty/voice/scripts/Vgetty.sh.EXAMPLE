@@ -1,0 +1,458 @@
+From: John Wehle <john@feith.com>
+Date: Thu, 21 Oct 1999 19:56:53 -0400 (EDT)
+Message-Id: <199910212356.TAA12563@jwlab.FEITH.COM>
+To: schaefer@vulcan.alphanet.ch
+Subject: Bash version of Vgetty.pm
+Cc: kas@fi.muni.cz
+Content-Type: text
+
+I found that starting the perl interpeter from vgetty takes too long
+(at least on the tiny machine in question) so I created a bash version
+of Vgetty.pm which you may find useful.
+
+A sample script which uses it is:
+
+  . `dirname $0`/Vgetty.sh
+
+  finish () {
+          v_stop
+          v_waitfor 'READY'
+          v_shutdown
+          exit 0
+  }
+
+  v_add_handler 'BUSY_TONE' 'hangup' 'finish'
+  v_add_handler 'DIAL_TONE' 'hangup' 'finish'
+  v_add_handler 'LOOP_POLARITY_CHANGE' 'hangup' 'finish'
+
+  v_enable_events
+
+  while true
+  do
+          announcement=`v_readnum "$voicedir/messages/main_menu.rmd" 2 2` \
+                  || break
+          case "$announcement" in
+                  1) v_play_and_wait "$voicedir/messages/announcement_1.rmd"
+                     ;;
+                  2) v_play_and_wait "$voicedir/messages/announcement_2.rmd"
+                     ;;
+                  3) v_play_and_wait "$voicedir/messages/announcement_3.rmd"
+                     ;;
+                  *) ;;
+          esac
+  done
+
+  v_shutdown
+  exit 0
+
+-- John
+--------------------------<-----------------------<----------------------
+#!/bin/sh
+# This is a shell archive (produced by GNU shar 4.0).
+# To extract the files from this archive, save it to some FILE, remove
+# everything before the `!/bin/sh' line above, then type `sh FILE'.
+#
+# Made on 1999-10-21 19:52 EDT by <john@pecan.FEITH.COM>.
+# Source directory was `/home/john'.
+#
+# Existing files will *not* be overwritten unless `-c' is specified.
+#
+# This shar contains:
+# length mode       name
+# ------ ---------- ------------------------------------------
+#   6533 -rw-r--r-- Vgetty.sh
+#
+touch -am 1231235999 $$.touch >/dev/null 2>&1
+if test ! -f 1231235999 && test -f $$.touch; then
+  shar_touch=touch
+else
+  shar_touch=:
+  echo 'WARNING: not restoring timestamps'
+fi
+rm -f 1231235999 $$.touch
+#
+# ============= Vgetty.sh ==============
+if test -f 'Vgetty.sh' && test X"$1" != X"-c"; then
+  echo 'x - skipping Vgetty.sh (File already exists)'
+else
+  echo 'x - extracting Vgetty.sh (text)'
+  sed 's/^X//' << 'SHAR_EOF' > 'Vgetty.sh' &&
+# Bash version of Vgetty.pm
+#
+# Copyright (c)  1999  John Wehle <john@feith.com>.  All rights reserved.
+# This package is free software; you can redistribute it and/or modify it
+# under the same terms as Perl itself.
+#
+# Derived from:
+# 
+# $Id: Vgetty.sh.EXAMPLE,v 1.1 2000/06/11 16:01:44 marcs Exp $
+#
+# Copyright (c) 1998 Jan "Yenya" Kasprzak <kas@fi.muni.cz>. All rights
+# reserved. This package is free software; you can redistribute it and/or
+# modify it under the same terms as Perl itself.
+#
+X
+testing=0
+log_file='/var/log/voicelog'
+X
+event_names="BONG_TONE|BUSY_TONE|CALL_WAITING|DIAL_TONE|\
+X	DATA_CALLING_TONE|DATA_OR_FAX_DETECTED|FAX_CALLING_TONE|\
+X	HANDSET_ON_HOOK|LOOP_BREAK|LOOP_POLARITY_CHANGE|NO_ANSWER|\
+X	NO_DIAL_TONE|NO_VOICE_ENERGY|RING_DETECTED|RINGBACK_DETECTED|\
+X	RECEIVED_DTMF|SILENCE_DETECTED|SIT_TONE|TDD_DETECTED|\
+X	VOICE_DETECTED|UNKNOWN_EVENT"
+X
+v_log () {
+X	case "$testing" in
+X		0|'') ;;
+X		*) echo "$*" >>"$log_file"
+X		   ;;
+X	esac
+}
+X
+_received_input=""
+X
+# The basic two functions (a low-level interface);
+v_receive () {
+X	local dtmf
+X	local input
+X	local var
+X
+X	while true
+X	do
+X		read input <&$VOICE_INPUT
+X		v_log "received: $input"
+X		eval "case '$input' in		\
+X			$event_names) ;;	\
+X			*) break		\
+X			   ;;			\
+X		esac"
+X		# Handle the event:
+X		dtmf=''
+X		case "$input" in
+X			RECEIVED_DTMF) read dtmf <&"$VOICE_INPUT"
+X				       v_log "DTMF $dtmf"
+X				       ;;
+X		esac
+X		for var in `set`
+X		do
+X			var="${var%%=*}"
+X			case "$var" in
+X				EVENT_${input}_*) v_log "Running handler ${var##EVENT_${input}_} for event $input"
+X						  eval \$$var '"$input"' '"$dtmf"'
+X						  v_log "Handler ${var##EVENT_${input}_} for event $input finished."
+X						  ;;
+X			esac
+X		done
+X	done
+X	_received_input=$input
+X	return 0
+}
+X
+v_send () {
+X	local output
+X
+X	output="$1"
+X	echo "$output" >&$VOICE_OUTPUT
+X	kill -PIPE "$VOICE_PID"
+X	v_log "v_send: $output"
+}
+X
+v_expect () {
+X	local expected
+X	local received
+X
+X	v_log "expecting: $*"
+X	v_receive || return 1
+X	for expected in "$@"
+X	do
+X		if [ "$_received_input" = "$expected" ]
+X		then
+X			echo "$_received_input"
+X			return 0
+X		fi
+X	done
+X	return 1
+}
+X
+v_waitfor () {
+X	local string
+X
+X	string="$1"
+X	while true
+X	do
+X		if v_expect "$string" > /dev/null
+X		then
+X			break
+X		fi
+X	done
+}
+X
+v_chat () {
+X	local cmd
+X	local receive
+X
+X	receive=0
+X	for cmd in "$@"
+X	do
+X		receive=$(($receive ^ 1))
+X		case "$cmd" in
+X			'') continue
+X			    ;;
+X		esac
+X		case "$receive" in
+X			1) v_expect "$cmd" > /dev/null || return 1
+X			   ;;
+X			*) v_send "$cmd"
+X			   ;;
+X		esac
+X	done
+X	return 0
+}
+X
+# Initial chat
+v_init () {
+X	v_chat 'HELLO SHELL' 'HELLO VOICE PROGRAM' 'READY'
+}
+X
+# Setting the voice device
+v_device () {
+X	local dev
+X
+X	dev="$1"
+X	v_log "attempting to set device $dev"
+X	v_chat '' "DEVICE $dev" 'READY' || return
+X	DEVICE="$dev"
+X        v_log "sucessfully set device $dev"
+}
+X
+v_shutdown () {
+X	v_chat '' 'GOODBYE' 'GOODBYE SHELL'
+}
+X
+v_enable_events () {
+X	v_chat '' 'ENABLE EVENTS' 'READY'
+}
+X
+v_disable_events () {
+X	v_chat '' 'DISABLE EVENTS' 'READY'
+}
+X
+v_beep () {
+X	local freq
+X	local len
+X
+X	freq="$1"
+X	len="$2"
+X	v_chat '' "BEEP $freq $len" 'BEEPING'
+}
+X
+v_dial () {
+X	local num
+X
+X	num="$1"
+X	v_chat '' "DIAL $num" 'DIALING'
+}
+X
+v_getty () {
+X	local id
+X
+X	v_chat '' 'GET TTY' || return 1
+X	v_receive || return 1
+X	id="$_received_input"
+X	v_expect 'READY' > /dev/null || return 1
+X	echo "$id"
+X	return 0
+}
+X
+v_modem_type () {
+#	To be implemented in vgetty first.
+X	return 1
+}
+X
+v_autostop () {
+X	local arg
+X
+X	arg="$1"
+X	v_chat '' "AUTOSTOP $arg" 'READY'
+}
+X
+v_play () {
+X	local file
+X
+X	file="$1"
+X	v_chat '' "PLAY $file" 'PLAYING'
+}
+X
+v_record () {
+X	local file
+X
+X	file="$1"
+X	v_chat '' "RECORD $file" 'RECORDING'
+}
+X
+v_wait () {
+X	local sec
+X
+X	sec="$1"
+X	v_chat '' "WAIT $sec" 'WAITING'
+}
+X
+v_stop () {
+X	v_send 'STOP' # Nechceme READY.
+}
+X
+v_add_handler () {
+X	local event
+X	local func
+X	local name
+X
+X	event="$1"
+X	name="$2"
+X	func="$3"
+X	eval "case '$event' in					\
+X		$event_names) ;;				\
+X		*) v_log 'v_add_handler: unknown event $event';	\
+X		   return 1					\
+X		   ;;						\
+X	esac"
+X	eval "EVENT_${event}_${name}"="$func"
+X	return 0
+}
+X
+v_del_handler () {
+X	local event
+X	local name
+X
+X	event="$1"
+X	name="$2"
+X	eval "case '$event' in					\
+X		$event_names) ;;				\
+X		*) v_log 'v_del_handler: unknown event $event';	\
+X		   return 1					\
+X		   ;;						\
+X	esac"
+X	eval "case \"\${EVENT_${event}_${name}}\" in	\
+X		'') v_log 'v_del_handler: trying to delete nonexistent handler $name' \
+X		    ;;					\
+X		*) unset 'EVENT_${event}_${name}'	\
+X		   ;;					\
+X	esac"
+X	return 0
+}
+X
+v_play_and_wait () {
+X	local file
+X
+X	file="$1"
+X	v_play "$file"
+X	v_waitfor 'READY'
+}
+X
+#####################################################################
+# The readnum routine, its private variables and the event handler. #
+#####################################################################
+X
+_readnum_number=""    # The number itself. Filled in by the event handler.
+_readnum_pound=0      # Was the '#' key pressed?
+_readnum_recursion=0  # Is the event handler already executing?
+_readnum_timeout=10   # The value of the timeout. Filled in by v_readnum.
+X
+# Event handler. Just adds key to the $_readnum_number.
+_readnum_event () {
+X	local dtmf
+X	local input
+X
+X	input="$1" # Unused. Should be 'RECEIVED_DTMF'.
+X	dtmf="$2"
+X
+X	case "$_readnum_pound" in
+X		1) return
+X		   ;;
+X	esac
+X	case "$dtmf" in
+X		'#') _readnum_pound=1
+X		     ;;
+X		*)   _readnum_number="$_readnum_number$dtmf"
+X		     ;;
+X	esac
+X	case "$_readnum_recursion" in
+X		0) _readnum_recursion=1
+X		   v_stop
+X		   v_waitfor 'READY'
+X		   case "$_readnum_pound" in
+X			1) v_log "_readnum_event(): Got #; stopping"
+X			   v_send "WAIT 0"
+X			   v_waitfor WAITING
+X			   return
+X			   ;;
+X		   esac
+X		   v_send "WAIT $_readnum_timeout"
+X		   v_waitfor WAITING
+X		   _readnum_recursion=0
+X		   ;;
+X	esac
+}
+X
+v_readnum () {
+X	local message
+X	local timeout
+X	local times
+X
+X        message="$1"
+X	timeout="$2"
+X	times="$3"
+X
+X	case "$timeout" in
+X		0|'') timeout=10
+X		      ;;
+X	esac
+X	case "$times" in
+X		0|'') times=3
+X		      ;;
+X	esac
+X
+X	_readnum_number=""
+X	_readnum_pound=0
+X	_readnum_recursion=0
+X	_readnum_timeout="$timeout"
+X
+X	# Install the handler.
+X	v_add_handler 'RECEIVED_DTMF' 'readnum' _readnum_event
+X	while [ -z "$_readnum_number" -a "$_readnum_pound" -eq 0 ]
+X	do
+X		times=$(($times - 1))
+X		if [ "$times" -eq "-1" ]
+X		then
+X			break;
+X		fi
+X		v_play_and_wait "$message"
+X		if [ -n "$_readnum_number" -o "$_readnum_pound" -ne 0 ]
+X		then
+X			break
+X		fi
+X		v_wait "$_readnum_timeout"
+X		v_waitfor 'READY'
+X	done
+X	v_del_handler 'RECEIVED_DTMF' 'readnum'
+X	case "$times" in
+X		-1) return 1
+X		    ;;
+X	esac
+X	echo "$_readnum_number"
+X	return 0
+}
+X
+v_log "-----------"
+v_log "### Pid $$ opening log"
+v_log "----------"
+v_init
+SHAR_EOF
+  $shar_touch -am 1021195299 'Vgetty.sh' &&
+  chmod 0644 'Vgetty.sh' ||
+  echo 'restore of Vgetty.sh failed'
+  shar_count="`wc -c < 'Vgetty.sh'`"
+  test 6533 -eq "$shar_count" ||
+    echo "Vgetty.sh: original size 6533, current size $shar_count"
+fi
+exit 0

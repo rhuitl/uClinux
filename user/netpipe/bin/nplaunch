@@ -1,0 +1,39 @@
+#! /bin/csh -f
+# Example:  nplauch NPtcp -h remote_host [options]
+# Works with NPtcp, NPgm, NPib, NPpvm
+
+set NEXT_ARG="no"
+set REMOTE_HOST=""
+set REMOTE_COMMAND=""
+set LOCAL_COMMAND="$*"
+
+echo "$LOCAL_COMMAND"
+echo "$REMOTE_COMMAND"
+
+foreach ARG ( $* )
+#   echo $ARG
+   if( $NEXT_ARG == "yes" ) then
+      set REMOTE_HOST="$ARG"
+      set NEXT_ARG="no"
+   else
+      if( "$ARG" == "-h" ) then
+         set NEXT_ARG="yes"
+      else
+         if( "$REMOTE_COMMAND" == "" ) then
+            set REMOTE_COMMAND="$cwd/$ARG"
+         else
+            set REMOTE_COMMAND="$REMOTE_COMMAND $ARG"
+         endif
+      endif
+   endif
+end
+
+#echo $LOCAL_COMMAND
+#echo $REMOTE_COMMAND
+#exit
+
+# Now launch the remote executible using ssh
+
+ssh -x -a $REMOTE_HOST "$REMOTE_COMMAND" &
+sleep 5
+$LOCAL_COMMAND

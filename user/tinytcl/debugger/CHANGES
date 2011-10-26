@@ -1,0 +1,45 @@
+This file describes things in the current release that are not in the
+paper presented at the Tcl/Tk Conference (see README).
+
+User Interface Changes ---------------------------------------------------
+
+-- Added p command which prints either scalar or array.  Note that this
+is a user-level procedure so it requires the default handling of unknown.
+
+-- The N command is useful for stepping over Tcl_Eval calls that are not
+inside a procedure or command.  For instance, if you are about to
+executed a "source" command, n will stop at the first command inside
+the sourced file while N will stop after the source is complete.
+
+-- Pressing return without entering an explicit command will cause the
+last previous action command to be executed.  For example, if you have
+just executed a step command, pressing return will execute another
+step command.  Actions commands are s, n, N, r, and c.  If you have
+not entered an action command, it defaults to n.
+
+Tcl-Application Interface Changes ----------------------------------------
+
+-- The function Dbg_Init makes the debugger trivial to drop into
+applications.  It works like other App_Init functions, taking an
+interp argument and returning TCL_OK.  Dbg_Init creates a command
+called "debug" in the current interpreter.
+
+This will add a "debug" command to your interpreter.  (Inside your
+application, "debug 1" will start the interpreter.  "debug 0" will
+stop it.
+
+You can also use give the command a different name (see the INSTALL
+file for more info).
+
+-- The function Dbg_Interactor was modified to take an extra argument
+of ClientData.  This argument is passed back to the interactor when it
+is called.  The return value of Dbg_Interactor is a structure
+containing the original arguments.
+
+-- The function Dbg_Output was created to send all debugger output
+somewhere other than the standard output.  For example, if you want to
+run it inside of Tk and send it to a window, you can do this.
+Dbg_Output takes an interp, a Dbg_OutputProc, and a ClientData as
+arguments.  Dbg_OutputProc takes an interp, the string to be output as
+arguments, and ClientData.  The return value of Dbg_Output is a
+structure containing the original arguments.

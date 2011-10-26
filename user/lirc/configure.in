@@ -1,0 +1,561 @@
+dnl $Id: configure.in,v 5.57 2001/02/18 16:44:54 columbus Exp $
+
+dnl Process this file with autoconf to produce a configure script.
+dnl configure.in, (c)1999 Tom Wheeley <tw104@york.ac.uk>
+
+AC_INIT(daemons/lircd.c)
+
+if test "$#" = "0"; then
+  if ! ./setup.sh; then
+    echo "Please read the documentation!!!"
+    exit 1
+  fi
+  exit 0
+fi
+
+
+AM_INIT_AUTOMAKE(lirc, 0.6.3)
+AM_CONFIG_HEADER(config.h)
+AM_PROG_LIBTOOL
+
+CFLAGS="-O2 -g -Wall"
+
+dnl Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+AC_PATH_PROG(mknod, mknod, /bin/mknod)
+AC_PATH_PROG(depmod, depmod, /sbin/depmod, $PATH:/sbin)
+AC_PROG_LN_S
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_HEADER_TIME
+AC_CHECK_HEADERS(fcntl.h limits.h sys/ioctl.h sys/time.h syslog.h unistd.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_C_INLINE
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+
+dnl Checks for library functions.
+AC_TYPE_SIGNAL
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS(gethostname gettimeofday mkfifo select socket strdup \
+	strerror strtoul snprintf strsep vsyslog)
+
+daemon=""
+AC_CHECK_FUNCS(daemon)
+if test "$ac_cv_func_daemon" != yes; then
+  AC_CHECK_LIB(bsd,daemon,daemon="-lbsd")
+  if test "$daemon" = ""; then
+    AC_MSG_ERROR([*** daemon() function not available on this system])
+  fi
+fi
+
+vga_progs=
+AC_CHECK_LIB(vga, vga_init,
+  AC_CHECK_LIB(vgagl, gl_setcontextvga,
+    AC_DEFINE(HAVE_LIBVGA)
+    vga_progs=smode2
+  )
+)
+
+x_progs="irxevent xmode2"
+AC_PATH_XTRA
+if test "$no_x" = "yes"; then
+  x_progs=
+fi
+
+
+dnl look for Linux kernel source
+
+AC_PATH_KERNEL_SOURCE
+
+dnl here we see what drivers we could possibly even hope to run.
+dnl this could be _much_ more sophisticated!  especially the lirc ones.
+
+AC_MSG_CHECKING([for which drivers can be installed on this system])
+AC_MSG_RESULT()
+
+possible_drivers="(none) (remotemaster) (pctv) (logitech) (slinke) \
+	(silitek) (mediafocusI) (irreal)"
+
+if test x${no_kernel} != xyes; then
+  possible_drivers="${possible_drivers} (lirc_serial) (lirc_sir) \
+	(lirc_parallel) (lirc_aver) (lirc_dev lirc_i2c) \
+        (lirc_fly98) (lirc_dev lirc_gpio)"
+fi
+
+AC_CHECK_LIB(caraca_client, caraca_init,
+  AC_DEFINE(HAVE_LIBCARACA)
+  possible_drivers="${possible_drivers} (caraca)"
+)
+AC_CHECK_LIB(irman, ir_strerror,
+  AC_DEFINE(HAVE_LIBIRMAN)
+  possible_drivers="${possible_drivers} (irman)"
+)
+AC_CHECK_LIB(irman_sw, ir_strerror,
+  AC_DEFINE(HAVE_LIBIRMAN_SW)
+  possible_drivers="${possible_drivers} (irman_sw)"
+)
+
+dnl here we see what driver the user wants.
+
+AC_ARG_WITH(driver,
+[  --with-driver=X         specify the driver to use, where X is one of:
+                          none, serial, sir, animax, packard_bell, parallel,
+                          irman, remotemaster, pctv, comX, lptX, avermedia,
+			  avermedia98, hauppauge, fly98, pixelview_pro,
+			  cph03x, cph06x, logitech, caraca, slinke, silitek,
+                          irdeo, irreal, chronos, pixelview_pak, pixelview_bt878,
+			  realmagic, mediafocusI, tekram, creative, provideo,
+			  bestbuy],
+
+driver=${withval},
+driver="unset"
+)
+
+lirc_driver="$driver"
+lircd_conf=""
+lircmd_conf=""
+irman_lib=""
+caraca_lib=""
+hw_module="hw_default.o receive.o transmit.o"
+kernel_module=""
+
+if test "$driver" = "none"; then
+  lirc_driver=none
+  hw_module=""
+  AC_DEFINE(LIRC_NETWORK_ONLY)
+fi
+
+if test "$driver" = "irman"; then
+  lirc_driver="irman"
+  hw_module="hw_irman.o serial.o"
+  irman_lib=-lirman
+fi
+if test "$driver" = "irman_sw"; then
+  lirc_driver="irman_sw"
+  hw_module="hw_irman.o serial.o"
+  irman_lib=-lirman_sw
+fi
+
+if test "$driver" = "serial"; then
+  lirc_driver=lirc_serial
+fi
+if test "$driver" = "sir"; then
+  lirc_driver=lirc_sir
+fi
+if test "$driver" = "tekram"; then
+  lirc_driver=lirc_sir
+  AC_DEFINE(LIRC_SIR_TEKRAM)
+fi
+if test "$driver" = "animax"; then
+  lirc_driver=lirc_serial
+  lircd_conf="animax/lircd.conf.animax"
+  lircmd_conf="animax/lircmd.conf.animax"
+  AC_DEFINE(LIRC_SERIAL_ANIMAX)
+fi
+if test "$driver" = "packard_bell"; then
+  lirc_driver=lirc_serial
+  lircd_conf="packard_bell/lircd.conf.packard_bell"
+fi
+if test "$driver" = "com1"; then
+  lirc_driver=lirc_serial
+  port=0x3f8
+  irq=4
+fi
+if test "$driver" = "com2"; then
+  lirc_driver=lirc_serial
+  port=0x2f8
+  irq=3
+fi
+if test "$driver" = "com3"; then
+  lirc_driver=lirc_serial
+  port=0x3e8
+  irq=4
+fi
+if test "$driver" = "sir_com3"; then
+  lirc_driver=lirc_sir
+  port=0x3e8
+  irq=4
+fi
+if test "$driver" = "com4"; then
+  lirc_driver=lirc_serial
+  port=0x2e8
+  irq=3
+fi
+
+if test "$driver" = "parallel"; then
+  lirc_driver=lirc_parallel
+fi
+if test "$driver" = "avermedia"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="avermedia/lircd.conf.avermedia"
+  lircmd_conf="avermedia/lircmd.conf.avermedia"
+fi
+if test "$driver" = "avermedia98"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="avermedia/lircd.conf.avermedia98"
+  lircmd_conf="avermedia/lircmd.conf.avermedia98"
+fi
+if test "$driver" = "hauppauge"; then
+  lirc_driver="lirc_dev lirc_i2c"
+  lircd_conf="hauppauge/lircd.conf.hauppauge"
+  lircmd_conf="hauppauge/lircmd.conf.hauppauge"
+fi
+if test "$driver" = "pixelview_bt878"; then
+  lirc_driver="lirc_dev lirc_i2c"
+  lircd_conf="pixelview/lircd.conf.pixelview_bt878"
+#  lircmd_conf="pixelview/lircmd.conf.pixelview_bt878"
+fi
+if test "$driver" = "fly98"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="life-view/lircd.conf.fly98"
+  lircmd_conf="life-view/lircmd.conf.fly98"
+fi
+if test "$driver" = "cph03x"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="cph03x/lircd.conf.cph03x"
+#  lircmd_conf="cph03x/lircmd.conf.cph03x"
+fi
+if test "$driver" = "cph06x"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="cph03x/lircd.conf.cph03x"
+#  lircmd_conf="cph03x/lircmd.conf.cph03x"
+fi
+if test "$driver" = "pixelview_pro"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="pixelview/lircd.conf.playtv_pro"
+  lircmd_conf="pixelview/lircmd.conf.playtv_pro"
+fi
+if test "$driver" = "provideo"; then
+  lirc_driver="lirc_dev lirc_i2c"
+  lircd_conf="provideo/lircd.conf.pv951"
+#  lircmd_conf="provideo/lircmd.conf.pv951"
+fi
+if test "$driver" = "chronos"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="chronos/lircd.conf.chronos"
+#  lircmd_conf="chronos/lircmd.conf.chronos"
+fi
+if test "$driver" = "pixelview_pak"; then
+  lirc_driver="lirc_dev lirc_gpio"
+# the config files are the same as for the PlayTV pro
+  lircd_conf="pixelview/lircd.conf.playtv_pro"
+  lircmd_conf="pixelview/lircmd.conf.playtv_pro"
+fi
+if test "$driver" = "bestbuy"; then
+  lirc_driver="lirc_dev lirc_gpio"
+  lircd_conf="bestbuy/lircd.conf.bestbuy"
+  lircmd_conf="bestbuy/lircmd.conf.bestbuy"
+fi
+if test "$driver" = "lpt1"; then
+  lirc_driver=lirc_parallel
+  port=0x378
+  irq=7
+fi
+if test "$driver" = "lpt2"; then
+  lirc_driver=lirc_parallel
+  port=0x278
+  irq=5
+fi
+if test "$driver" = "remotemaster"; then
+  lirc_driver="none"
+  hw_module="hw_pixelview.o serial.o"
+  lircd_conf="pixelview/lircd.conf.remotemaster"
+  lircmd_conf="pixelview/lircmd.conf.remotemaster"
+fi
+if test "$driver" = "realmagic"; then
+  lirc_driver="none"
+  hw_module="hw_pixelview.o serial.o"
+  lircd_conf="sigma_designs/lircd.conf.realmagic"
+#  lircmd_conf="sigma_designs/lircmd.conf.realmagic"
+fi
+if test "$driver" = "pctv"; then
+  lirc_driver="none"
+  hw_module="hw_pinsys.o serial.o"
+  lircd_conf="pinnacle_systems/lircd.conf.pctv"
+#  lircmd_conf="pinnacle_systems/lircmd.conf.pctv"
+fi
+if test "$driver" = "logitech"; then
+  lirc_driver="none"
+  hw_module="hw_logitech.o serial.o"
+  lircd_conf="logitech/lircd.conf.logitech"
+  lircmd_conf="logitech/lircmd.conf.logitech"
+fi
+if test "$driver" = "caraca"; then
+  lirc_driver="caraca"
+  hw_module="hw_caraca.o"
+  caraca_lib=-lcaraca_client
+  lircd_conf= "caraca/lircd.conf.caraca"
+#  lircmd_conf="caraca/lircmd.conf.caraca"
+fi
+if test "$driver" = "slinke"; then
+  lirc_driver="none"
+  hw_module="hw_slinke.o serial.o receive.o"
+fi
+if test "$driver" = "silitek"; then
+  lirc_driver="none"
+  hw_module="hw_silitek.o serial.o"
+  lircd_conf="silitek/lircd.conf.silitek"
+  lircmd_conf="silitek/lircmd.conf.silitek"
+fi
+if test "$driver" = "irreal"; then
+  lirc_driver="none"
+  hw_module="hw_irreal.o serial.o receive.o transmit.o"
+fi
+if test "$driver" = "irdeo"; then
+  lirc_driver=lirc_serial
+  AC_DEFINE(LIRC_SERIAL_IRDEO)
+fi
+if test "$driver" = "mediafocusI"; then
+  lirc_driver="none"
+  lircd_conf="technisat/lircd.conf.mediafocusI"
+#  lircmd_conf="technisat/lircmd.conf.mediafocusI"
+fi
+if test "$driver" = "creative"; then
+  lirc_driver="none"
+  hw_module="hw_creative.o serial.o"
+  lircd_conf="creative/lircd.conf.creative"
+#  lircmd_conf="creative/lircmd.conf.creative"
+fi
+
+dnl now check to see if the user is behaving himself
+
+if test "$lirc_driver" = "unset"; then
+  AC_MSG_ERROR([no driver specified, try ./configure --help])
+fi
+
+if echo ${possible_drivers} | grep "($lirc_driver)" >/dev/null 2>&1; then
+  dummy=
+else
+  case $lirc_driver in
+  irman*)
+    AC_MSG_ERROR([*** you need to first install the libirman package
+	(libirman-0.4.2 or better) before you can use this driver])
+    ;;
+  caraca*)
+    AC_MSG_ERROR([*** you need to first install the caraca package
+	before you can use this driver])
+    ;;
+  lirc_*)
+    AC_MSG_ERROR([*** you need to have the Linux kernel source installed
+	for this driver])
+    ;;
+  *)
+    AC_MSG_ERROR([*** it is not possible to install the specified driver
+	on this system])
+    ;;
+  esac
+fi
+
+dnl now we've checked, we can rename things for the drivers/Makefile
+
+if test "$lirc_driver" = "none" || test "$lirc_driver" = "irman" || test "$lirc_driver" = "irman_sw" || test "$lirc_driver" = "caraca"; then
+  lirc_driver=
+fi
+
+if test "$lirc_driver" = "lirc_dev lirc_gpio"; then
+  kernel_module="lirc_gpio"
+elif test "$lirc_driver" = "lirc_dev lirc_i2c"; then
+  kernel_module="lirc_i2c"
+elif test "$lirc_driver" != ""; then
+  kernel_module=$lirc_driver
+fi
+
+dnl slightly more advanced options
+
+dnl maintainer mode options
+
+maintmode_daemons_extra=
+AC_ARG_ENABLE(maintainer-mode,
+[  --enable-maintainer-mode    enable maintainer specific things],
+[
+AC_DEFINE(MAINTAINER_MODE)
+maintmode_daemons_extra="lircd.simrec lircd.simsend slinke"
+])
+
+AC_ARG_WITH(devdir,
+[  --with-devdir=DIR       Install device files in DIR (/dev)],
+devdir=${withval},
+devdir=/dev)
+
+default_moduledir=/lib/modules/`uname -r`/misc
+AC_ARG_WITH(moduledir,
+[  --with-moduledir=DIR    kernel modules in DIR (/lib/modules/`uname -r`/misc)], 
+moduledir=${withval},
+moduledir=${default_moduledir})
+
+AC_ARG_ENABLE(long-codes,
+[  --disable-long-codes    use this if your compiler won't do long long],
+test x${enableval} = xyes && AC_DEFINE(LONG_IR_CODE),
+AC_DEFINE(LONG_IR_CODE))
+
+AC_ARG_WITH(major,
+[  --with-major=value      specify the device major for the driver (61)],
+lirc_major=${withval},
+lirc_major=61)
+
+AC_ARG_WITH(port,
+[  --with-port=port        specify the port number for the lirc device.],
+port=${withval},
+[case $lirc_driver in
+lirc_serial)   port=${port:-0x3f8} ;;
+lirc_sir)   port=${port:-0x3f8} ;;
+lirc_parallel) port=${port:-0x378} ;;
+esac]
+)
+
+AC_ARG_WITH(irq,
+[  --with-irq=irq          specify the irq line for the lirc device.],
+irq=${withval},
+[case $lirc_driver in
+lirc_serial)   irq=${irq:-4} ;;
+lirc_sir)   irq=${irq:-4} ;;
+lirc_parallel) irq=${irq:-7} ;;
+esac]
+)
+
+AC_ARG_WITH(timer,
+[  --with-timer=value      specify the timer value for the parallel driver],
+timer=${withval},
+timer=65536)
+
+dnl I dont think libirman  will accept this at the moment
+AC_ARG_WITH(tty,
+[  --with-tty=file         specify the tty to use (Irman, RemoteMaster, etc.)],
+irtty=${withval})
+
+AC_ARG_WITH(soft-carrier,
+[  --without-soft-carrier  use this if your serial hw generates carrier],
+test x${withval} = xyes && AC_DEFINE(LIRC_SERIAL_SOFTCARRIER),
+AC_DEFINE(LIRC_SERIAL_SOFTCARRIER))
+
+AC_ARG_WITH(transmitter,
+[  --with-transmitter      use this if you use a transmitter diode],
+test x${withval} = xyes && AC_DEFINE(LIRC_SERIAL_TRANSMITTER))
+
+AC_ARG_ENABLE(debug,
+[  --enable-debug          enable debugging features],
+test x${enableval} = xyes && AC_DEFINE(DEBUG)
+)
+
+AC_ARG_ENABLE(daemonize,
+[  --disable-daemonize     disable daemons from daemonizing],
+test x${enableval} = xyes && AC_DEFINE(DAEMONIZE),
+AC_DEFINE(DAEMONIZE))
+
+AC_ARG_WITH(syslog,
+[  --with-syslog=facility  use syslog instead of logfile],
+if test -n "${withval}"; then
+  facility="${withval}"
+  if test "${withval}" = yes; then
+    facility=LOG_DAEMON;
+  elif test "${withval}" = LOG_AUTH; then
+    true;
+  elif test "${withval}" = LOG_AUTH; then
+    true;
+  elif test "${withval}" = LOG_AUTHPRIV; then
+    true;
+  elif test "${withval}" = LOG_DAEMON; then
+    true;
+  elif test "${withval}" = LOG_LOCAL0; then
+    true;
+  elif test "${withval}" = LOG_LOCAL1; then
+    true;
+  elif test "${withval}" = LOG_LOCAL2; then
+    true;
+  elif test "${withval}" = LOG_LOCAL3; then
+    true;
+  elif test "${withval}" = LOG_LOCAL4; then
+    true;
+  elif test "${withval}" = LOG_LOCAL5; then
+    true;
+  elif test "${withval}" = LOG_LOCAL6; then
+    true;
+  elif test "${withval}" = LOG_LOCAL7; then
+    true;
+  elif test "${withval}" = LOG_USER; then
+    true;
+  else
+    AC_MSG_ERROR([*** invalid facility (see syslog(3) for possible facilities) ])
+  fi
+  AC_DEFINE(USE_SYSLOG)
+fi
+)
+
+dnl if --prefix is not specified, then $prefix is still set to NONE by
+dnl configure.  That's bad here where we want to expand it!
+cur_prefix=$prefix
+test "x${prefix}" = "xNONE" && prefix=$ac_default_prefix 
+sysconfdir_exp=`eval "echo ${sysconfdir}"`
+prefix=$cur_prefix
+
+dnl tell the Makefiles what we decided
+AC_SUBST(daemon)
+AC_SUBST(devdir)
+AC_SUBST(sysconfdir)
+AC_SUBST(moduledir)
+AC_SUBST(lirc_major)
+AC_SUBST(driver)
+AC_SUBST(lirc_driver)
+AC_SUBST(irman_lib)
+AC_SUBST(caraca_lib)
+AC_SUBST(vga_progs) 
+AC_SUBST(x_progs)
+AC_SUBST(hw_module)
+AC_SUBST(irtty)
+AC_SUBST(lircd_conf)
+AC_SUBST(lircmd_conf)
+
+AC_SUBST(maintmode_daemons_extra)
+
+dnl tell the C code what we decided
+AC_DEFINE_UNQUOTED(DEVDIR, "$devdir")
+AC_DEFINE_UNQUOTED(SYSCONFDIR, "$sysconfdir_exp")
+AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE")
+AC_DEFINE_UNQUOTED(VERSION, "$VERSION")
+
+AC_DEFINE_UNQUOTED(LIRC_DRIVER, "$driver")
+AC_DEFINE_UNQUOTED(LIRC_MAJOR, $lirc_major)
+AC_DEFINE_UNQUOTED(LIRC_PORT, $port)
+AC_DEFINE_UNQUOTED(LIRC_IRQ, $irq)
+AC_DEFINE_UNQUOTED(LIRC_TIMER, $timer)
+AC_DEFINE_UNQUOTED(LIRC_IRTTY, "$irtty")
+AC_DEFINE_UNQUOTED(LIRC_SYSLOG, $facility)
+
+dnl bug in automake/autoconf?
+dnl SHELL=/bin/sh AC_SUBST(SHELL)
+
+dnl write these decisions out to the Makefiles
+AC_OUTPUT([
+  Makefile
+  drivers/Makefile
+  drivers/lirc_serial/Makefile
+  drivers/lirc_sir/Makefile
+  drivers/lirc_parallel/Makefile
+  drivers/lirc_i2c/Makefile
+  drivers/lirc_gpio/Makefile
+  drivers/lirc_dev/Makefile
+  daemons/Makefile
+  tools/Makefile
+  doc/Makefile
+])
+
+echo
+if test "$driver" = "mediafocusI"; then
+  echo "You will have to use the MediaFocus driver from:"
+  echo "http://www.uni-giessen.de/~gej2/"
+elif test "$kernel_module" = ""; then
+  echo "Your hardware does not require a kernel module."
+else
+  echo "You will have to use the $kernel_module kernel module."
+fi
+echo
+echo "Now enter 'make' and 'make install' to compile and install the package."
+echo

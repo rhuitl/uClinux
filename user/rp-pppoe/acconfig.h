@@ -1,0 +1,2 @@
+#undef HAVE_STRUCT_SOCKADDR_LL
+

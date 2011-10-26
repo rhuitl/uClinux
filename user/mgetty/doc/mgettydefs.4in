@@ -1,0 +1,368 @@
+.TH mgettydefs 4 "4 Dec 93" "greenie" "mgetty_sendfax manual"
+.IX mgettydefs
+.SH NAME
+mgettydefs \- speed and terminal settings used by mgetty
+.SH DESCRIPTION
+The
+.B /etc/gettydefs
+file contains information used by
+.IR mgetty (1)
+to set up the speed and terminal settings for a line.
+It also supplies information on what the
+.I login
+prompt should look like.
+.PP
+Many versions of UNIX have a version
+of
+.IR getty (1)
+that also reads 
+.BR /etc/gettydefs .
+Both
+.I mgetty
+and
+.I getty
+expect similar formats in
+.B /etc/gettydefs
+except that, when used by
+.IR mgetty ,
+extended functionality is available.
+Even so, the additional functions are simply ignored by
+standard
+.IR getty ,
+so they can co-exist using the same file.
+Note, however, that
+.I mgetty
+can be compiled to use a file different from
+.B /etc/gettydefs 
+if your
+.I getty
+gets upset about the extensions.
+This manual page documents
+.B /etc/gettydefs
+and describes the extended functionality available when used by
+.IR mgetty (1).
+This document will refer to
+.IR getty (1)
+except where
+.IR mgetty 's
+behaviour is different.
+.PP
+Each entry in
+.B /etc/gettydefs
+has the following format:
+.IP
+label# initial-flags # final-flags # login-prompt #next-label
+.PP
+Each entry is followed by a blank line.
+The login prompt field can contain quoted characters which
+will be converted to other values.
+The sequences and their substitutions are:
+.TP 15
+.B \en
+newline
+.TP
+.B \er
+carriage return
+.TP
+.B \eg
+beep
+.TP
+.B \eb
+backspace
+.TP
+.B \ev
+vertical tab (VT)
+.TP
+.B \ef
+formfeed
+.TP
+.B \et
+tab
+.TP
+.B \eL
+portname
+.TP
+.B \eC
+time in
+.IR ctime (3)
+format.
+.TP
+.B \eN
+number of users currently logged in
+.TP
+.B \eU
+number of users currently logged in
+.TP
+.B \eD
+date in DD/MM format
+.TP
+.B \eT
+time in hh:mm:ss format
+.TP
+.B \eI
+modem CONNECT attributes
+.TP
+.B \esequence
+where "sequence" is a valid strtol format, such as:
+\e0nnn (octal),
+\e0xnnn (hex),
+or
+\ennn (decimal).
+.PP
+Note that standard
+.I getty
+usually only supports \eb, \er and \en.
+.PP
+The various fields are:
+.TP 15
+.I label
+This is the string against which
+.I getty
+tries to match its second argument.
+It is often the speed, such as
+.BR 1200 ,
+at which the terminal is supposed to run, but it need not be (see below).
+.TP
+.I initial-flags
+These flags are the initial
+.IR ioctl (2)
+settings to which the terminal is to be set if
+a terminal type is not specified to
+.IR getty .
+The flags that
+.I getty
+understands are the ones listed in
+.IR termio (7)).
+.I mgetty
+is usually compiled for
+.IR termios (7)
+and often has a more complete set than
+.IR getty .
+.TP
+Normally only the speed flag is required in the
+.IR initial-flags .
+.I getty
+automatically sets the terminal to raw input mode and
+takes care of the other flags.
+If the "\-s" option is used with
+.IR mgetty (1)
+the speed setting is ignored.
+The
+.I initial-flag
+settings remain in effect until
+.I getty
+executes
+.IR login (1).
+.TP
+.I final-flags
+These flags take the same values as the
+.I initial-flags
+and are set just before
+.I getty
+executes
+.IR login .
+The speed flag is again required, except with
+.I mgetty
+if the \-s flag was supplied.
+Two other commonly specified
+.I final-flags
+are
+.SM
+.BR TAB3 ,
+so that tabs are sent to the terminal as spaces, and
+.SM
+.BR HUPCL ,
+so that the line is hung up on the final close.
+.TP
+.I login-prompt
+This entire field is printed as the
+.IR login-prompt .
+Unlike the above fields where white space 
+(a space, tab or new-line)
+is ignored,
+they are included in the
+.I login-prompt
+field.
+This field is ignored if the "\-p" option has been
+specified to
+.IR mgetty (1).
+.TP
+.I next-label
+specifies the label to use if the user
+user types a
+.I <break>
+character,
+or
+.I getty
+detects a reception error.
+.I Getty
+searches for the entry with
+.I next-label
+as its
+.I label
+field and set up the terminal for those settings.
+Usually, a series of speeds are linked together in this fashion,
+into a closed set; for instance,
+.B 2400
+linked to
+.BR 1200 ,
+which in turn is linked to
+.BR 300 ,
+which finally is linked to
+.BR 2400 .
+.I next-label
+is ignored with
+.IR mgetty (1).
+.PP
+Several additional composite settings are available for
+.I initial-flags
+and
+.IR final-flags .
+The following composite flags are supported by
+.I mgetty
+and are usually supported by
+.IR getty :
+.TP 20
+.B SANE
+equivalent to ``stty sane''.
+(BRKINT, IGNPAR, ISTRIP, ICRNL, IXON, OPOST, CS8, CREAD, ISIG, ICANON,
+ECHO, ECHOK)
+.TP
+.B ODDP
+Odd parity
+(CS7, PARENB, PARODD)
+.TP
+.BR PARITY , EVENP
+even parity
+(CS7, PARENB)
+.TP
+.BR -ODDP , -PARITY , -EVENP
+no parity
+(resets PARENB, PARODD, and sets CS8)
+.TP
+.B RAW
+raw I/O (no canonical processing)
+(turns off OPOST, ICANON)
+.TP
+.BR -RAW , COOKED
+enable canonical processing
+(turns on OPOST, ICANON)
+.TP
+.B NL
+Ignore newlines.
+(ICRNL, ONLCR)
+.TP
+.B -NL
+Respect newlines (turns INLCR, IGNCR, ICRNL, ONLCR, OCRNL, ONLRET
+off)
+.TP
+.B LCASE
+Ignore case - treat all as lowercase.
+(IUCLC, OLCUC, XCASE)
+Is set if mgetty believes login is entirely uppercase.
+.TP
+.B -LCASE
+Repect case 
+(turns off IUCLC, OLCUC and XCASE)
+.TP
+.B TABS
+output tabs as tabs
+.TP
+.BR -TABS , TAB3
+output tabs as spaces
+.TP
+.B EK
+Sets VERASE to "#" and VKILL to CKILL respectively.
+(note that while many gettys default VERASE to "#".
+.I mgetty
+defaults VERASE to backspace.)
+.PP
+Additionally,
+.I mgetty
+(but not
+.IR getty )
+can set any of the control characters listed in the
+.B c_cc
+termio(termios)
+structure by the use of two tokens:
+.PP
+<character name> <value>
+.PP
+Eg:
+.PP
+VERASE ^h
+.PP
+The value can be set as ``^<character>'', ``\ennn'' or
+``\e<character>'' (normal UNIX \e escapes).
+.PP
+See the 
+.IR termio (7)
+or
+.IR termios (7)
+manual pages to a list of which ``V'' variables can be changed.
+Note that many of these can be changed in the c_cc array, but won't
+have any effect.
+.PP
+If
+.I getty
+is called without a second argument, the first entry of
+.B /etc/gettydefs
+is used by
+.IR getty ,
+thus making the first entry of
+.B /etc/gettydefs
+the default entry.
+It is also used if
+.I getty
+cannot find the specified
+.IR label .
+.I Mgetty
+use a default label of ``n'', but this can be changed in the
+configuration.
+If
+.B /etc/gettydefs
+itself is missing, there is one entry built into
+the command which brings up a terminal at
+.B 300
+(configuration parameter in
+.IR mgetty )
+baud.
+.PP
+It is strongly recommended that after making or modifying
+.BR /etc/gettydefs ,
+it be run through
+.I getty
+with the check option to be sure there are no errors.
+.SH EXAMPLES
+The following two lines show an example of 300/1200 baud toggle, which is
+useful for dial-up ports:
+.IP
+1200# B1200 HUPCL # B1200 SANE IXANY TAB3 #login: #300
+.br
+300# B300 HUPCL # B300 SANE IXANY TAB3 #login: #1200
+.PP
+The following line shows a typical 9600 baud entry for a hard-wired connection
+(not currently supported for
+.IR mgetty ):
+.IP
+9600# B9600 # B9600 SANE IXANY IXANY ECHOE TAB3 #login: #9600
+.PP
+The following line is a typical smart-modem setup, suitable
+for
+.IR mgetty :
+.IP
+.nf
+19200mg#
+    B19200 #
+    B19200 SANE VERASE \eb VINTR \e003 HUPCL #
+    \en\eD \eT \eN Users @!login: #19200mg
+.fi
+.SH FILES
+/etc/gettydefs
+.SH "SEE ALSO"
+mgetty(8),
+getty(8),
+login(1),
+ioctl(2),
+termio(7),
+termios(7).

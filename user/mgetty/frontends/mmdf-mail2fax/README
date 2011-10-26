@@ -1,0 +1,135 @@
+From stonewall.demon.co.uk!nigel Wed Mar  8 09:46:56 1995
+Return-Path: <nigel@stonewall.demon.co.uk>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0rmHNf-0003lzC@greenie.muc.de>; Wed, 8 Mar 95 09:46 MET
+Received: from post.demon.co.uk ([158.152.1.72]) by colin.muc.de with SMTP id <25595-1>; Wed, 8 Mar 1995 03:00:04 +0100
+Received: from stonewall.demon.co.uk by post.demon.co.uk id aa09109;
+          8 Mar 95 1:31 GMT
+From: Nigel Whitfield <nigel@stonewall.demon.co.uk>
+Date: Wed, 8 Mar 1995 02:07:08 +0100
+In-Reply-To: Gert Doering's message 'Re: Email to gax gateway' of Tue 3 Jan
+Reply-To: Nigel Whitfield <nigel@stonewall.demon.co.uk>
+X-Mailer: Mail User's Shell (7.2.5 10/14/92)
+To: Gert Doering <gert@greenie.muc.de>
+Subject: E-mail to fax gateway - instructions
+Message-ID: <9503080107.aa20588@fags.stonewall.demon.co.uk>
+Status: RO
+
+Gert,
+
+This is a little late, but it appears to work reasonably well. It's
+not been extensively tested, but I've had no problems in casual use.
+
+The information below should be sufficient for people; I can give
+limited support via nigel@stonewall.demon.co.uk
+
+General information:
+
+This is a mail to fax gateway, designed to work with mgetty and MMDF
+on a SCO Unix system (ODT 3.0). It might well be possible to make it
+work with other systems, but it was a quick and dirty hack.
+
+It's designed to allow you to send a message to, for example
+01818061048@fax, using your ordinary mail program, and will turn the
+text of the message into a fax. If a global alias is set up, you can
+use an address like nigel@fax
+
+A header page will be generated with a brief explanatory note, and the
+date, subject and sender of the fax. A recipient name will be used if
+one is present in the global fax alias file.
+
+A log of faxes processed is sent to the fax administrator, and a
+receipt is sent to the originator when 
+
+There is not a huge amount of checking in the code, and it may not
+stand up to heavy use. Use at your own risk. I'll give what help I
+can, but if you've fiddled with MMDF, or you run a different mail
+transport you're probably on your own.
+
+Note that there is no checking in this script to see if people are
+authorised to use your system for faxing. If you want authorisation,
+use the MMDF facilities.
+
+Nigel
+
+1 - the fax channel
+The system relies on creating a passive channel in MMDF, which just
+leaves messages in a queue directory where they can be picked up by a
+program later. 
+
+My domain is stonewall.demon.co.uk, and machines are hidden within
+that domain.
+
+Add the following lines to /usr/mmdf/mmdftailor (I put them between
+the SMTP channel and the local domain table):
+
+--- cut here
+;
+; Mail to fax gateway
+;
+MTBL	faxchn, file=fax.chn, show="Fax gateway"
+MCHN	fax, show="Mail to fax gateway", ap=same, mod=psv,
+	tbl=faxchn
+--- ends
+
+You also need to create the fax.chn file in /usr/mmdf/table:
+
+--- cut here
+fax.stonewall.demon.co.uk:
+--- ends
+
+And you can put a line in domain.dom like this:
+
+--- cut here
+fax: fax.stonewall.demon.co.uk
+--- ends
+
+Don't forget to run dbmbuild when you've made the changes
+
+
+2 - the fax gateway script
+
+Install the faxgate script as something like /usr/mmdf/bin/faxgate.
+
+If you have a pretty standard SCO installation, you shouldn't need to
+change anything more than $faxsender and $faxadmin
+
+I won't pretend this is an elegant perl script, but it does the job.
+If you have a different mail transport, you'll need to hack the bit
+that opens the MMDF queue file and extracts the information from it.
+
+Note that we don't attempt to extract a Reply-To field or anything
+fancy - the address used for returning information is the envelope
+address.
+
+3 - Making it all work
+
+Create a crontab entry for MMDF to run the faxgate script
+periodically. Messages are not sent directly - they are simply placed
+in the fax queue, and will be sent whenever that is run.
+
+4 - Things to do
+
+* Make it understand mail messages that contain a PostScript document
+* Add authorisation lists
+* Look for a Reply-To: header
+* Find an elegant way of setting the recipient name on the header page
+* Make it less dependent on MMDF
+* Write proper documentation
+
+5 - Copyright
+I wrote this software, and it's my copyright. But you can distribute
+it freely, for use with Gert Doering's mgetty program. If you want to
+use it as the basis of non-commercial software, you're welcome to,
+provided you keep a credit of some type. If you change the software,
+I'd welcome details of your changes so that the software can be kept
+up to date.
+
+Nigel.
+
+
+-- 
+[Nigel Whitfield                                 nigel@stonewall.demon.co.uk]
+[For details on the uk-motss mailing list mail uk-motss-request@dircon.co.uk]
+[******  All demon.co.uk sites are independently run internet hosts   ******]
+

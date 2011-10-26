@@ -1,0 +1,161 @@
+Author: Marc SCHAEFER <schaefer@alphanet.ch>
+Software: Minimal voicemail system (mvm) version 1.2
+$Id: README,v 1.2 1998/09/09 21:07:39 gert Exp $
+
+# DISCLAIMER
+#    No warranty, either expressed or implied.
+# COPYRIGHT
+#    Fully protected under Berne Convention, use authorized except
+#    if you make money from this use (contact me before).
+
+PRIMARY DISTRIBUTION SITE: (currently MET 0900-2300 only)
+   http://www-internal.alphanet.ch/archives/local/alphanet/mvm/
+SECONDARY DISTRIBUTION SITE:
+   ftp://ftp.imp.ch/alphanet/files/mvm/
+THIRD DISTRIBUTION:
+   - In the vgetty/mgetty distribution, directory voice/mvm.
+
+1.  What is this thing, anyway ?
+
+Hi and welcome to the minimal voicemail system. This is a shell script
+and some utilities (also shell scripts) developped under Linux and
+RISCos in order to run a rather simple but scalable voicemail system.
+
+You can look in the file SPEC to see what the final goal is. This
+README file is only an introduction how to set up the voicemail system
+on your Linux computer (as I assume that noone else has RISCos anymore).
+
+NOTE: I have abandonned RISCos as a development plateform. I currently
+      use Linux 2.0.27 (test/production) and 1.2.13 (production). I am
+      using two ZyXEL 2864 I which answer X.75 ISDN, V34 modem, fax and
+      mvm. I recently switched to a 1496 (ROM 6.18) and I received
+      feedback it also works on some USR derivate.
+
+You need a voice modem (e.g ZyXEL series) supported by vgetty and a
+moderatly fast computer (generating voice online needs some CPU/FPU).
+
+YOU ALSO NEED A SAY COMMAND (see adds_on/rsynth/)
+
+Please also look at the CHANGES file.
+
+2.  Installation
+
+2.1 Initial setup
+
+First, log as root and type the command
+   ./setup.sh
+
+This will create /usr/lib/mgetty and /usr/spool/voice. It will not alter
+anything else on your system. The diskspace needed is less than 1
+megabyte.
+
+WARNING: if your config files are already in /usr/lib/mgetty, they
+will be erased !
+
+The installation script will ask you things to configure the
+scripts. Full fonctionnality needs to to pre-install rsynth (english
+text-to-speach) and mgetty.
+
+I also expect a recent mgetty (at least 1.1.7).
+
+This release has been tested with
+   ZyXEL 1496, Linux 2.0.27, mgetty 1.1.7
+
+Previous releases have been tested with
+   ZyXEL 2864I and non I
+   USR (model?)
+
+2.2 Generic vgetty/mgetty in /etc/inittab
+
+When installed, you can launch vgetty manually or in /etc/inittab (do
+not forget the /sbin/init q). Play with the arguments as you like.
+
+s1:456:respawn:/usr/lib/mgetty/vgetty -x 10000 -s 38400 -p "(vulcan-ttyS0) login: " ttyS0
+
+3.  Needed files
+
+  File/Directory                 Used for          Created by    Using
+  /usr/lib/mgetty/mgetty.config                    setup.sh      text editor
+  /usr/lib/mgetty/voice.conf                       setup.sh      same
+* /usr/lib/mgetty/vgetty                           USER          make voice
+  /usr/lib/mgetty/randomize                        setup.sh      gcc
+* /usr/lib/mgetty/say                              setup.sh      gcc (rsynth)
+  /usr/spool/voice               mvm               setup.sh      same
+  /usr/spool/voice/main/commands mvm, dynamic menu
+                                 system            setup.sh      same or mvm
+                                                               menu editor
+  /usr/spool/voice/messages/*    mvm prompts       setup.sh      generate.sh
+                                                                and MESSAGES
+                                                                file and
+                                                                rsynth and
+                                                                pvftools
+  /usr/spool/voice/mailboxes
+  /usr/spool/voice/menu_item_types         setup.sh
+
+Files marked with a (*) MUST be obtained separately because they are
+not part of this software. They won't be installed by setup.sh
+randomize source is given in adds_on/randomize.
+
+If you have a library of Sun AU (or au.gz) files, you can use it
+when setup.sh asks for a ``random library file path''.
+
+If you did not install rsynth, or if you did not hack it to write to a
+file named tmp in the current dir, use the one in OLD_BINS. Same for
+vgetty and randomize (a program which randomizes its arguments). Only
+Linux binaries are supported (and if you read this in an official
+vgetty distribution, there are NO binaries).
+
+4.  Known bugs
+
+5.  How to use this.
+
+The password for the voicemail operator (code 0) is 42, of course.
+Change it :-) (vi /usr/spool/voice/mailboxes/0/.password).
+And then chmod 700 /usr/spool/voice/
+
+Then dial your number, just after the modem answers (it will NOT
+play the normal modem handshake) and *before* two seconds, send
+any DTMF. You should hear the welcome message. Wait til the
+end of the message, and follow the directions. At the main menu,
+you can use * to identify yourself (code 0, then #, then another
+message, then 42, then #).
+
+[ the above paragraph is for VOICE_MODE=normal, see the setup script ]
+
+Main menu commands are described in /usr/spool/voice/main/commands.
+Types are explained in /usr/spool/voice/menu_item_types.
+
+6.  Final comments
+
+CURRENTLY IMPLEMENTED:
+   - modem/fax or voice detection (based on a human input)
+     and X.75 support.
+   - multiple languages support
+   - user identification, new user creation, access levels,
+     passwords
+   - voice-mailboxes for each user. Send, delete, reply functions
+   - dynamic menu system (editable online).
+   - tree and menu edition
+   - hotkeys (also multiple keys at once)
+   - mail to voicemail text speach generation (adds_on/mail_to_voice)
+
+CURRENTLY NOT IMPLEMENTED:
+   - public messaging system
+   - user edition
+   - crypt() for passwords
+   - not running under root.
+   - reading of UNIX mail
+   - sending of sounds through e-mail both directions (MIME)
+
+
+
+
+
+
+
+
+
+
+
+
+

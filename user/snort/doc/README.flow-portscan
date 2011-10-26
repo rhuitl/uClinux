@@ -1,0 +1,319 @@
+Flow-Portscan module documentation:
+
+Initial Discussions:
+
+ Marc Norton
+ Dan Roelker
+ Chris Green
+
+Implementation:
+
+ Chris Green everything but sfxhash
+
+Documentation to-dos:
+
+ - explain the time domains
+ - explain the scoring domains
+
+Documentation last updated: 2003-09-22
+
+  This is module is designed to detect rapid portscans based off flow
+  creation in the flow preprocessors.  The goals is to catch one->many
+  hosts and one->many ports scans.
+
+  The flow preprocessor to portscan recognizer is taken from
+  experience with spp_conversation/portscan2 by Jason Larsen & Jed
+  Haile and ipaudit by Jon Rifkin.
+
+  This subsystem became a bit more complicated than originally
+  intended but it does a good job of mitigating false positives from
+  devices such as squid proxies.  The new design is also a lot more
+  memory consistent than portscan1 or 2.  It also ignores single port
+  syn floods as they are a DoS, not a portscan.
+
+  Memory requirements should be way down from portscan2 architecture
+  though but there's slightly less information saved off.  The new
+  architecture operates similarly to a ring buffer.  When a scanner
+  has not been active in a long time, it's only reclaimed when there
+  is no more memory to use.
+
+  All of the prior methods for portscan detection in snort are
+  deprecated and will be removed in the near future.  If you have
+  custom code against conversation or one of the portscan
+  preprocessors, consider making it a module in flow or portscan.
+
+  Basic components:
+
+  2 Scoreboards ( One Talker, One Scanner )
+
+    Scoreboards contain information regarding timescales for a single
+    IP address.  There are two scoreboards, one for talkers (nodes
+    that are active on your network) and one for scanners (nodes that
+    have talked to a previously unknown port in your
+    server-watch-net)
+
+  1 Uniqueness tracker
+
+     The uniqueness tracker is used to determine if this connection
+     should count as something "new" for a particular IP.  It checks
+     if a connection is a new type of connection for a Source IP by
+     disregarding the source port.
+
+     Any change in (SIP,DIP,IP_PROTO,DPORT) indicates a new unique
+     connection and will be processed further for the server
+     statistics table and scoring.
+
+     This keeps things like a web page with 15 images from
+     rapidly increasing point scores with lots of accesses to the same
+     web server.
+
+  1 Server Statistics Tracker
+
+    This is used to track flows destined to the "server-watchnet"
+    and keep "hitcounts" on the number of times a particular service
+    has been requested with unique requests since snort has started.
+
+    This hitcount is tracked by (DIP,DPORT,PROTOCOL).
+
+    If a service is very popular, we can make connections to it be
+    ignored for scoring by comparing the hitcount to the
+    "server-ignore-limit". If we have more requests to this service
+    than the server-ignore-limit, then we will completely ignore this
+    service.  Similarly, the "server-scanner-limit" controls if a
+    request to a service counts as scanner points or as talker points.
+
+    If a request to a service is not in the server-watch-net, it will
+    count as talker points.
+
+    Caveat:
+
+    This does not perform validation that the service is connected
+    correctly so it is possible while learning that someone floods the
+    table with unique connections that it is possible to have
+    something become a service that you do not wish to be a service.
+    It's generally assumed that the learning time will occur at a time
+    where traffic is "typical". Future versions of snort should allow
+    this state to be saved and modifiable.
+
+    If this caveat is a concern in your environment, do not set a server
+    watchnet and rely only on talker scores.  
+
+Module Overview:
+
+  1) flow-portscan receives a new flow message from the flow module
+
+  2) The uniqueness tracker determines if message is a new type of 
+     flow by looking for changes in (SIP,DIP,IP_PROTO,DPORT).  If this is
+     not unique, and the TCP flags are normal, exit out.
+
+  3) If this connection is to an Destination IP in the server-watchnet:
+
+      During the "server-learning-time", it increments the hitcounts
+      for service popularity. 
+
+      If it's otherwise just get the stored hitcount.  If the hitcount
+      is greater than the server-ignore-limit, exit out.  If it's less
+      than the server-scanner-limit, mark the incremented points as
+      scanner points.
+
+  4) A connection is marked as either a talker or a scanner by step 3.
+
+     There are 4 time scales; 2 each for the IP Scanner and IP Talker.
+
+     The fixed timescales detect N events in M seconds.  This is the
+     typical type of portscan alert.
+
+     The sliding timescales adjust the "score reset point" on each
+     event after the first.  This adjusts the side of the window we're
+     detecting portscan events in by taking
+
+            end = end + ((end - start) * sliding-scale-factor)
+
+     Each time scale has it's own point tally that is incremented per
+     new flow.  Each set of points only touches either the
+
+         talker-fixed-score and talker-sliding-score
+
+     OR
+         scanner-fixed-score and scanner-sliding-score
+  
+
+  5) Evaluate the score against individual thresholds, either talker
+     or scanner. 
+
+     if(fixed_limit <= fixed_score)
+       generate_alert()
+
+flow-portscan options:
+
+General Note: higher row counts will take more memory away from the
+memory caps for a specific subsystem.  In the snort output, this is
+referred to as "overhead bytes" and the percentage of overhead
+encountered will be shown.  Higher row counts provide a larger hash
+table to minimize collisions and have a faster overall processing time
+at the expense of memory.  The hash tables themselves use a
+pseudorandom hardening salt that is picked at initialization time.
+
+scoreboard-memcap-talker     <bytes>
+
+  Number of bytes to use for the talker table
+    
+scoreboard-rows-talker       <count>
+
+  Number of rows to use for the talker table
+
+scoreboard-rows-scanner      <count>
+
+  Number of rows to use for the scanner table
+
+scoreboard-memcap-scanner    <bytes>
+
+  Number of bytes to use for the scanner table
+
+scanner-fixed-threshold      <integer>
+
+  Number of points that a scanner must accumulate in the
+  scanner-fixed-window time range.  Set to 0 to disable this type of
+  alert.
+
+scanner-sliding-threshold    <integer>
+
+  Number of points that a scanner must accumulate in 
+  scanner-sliding-window time range. Set to 0 to disable this type of
+  alert.
+
+scanner-fixed-window         <integer>
+
+  How many seconds we should go before resetting the fixed scanner score
+
+scanner-sliding-window       <integer>
+
+  How many seconds we should go before resetting the sliding scanner score
+
+scanner-sliding-scale-factor <float>
+
+  How much to increase the sliding window by each time we get a new
+  sliding scanner entry.  It's current size + (<scale factor> * current_size)
+
+talker-fixed-threshold       <integer>
+
+  Number of points that a scanner must accumulate in 
+  talker-fixed-window time range. Set to 0 to disable this type of
+  alert.
+
+talker-sliding-threshold     <integer>
+
+  Number of points that a scanner must accumulate in 
+  talker-sliding-window time range. Set to 0 to disable this type of
+  alert.
+
+talker-fixed-window          <integer>
+
+  How many seconds we should go before resetting the fixed talker score
+
+talker-sliding-window        <integer>
+
+  How many seconds we should go before resetting the sliding talker score
+
+talker-sliding-scale-factor  <float>
+
+  How much to increase the sliding window by each time we get a new
+  sliding talker entry.  It's current size + (<scale factor> * current_size)
+
+unique-memcap                <bytes>
+
+  How many bytes to allocate to the uniqueness tracker. The more
+  memory given, the less that connections to a busy server will appear
+  as a scan target on a popular service. 
+
+unique-rows                  <integer>
+
+  How many rows to allocate for the uniqueness tracker.  
+
+server-memcap                <bytes>
+
+  How many bytes to allocate for server learning
+
+server-rows                  <integer>
+
+  How many rows to allocate for server learning
+
+server-watchnet              <ip list in snort notation>
+
+  The IP list of what machines to learn services on.  Busy servers
+  should be placed here to help the portscan detector learn what
+  services are requested on the network.
+
+src-ignore-net                   <ip list in snort notation>
+
+  The IP list of what Source IP's to ignore.
+
+dst-ignore-net                   <ip list in snort notation>
+
+  The IP list of what Destination IP's to ignore.
+
+tcp-penalties                <on|off>
+
+  If this is enabled, when a new tcp flow enters the portscan
+  detection set, check the TCP flags for non-standard session
+  initiators and assign penalty points for odd combinations such as
+  SYN+FIN
+
+
+  Flag mapping:
+
+  SYN or SYN+ECN bits                   == base_score ( defaults to 1 point )
+  SYN+FIN+TH_ACK and anything else      == 5 points
+  SYN+FIN and anything else without ack == 3 points
+  Anything else                         == 2 points
+
+
+server-learning-time         <seconds>
+
+  How many seconds we should keep increment hitcounts of services on
+  IP's in the server-watchnet
+
+server-ignore-limit          <hit count>
+
+  How many requests a port on an IP in the server-watchnet must see
+  before it is ignored for the purposes of portscans.
+
+server-scanner-limit         <hit count>
+
+  How many requests a port on an IP in the server-watchnet must see
+  before it is is treated as a talker rather than a scanner.  This is
+  a minimum number of requests that must be seen during the
+  server-learning-time for the flow to be treated as a talker
+  connection rather than as a scanner connection.
+
+alert-mode                   <once|all>
+
+  In once mode, alert only on the first time we get a scan entry hit.
+  This dramatically reduces clutter because the scan alert in the
+  first place tells one to look for other event types
+.
+  On All, alert each time the score increases beyond a threshold.
+
+output-mode                  <msg|pktkludge>
+
+  msg       - a variable text message with the scores included
+  pktkludge - generate a fake pkt and use the Logging output system
+
+dumpall 1
+
+  When snort is exiting, dump the entire contents of the server table,
+  the uniqueness tracker table, and the scoreboard entries.  This is
+  ' useful if you suspect an underlying bug in the algorithms used or if
+  you would just like to see what it has learned.
+
+Example Configuration:
+
+preprocessor flow: stats_interval 0
+preprocessor flow-portscan: \
+server-watchnet [10.0.0.0/8] \
+unique-memcap 5000000 unique-rows 50000 \
+tcp-penalties on \
+server-scanner-limit 50 \
+alert-mode all \
+output-mode msg \
+server-learning-time 3600

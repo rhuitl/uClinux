@@ -1,0 +1,50 @@
+Date: 2006/11/11 02:46:13
+#11908
+
+Link dnsmasq2 into uclinux build system.
+
+Index: dnsmasq2/makefile
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ dnsmasq2/makefile	2009-03-12 13:30:44.000000000 +1000
+@@ -0,0 +1,25 @@
++
++CFLAGS += -DNO_GETTEXT -DHAVE_ISC_READER -DNO_TFTP
++
++CFLAGS += -g -O2
++ifndef CONFIG_IPV6
++CFLAGS += -DNO_IPV6
++endif
++ifdef CONFIG_USER_FLATFSD_FLATFSD
++CFLAGS += -DETC_DIR=\"/etc/config\"
++endif
++
++EXTRA_OBJS = preload.o
++export EXTRA_OBJS
++
++all: 
++	$(MAKE) -f Makefile all
++
++clean :
++	$(MAKE) -f Makefile clean
++
++install : 
++	$(MAKE) -f Makefile install
++
++romfs:
++	$(ROMFSINST) src/dnsmasq /bin/dnsmasq
+Index: dnsmasq2/bld/Makefile
+===================================================================
+--- dnsmasq2.orig/bld/Makefile	2009-03-12 13:03:52.000000000 +1000
++++ dnsmasq2/bld/Makefile	2009-03-12 13:03:59.000000000 +1000
+@@ -1,8 +1,8 @@
+-CFLAGS = -Wall -W -O2
++CFLAGS += -Wall -W
+ 
+ OBJS = cache.o rfc1035.o util.o option.o forward.o isc.o network.o \
+        dnsmasq.o dhcp.o lease.o rfc2131.o netlink.o dbus.o bpf.o \
+-       helper.o tftp.o log.o
++       helper.o tftp.o log.o $(EXTRA_OBJS)
+ 
+ .c.o:
+ 	$(CC) $(CFLAGS) $(COPTS) $(DBUS_MINOR) $(I18N) $(DBUS_CFLAGS) $(SUNOS_VER) $(RPM_OPT_FLAGS) -c $<

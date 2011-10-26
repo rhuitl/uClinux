@@ -1,0 +1,360 @@
+HTML-File:
+
+You need to specify which devices (eth0, eth1, ppp0, ippp0 and so on) you
+want to have displayed. This is done by the Parameters list. The following
+parameters are currently supported by the applet:
+
+Global settings:
+
+INFOPORT   The portnumber to contact for general information.
+           Opening a connection to this port should trigger a
+           script that dumps the contents of /proc/net/dev
+           (with an additional line consisting of exactly one #). 
+           See the install instructions for an example of such a script
+
+ALIGNMENT  Specifies whether the graphs should be aligned in X-
+           or in Y-direction.
+           If you specify "Y" the applet will use vertical
+           alignment; every other value will make the applet
+           use horizontal alignment.
+           If you don't specify this parameter at all, the
+           applet will use vertical alignment.
+
+DRAW_CLIENT_BORDER   
+           Specifies whether a border around the client area
+           (where the graphs are drawn) should be displayed
+           Default: true
+           Values:
+           0 or "false" to not draw a border
+           1 or "true" to draw a border
+
+DRAW_COMPONENT_BORDER
+           Specifies whether a border around the component
+           should be displayed
+           Default: true
+           Values:
+           0 or "false" to not draw a border
+           1 or "true" to draw a border
+
+INSETS     Specifies the number of pixels between the outer
+           border of the component and the area that will be
+           used to draw strings/lines etc.
+
+Colors:
+
+All colors should be specified in the following format:
+
+<PARAM NAME=xxxx_COLOR Value="RRGGBB">
+  where  RR is the 2 digit hex-code for the red component of the color
+         GG is the 2 digit hex-code for the green component of the color
+         BB is the 2 digit hex-code for blue red component of the color
+
+For example: 00FF00 for pure red or C8C8C8 for gray
+
+CONTROL_BACKGROUND_COLOR     The color of the title-bar and status bar
+                             (default C8C8C8)
+
+CONTROL_FOREGROUND_COLOR     The color of the text in the title- and
+                             status-bar (default 000000)
+
+DATA_BACKGROUND_TRYING_COLOR The color of the section of the screen,
+                             where the data from the device is displayed
+                             (default FFFF00) (when the device is trying
+                             to go online)
+                             Currently, only relevant for ISDN-Devices
+
+DATA_BACKGROUND_OFFLINE_COLOR
+                             The color of the section of the screen,
+                             where the data from the device is displayed
+                             (default C8C8C8) (when the device is
+                             offline)
+                             Currently, only relevant for ISDN-Devices
+
+DATA_BACKGROUND_COLOR        The color of the section of the screen,
+                             where the data from the device is displayed
+                             (default 144014)
+
+DATA_FOREGROUND_COLOR1       First color of the data (default 00FF00)
+
+DATA_FOREGROUND_COLOR2       Second color of the data (default 00FFFF)
+                             (only used in line-view)
+
+GRID_COLOR                   Color of the grid (default 006000)
+
+BAR_BACKGROUND_COLOR         The background-color of the bar in bar-view
+                             (default 288028)
+
+CPU_SYSTEM_COLOR             Color for system (=Kernel) CPU-usage
+                             (default FF0000)
+
+CPU_USER_COLOR               Color for user-space CPU-usage (default
+                             0000FF)
+
+CPU_NICE_COLOR               Color for nice CPU-usage (default 0000FF)
+
+CPU_IDLE_COLOR               Color for idle CPU-usage (default
+                             CONTROL_BACKGROUND_COLOR)
+
+Device specific settings:
+
+(the x must be replaced with an integer, beginning with 0; gaps in the
+numbering are not allowed):
+
+DEVx_NAME          This parameter specifies the name of the device (eth0
+                   or so). This parameter must be the first in the list.
+
+DEVx_LABEL         This parameter specifies the name that should be
+                   displayed in the applet. If no label is specified, the
+                   device-name is shown.
+
+DEVx_DRAW_LEGEND   Specifies (any value !=0 will do) that a "legend"
+                   should be drawn in line view. This means that there
+                   will be two labels ("In" and "Out") in the upper right
+                   corner of the window, each in the color the line for
+                   the corresponding value is painted.
+
+DEVx_DRAW_TITLE    Specifies (any value !=0 and !="false" will do) that a
+                   title bar with the name (or, if specified, the label)
+                   of the device should be drawn
+
+DEVx_DRAW_STATUS   Specifies (any value !=0 and !="false" will do) that a
+                   status bar with the current in/out/maximum values
+                   should be drawn
+
+DEVx_GRID_INTERVAL Specifies how many bytes should be between grid-lines.
+
+DEVx_GRID_LINECOUNT
+                   Specifies how many gridlines should be painted. This
+                   was introduced because for devices with high
+                   throughput it is more practical to define that 10
+                   lines should be drawn rather than that the interval is
+                   131072 (for a 10MBit device).
+                   You should only give a value for either
+                   DEVx_GRID_INTERVAL or DEVx_GRID_LINECOUNT. If you
+                   specify a value for both, the value for
+                   DEVx_GRID_LINECOUNT has higher priority.
+                   If you don't specify a value for either, no grid is
+                   drawn.
+
+DEVx_SHOW_CPU_USAGE
+                   If set to a value different from 0, cpu-usage of the
+                   router will be displayed (only works with the C server 
+                   side program, not with the script).
+                   This will be a bar above the title of the graph (so if
+                   you set DEVx_DRAW_TITLE to not draw a title, you will
+                   also not get cpu-usage).
+                   See the colors section for information on how to
+                   specify the colors to be used.
+                   Note: if the parameter INSETS is specified to
+                   something less than 4, no cpu-usage will be drawn!
+
+DEVx_MAX           Specifies the maximum throughput this device can have,
+                   in bytes per second. So for a 100 MBit network card,
+                   specify 13107200, for 10MBit 1310720, for an
+                   ISDN-device 8192 and so on (MBits/8*1024*1024). This
+                   is used for the scaling in bar, line and histogram
+                   mode.
+                   WARNING: if your device supports (and uses) full
+                   duplex, the maximum throughput parameter should be
+                   twice the theoretical throughput when using histogram
+                   mode (since here in and out are added).
+                   This parameter is only evaluated for bar, line and
+                   histogram view.
+                   For line and histogram view, you can also specify
+                   "auto" and "auto_accumulate" to enable autoscaling.
+                   "auto_accumulate" scales using the maximum value since
+                   the applet was started; "auto" will use the largest
+                   value that's currently being displayed.
+
+DEVx_IN_OFFSET and DEVx_OUT_OFFSET
+                   Specifies the number of bytes that should be
+                   subtracted from the throughput before displaying the
+                   data. This way you can filter out a constant load on
+                   the device that you don't want to see.
+
+DEVx_MODE          Specifies how the data shall be displayed. Possible
+                   values are: histogram, doublehistogram, line, bar or
+                   numeric
+
+DEVx_DONT_NORMALIZE If set to a value different from 0, the values will not
+                    be normalised to values per second
+
+DEVx_ABSOLUTE      If set to a value different from 0, the values will be
+                   displayed as is, and not the change from the previous 
+                   value. This only makes sense when you're monitoring other
+                   data, like CPU-Temperature, number of processes or 
+                   something like that.
+
+DEVx_PERCENT       This will cause the input value to be converted to a
+                   percentage (in + out = 100 %)
+                   In Line-graph, only one line will be drawn, in all others
+                   the out-value will always be considered 0
+                   Great for displaying CPU-usage as a graph, where in would be
+                   System+User+Nice and out would be idle.
+
+DEVx_IN_CAPTION    Specifies the string to be displayed in the status bar 
+                   and legend, in front of the in-values. Default: "In"
+DEVx_OUT_CAPTION   Specifies the string to be displayed in the status bar 
+                   and legend, in front of the out-values. Default: "Out"
+		   
+DEVx_DRAW_TICKS    Specifies that a grid along the X-axis should be drawn
+DEVx_TICK_INTERVAL Specifies the interval (in pixels) between each "tick"
+                   along the x-axis (default 10)
+
+Action specification:
+
+The applet supports any number of actions that can be triggered by using a
+context-menu. The number of the action (y) will determine the position of
+the item in the context menu.
+This number must also start with 0 and must not contain any gaps in the
+numbering.
+
+DEVx_ACTION caption; command
+            caption: The string to be displayed in the menu
+
+Supported commands
+
+GET dir        dir is the part behind the hostname in the URL, like
+               /cgi-bin/goOnline.sh
+               This tells the program to fetch an html-document from the
+               specified position on the current server (other servers
+               cannot be contacted due to the Java-Sandbox)
+               The protocol-part for this URL is always assumed to be
+               "http://"
+
+OPEN portnumber  Opens a connection to the specified port (and waits until
+                 this connection is closed again)
+
+The action is now being run in a separate thread - so you can also specify
+an action that will take a long time to complete (like, triggering sendmail
+send mails in the queue, or fetchmail to fetch emails). As of version 0.8
+the applet will no longer be blocked until the action is completed.
+
+ISDN related stuff
+
+The new server-component will automatically detect when there is an
+ISDN-device present, and will send info about that device to the client
+(mainly the device status that is online/offline/trying to connect). This
+is achieved by parsing the output of /dev/isdninfo. So, for the new
+server-component to work correctly, you'll have to set the permissions of
+/dev/isdninfo in a way that the lrpStat process can access it (obviously,
+this is not a problem when it runs as root ;-))
+
+Components for ISDN-devices will be painted in different colors, depending
+on the status. By default, this is green for an online device, gray for a
+device that's offline, and yellow while the device is trying to connect.
+See the color section for details on how to customize these colors.
+
+Together with the actions that can be defined, this makes for a rather
+decent "dial manager". Of course, it works for modems as well, but without
+detection whether the line is up or down.
+
+Monitoring CPU usage
+
+Since version 0.11, the c-program (and only the c-version of the server 
+program - the script does not (and will not, unless somebody else implements 
+this functionality) gather the information about cpu usage) formats the 
+cpu-usage as a "virtual" interface (name cpu0), which can be used to 
+display cpu-usage in a graph. See also the DEVx_PERCENT parameter.
+
+If you have more than one cpu, the first two are displayed as device "cpu0" (the
+first cpu will be presented as "incoming traffic", the second as "outgoing
+traffic"). The next two as device "cpu1" and so on. This has been tested on a system 
+with 4 cpus and it works fine. If you want to use it on a system with more cpus, 
+you'll have to change the "MAX_CPUS" define in src/server/lrpStat.h and recompile. 
+I don't have access to a system with more than 4 CPUs, so I can't test it myself, but
+it _should_ work. 
+
+
+Example for an HTML-Page:
+
+<HTML>
+<TITLE>Test page for lrp-Status monitor</TITLE>
+<BODY>
+<H3>lrp-Status monitor</H3>
+<APPLET CODE="LrpStatApplet.class"  ARCHIVE="lrpStat.jar" WIDTH="100%" HEIGHT="100%">
+        <PARAM NAME=INFOPORT VALUE="60183">
+        <PARAM NAME=ISDNPORT VALUE="60184">
+
+        <PARAM NAME=DEV0_NAME VALUE="eth0">
+        <PARAM NAME=DEV0_LABEL VALUE="Internal interface">
+        <PARAM NAME=DEV0_TYPE VALUE="static">
+        <PARAM NAME=DEV0_MAX VALUE="1310720">
+        <PARAM NAME=DEV0_MODE VALUE="histogram">
+        <PARAM NAME=DEV0_GRID_LINECOUNT VALUE="10">
+
+        <PARAM NAME=DEV1_NAME VALUE="ippp0">
+        <PARAM NAME=DEV1_LABEL VALUE="ISDN device">
+        <PARAM NAME=DEV1_TYPE VALUE="dynamic">
+        <PARAM NAME=DEV1_MAX VALUE="auto_accumulate">
+        <PARAM NAME=DEV1_USE_ISDNINFO VALUE="1">
+        <PARAM NAME=DEV1_MODE VALUE="line">
+        <PARAM NAME=DEV1_ACTION0 VALUE="online;GET /cgi-bin/goOnline.sh">
+        <PARAM NAME=DEV1_ACTION1 VALUE="offline;GET /cgi-bin/goOffline.sh">
+        <PARAM NAME=DEV1_GRID_INTERVAL VALUE="1024">
+        <PARAM NAME=DEV1_DRAW_LEGEND VALUE="1">
+
+        <PARAM NAME=DEV2_NAME VALUE="ppp0">
+        <PARAM NAME=DEV2_LABEL VALUE="Modem">
+        <PARAM NAME=DEV2_TYPE VALUE="dynamic">
+        <PARAM NAME=DEV2_MAX VALUE="4200">
+        <PARAM NAME=DEV2_MODE VALUE="histogram">
+        <PARAM NAME=DEV2_ACTION0 VALUE="online;OPEN 60180">
+        <PARAM NAME=DEV2_ACTION1 VALUE="offline;OPEN 60181">
+</APPLET>
+</BODY>
+</HTML>
+
+Java application:
+
+Starting the application:
+
+java LrpStatApplication [-v] [-vertical]
+                        [-width value]			
+                        [-height value]
+                        [-configfile htmlFilename]
+                        -hostname routername
+                        [paramName paramValue] [paramName paramValue] ...
+
+Command-line parameters:
+ -v          Prints verbose messages (should be turned on for troubleshooting)
+ -vertical   Specifies that the controls for monitoring several hosts are 
+             aligned vertically (default is horizontal). This does not  
+             interfere with the "ALIGNMENT" parameter in the html-file
+ -width      The width of the window (default 640)
+ -height     The height of the window (default 480)
+ -configfile The name of the html-file that could also be used to start the
+             applet (must be a local file)
+ -hostname   Required.
+             The name of the router you want to monitor
+ paramName   Any number of parameters. This is equivalent to specifying a
+             config file with the parameters defined there
+
+Note: that whole block of
+
+-hostname xxx -configfile yyy applet-parameters
+
+may be repeated as often as desired (obviously, with different values).
+This way, you can display several connections to different computers at the
+same time. The controls will be displayed with horizontal alignment (one
+next to the other).
+
+If the parameter name or value contains spaces, enclose the name/value in
+parentheses. For example:
+
+DEV0_LABEL "Internal interface"
+
+You should not specify parameters on the command-line that are also
+specified in the config-file. If you do, which parameter takes effect
+depends on where the parameter is specified in the command line (before or
+after the -configfile parameter).
+
+The easy way to get the application running is to set everything up the way
+you want in Netmon.html (but not upload to the web-server) and start the
+application with
+
+java LrpStatApplication -hostname host -configfile Netmon.html
+
+If you want to "swallow" the application into the Gnome-panel, you should
+specify that the application doesn't paint a legend, title, status bar or
+borders - that way, the available space will be used effectively.

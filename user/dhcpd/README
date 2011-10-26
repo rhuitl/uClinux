@@ -1,0 +1,80 @@
+NETtel DHCP Server README
+-------------------------
+
+The NETtel DHCP Server is designed to run on a NETtel (which
+runs on Greg Ungerer's uClinux-coldfire kernel) but will easily
+run on normal Linux distributions for PCs.
+
+The NETtel DHCP Server is designed deliberately to be a small,
+lean, DHCP server. It does not implement the entire protocol
+but only what is necessary to serve the following:
+
+	IP address (and its subnet)
+	Gateway address
+	DNS Server address
+	WINS (NetBIOS Name Server) 
+
+The lease times are hard coded to 10 days (from memory :-)
+
+
+The NETtel DHCP Server employs a number of simple config files:
+
+dhcpd.iplist
+------------
+Binary list of ip addresses that the server may offer. This list may
+include ip addresses already leased out.
+
+
+dhcpd.leased
+------------
+Binary list of leased ip addresses and their respective MAC address.
+format:
+
+16 byte MAC
+8 byte ip address
+16 byte MAC
+8 byte ip address
+.
+etc.
+
+example: hexdump dhcpd.leases
+
+   0: 00 AB 00 00 00 00 00 00-00 FF 00 00 00 00 00 01 ................
+  10: CB 18 97 78 00 BB 00 00-00 00 00 00 00 AA 00 00 ...x............
+  20: 00 00 00 CC CB 18 97 79-00 80 5F 94 28 2A 00 00 .......y.._.(*..
+  30: 00 00 00 00 00 00 00 00-CB 18 97 7A             ...........z    
+
+dhcpd.conf
+----------
+
+/etc/config> cat dhcpd.conf
+subnet 255.255.255.0
+router 203.24.151.121
+wins 203.50.0.24
+/etc/config> 
+
+
+---
+DNS is grabbed from resolv.conf:
+nameserver x.x.x.x
+nameserver y.y.y.y
+nameserver z.z.z.z
+
+Up to 3 DNS servers are supported.
+
+---
+Q&A
+
+
+Q. Isn't this all very complicated for a lease/ip pool?
+A. yes.. but it saves space :-)
+
+
+
+
+
+
+
+Have fun!
+-Lineo DHCP Server development team.
+

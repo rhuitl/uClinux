@@ -1,0 +1,32 @@
+fnord is meant to be used under Linux with the diet libc
+(http://www.fefe.de/dietlibc/).  These are actual apache bench results,
+all on localhost on a 100k JPEG test file, 1000 requests with a
+concurrency of 10.
+
+To be fair, I linked thttpd, mini_httpd and fnord against the diet libc.
+I did not try this with apache, though.  Since apache does not exec
+anything, it should not matter much, though.
+
+mini_httpd forks for each request, apparently does not support
+keep-alive and compared to fnord does not incur the overhead of execve
+for each request.
+
+thttpd is the fastest web server known to me.
+
+Values are time in seconds for the whole transaction (1000 downloads, 10
+parallel connections).
+
+server software		keep-alive		no keep-alive
+----------------------------------------------------------------
+mini_httpd 1.15c	1.690			0.943
+apache 1.3.22		1.236			1.178
+thttpd 2.21b		0.896			0.839
+fnord			1.008			1.331
+fnord w/ sendfile	0.316			0.912
+
+Please note that fnord actually plays in the same league as others even
+without keep-alive and sendfile support.  That is surprising since fnord
+has one fork() _and_ one execve() as overhead for each request!  As the
+difference between keep-alive and non-keep-alive shows, that difference
+is not very large.  That is the achievement of the diet libc, which
+reduces the normally significant libc overhead to zero.

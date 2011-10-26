@@ -1,0 +1,4491 @@
+\input texinfo    @c -*-texinfo-*-
+@c %**start of header
+@c $Id: mgetty.texi-in,v 4.65 2005/02/15 10:28:37 gert Exp $ (c) 1993-2000 Gert Doering and Klaus Weidner
+@setfilename mgetty.info
+@settitle mgetty + sendfax
+@c %**end of header
+@finalout
+
+@ifinfo
+@dircategory Miscellaneous
+@direntry
+* mgetty: (mgetty).               Smart getty replacement.
+* sendfax: (mgetty).              Standalone backend program to send fax files.
+@end direntry
+
+This is the online documentation for the mgetty + sendfax
+package.
+
+Copyright @copyright{} 1993-2005 Gert Doering
+@end ifinfo
+
+@titlepage
+@sp 6
+@center @titlefont{mgetty+sendfax}
+@sp 4
+@center Version 1.1.32
+@sp 1
+@center January 2002
+@sp 5
+@center Gert Doering
+@center gert@@greenie.muc.de
+
+@vskip 0pt plus 1filll
+@c Copyright @copyright{} 1993-2002 Gert Doering
+@end titlepage
+
+@ifinfo
+@node Top, Intro, (dir), (dir)
+@top mgetty + sendfax
+
+This is the online documentation for the mgetty+sendfax package written
+by Gert Doering.
+
+@menu
+* Intro::           Introduction
+* mgetty::          Using @code{mgetty}
+* Fax::             Fax Operations
+* voice::           Voice Operations
+* Problems::        Common problems and solutions (TROUBLESHOOTING)
+* Thanks::          Credits
+@end menu
+
+@end ifinfo
+
+@c ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+@node Intro, mgetty, Top, Top
+@chapter Introduction
+
+@code{mgetty} allows you to make optimum use of your modem or fax modem in
+a unix environment. @code{mgetty} handles incoming calls without
+interfering with outgoing calls. If the modem can do fax class 2 or 2.0,
+@code{mgetty} can also receive faxes.
+
+@code{sendfax} is a standalone backend program to send fax files.  
+
+This manual explains how to configure and install the package on various
+operating systems and modems, and how to use those programs.
+
+@menu
+* Copying::         Copying conditions and (lack of) warranty
+* Overview::        Features of @code{mgetty} and @code{sendfax}
+* Supported::       Supported systems and modems
+* Install::         Configuration and installation
+* intro-runtime::   Runtime Configuration: an Overview
+@end menu
+
+@node Copying, Overview, Intro, Intro
+@section Copying conditions and (lack of) warranty
+
+@cartouche
+@strong{WARNING:} This package is still BETA software. Use it at your own
+risk, there is @strong{no} warranty. If it erases all the data on your hard
+disk, damages your hardware, or kills your dog, that is entirely your
+problem. Anyway, the program works for me and quite a lot of other people.
+@end cartouche
+
+The @code{mgetty+sendfax} package is Copyright @copyright{} 1993-2002
+Gert Doering, Klaus Weidner, Marc Eberhard, Marc Schaefer, and others.
+
+It is distributed on terms of the GNU General Public License, which you
+can find in the main mgetty directory in the file @file{COPYING}.
+
+If you want to redistribute @code{mgetty+sendfax} under a different 
+license (like in "selling it to your customers"), contact me, and we 
+will work something out.
+
+@node Overview, Supported, Copying, Intro
+@section Features of @code{mgetty} and @code{sendfax}
+
+This package contains two major programs, @code{mgetty} and
+@code{sendfax}.
+
+This is what you can do with @code{sendfax} if you have a standard
+class 2 fax modem:
+
+@itemize @bullet
+@item
+send faxes directly or using shell scripts
+
+@item
+do ``fax polling'', this means you can call the weather station and
+get them to send you a fax containing the current weather map. (Not all
+modem manufacturers implement this feature in their modems!)
+
+@item
+create a ``fax queue'', outgoing faxes get sent automatically, the
+user is informed by mail about the result.
+@end itemize
+
+@code{mgetty} allows you to use your modem line for receiving fax and
+data calls, without hindering dial-out on the same line.
+
+@itemize @bullet
+
+@item
+@code{mgetty} knows about ``smart'' modems, and will make sure that the
+modem is always in a defined state (specific modem initialization possible)
+
+@item
+Incoming calls are answered manually (@code{RING}
+-> @code{ATA} -> @code{CONNECT}) instead of using auto-answer
+(@samp{ATS0=1}), this way the modem won't pick up the phone when the
+machine is down or logins are not allowed. 
+
+@item
+@code{mgetty} incorporates all features of uugetty: it honours @file{LCK.*}
+files created by @code{uucico} and other comm programs, this way it will
+prevent dial-outs while a caller is online and it won't be confused if
+other programs use the modem.
+
+@item
+@code{mgetty} can receive faxes (if your modem supports fax class 2 or 2.0).
+
+@item
+@code{mgetty} knows about incoming FidoNet calls.
+
+@item
+@code{mgetty} has extensive logging / debugging features
+
+@item
+do ``fax poll sending'', that is, you can setup your machine as fax poll
+server, to send some fax pages to ``fax poll'' callers. (Send informations
+about your system, the current wheather map, ...). Be warned, even less
+modems support this feature.
+
+@item
+@code{mgetty} can selectively refuse calls based upon CallerID, if your
+local Telco supports it and your modem knows how to decode and report
+it.  CallerID is also logged.
+
+@item
+@code{mgetty} has facilities to allow you to refuse incoming FAXes when
+available disk space is low.
+
+@end itemize
+
+If you have any bug reports, suggestions, please report them to
+gert@@greenie.muc.de (or, if [and only if!] that doesn't work, to
+gert@@space.net).
+
+Also, I have created a mgetty mailing list, for discussion of problems
+and suggestions. You can subscribe by sending a request to
+mgetty-request@@muc.de (forwarded to Crynwr.com for precessing)
+and you can send articles to the list by sending them to mgetty@@muc.de.
+The list manager will write you back for verification of your address,
+so make sure it is correct.
+
+The mailing list is currently gated bidirectionally into the newsgroup
+de.alt.comm.mgetty. In spite of being in the German language hierarchy,
+the language in the group is English. Posts in German should be ignored.
+
+The mailing list is archived on a WWW site, look at
+@file{http://www.elilabs.com/mgarc/index.html} (many thanks to
+Robert J. Brown, rj@@eli.elilabs.com).  It's also archived by Marc
+Schaefer, on @file{http://search.alphanet.ch/} @strong{(NEW!)}.
+The latter search engine indexes somewhat more than only the mgetty list,
+so you might want to add 'mgetty' to your query to restrict it.
+
+@node Supported, Install, Overview, Intro
+@section Supported systems and modems
+
+Mgetty has been successfully installed and run on the following
+systems (though older systems might need work to get current mgetty
+versions to compile):
+
+@display
+    SCO Unix 3.2.1 (ODT 1.0)                   (well tested)
+    SCO Unix 3.2.4 (ODT 2.0 + 3.0)             (very well tested)
+    SCO Open Server 5.0                        (well tested)
+    Linux (everything from 0.99pl1 up)         (very well tested)
+    ISC Unix 3.0                                (tested)
+    SVR4 Unix                                   (well tested)
+    SVR4.2 Unix                                 (needs more testing)
+    AT&T 3B1 3.51m                              (tested)
+    HP-UX 8.x and 9.x                           (well tested)
+    AIX 3.2.5, 4.1, 4.2 and 4.3                  (very well tested)
+    SunOS 4                                     (well tested)
+    Solaris 2.x                                 (well tested)  
+    NetBSD / FreeBSD (all versions)            (very well tested)
+    Apple Darwin (Kernel 5.1)                  (tested)
+@end display
+
+It should be possible to run mgetty on any other Unix with @file{termio.h}
+or @file{termios.h}. For best results, use of the library functions
+@code{select(S)} or @code{poll(S)} is recommended, but there's a workaround
+if your system hasn't either. (Warning: for Unix SVR3.1 or earlier,
+@emph{do not use poll()}, it will not
+work on tty devices.)
+
+
+Up to now, it has been successfully used with the following modems (no
+exhaustive list) in fax mode:
+
+@display
+    ZyXEL U1496 (various ROM releases)
+        (very well tested, a couple of problems remain, depending on the
+         ROM release)
+
+    ZyXEL 2864/2864I (various ROM releases)
+        (very well tested, some firmware versions have problems)
+
+    USR Courier/Sportster series
+        (well tested, Couriers work great, Sportsters are ok for data)
+
+    MultiTech (various models)
+        (tested, works very well, very good fax implementation)
+
+    SupraFAX v32bis
+        (tested, works well, no fax polling available)
+
+    GVC FM144/+
+        (tested, works well, no fax polling available)
+
+    TKR DM-24VF+ (Deltafax)
+        (tested, works quite well)
+
+    Zoom V.FAST 24K/28K
+        (tested, works, some problems with fax/data distinction)
+
+    ELSA MicroLink (various)
+    	(tested, usually works well, some firmware versions have issues)
+@end display
+
+It @emph{should} work with all class 2 faxmodems. Maybe the DC2
+character sent at the beginning of a page by @file{faxrec.c} must be
+changed to XON, for very old class 2 modems (implementing very old drafts of
+the standard). @xref{Modems}. 
+
+In Data mode, it will work with every Hayes-compatible modem.
+
+
+@node Install, intro-runtime, Supported, Intro
+@section Configuration and installation
+
+Compiling of the package should be quite straightforward. You have to
+copy @file{policy.h-dist} to @file{policy.h} and edit it to set some
+local policy options, see the comments in that file.  (Most default
+values should be fine, though).
+
+Then, edit the @file{Makefile}, to specify installation paths, some
+system defines and some system dependent libraries (explained there).
+
+After that, a @samp{make} should build the programs and the documentation.
+
+Before you can run @samp{make install} to setup and install everything,
+make sure that the user that you specified for @samp{FAX_OUT_USER} in
+@file{Makefile} exists in your system.  This user will be needed to
+run @code{faxrunq} or @code{faxrunqd}, and owns all the outgoing fax queue
+(this has been changed for 1.1.29 - earlier versions had the fax queue
+world writeable, which was a security problem).
+  
+If your compiler complains about the @code{#ident} lines I use for
+@file{RCS}, please run @code{make noident}, that will take care of those
+lines (this is only needed if the compiler refuses to go on - some
+compilers complain, but go on anyways).
+
+If you get an error message about ``unresolved symbols'' when linking, you
+may have to tell the package whether you have the select(S) or poll(S)
+system calls, by defining @code{-DUSE_SELECT} or @code{-DUSE_POLL} flags in
+the @file{Makefile} (If you don't know it, try both, until the error goes
+away). If it's not related to @code{select} or @code{poll}, please check
+the systems man pages which libraries to link, and add appropriate
+@code{-l<library>} statements to @code{LIBS}.
+
+If your system has neither the select(S) call nor the poll(S) call,
+mgetty is not fully operational---these functions are the only way to
+prevent mgetty from eating up characters when some other process is
+trying to dial out.
+
+You can use mgetty anyway, by specifying @code{-DUSE_READ} in the
+Makefile, but beware: with this, mgetty will eat up at least one
+character of the modem response when another program is dialing out.
+That may lead to disastrous results if e.g. the @samp{CONNECT} string
+is thus corrupted, but most of the time, the character that @file{mgetty}
+eats away will be an @code{cr} or @code{nl} or part of the command
+that the modem echoes back.
+
+If you have any problems compiling mgetty and sendfax (on a Unix-like
+system---I do not support MS-DOS or Windows!), please contact me.
+@emph{But make sure that you have read the documentation!}
+
+Later on in this document you can find some more detailed instructions
+about specific operating systems (Linux, FreeBSD, and so on).
+
+@node intro-runtime,  , Install, Intro
+@section Runtime configuration: Overview
+
+If @code{mgetty} or @code{sendfax} are run "as is", they will use their
+compiled-in defaults from @file{policy.h}.
+
+If the configuration files @file{mgetty.config} (@pxref{runtime-mgetty})
+and @file{sendfax.config} (@pxref{runtime-sendfax}) exist (and are
+readable), both programs will get their run-time configuration from there.
+Items not specified there will still be taken from the compiled-in
+defaults. Command line switches will always override those settings. The
+configuration files are usually located in @file{@CONFDIR@/}.
+
+If you specify command line arguments (see the mgetty(1) and sendfax(8) man
+pages for details), this will override both compiled-in and config file
+defaults.
+
+@c ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+@node mgetty, Fax, Intro, Top
+@chapter Using @code{mgetty}
+
+You can't simply call @code{mgetty} from a shell script (like @file{/etc/rc})
+or interactively, because login is not possible unless mgetty is called
+directly by the @code{init} process. The next sections explain how to do this.
+
+@menu
+* How::             How @code{mgetty} works
+* Inittab::         The @file{/etc/inittab} entry
+* Devices::         Choosing the right device
+* Logs::            Log files
+* Deny::            Denying logins (and scheduling)
+* Direct::          Direct serial lines
+* Interaction::     Interaction between @code{mgetty} and other programs
+* Caller-ID::       Using Caller-ID to selectively accept or reject calls
+* runtime-mgetty::  Runtime configuration: @file{mgetty.config}
+@end menu
+
+@node How, Inittab, mgetty, mgetty
+@section How @code{mgetty} works
+
+To help you understand how mgetty works, here is an example of what
+happens in various circumstances when you use it to control a modem
+connected to a serial line, e.g. @file{/dev/tty2a}.
+
+When the computer is booted, the operating system starts the @code{init}
+process, which is responsible for making sure that gettys are running on
+the appropiate i/o devices, e.g. virtual terminals, serial lines and
+modems.  @code{init} reads its configuration file, @file{/etc/inittab} (on
+System V), which tells it that the line @file{/dev/tty2a} should be
+controlled by mgetty. It then creates an entry in @file{/etc/utmp}
+(@code{login} needs this, that's why you can't log in if you try to start
+mgetty by hand), and forks a new @code{mgetty} process, using the command
+line specified.
+
+When mgetty is started, it first checks if a valid lock file held by
+another process exists. If it does, this means that the port is in
+use, and mgetty will wait until the lock file goes away. Invalid lock
+files, e.g. for nonexistent processes (``stale'' locks), are ignored.
+
+Once the port is free, mgetty creates its own lockfile, initializes the
+modem and removes its lock file again. Then it waits for something to
+happen on the port. Note that it does not @emph{read} any characters, it
+just checks if there are any available for reading by using @code{poll()}
+or @code{select()}.
+
+There are two possibilities once characters arrive, either a different
+program (e.g.  @code{uucico}) has started dialing out or a @samp{RING} was
+sent by the modem.  In the first case, mgetty should leave the port
+alone. This is easy @emph{if} the program dialing out has created a valid
+lock file: mgetty will find it, wait for it to go away and then exit (which
+will cause @code{init} to start a fresh @code{mgetty} process, which will
+then wait for the next call).
+
+In the second case, when there is no lock file, mgetty assumes that
+the phone is ringing, creates a lock file and reads the characters
+available. If it finds a @samp{RING}, it picks up the phone by sending
+@samp{ATA} and waits for the @samp{CONNECT} message. If the caller is
+a fax machine, it saves the fax in the directory @file{FAX_SPOOL_IN}
+(usually @file{@FAX_SPOOL_IN@}) and exits. If it is a modem,
+it prints @file{/etc/issue} and displays a login prompt. Once it has
+received a login string, it calls @code{@LOGIN@} and lets it handle
+things from here. @code{login} will read the password and will then
+start the user's login shell, @code{uucico}, a dialup SLIP link or
+whatever, but mgetty doesn't care about that. The lock file remains so
+that no other programs will try to use the modem while somebody is logged in.
+
+(If the @file{login.config} configuration file is used, mgetty can also call
+other login programs than @code{@LOGIN@}. See below for more details)
+
+Once mgetty has terminated for whatever reason, @code{init} might
+reinitialize the port (this is why mgetty waits for lock files to go
+away instead of quitting immediately) and will then start a new
+@code{mgetty} process, which will remove lock files left over from the
+last login.
+
+The lock file handling is tricky, but very important. It is essential
+that @emph{all} programs that use the modem agree on one locking
+protocol, otherwise one program might not know that the modem is in
+use and will try to dial out anyway. A typical lock file is a file
+called @file{@LOCK@}, containing the process ID (PID) of
+the process currently using the modem. Other processes can read it and
+tell if the lock file belongs to an existing process or if it is
+``stale'' and can be removed. This will obviously not work if the
+processes look for lock files in different places, or if one of them
+writes its PID in ASCII and another one tries to read it as a binary
+number (while mgetty and sendfax do not care whether foreign lock files
+are written in binary or ascii format, other programs do! mgetty can
+sometimes detect this problem, and will then log a warning).
+
+@node Inittab, Devices, How, mgetty
+@section The @file{/etc/inittab} entry
+An typical @file{inittab} entry for @code{mgetty} looks like this (on
+SystemV-style OSes):
+
+@example
+<tt>:rlevel:<respawn|off>:@SBINDIR@/mgetty [options] <device>
+@end example
+
+where @samp{tt} is a short form of the @samp{device} name, used by
+@code{init} and @code{who} for internal purposes. Usually this is
+something like @samp{S0} or @samp{2A} or so.
+
+@samp{rlevel} specifies the runlevel that the command in the fourth field
+is run at, this may be @samp{23} or @samp{56} or so, look at @code{man
+init} and the existing @file{/etc/inittab} on your system.
+
+The next field tells @code{init} whether that entry is active
+(@code{respawn}) or not (@code{off}), and the fourth field specifies the
+full path of the program to run.
+
+The following options are available for @code{mgetty}:
+
+@samp{-x @var{<level>}} sets the debugging level. This is very important
+for diagnosing problems, as with higher levels, @code{mgetty} will write
+very detailed informations about its internal workings to its log file.
+
+@samp{-s @var{<speed>}} sets the port speed. If not specified, the default
+from @file{policy.h}, (definition @code{DEFAULT_PORTSPEED}) will be used.
+
+@samp{-k @var{<space>}} sets the minimum number of kbytes required
+on the incoming FAX spool directory.  If there isn't this much space
+in the spool directory, the connection is terminated.  The default
+is 1 megabyte.
+
+@samp{-m @var{'expect send ...'}} sets the modem initialization sequence.
+  
+@samp{-r} for direct lines (no modem chats are done)
+
+@samp{-p @var{<login prompt>}} sets the login prompt (various escapes are
+allowed)
+
+@samp{-n @var{<rings>}} sets the number of @code{RING} messages to expect
+before sending @code{ATA} to answer the phone. Default is one @code{RING}.
+
+@samp{-R @var{<sec>}} tells mgetty to enable ``ring-back'' or
+``ring-twice'' mode. This means that mgetty won't pick up a call
+immediately, but the caller has to hang up after the first ring, and
+call again in the next @var{<sec>} seconds.
+
+@samp{-i @file{/etc/issue}} specifies the issue file to display before 
+prompting for login.
+
+@samp{-S @file{<fax_document>}} specifies the document(s) to send to
+polling fax machines (full path required). @file{<fax_document>} has to be
+in G3 format (as for @code{sendfax}), or a text file listing G3 fax files
+(one file per line).
+
+A sample entry in @file{/etc/inittab} might look like this:
+
+@example
+F1a:23:respawn:@SBINDIR@/mgetty -x 3 tty2a
+@end example
+
+For a more detailed explanation of all the options, please look into the
+@file{mgetty(1)} man page.
+
+@node Devices, Logs, Inittab, mgetty
+@section Choosing the right device
+
+Some operating systems provide two separate devices for each serial
+line, one of which is intended especially for gettys. This is
+@emph{NOT} a good idea, because it won't work with @code{mgetty}. It is
+meant for modems used in auto-answer mode.
+
+@code{mgetty} picks up the phone by hand, this will only work properly
+if you use the @emph{same} device you would use for dialing out. (Some
+people like to create a symlink @file{/dev/modem} for this, but you
+have to be consistent and use this for @emph{all} comm programs if you
+do - otherwise you'll run into problems with the lock file names).
+
+Here are some examples for different systems:
+
+@itemize @bullet
+@item
+SV Unix systems using the FAS serial driver:
+
+Use @code{ttyF01} etc., (minor number 80+(port number). Do @emph{not}
+use @code{ttyFMxxx}---mgetty will open the device anyway, but then an
+open to the ``normal'' port (without carrier detect) will block.
+
+@item
+SCO Unix systems with the stock serial driver:
+
+Use the modem-control port (@code{tty2A}), @emph{not} @code{tty2a}, because
+hardware flow control and carrier detection do not work on ``lowercase''
+tty devices.
+
+The same holds for ``smart'' serial boards, as specialix, digiboard,
+@dots{}, because they mimic the behaviour of SCO's sio driver.
+
+@item
+Linux:
+
+Use @file{/dev/ttyS*}, @emph{not} @file{/dev/cua*}. @xref{Linux}.
+
+@item
+SunOS, FreeBSD, NetBSD:
+
+Use @file{/dev/cua*}, not @file{/dev/ttyS*}. Don't ask me why it has to be
+this way, but the other way won't work. (On SunOS or Solaris, you can
+find some gory details in the @code{man zs} man page).
+
+@end itemize
+
+@node Logs, Deny, Devices, mgetty
+@section Log files
+
+@code{mgetty} will normally write all actions into a logfile, named
+@file{LOG_PATH.@var{<device>}} (LOG_PATH is defined @file{policy.h}),
+e.g. @file{@LOG_PATH@}, so you can easily see what's happening in your
+system. (If a fatal error
+occurs, the error message is also written to the console, and if that
+is not possible, mailed to @samp{ADMIN}). The name of the log file can be
+changed in @file{policy.h}.
+
+If @code{mgetty} is compiled with @code{-DSYSLOG}, auditing and error log
+messages will also go to @code{syslog} (if your system supports it).
+
+@node Deny, Direct, Logs, mgetty
+@section Denying logins
+
+If you want to prevent mgetty from accepting calls, you can do so by
+creating a file called @file{/etc/nologin.@var{<device>}}
+(e.g. @file{/etc/nologin.tty2a}). If mgetty detects an incoming call, and
+sees this file, it will @emph{NOT} answer the phone. This way the caller
+does not lose money for a useless call when logins are not allowed
+anyway. (You can change the filename that is checked by changing
+@code{NOLOGIN_FILE} in @file{policy.h})
+
+This can be used for quite sophisticated scheduling purposes - imagine a
+modem attached to a line used for voice during the daytime. So, you want
+the modem only to answer the phone during 9 pm and 7 am. What you do is to
+have @code{cron} create a @file{/etc/nologin.@var{device}} file at 7 am (so
+the modem won't answer the call during the day) and remove it at 9 pm (so
+the modem can answer the phone at night).
+
+Naturally, this can be easily extended - e.g., answer the phone only on
+weekends (similar cron job), don't answer the phone if there are less
+than 5 Mbyte free on disk (have a process check for free disk space
+regularily and create @file{/etc/nologin.*} file(s) accordingly), @dots{}
+
+@node Direct, Interaction, Deny, mgetty
+@section Direct serial lines
+
+If you have a direct serial line between two unix machines, or a unix
+machine and something else, and want to run a getty program on the unix
+side that should not interfere with outgoing traffic (e.g.: two unix
+machines, both sides running gettys, both sides able to initiate an uucp
+connection), you can also use mgetty. Start it with the @samp{-r} flag (as
+with uugetty), and it will not try to initialize the modem or wait for
+RINGs. It will just sit silently on the port and wait@dots{} You won't see
+@file{/etc/issue} on the other side until mgetty gets at least one
+character, this prevents two mgettys from talking to each other.
+
+This may be valid for leased lines with modems in leased line mode as well,
+but that may depend on your modem setup.
+
+@node Interaction, Caller-ID, Direct, mgetty
+@section Interaction between @code{mgetty} and other programs
+
+Normally, after a caller enters his login name, @code{mgetty} calls
+@code{@LOGIN@} to do the password checking and system login.
+
+In some special cases, you may want to call other programs instead of
+@code{@LOGIN@}. For example, you could want to call
+@code{/usr/lib/uucp/uucico -L <username>} for all login names starting with
+@samp{U*} (to have @code{uucico} do the authentication, works only with
+taylor uucp 1.05 or taylor uucp 1.04 with my patch in
+@file{patches/taylor.p1}), or @code{/usr/lib/fnet/ifcico} for incoming
+FidoNet calls (using @code{ifcico} from Eugene Crosser's @file{ifmail}
+package).
+
+@code{mgetty} can do all this. It's controlled by a configuration file
+@file{login.config}, normally located in
+@file{@CONFDIR@/} (definition @code{LOGIN_CFG_FILE} in
+@file{policy.h}). I have provided a sample file with lots of comments,
+please look into that file for the syntax to use. To make @code{mgetty}
+understand incoming fido calls, you have to compile it with @code{-DFIDO}.
+
+If you are worrying about security, you can also use this mechanism: just
+call @code{@LOGIN@} only for trusted, known users, and @code{/bin/false}
+for every other login name - so, only those listed in @file{login.config}
+will be able to log in.
+
+This mechanism can also be used to automatically start up a @code{PPP}
+server if an incoming client sends PPP packets.  This feature is called
+@emph{AutoPPP}.  For it to work, you have to compile @code{mgetty} with
+@code{-DAUTO_PPP} (added to CFLAGS in Makefile).  After this,
+@code{mgetty} will detect incoming PPP packets, and run the program that
+is specified in @file{login.config} by the special user name
+"/AutoPPP/".  See the sample @file{login.config} file for an example.
+
+Which options should be specified depends on your PPP server program and
+your local setup.  Don't ask me about that -- I wouldn't know.  Instead,
+please check the relevant man pages.
+
+@node Caller-ID, runtime-mgetty, Interaction, mgetty
+@section Using Caller-ID to selectively accept or reject calls
+
+Some telephone companies provide a service to the subscriber, called
+``Caller ID'', where the phone number of the caller is transmitted while
+your phone is ringing. Not all providers support it, and you'll have to
+ask for it.
+
+If your modem is able to retrieve callerid information, and @code{mgetty}
+is compiled with @code{CNDFILE} defined in @file{policy.h}, @code{mgetty}
+can check the caller's number before answering the phone. (Right now, it
+works for most variants out there, ZyXEL, Rockwell, ELSA and isdn4linux
+among them).  If @code{CNDFILE} is undefined, or if the
+file specified does not exist, all calls will be allowed.
+
+One important thing: for most analog modems, you @strong{must} set the
+number of RINGs to wait for to two (2) or higher (set @samp{rings 2} in
+@file{mgetty.config}), because the ID code is sent between the first and
+the second RING. If mgetty picks up the phone too soon, the modem can't
+get this information.
+
+Whether a call is accepted or denied is controlled by the configuration file
+set with @code{CNDFILE} in @file{policy.h}. The usual default is
+@file{@CONFDIR@/dialin.config} (a sample file is installed per default).
+
+That file contains a series of tokens separated by newlines, commas, tabs
+and spaces. The callerid number is compared with each token in turn, until
+a match occurs. A match occurs when the token compares equally to the
+callerid information up to the length of the token.  If the token is
+prefixed with a ``!'', a match means ``do not answer the phone''. The token
+``all'' matches any telephone number, and will terminate scanning of the
+cndfile. If no callerid number is present, it is assumed to have the value
+``none''. A line starting with ``#'' is a comment.  There is an implicit
+``all'' at the end of the file.
+ 
+For example:
+
+@example
+	# list of my friends' data lines
+	3433535, 7445343, 5551212
+	# dad's fax
+	4164646777
+	# disallow [other] calls from numbers matching the following prefix:
+	!416
+	# disallow that speed dialer that keeps hitting my machine
+	!3444444
+	# allow all calls with the following prefixes
+	832, 555
+	# don't allow calls when there's no callerid:
+	!none
+	# It's okay to accept calls from out of area
+	# ("OUT_OF_AREA" token seems ZyXEL specific)
+	OUT_OF_AREA
+	# disallow all other calls
+	!all
+@end example
+
+For the future, Chris Lewis is planning on adding special modem initialization
+strings (e.g., 2400 bps only, fax-only, ...) dependant on the caller
+number.
+
+
+For most applications, this kind of static configuration is enough.  If
+you have special needs, you can choose to run an external program to
+decide this.  The program name is configured with the @code{cnd-program}
+statement in @file{mgetty.config}.  Its command line arguments are:
+
+@example
+  <program> <tty> <CallerID> <Name> <dist-ring-nr.> <Called Nr.>
+@end example
+
+@code{CallerID} is the number of the caller, if known, or @samp{none}, if
+not.  @code{Name} is the name of the caller, or empty ('') if unknown. 
+@code{dist-ring-nr.} is the RING type, if you have ``distinctive
+RING'' on your telephone line and your modem supports this, or ``0'' 
+for an unidentified call.  @code{Called Nr.} is the number that was called
+(this is only meaningful if you have ISDN, and your modem signals the
+complete number called to the host - e.g. ELSA or ZyXEL 2864I do that).
+
+For example, a call from 12345 to 56789, using ISDN, coming in on ttyS3, 
+could lead to a program called like this:
+
+@example
+  check.cnd ttyS3 12345 '' 0 56789
+@end example
+
+The program return value decides whether the call should be accepted.
+Currently, the following values are defined:
+
+@display
+ 0 - accept call, no specific preferences
+ 1 - reject call
+@end display
+
+Future versions will allow external selection of the way mgetty/vgetty is
+supposed to answer the call (data/voice/fax/...), but that's not
+implemented yet.
+
+Note: this can not only be used to decide whether to accept a call or not.
+You could as well use it to display the caller ID on an external LCD
+screen, in an X11 window, print it, initiate a D-Channel Callback, or do 
+whatever you want that needs the Caller ID data.
+
+@strong{Note2: be careful what kind of programs you call! They run with
+user id 0 (root), so that could easily be a security risk if you're not
+careful.}
+
+@node runtime-mgetty,  , Caller-ID, mgetty
+@section Runtime configuration for mgetty: @file{mgetty.config}
+
+@code{Mgetty} works quite well with the compiled-in defaults (it has been
+the only way to configure it for a long time), but that's quite unflexible,
+and especially if you use different modem types, it's extremely unhandy.
+The built-in defaults can be modified by command line options, but that's
+not perfect either, because it makes @file{/etc/inittab} entries very long
+and difficult to read.
+
+If compiled with @emph{config file} support (define @code{MGETTY_CONFIG} in
+@file{policy.h}), @code{mgetty} can use a configuration file, quite similar
+to those which "Taylor UUCP" uses, which make dynamic setup far easier.
+
+The config file is usually located in @file{@CONFDIR@/} and named
+@file{mgetty.config}. Its format is very simple. Each line contains one
+keyword, and possibly arguments for it, separated by whitespace. Empty
+lines, and comment lines (lines starting with @samp{#}) are allowed.
+
+The config file is grouped into port-specific sections, separated by
+@code{port @var{<tty-name>}} lines. Everything before the first @code{port}
+line specifies global defaults, everything between two @code{port}
+statements specifies configuration items valid only for exactly this
+device. Let me show you an example:
+
+@example
+# global defaults:
+# fax station id is always the same
+fax-id ++49-89-1234
+# per port stuff
+port tty1a
+# This modem can't fax
+modem-type data
+
+port tty2a
+# more verbose logging for this modem
+debug 9
+@end example
+
+
+The data part of each line, following the keyword, can be a string (in most
+cases), a chat sequence (a series of strings, separated by whitespace, that
+specify the "modem talk" to do. It starts with "expect" string, then "send",
+then "expect" again, and so on), an integer (interpreted as decimal, octal
+or hexadecimal, depending on the leading character [1-9/0/0x]), or boolean
+(@samp{y(es)} or @samp{t(rue)} vs. @samp{n(o)} or @samp{f(alse)}). If
+no argument is specified, this will be considered ``value not set'' (if
+allowed) or ``error'' (if value is mandatory), except for boolean values.
+In that case, it's interpreted as @samp{true}.
+
+
+Many of those configuration items can be overriden from the command line.
+In that case, command line options take precedence over configuration file
+settings (and those take precedence over built-in defaults). In many cases,
+the built-in defaults can be set in @file{policy.h}.
+
+The available configuration items are (command line options, if available,
+given in brackets):
+
+@itemize @minus
+@item @code{speed} [-s] @var{port speed}
+
+Specify, as integer value, the port speed to use. Default is
+@code{DEFAULT_PORTSPEED}. If the given speed is not valid, @code{mgetty}
+complains loudly and exits.
+
+@item @code{switchbd} @var{fax recv. speed}
+
+Some modems, mainly Rockwell chipsets, switch to 19200 bps when entering
+fax mode. Others may need other speed switches (but I know none).  If your
+modem is Rockwell based, try @code{switchbd 19200} if fax reception doesn't
+work. (@strong{Warning:} if this is set wrongly, fax reception will
+definitely fail. For most sane modems, you do @strong{not need} this.).
+Default is @code{FAX_RECV_SWITCHBD}.
+
+@item @code{direct} @var{yes/no} [-r]
+
+Tells mgetty that it is running on a direct line. Mgetty won't try to
+initialize any modem, nor will it wait for @samp{RING}. It will just wait
+for any character, and then output the issue file and login prompt. This
+option is used if you want to connect to machines via nullmodem cable.
+Default is @var{no}, since @code{mgetty} is designed for modems@dots{}
+
+@item @code{blocking} @var{yes/no} [-b]
+
+Tells mgetty to open the device in @samp{blocking} mode, that is, the
+@code{open()} system call won't succeed until carrier detect is set. This
+is set if @code{mgetty} is called as @code{getty}. I'm not sure whether
+it's very useful, but I include it for completeness. Default is @var{no}.
+
+@strong{Do not activate this unless you understand all implications!}
+
+@item @code{port-owner} @var{username/userid}
+
+If set, mgetty will @code{chown} the tty line to the given username (you
+can specify a string or an integer uid, but the integer must be valid).
+This is highly recommended for security purposes: only give port access to
+those users you trust not to misuse your modem lines! Default is
+@code{PORT_OWNER}.
+
+@item @code{port-group} @var{groupname/gid}
+
+If set, mgetty will @code{chgrp} the tty line to this group id (which can
+be given as group name, or as integer gid). If it's not given, or not
+valid, the primary group id of @samp{port-owner} will be used. Default is
+@code{PORT_GROUP}.
+
+@item @code{port-mode} @var{permissons}
+
+Specifies the permissions to @code{chmod} the device to. @strong{Never}
+make a modem device world-accessible, better use @samp{0660} or even
+@samp{0600}. Default is @code{PORT_MODE}.
+
+@item @code{toggle-dtr} @var{yes/no}
+
+Tells mgetty whether it should lower the DTR line upon startup to reset
+modem. Default is @samp{yes}, but some (few) modems react allergic to that
+and crash.
+
+@item @code{toggle-dtr-waittime} @var{msecs}
+
+Specifies the time to hold the DTR line low. Default is 500 milliseconds.
+
+@item @code{data-only} @var{yes/no} [-D]
+
+Tells @code{mgetty} to forget about faxing and only use the data part of
+the modem. Default is @samp{false}. You need this if your modem can't
+distinguish incoming fax and data calls.
+
+@item @code{fax-only} @var{yes/no} [-F]
+
+Tells @code{mgetty} to put the modem in fax-only mode. You need this if
+your modem can't distinguish incoming fax and data calls, but you need fax
+more important than data; and you need it if you want to disable data calls
+for security reasons (this could be achieved via @file{login.config} as well)
+
+Watch out: if you have setup some unusual @code{answer-chat}, incoming 
+calls might still come through. So check your setup!
+
+@item @code{modem-type} [-C] @var{mtype}
+
+Specifies the kind of modem connected to the port. Default is
+@code{DEFAULT_MODEMTYPE}. Valid options are:
+
+@itemize @bullet
+@item auto
+
+Mgetty will detect the modem type itself (which may occasionally be not
+desirable, or it may fail on old modem equipment).  Mgetty will use 
+the @code{ATI} command to find out the modem type, and select the proper
+fax class accordingly.  If that fails (unknown modem type), mgetty will
+try class 2.0 and then class 2.
+
+@item c2.0
+
+Modem is a @var{class 2.0} fax mode. Works better than class 2, if both are
+available, because its better standardized. Known to work with USR, ZyXEL
+1496 and 2864 series, and ELSA modems.
+
+@item cls2
+
+Modem is a @var{class 2} fax modem, mgetty will not try class 2.0.
+
+@item c2.1
+
+Modem conforms to the new ITU T.32 standard (class 2.1).  To my knowledge,
+there are no such modems available yet, but supporting them will be easy
+as class 2.1 is very similar to class 2.0.
+
+@item cls1
+
+Modem can only do class 1 fax.  NOT IMPLEMENTED YET.  (And not recommended
+anyway).
+
+@item c1.0
+
+Modem can do class 1 fax conforming to ITU T.31 standard.  This isn't 
+much better than class 1 (use class 2 / 2.0 if available!), but is better
+standardized.  NOT IMPLEMENTED YET.
+
+@item cls2ok
+
+(obsolete, use @code{modem-quirks 02})
+
+@item data
+
+Do not try fax initialization, same as if @samp{-D} given.
+@end itemize
+
+There is no way (yet) to tell mgetty to use @strong{only} fax mode and
+refuse data calls with this option, use the @code{fax-only true} statement
+for that.
+
+@item @code{modem-quirks} @var{bitmask}
+
+Some modems have a very peculiar interpretation of the fax standards. 
+Some of the internal operations of @code{mgetty+sendfax} can be adapted
+to that.  The argument is a number, constructed from valies in
+@file{fax_lib.h}, one bit per "quirk".  Usually you won't need this 
+option, because those modems really needing it are auto-detected and
+handled properly anyway.
+
+Right now, the following quirks are defined:
+@display
+0x01  leave the modem in class 2 mode instead of switching
+      to class 0 before sending ATA (you might try this if
+      adaptive fax/data answer doesn't work).
+0x02  class 2 bit order is correct (MultiTech) - unimplemented
+0x04  do not trust +FPTS:x,lc,blc values
+0x08  do not wait for XON character when sending pages
+0x20  AT+FCC/+FMINSP bug workaround for (very) old USR Courier V.32
+0x40  display incoming informations about 'non standard frames' - this
+      might be necessary on some USR modems to work around logic bugs
+@end display
+
+@item @code{init-chat} [-m] @var{expect send expect send ...}
+
+Tells mgetty the chat sequence to use for initializing the modem.
+@strong{Warning}: the sequence starts with @strong{expect}, which will in
+most cases be @samp{""} (nothing). This ordering was chosen because UUCP
+does it this way, and I wanted to avoid confusion here.
+
+Example:
+
+@example
+init-chat "" ATQ0E1V1H0 OK ATL0M0S0=0 OK AT&K3 OK
+@end example
+
+@item @code{force-init-chat} @var{expect send expect send ...}
+
+In some cases, the modem can get stuck in a mode where it won't react to a
+simple @code{AT} command. Usually this happens because the modem is set to
+ignore a DTR drop and still has a data connection to the other side. If
+you use a voice modem, it could be stuck in voice mode.
+
+In these situations, the normal @code{init-chat} will time out, because
+the modem won't send the proper responses back.
+
+To get the modem back into a sane state, you can use the
+@code{force-init-chat} chat sequence. The default setup will send
+the DLE ETX characters, to get voice modems back to life, and then the
+@code{(pause)+++(pause)ATH0} sequence to get the modem back from data
+mode to command mode. 
+
+You could prepend this sequence to @code{init-chat} (it wouldn't harm),
+but especially the pauses around the +++ sequence makes this undesirable
+slow.
+
+@item @code{post-init-chat} @var{expect send expect send ...}
+
+Some modems forget parts of their settings when going from data to fax
+mode and back during modem initialization.  For example, some USR models
+forget the settings of ``Caller ID delivery'' (AT#CID=1), and some ELSA
+modems forget their current DTE port speed when going from voice to data
+mode, thus leading to RING messages being delivered with the wrong baud
+rate.
+
+For those modems, you can use this command to set up some AT commands that
+are executed after all other fax and voice initialization has been done.
+Be careful with what you do!  If you send an ATZ (modem reset) or 
+something similar here, all your fax/voice settings will be lost!
+
+@item @code{modem-check-time} @var{seconds}
+
+Some modems have the nasty tendency to crash silently. With this option,
+you tell @code{mgetty} to check every @var{seconds} seconds with a simple
+@samp{AT...OK} sequence whether the modem still reacts. If not,
+@code{mgetty} will restart itself and do a full modem reset. Default is @code{MODEM_CHECK_TIME}
+
+@item @code{rings} [-n] @var{nnn}
+
+Sets the number of @code{RING} messages to wait for, before mgetty picks up
+the phone. Default is 1. @strong{Warning:} if your modem auto-answers, for
+whatever reason, set this to something @strong{different} than the value
+set with @code{ATS0=mmm}, otherwise the modems autoanswer and mgettys
+manual answer will collide (most modems hang up if a command is received
+during auto-answer)
+
+@item @code{msn-list} @var{msn1 msn2 msn3...}
+
+If you have an ISDN modem that signals the called party number (MSN) to
+the host, you can use this statement to map the MSN numbers to distictive
+RINGs.  The MSN called will be compared the list, and the first match is
+used for the distinctive RING number.  The list is searched from left to
+right.
+
+This is known to work with ELSA and ZyXEL ISDN terminal adaptors.
+
+@item @code{get-cnd-chat} @var{chat sequence}
+
+This is needed if you have a modem that supports ``caller ID'' detection,
+but needs a special command to get the CID information. Right now, this is
+only needed for some ELINK ISDN adaptors (@pxref{Elink-ISDN}), most other
+CID-capable modems send the CID on their own and don't need this.
+
+Don't forget to set @code{rings} to at least 2, otherwise the CID grabbing
+code won't work.
+
+@item @code{cnd-program} @var{pathname}
+
+Specify a program to be run before answering an incoming call.  Use this
+if the static Caller ID selection in CNDFILE (policy.h) is not sufficient,
+or if you want to use the Caller ID data for other purposes (displaying,
+for example).  @xref{Caller-ID}.
+
+@item @code{answer-chat} @var{chat sequence}
+
+This is the command sequence that is used to answer a phone call. Usually
+you can leave it at the default @samp{ "" ATA CONNECT \c \r }, but for
+some modems you need @samp{ATS0=1} in place of @samp{ATA} (ATA not
+allowed). The extra @samp{\r} expect string is needed that the code can
+grab the full @var{CONNECT xyz\r} string. It will work without the \r,
+but then the logging information will be less detailed. @strong{Right now,
+\r won't work at all, it's not implemented yet. Don't use it.}
+
+@item @code{answer-chat-timeout} @var{secs}
+
+During the @var{answer-chat}, each "expect" string must be seen in the time
+specified here. Default is 80 seconds. This time should be at least some 5
+seconds longer than the time set with the @code{ATS7=...} modem setup
+command.
+
+@item @code{autobauding} @var{yes/no} [-a]
+
+Some modems switch their DTE line speed to the communication line speed
+after connecting, e.g., after sending @samp{CONNECT 2400}, the modem
+switches to 2400 bps. Newer modems usually have a switch to "lock" a DTE
+baud rate, which is strongly recommended. If your modem insists on doing
+this speed switch, setting @code{autobauding} to @var{true} will make
+mgetty behave accordingly.
+
+@item @code{ringback} @var{yes/no} [-R]
+
+If you have to put your modem and your telephone on the same phone line,
+you can switch on "ringback" or "ring-twice". This means, mgetty won't
+answer the phone on the first call, but remember the call, and pick up on
+the second call (if it comes in the time specified by @code{ringback-time}).
+
+@item @code{ringback-time} @var{secs}
+
+This setting specifies how much time may pass between the first and the
+second call if "ringback" is active. Default is 30 seconds.
+
+@item @code{ignore-carrier}
+
+If your Modem does not assert the DCD (carrier detect) line, or the
+serial port or cable or serial driver is broken, it is possible that
+@code{mgetty} or @code{login} will block after a successful CONNECT
+(that means: everything seems to work, but suddenly nothing is sent
+to the port anymore. Depending on the operating system used, this can
+be before printing the @file{/etc/issue} file or not before printing
+the @samp{password:} prompt.
+
+To work around this, you can switch off the carrier detection in the
+kernel: set @code{ignore-carrier true}. Default is @code{false}.
+
+@strong{WARNING:} If you use this, your system won't be able to detect
+when a caller just hangs up instead of cleanly logging out. This may
+result in hanging modems, etc.
+
+@item @code{issue-file} [-i] @var{file}
+
+This is the file printed before the login prompt. Default is
+@samp{/etc/issue}.  Some special characters are substituted by connect
+speed, date, etc. - see below (login-prompt) for a list.  
+
+Note: maximum line length after substitution is 300 characters, so be 
+careful with ASCII art banners with lots of color settings and such.
+
+@item @code{prompt-waittime} @var{msecs}
+
+This specifies how long @code{mgetty} will wait for modem and line to
+settle down before printing issue file and login prompt. Default is 500
+milliseconds.
+
+@item @code{login-prompt} [-p] @var{prompt}
+
+This specifies the login prompt that mgetty will output. Some special
+characters in this string (and in the issue file, btw) are recognized and
+replaced by something else:
+
+@itemize @bullet
+
+@item @@ system name
+@item \n newline
+@item \r carriage return
+@item \g bell
+@item \b backspace (ascii 010)
+@item \f form feed (ascii 013)
+@item \t TAB
+@item \s operating system (OS)
+@item \m hardware name
+@item \V OS version
+@item \R OS release
+@item \P (and \L) port name (e.g. ttyS0)
+@item \C date and time, in "ctime()" format
+@item \I Connection string (e.g. 2400/REL)
+@item \N (and \U) number of users currently logged in
+@item \S Port speed (e.g. 38400)
+@item \D current date in dd/mm/yy format
+@item \T current time in hh:mm:ss format
+@item \Y CallerID of the current caller
+@item \@var{digit} character with the specified octal code
+@end itemize
+
+The maximum lenght of the login prompt is limited to 300 characters (after
+expansion).
+
+@item @code{login-time} @var{secs}
+
+This specifies the maximum time the user can take to log in. If no login
+has occured after that time, @code{mgetty} will hang up. Default is
+@code{MAX_LOGIN_TIME} from @file{policy.h}.
+
+@item @code{fido-send-emsi} @var{yes/no}
+
+Only relevant when mgetty was compiled with @code{-DFIDO}. Controls
+whether mgetty should send a FidoNET style ``EMSI_REQA77E'' packet before
+prompting for login. Default is on. Switch this off if you have FIDO
+support compiled in but experience weird problems with some PPP clients
+(or users!) being confused by that string.
+
+@item @code{login-conf-file} @var{pathname}
+
+Specifies the path and filename of the 'login.config' file that tells 
+mgetty which program to call for login.  See the example login.config 
+file to get some ideas what to do with it.
+
+The file name given will be ignored for security reasons if the file is
+not owned by 'root', or is readable or writeable by anybody else than
+'root' (that is, it must be mode 0600 or 0200).
+
+@item @code{fax-id} [-I] @var{local fax number}
+
+This sets the fax station ID used in fax mode to identify your site to the
+caller (usually this is simply your fax phone number). Default is
+@code{FAX_STATION_ID}.
+
+@item @code{fax-server-file} [-S] @var{poll control file}
+
+Specifies the fax file(s) that is to be sent if someone else calls your
+modem in @emph{fax polling mode}, that is, the caller @emph{receives} a
+document.  
+
+Normally, the file given is a text file, containing the list of G3 files to
+send to the calling machine, one file per line. Comment lines (starting
+with ``#'') are ignored. For backward compatibility, @code{mgetty} does
+check whether the named file is a G3 file itself, in which case this file
+is sent directly (but then, you can only send one page).
+
+Not all modems support fax poll @emph{server} mode, I know that the ZyXEL
+and MultiTech do, and USR does not.
+
+@item @code{diskspace} [-k] @var{kbytes}
+
+This setting tells mgetty the minimum amount of disk space that has to be
+available in the fax spool directory for fax reception to be allowed.
+Default is 1 Mbyte.
+
+@item @code{notify} @var{mail address}
+
+This is the address that will get mails if a fax is received.  If you do
+not want e-mail notification, specify @code{notify} without an e-mail
+address.
+
+@item @code{fax-owner} @var{username/uid}
+@item @code{fax-group} @var{groupname/gid}
+@item @code{fax-mode} @var{perms}
+
+Similar to @code{port-owner/group/mode}, these settings specify the owner,
+group and file mode mgetty will use for incoming faxes. Defaults are taken
+from @code{FAX_IN_OWNER}, @code{FAX_IN_GROUP}, and
+@code{FAX_FILE_MODE}.
+
+@item @code{fax-spool-in} @var{dir1:dir2:dirn}
+
+Specifies a directory, or list of directories, where incoming faxes are
+saved.  Multiple directories are tried in order until, the first one
+that has enough disk space and is writeable is used.
+
+The default setting is taken from @code{FAX_SPOOL_IN} in the Makefile
+usually @code{@FAX_SPOOL_IN@:/tmp} (/tmp is used as fallback).
+
+@item @code{debug} [-x] @var{debug level}
+
+This sets the amount of logging @code{mgetty} will do. A good value is
+@var{4}, more details are seen with @code{5}, and @code{9} is really noisy.
+Try it! The log data is written to the file specified by @code{LOG_PATH} in
+@file{policy.h}, usually this is something like @file{@LOG_PATH@}.
+
+@item @code{gettydefs} @var{gd tag}
+
+If you use the gettdefs feature of @code{mgetty} -- which is @emph{not}
+recommended! -- this specifies the gettydefs tag to use for the given line.
+See @var{man gettydefs}, @var{man mgettydefs}.
+
+@item @code{term} @var{terminal type}
+
+If you are on Linux or similar OSes that have @code{getty} set the
+@code{TERM=xxx} terminal type variable, and have no other method to set it
+(e.g. from @file{/etc/profile} or @file{$HOME/.profile}), @code{mgetty} can
+do it for you. Just specify @samp{@code{term} vt100} or so. I don't think
+it's a good idea to specify the terminal type on a per line base (what if
+all your callers use different terminal types?), so the default is
+@var{unset}.
+
+@end itemize
+
+@c ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+@node Fax, voice, mgetty, Top
+@chapter Fax Operations
+
+Both mgetty and sendfax deal exclusively with raw ``g3'' fax files (``g3''
+stands for ``group 3'', which is the CCITT standard for encoding images for
+fax transmission). You will have to use external programs to create, view
+or print these.
+
+There are two kinds of g3 files, the high resolution type with 204x196
+dpi and the low (``normal'') resolution ones with 204x98 dpi.  If you
+mix up the two, the recipient will get a fax page that is either twice
+or half the proper length. You have been warned.
+
+The width of a fax page is always 1728 pixels, the length is arbitrary
+(though there are some plain paper fax machines out there that limit the
+page length to A4 paper). A typical full page has a length around 2100
+pixels in high-resolution mode.
+
+@menu
+* Convert::         Converting fax files
+* Receiving::       Receiving faxes
+* Sending::         Basic @code{sendfax} usage
+* Polling::         Fax polling using @code{sendfax}
+* Queuing::         Automated fax queuing 
+* Fax-Tools::       Additional tools provided for handling g3 files
+* Scanner::         Using an external fax as a scanner
+* runtime-sendfax::  Runtime configuration: @file{sendfax.config}
+@end menu
+
+@node Convert, Receiving, Fax, Fax
+@section Converting fax files
+
+I recommend getting the @samp{pbmplus} package written by Jeff Poskanzer,
+which includes lots of small programs to convert various bitmap formats
+into a portable intermediate format (@code{pbm}) that can easily be
+converted to fax format with the @code{pbm2g3} program. Further, it comes
+with lots of tools to scale, flip, and otherwise manipulate the @code{pbm}
+bitmaps. Be warned: it includes its own version of G3 conversion programs
+(@code{pbmtog3} and @code{g3topbm}), so be careful which one you use.
+The programs in the @code{mgetty} package (@code{pbm2g3} and
+@code{g32pbm}) behave slightly different (that is, they work!), and are 
+significantly faster.  Note that the @code{pbmplus} package does not 
+include a graphical front end.
+
+The @file{pbmplus} package can be found on most major FTP sites, e.g. on
+ftp.x.org in the @file{/contrib} directory. @xref{ftp}.
+
+If you want to view the images using X11, you should get one of the many
+image viewers, like @samp{xview}, @samp{xloadimage} or @samp{xv}.
+@xref{Fax-Tools}. A simple, but very fast fax viewer can be found in
+@file{mgetty/frontends/X11/}.
+
+Here are some examples for viewing fax files using @code{g32pbm}:
+
+@itemize @bullet
+@item
+You can print a fax on a PostScript printer (try @samp{lpr -Pps} if you
+don't have @samp{lp}):
+
+@example
+cat $faxfile | g32pbm | pnmtops -noturn | lp -dest postscript
+@end example
+
+@item
+or on an Epson-LQ, scaled for fine resolution (use -yscale 1.84 for
+normal resolution):
+
+@example
+cat $file | g32pbm | pnmscale -xscale 1.76 -yscale 0.92 |\
+    pgmtopbm | pbmtodot -360x180| lp -o epson -
+@end example
+
+@item
+or you could view it using X11 via one of the following commands:
+
+@example
+$ viewfax -v $file
+
+$ cat $file | g32pbm >/tmp/fax.pbm ; xloadimage /tmp/fax.pbm
+
+$ g32pbm $file | xv -
+@end example
+
+@end itemize
+
+There are three easy ways to create g3 fax files, either use @code{pbm2g3}
+(included in this package. Do not use @code{pbmtog3} from the pbmplus 
+toolkit. @xref{pbmtog3}.), use GhostScript (GNU Software, can be found on
+prep.ai.mit.edu) which contains a ``digifax'' driver that will produce the
+required format, or try Chris Lewis' @samp{hp2pbm} package which will
+convert HP Laserjet print files into g3 fax files (@code{hp2hig3}
+program).
+
+Once you have the right tools, there are lots of ways to create fax files
+for a wide variety of applications. Here are some examples:
+
+@itemize @bullet
+@item
+Ascii files can be converted using @samp{pbmtext | pbm2g3} (use a
+@emph{large} font, and don't convert texts longer than about 50 lines).
+Alternatively, you can convert ascii files to PostScript using
+@samp{psify}, the @samp{pslp.ps} program from the ghostscript
+distribution, or similar tools, and feed their output into GhostScript.
+
+@item
+PostScript input can be converted by GhostScript (version 2.4 or
+higher), using the digifax (@samp{dfaxhigh} and @samp{dfaxlow}) drivers.
+It will generate a plain g3 file with a 64 byte additional header, which
+will be skipped automatically. (You have to generate separate g3 files,
+one per page). 
+
+A typical call to ghostscript would look like this:
+
+@example
+gs -sDEVICE=dfaxhigh -sOutputFile=/tmp/fax.g3.%d yourdocument.ps
+@end example
+
+Do @emph{not} use the ``tiffg3'' or similar drivers, they will create output
+files with headers that sendfax does not understand, thus causing the
+receiving fax machine to reject the data (it will assume that the
+transmitted headers are garbled data).
+
+If you use Ghostscript version 3.01 and up, you can use the @samp{faxg3}
+driver as well, its output is identical to the output of the
+@samp{dfaxhigh} driver except for the 64 byte header.  Besides this,
+there should not be any difference.
+
+I have observed that with Ghostscript 5.01, the output of the @samp{faxg3}
+driver is rendered better than that of the @samp{dfaxhigh} driver. In
+addition, the former is compiled-in by default, while the latter is not.
+Thus, the default driver used by @code{faxspool} is now (starting with 1.1.7)
+the @samp{faxg3} driver.
+
+@item
+Bitmaps can be converted using the @samp{pbmplus} tools, but you'll have
+to do the proper scaling by hand. Use a pipeline with @code{pbm2g3} at the
+end.
+
+@item
+@TeX{} dvi files can be converted to PostScript using @samp{dvialw} or
+@samp{dvips}. If you want to get the best possible output quality, you can
+use Metafont to create a set of 204x196 dpi fonts, which will look a lot
+better than scaled 300 dpi fonts (look into @file{contrib/dvi-fax} for
+instructions how to do this). You can use the @code{epsf} macros to include
+encapsulated PostScript files, e.g. a scanned signature.
+
+@item
+Another way for @TeX{} file conversion is Ralf Schleicher's @code{faxdvi}
+package, found at
+@file{ftp://ftp.leo.org/pub/comp/os/unix/networking/mgetty/faxdvi-1.1.tar.gz}. Don't
+ask me about, ask him!
+
+@item
+HP-Laserjet files can be translated with Chris Lewis' @file{hp2pbm}
+package. It contains a program @code{hp2hig3} that will read
+HP-Laserjet @file{PCL4} files and produce G3 output.
+
+@strong{Warning:} the G3 files that hp2hig3 emits lack the leading EOL
+code, thus causing @code{sendfax} to complain and possibly fail. As a quick
+fix, you can pipe those files through @code{g3cat}, it will fix the data.
+
+@end itemize
+
+A rather crude sample conversion program (@code{faxcvt}) is provided in
+the fax directory.
+
+Better conversion, including guessing of the format of the input files,
+is done by the @code{faxspool} program, also provided in the fax
+directory. @xref{Queuing}.
+
+
+@node Receiving, Sending, Convert, Fax
+@section Receiving faxes
+
+If everything has been set up properly, faxes will be received
+automatically. Obviously, mgetty has to be listening to the proper modem
+line. Then, if a fax arrives, mgetty will store it in the directory
+@code{FAX_SPOOL_IN} (or the directory configured in @file{mgetty.config}, 
+@pxref{runtime-mgetty}) and send a mail to @code{MAIL_TO} (defined 
+in @file{policy.h}).
+
+The file name format is somewhat tricky (the reason behind it is that I
+have to create something unique without using @code{mktemp()}, because that
+would make it impossible to find out which pages belong to which fax). It
+is:
+@example
+f<res><seq><line>[-<remote id>].<pagenr>
+@end example
+@code{<res>} is @code{n} or @code{f}, depending on the resolution of the
+fax. @code{<seq>} is a sequence number, 7 digits wide, somewhat related to
+the reception time. @code{<line>} are the last two letters of the tty
+device, e.g. @file{S1}. If the sending side specified a fax station id,
+it comes next, after a leading dash (all blanks are replaced by dashes).
+Finally, after a dot, you'll see the page number.
+
+
+If you want to process incoming faxes automatically, for example, print
+them, re-send them to another fax, send them by mail to you when you're on
+vacation, you could use what I call ``notify programs'':
+
+If you define @code{FAX_NOTIFY_PROGRAM} in @file{policy.h}, mgetty
+will call this program (or shell script) when a fax has been completely
+received. It will be called with the following command line arguments:
+
+@example
+FAX_NOTIFY_PROGRAM @var{<hangup code>} '@var{<sender id}>' @var{<nr of pages>} \
+                   @var{<file name page 1>} @var{<file name page 2>} @dots{}
+@end example
+
+@var{<hangup code>} is 0 if the receive was successful, non-zero
+otherwise.  @var{<sender id>} is the fax identification string received
+from the other side.  @var{<file name page (i)>} is the full path name for
+each received page.
+
+A sample command line might look like this:
+
+@example
+@BINDIR@/new_fax 0 "+49 89 3243328" 1 @FAX_SPOOL@/ff-01.a123
+@end example
+
+In addition, some environment variables are provide: @code{CALLER_ID},
+@code{CALLER_NAME}, @code{CALLED_ID} (Caller ID and destination ISDN MSN,
+if available and supported by your modem), and @code{DEVICE} (the full 
+name of the tty device, if you want to process faxes differently 
+depending on the line they came in).
+
+Such a ``notify program'' could print out the fax, convert it into a MIME
+metamail and send it away, display it in an X window (this a little bit
+tricky), or whatever. (A friend of mine uses it on his Linux box to call a
+program that will make the keyboard LEDs blink when a fax has arrived -- as
+you can see, maximum flexibility is possible).
+
+I provide a few examples (printing on HP laserjet, mailing as gzip'ed,
+uuencoded pbm file, @dots{}) in @file{samples/new_fax.*}
+
+
+If you have the @code{dialog} shell tool, you can use the @code{faxv}
+program (``faxview'') that I provide in @file{frontends/dialog/faxv} to
+browse through all faxes in the incoming spool directory, view them, print
+them, rename and move them, @dots{}. @file{faxv} is really more a sample
+program to show you how to do it, and you have to configure the X11 viewer
+and the printing program in the source code, but I use it for my faxes, and
+it works. Because of limitations on some operating systems, the list of
+faxes displayed is limited to the last 50 faxes received.
+
+
+@node Sending, Polling, Receiving, Fax
+@section Basic @code{sendfax} usage
+
+Sendfax is very primitive---no spool management, no format conversion,
+etc.  It is designed to be able to send exactly one fax (consisting of
+multiple pages) to exactly one fax machine, but it is usable from
+within shell scripts.  Its input are pages in ``g3'' format, either
+created with ghostscript or with pbm2g3.
+
+It is called like this:
+
+@example
+sendfax [-v] [-n] @var{<phone-number>} @var{<fax page(s)>}
+@end example
+
+e.g.
+
+@example
+sendfax 0893243328 /tmp/to_gert_1.g3 @FAX_SPOOL_OUT@/picture.g3
+@end example
+
+It will then attempt to open the fax device and send all the pages to
+the remote fax machine, in the given order.
+
+It will print little or nothing to stdout or stderr, except if it cannot
+find or open one of the named files, or if some transmission errors occur.
+
+(There are a few stubs in the code to put headers on the pages at run-time,
+but since most class 2 faxmodems do not implement the command set properly,
+putting a header on a page does not work with them - because of that, I had
+to disable the corresponding code. @code{faxspool} works around this
+problem by using @code{g3cat} (@pxref{Fax-Tools}) to ``paste'' a header
+line on top of each page)
+
+If you specify @samp{-v}, sendfax will output more verbose progress
+messages.
+
+If you specify @samp{-n}, it will try to send the fax data in normal
+resolution, default is fine resolution. (No conversion is done, so make
+sure that your input data is already in the proper format.)
+
+Detailed reports can be found in the log file (usually
+@file{@FAX_LOG@}) --- but they may be of little more than
+technical interest since virtually all conversation with the fax modem is
+logged. (Nevertheless, if you send me any bug report, @emph{please include
+all log files})
+
+@strong{Warning:} Watch sendfax closely when sending the first few
+faxes. I had it abort a transfer a couple of times, not being able to
+recover and @emph{not} hanging up the modem (the modem was completely
+locked up, with the phone line off-hook)! In my case, it was a problem
+of the modem that went away when I upgraded the firmware. Very old
+ZyXEL releases sometimes stopped the DTE and forgot to re-start it again.
+
+The return codes of the sendfax program were chosen to make it easy for
+external programs (i.e. faxrunq) to decide whether to try again or not:
+
+@example
+ 0: all pages transmitted successful
+ 1: error on command line
+ 2: cannot open fax device (typically happens if fax device is
+    locked, but could also be a permission problem)
+ 3: error initializing the modem
+ 4: dial failed, "BUSY"
+ 5: dial failed, "NO DIALTONE"
+10: dial failed, "ERROR" or "NO CARRIER"
+11: waiting for XON failed (should never be seen)
+12: transmitting page(s) failed (or polling failed)
+15: some catastrophe hit (termination signal or blocked modem)
+@end example
+
+If the error code is less than 10, the attempt didn't cost anything, so an
+external program should try again to send the files. If it is 10 or higher,
+the failed attempt probably cost something, and the program should decide
+whether to try again (thus expending more money) or mail the operator and
+tell him something went wrong. My @code{faxrunq} program will suspend the
+job after five unsuccessful tries with error codes >= 10.
+
+@node Polling, Queuing, Sending, Fax
+@section Fax polling using @code{sendfax}
+
+Sendfax can also be used for fax polling (that is, you call someone and
+initiate a fax connection, and then @emph{receive} a document. Don't
+confuse it with fax-on-demand, this is something different), the syntax is:
+
+@example
+sendfax -p @var{<fax-number>}
+@end example
+
+
+or for sending a fax and then switch to polling:
+
+@example
+sendfax -p @var{<fax-number>} @var{<send-documents>}
+@end example
+
+(in this case @var{<send-documents>} are sent, and then the documents
+from the other modem are polled, if there are any)
+
+the received pages are written to the current directory, so make sure
+you have write access...
+
+
+@strong{Warning:} Fax polling does @emph{not} work with ZyXEL Modems
+with ROM releases before 6.00 - with the 6.01 and 6.10 Eproms it works,
+but 6.11a is broken again. 6.12 and 6.13 work fine.
+
+It definitely doesn't work with some Rockwell-based Faxmodems (Supra), 
+since many versions of this chipset does not support polling. Some work,
+though, so you simply have to try it.
+
+Could anybody try this with an Everex Faxmodem?
+
+
+@node Queuing, Fax-Tools, Polling, Fax
+@section Automated fax queuing 
+
+For fax spooling and processing the queue, four additional utility
+programs are provided:
+
+@itemize @bullet
+
+@item
+@code{faxspool} will spool a number of files (accepting various formats)
+and put them into the fax spool directory. Its syntax is:
+
+@example
+faxspool [options] phone-number input-file(s)
+@end example
+  
+@samp{phone-number} can be an alias, in this case the private and global
+alias files @file{$HOME/.faxnrs} and @file{@CONFDIR@/faxaliases} will be
+searched for a line starting with this alias. The remainder of this line
+will then be used as fax number.
+
+@code{faxspool} interacts with the @code{file} program and
+@file{/etc/magic} to determine the file type of the input files. If your
+@file{/etc/magic} lacks entries for the various bitmap files, take a look
+at @file{fax/etc-magic}, it contains the most important magic numbers.
+
+@code{faxspool} reads the text to put on top of each fax page from a text
+file. The text file is (in order of precedence) the argument of the option
+-h, the @file{$HOME/.faxheader} and as system-wide default
+@file{@CONFDIR@/faxheader}. This file must
+contain pure ASCII text. Some tokens are replaced by the actual values:
+@@T@@ becomes the destination phone number, @@P@@ becomes the actual and
+@@M@@ the total page number, and @@U@@ is replaced by the user name. If
+your fax modem cuts of a few lines on top of each page, it may be a good
+idea to put a blank line before the header line itself, and it is also a
+good idea to indent the line about 5 spaces.
+
+For the available options, please read the @file{faxspool.1} man page.
+
+@item
+@code{faxrunq} will read this directory and try to send all the faxes
+queued there (time scheduling is available, but primitive). If faxrunq
+succeeds, the fax is deleted and the sender is mailed. If it does not
+succeed after five tries (@samp{BUSY} or a locked fax modem do
+@emph{not} count for this) it will send a mail and not try any further
+to send this fax. (This should prevent your faxmodem from making you
+bancrupt@dots{}).
+
+@code{faxrunq} should be called at regular intervals from @code{cron} to
+process the queued jobs. It should only be executed by @emph{root}, to
+make sure that all the files in the fax spool directory are read- and
+writeable.
+
+
+@item
+@code{faxq} will display all entries in the fax queue. If called with
+the @samp{-o} parameter, it will also display completed, but not yet
+deleted jobs (JOB.done files). If called with the @samp{-v} parameter, the
+output will be more verbose.
+
+Jobs that are just being sent are not shown (@code{faxq} doesn't see locked
+jobs)
+
+@item
+@code{faxrm} can be used to remove fax jobs from the queue. It is called
+with the job ids of the to-be-removed faxes as command line argument. The
+job ids are those that @code{faxq} returns.
+
+@end itemize
+
+These utilities do still have some rough edges, but I think they are fairly
+usable by now.
+
+Earlier variants of those utilities had to be configured in the source
+code, from release 0.20 on, this is done by @code{make}. Please check the
+scripts nevertheless, whether all directories and files are set up
+properly.
+
+@node Fax-Tools, Scanner, Queuing, Fax
+@section Additional tools for working with g3 files
+
+Some additional tools are provided for manipulating G3 fax files:
+
+@itemize @bullet
+@item 
+@code{g3cat} (in the @file{g3/} directory) concatenates multiple G3
+fax files. It accepts ``raw'' g3 files and digifax files and outputs a
+``raw'' g3 file without headers. Its syntax is analogous to
+@code{cat}, except that you @emph{have} to specify @file{-} to read
+from @file{stdin}.
+
+@code{g3cat} recognizes two flags: @code{-l}, to separate the fax files
+with a thin black line, and @code{-a} to byte-align the end-of-line
+codes in the file (Warning: some modems do not like this).
+
+@item
+To convert an incoming fax to Jef Poskanzers @file{portable bitmap}
+(@code{pbm}) format, you can use the @code{g32pbm} program that is
+also provided in @file{g3/}. It's advantages over Jef's
+@code{g3topbm} program are that it's approximately five times faster
+and takes only one eigth as much virtual memory (on machines with low
+virtual memory, it can thus be up to 100 times faster!). Its disadvantage
+is that it produces only ``raw'' (i.e., binary) @file{pbm} files; and
+it's not as stable when handling erroneous @file{g3} data (means that
+if one line is severly corrupted, it can happen that the next line
+will not be decoded properly. The rest of the file will then be OK
+again).
+
+Syntax:
+@example
+g32pbm [-r] [-s] [-l] [-d <dpi>] [g3-file]
+@end example
+
+If no g3 file is specified, standard input is used.
+
+The @code{-s(tretch)} option causes @code{g32pbm} to double each row of
+the g3 file.  You can use this to adjust the aspect ratio of a "normal"
+resolution fax file to match that of a "fine" resolution fax.  Of course
+you can use other @code{pbmplus} tools for this instead, but 
+@code{-s} is sure to be faster.
+
+If you have a HP Laserjet printer, you can make @code{g32pbm} output HP
+LJ data with the @code{-l} switch. The desired resolution is chosen with
+the @code{-d 75|150|300} switch.
+
+@item
+For the other direction, I have provided a @code{pbm2g3} program that will
+convert Jef Poskanzer's Portable BitMap format into G3 fax data suitable
+for faxing with @code{sendfax}. The @file{pbm} files can be produced by
+various sources, e.g. drawing programs (@code{xpaint}), bitmap manipulation
+programs (@code{xv}), or simply be converted from other file formats by
+means of the @file{pbmplus} tools.
+
+As above, my variant is a lot faster than Jef's, and unlike his, it
+produces g3 data that adheres to the T.4 standard (if you don't fiddle too
+much with the options...), so you don't have to apply any patches to make
+it work together with @code{sendfax}.
+
+Syntax:
+@example
+pbm2g3 [-r] [-a] [-w page with] [-h blank lines] [pbm-file]
+@end example
+
+if no pbm file is specified, standard input is used.
+
+For a detailed description, see the @file{pbm2g3(1)} man page.
+
+@item
+@code{viewfax}. To view G3 data files under X11, Frank D. Cringle has
+written a very nice and fast tool that will display the files on screen,
+turn them, zoom them in and out, @dots{}
+
+The source code can be found in the @file{mgetty/frontends/X11} directory.
+It's not (yet) built and installed by default, but it's straightforward.
+
+For a detailed description, see the @file{README} and @file{viewfax.man}
+files in that directory.
+
+@item
+To convert an incoming fax into X-Windows @file{xwd} bitmaps, you can
+use Chel van Gennip's @code{g3toxwd} program, found in the
+@file{contrib/} directory.
+
+@item
+If you want to print out faxes on a HP laserjet printer, you have two
+opions: you can use Chel's @code{g3tolj} program (also in the
+@file{contrib/} directory), or you use my @code{g32pbm} program with the
+@code{-l} option, which will make it output LJ data.
+
+@end itemize
+
+@node Scanner, runtime-sendfax, Fax-Tools, Fax
+@section Using an external fax as a scanner
+
+It is possible to tell mgetty to answer the phone even if it is not
+ringing (I call this ``virtual rings''). Just send mgetty a signal
+@code{SIGUSR1}, this is usually done with @samp{kill -USR1
+@var{<mgetty-pid>}}.  Mgetty will then pick up the phone and try to make a
+connection.
+
+If you have a normal fax machine connected to the fax modem, it should
+be possible to have that fax machine dial any digit (to turn off the
+dial tone), and then have mgetty answer the phone to receive the
+``incoming'' fax, thus using the fax machine as scanner without paying for a
+call. For a description of an sample setup (thanks, caz!), please see
+@file{doc/scanner.txt}.
+
+Whether it works may depend on your phone company's setup, but it should.
+
+If you have a modem that has a @samp{data/voice} button, it should also be
+possible to hit that button to make the modem pick up the phone. Mgetty
+will automatically notice that and handle it properly. (I've tested this
+only with ZyXELs - could somebody else please test this with other modem
+types and send me a logfile? Thanks)
+
+@node runtime-sendfax,  , Scanner, Fax
+@section Runtime configuration for sendfax: @file{sendfax.config}
+
+Basically, @code{sendfax} can work very well with the compiled-in defaults
+(from @file{policy.h}), sometimes slightly modified by command line
+options.
+
+If you use more than one fax modem, possibly of different type, this is
+very awkward, because the command line will get very long. For that reason,
+there is a configuration file which will control nearly every detail of
+sendfax' behaviour.
+
+It is usually named @file{@CONFDIR@/sendfax.config}.
+
+The config file consists of multiple sections, separated from each other by
+the keyword @samp{port}. All configuration options given before the
+first @samp{port} statement specify global options, and everything between
+two @samp{port} statements applies only for the device with the given name
+(@samp{port} takes an argument). Let me show you an example:
+
+@example
+# global defaults:
+# fax station id is always the same
+fax-id ++49-89-1234
+# always have the speaker on
+modem-init ATM1L3
+
+# port specific: for /dev/tty1a, switch the speaker off
+port tty1a
+modem-init ATM0L0
+
+# port specific: for ttyS1, use another fax station id
+port ttyS1
+fax-id ++1234567
+@end example
+
+As you can see, empty lines and comment lines (starting with "#") are
+allowed.
+
+Every line in the config file that is not a comment - or empty - starts
+with a keyword (listed in detail below), followed by a "data" field. In the
+example above, @samp{fax-id} is the keyword, @samp{++49-89-1234} is the
+corresponding data, the fax ID for the sending machine. Most data fields
+are strings, but there are a few boolean and integer items.
+
+The available keywords are (if it's possible to set this item from the
+command line, the flag is given in brackets).
+
+@itemize @minus
+@item @code{fax-devices} [-l] @var{ttys}
+
+Sets the fax modems to use, e.g. @samp{tty1a:tty2a}. Default is
+@code{FAX_MODEM_TTYS} from @file{policy.h}. The device names given here are
+used to look up the corresponding @code{port} section later. Watch out for
+upper-/lowercase.
+
+It is not very useful to specify this in the per-port section, so it is
+ignored if met there.
+
+@item @code{modem-init} [-m] @var{command}
+
+Specifies an @samp{AT...} command that is to be sent to the modem right at
+the @strong{beginning} of all modem talk (even before setting the modem
+into fax mode, so this could be an @samp{ATZ} if you want to reset the
+modem).
+
+@item @code{modem-handshake} @var{command}
+
+Specifies an @samp{AT...} command that will be sent to the modem at the
+@strong{end} of the modem initialization, right before dialing. @strong{Do
+not use ATZ or such here}, since resetting the modem will switch off fax
+mode. Default is @code{FAX_MODEM_HANDSHAKE}.
+
+@item @code{modem-type} [-C] @var{type}
+
+Force the modem command set to use. Default is @samp{auto} (auto-detect,
+which may not work on very cheap modems), possible other values are
+@samp{cls2}, for ``class 2 only'' modems, and @samp{c2.0} for ``class 2.0''
+faxmodems. Default is @code{DEFAULT_MODEMTYPE}. @xref{runtime-mgetty}.
+
+@item @code{modem-quirks} @var{bitmask}
+
+Same as in @code{mgetty}, this can be used to adapt @code{sendfax} to
+some peculiarities in certain modems. @xref{runtime-mgetty}.
+
+@item @code{max-tries} @var{nnn}
+
+Specify the maximum number of tries per page if the receiving end reports
+reception errors. If @var{nnn} tries do not suffice to successfully
+transmit a page, @code{sendfax} will give up or simply go on, depending on
+the setting of @code{max-tries-continue} (see below). If this is set to
+@samp{0}, @code{sendfax} will ignore retransmission requests and simply go
+on.  Default is @code{FAX_SEND_MAX_TRIES}.
+
+@item @code{max-tries-continue} @var{y|n}
+
+After the maximum number of tries for one page are reached, @code{sendfax}
+can report an error and abort (@code{max-tries-continue @var{no}}), or go
+on with the next page (@var{yes}).
+
+For ``mission critical'' faxes, I'd set it to @var{no}, but since the page
+quality is most often quite good even if reported as ``page bad'', the
+default is @var{yes}.
+
+@item @code{speed} @var{baudrate}
+
+Set the port speed to use for fax send operations. Usually, @samp{38400} is
+a good choice, but a few dumb modems (for example, some based on rockwell
+chipsets) need @samp{19200} or even @samp{9600}. A few modems can go
+higher, but @code{sendfax} may not support it, and it may not always work.
+Default is @code{FAX_SEND_BAUD}.
+
+@item @code{switchbd} @var{baudrate}
+
+On some (very few) modems it is necessary to start with baudrate "A" and
+switch to baudrate "B" after sending the @samp{AT+FCLASS=2} command. If you
+specify this, @code{sendfax} will switch from @code{speed} to
+@code{switchbd} right after setting the modem to class 2/2.0. Default is
+@code{FAX_SEND_SWITCHBD}, I'd recommend @strong{not} using it unless you're
+sure that you need it.
+
+@item @code{open-delay} @var{msec}
+
+A few modems respond to raising the DTR line (when opening the device)
+with @samp{OK}.  This can confuse @code{sendfax}, because it will see
+this OK as response to the next command.  In the log file, you can see if
+your modem exhibits this problem if the echo of each @code{AT} command 
+can be seen when waiting for the response to the @emph{next} @code{AT} 
+command.  With @code{open-delay} you can give a number of milliseconds to
+wait after the device is active until sendfax flushes all incoming
+responses and goes ahead.
+
+The only modems that need this so far are an ELSA 33.6 and an ELSA
+MicroLink 56k, and delaying for about 1500 ms cured the problem.
+
+@item @code{ignore-carrier} @var{y|n}
+
+Some misbehaving modems lower the DCD (carrier detect) line briefly
+between sending multiple pages.  Depending on the operating system used,
+this may cause all subsequent port accesses on this serial port to fail.
+You'll recognize it if you get a ``weird-looking'' sendfax log file that works
+fine up to the end of the first page, and then aborts with @samp{I/O
+error} or so.
+
+In earlier versions, you could achieve this by setting
+@code{FAX_SEND_IGNORE_CARRIER} in @file{policy.h}, but this has been
+removed.  Use the config file instead.
+
+Modems where this is known to be necessary include all USR modems
+(Courier and Sportsters), some ZyXEL 1496 EG(+), and some GVC models.
+
+The default is @code{ignore-carrier yes}, as there are just too many users
+out there to read documentation, and it does less harm that way.
+
+@item @code{dial-prefix} @var{command}
+
+This is the command used for dialing out. Usually this will be something
+simple, as @samp{ATD} or @samp{ATDP}, but if you have an unusual setup, it
+could also be something like @samp{ATX0DP0;X4DT} (meaning: switch off
+dial-tone detection, pulse-dial @samp{0}, back to command mode, switch on
+dial-tone detection, and go ahead dialing with touch tones). The phone
+number will be sent right after the @code{dial-prefix}. Default is
+@code{FAX_DIAL_PREFIX}.
+
+@item @code{fax-id} [-I] @var{your fax phone}
+
+specifies the "fax station id" used to identify your fax machine to the
+receiving end. Usually this is the telephone number of your own fax
+machine, but if you want to (and if your modem support it), you can put up
+to 20 alphanumeric characters here, e.g. @code{+1-11-222 Fred}. Default is
+@code{FAX_STATION_ID}.
+
+Watch out: the @code{faxspool} program @emph{only} uses the @emph{global}
+definition from sendfax' config file, so the fax id it puts on the header 
+might not be the same as the one transmitted by sendfax, if you use port
+specific settings for @code{fax-id} in @file{sendfax.config} (Paul Sands).
+
+@item @code{poll-dir} [-d] @var{full path}
+
+This is used to specify a directory where polled faxes (wheather maps and
+such) are to be saved into. Default is the current directory.
+
+@item @code{normal-res} @var{y|n} [-n]
+
+If set to @samp{yes} or @samp{true} (boolean), @code{sendfax} won't attempt
+to make a fax connection in "fine resolution" mode. Normally you won't need
+to use that option, since @code{faxrunq} will set the @code{-n} switch if
+needed.  Default is @samp{no}
+
+@item @code{fax-min-speed} @var{speed}
+
+Sets the lowest transmission speed that the modem will negotiate with
+the receiving modem. (Not implemented yet).
+
+@item @code{fax-max-speed} @var{speed} [-M]
+
+Sets the maximum transmission speed that the modem will negotiate with the
+fax receiver.  Usually, you don't need this, as decent modems will pick
+the best speed automtically, but sometimes (e.g. for the USR Courier
+series) this doesn't always works, and transmission fails with +FHS:25. 
+If you see that error, you might want to try @code{fax-max-speed 7200}.
+
+@item @code{verbose} @var{y|n} [-v]
+
+If set to @samp{yes} or @samp{true}, @code{sendfax} will output progress
+reports on stdout, if set to @samp{no}, @code{sendfax} will only print
+error and warning messages. Default is @samp{no}.
+
+@item @code{debug} [-x] @var{nn}
+
+controls the amount of information written into the fax log file
+(@code{FAX_LOG} in @file{policy.h}). @samp{0} means "totally silent" (not
+even errors are written), @samp{9} is really noisy. I usually use @samp{3}
+or @samp{4} in normal use, and @samp{6} for debugging. Default is
+@code{LOG_LEVEL}.
+
+@item @code{page-header} [-h] @var{file}
+
+Yet unused (because of implementation shortcomings in all tested modems)
+
+@end itemize
+
+To show you how it will look like, I have included a sample
+@file{sendfax.config} file below. Three modem lines exist on my system, all
+modems have different initialization and flow control commands, and on one
+line I have to tell the modem to use pulse dial because the PBX is too old.
+
+@example
+#
+# sample configuration file for sendfax
+#
+
+# global settings
+verbose y
+# the modems are attached to the following ports:
+fax-devices tty1a:tty2a:tty4c
+
+# this is my fax number
+fax-id +49-89-xxxxxx
+
+# generic defaults
+modem-init ATL3M1
+dial-prefix ATD
+debug 4
+
+# port specific overrides
+
+# Zoom 28K8
+port tty1a
+  modem-handshake AT&K4
+
+# MultiTech
+port tty2a
+  dial-prefix ATDP
+  modem-handshake
+#                ^^^ this means "no extra command to set modem handshake"
+  debug 9
+
+# ZyXEL 
+port tty4c
+  modem-init ATM1L2
+  modem-handshake AT&H3
+
+@end example
+
+@c ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+@node voice, Problems, Fax, Top
+@chapter Voice Operations
+
+This chapter explains how you can use mgetty to implement an answering
+machine if you have a modem that understands the voice command set
+(i.e. the ZyXEL). 
+
+The first version of these extentions was written by Klaus Weidner. 
+
+Since February 1995 these extentions are now developed and maintained 
+by Marc Eberhard (Marc.Eberhard@@Poseidon.ThPhy.Uni-Duesseldorf.DE).
+Since late 1998, Marc Schaefer (schaefer@@alphanet.ch) took over
+vgetty development. Please see
+http://www-internal.alphanet.ch/~schaefer/vgetty.html for vgetty
+specific information, patches and releases, and please
+send email about the voice features to him, not to me.
+
+@strong{I have removed the whole chapter from the documentation for 
+now, as the voice stuff has changed too much, but the docs were not
+updated accordingly. Please see the programs and examples in the 
+@file{voice} subdirectory for ideas how to get it going. Configuration is
+explained in @file{voice.conf}}.
+
+The @file{voice} subtree is @strong{NOT} included in the official release
+1.0, because of the lack of documentation, and because Marc thinks it's
+not stable enough yet.  It @emph{is} included in the 0.99 and 1.1 beta
+development trees, so if you want to play with it, get one of those
+version. @strong{BUT} keep in mind what ``beta'' means: lacking 
+documentation, problems, crashes, whatever.
+
+@c ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+@node Problems, Thanks, voice, Top
+@chapter Common problems and solutions (TROUBLESHOOTING)
+
+This chapter tries to describe some known problems that can occur when
+installing or using this package. Don't worry, most of these have been
+solved.
+
+@menu
+* Modems::          Modems
+* Systems::         Operating Systems
+* General::         General problems
+* logfiles::        Sample Log files
+* ftp::             Where to find the programs mentioned (FTP)
+* get-uucp::        How to get the software via UUCP
+@end menu
+
+
+@node Modems, Systems, Problems, Problems
+@section Modems
+
+This section describes problems that can occur when using various types
+of modems. Unfortunately, the class 2 fax implementations vary quite a
+bit between different manufacturers.
+
+Many of the instructions for certain modem types below still refer to
+changing @code{#define}s in @file{policy.h} instead of listing the
+appropriate @file{mgetty.config}/@file{sendfax.config} lines, mainly
+because I haven't had the time to figure it out myself and didn't get
+enough feedback from config file users yet.
+
+@menu
+* Common::          Problems common to many modem types
+* Zyxel::           ZyXEL U1496 modem series
+* TelelinkIMS08::   Telelink IMS 08 Faxline + Modems
+* Rockwell::        Rockwell-based modems, e.g. Supra
+* Zoom-vfast::      Zoom VFP/VFX 24K FaxModem (V.FAST 24,000 Modem)
+* Best14496EC::     Best 14496 EC Faxmodem
+* GVC::             GVC FM-144Vbis+/1 (Rockwell-Based)
+* creatix::         CREATIX modems (Rockwell-Based)
+* Telekom::         German Telekom approved GVC modems
+* Dallas::          Dallas Fax 14.4
+* Everex::          Everex
+* Exar::            Exar 9624 fax modem
+* Tornado::         Tornado / Lightspeed modems
+* Zoltrix::         Zoltrix Platinum Series 14.4 (Rockwell-Based)
+* MultiTech::       MultiTech modems
+* ELSA::            ELSA analog/ISDN faxmodems
+* USR::             US Robotics Courier/Sportster Data/Faxmodems
+* Elink-ISDN::      Elink ISDN Terminal Adaptors (``ISDN Modems'')
+* i4l::             ISDN 4 Linux support
+* i4l-capi::        ISDN 4 Linux with CAPI (capi4linux)
+* Class 1::         Class 1 Faxmodems
+@end menu
+
+@node Common, Zyxel, Modems, Modems
+@subsection Problems common to many modem types
+
+@itemize @bullet
+@item
+Disable auto-answer in the modem (@code{ATS0=0}), because it will interfere
+with the manual answer done by @code{mgetty}. If you @emph{have} to use
+auto-answer, set the @code{mgetty} ring-counter (@code{-n <i>}) high enough
+that @code{mgetty} will never try to answer the phone manually.
+
+@item
+Make sure that your modem is set to return @emph{verbose result codes},
+that is, set @code{ATV1}. Otherwise, the modem won't return @samp{CONNECT}
+or @samp{RING} but @samp{1} or @samp{2} as result code, and mgetty
+definitely doesn't understand that. By default, @code{mgetty} sets
+@code{ATV1} automatically, but if you change the init sequence, watch out
+for this.
+
+@item
+Make sure that your modem is set to the proper dialing type (@code{ATT&W}
+for touch-tone, @code{ATP&W} for pulse dialing) --- @code{sendfax} uses
+@code{ATD...} to dial out, assuming that the modem knows which dialing
+method to use. Alternatively, set @code{FAX_DIAL_PREFIX} in @file{policy.h}
+or @code{dial-prefix} in @file{sendfax.config} accordingly.
+
+@item
+If the default modem initialization string in @file{policy.h}, which is
+quite generic, doesn't work for your modem, you can either change it
+according to your needs, or store all settings in the non-volatile RAM
+(NVRAM) inside the modem and change the initialization strings to plain
+@code{ATZ} (modem reset).
+
+These settings ought to work with most modems:
+
+@code{ATS0=0}: do not auto-answer, @code{E1}: echo on, @code{Q0}: send
+modem responses, @code{&D3}: reset on DTR->low.
+
+The following, for example, are ZyXEL specific things:
+
+@code{&H3}: set handshake to RTS+CTS,
+@code{&N0}: ``multi-auto'' connect, accept all known protocols,
+@code{&K4}: enable v42bis/mnp5 compression.
+
+Naturally, you can use any init string you want (but the modem has to
+return OK) --- check with your modem manual.
+
+@item
+On USR and some ELSA Modems, it has occasionally been reported that the 
+initialization phase runs through fine, but incoming @code{RING} messages 
+are not recognized, and mgetty complains about @samp{junk on the line}. 
+In all those cases, it were baud rate problems. The modem was initialized 
+with an init-sequence of @code{"" ATZ OK} only. Problem with this is, 
+after ATZ, the modem changes to the DTE baud rate that the last AT&W 
+command was sent with. If that baud rate differs from the @code{mgetty} 
+port speed, a RING won't be detected.  Fix is easy: send another 
+@code{AT} command after the @code{ATZ}. For example, make the init 
+sequence @code{"" ATZ OK AT OK}. The second @code{AT} command will 
+set the modem back to the mgetty port speed.
+
+@item
+Some modems do not like the @samp{+FDCC=1,5,...} command.
+
+In the latest version, mgetty and sendfax will automatically detect if the
+modem isn't able to do 14400 bps for faxing and will use 9600 bps ---
+@samp{+FDCC=1,3,...} --- instead. So don't worry about the error message.
+
+@item
+Sometimes mgetty cannot initialize the modem, it times out waiting for
+the first @samp{OK}. (USR Sportsters are known to hit this).
+
+I assume that the problem is the DTR-induced modem reset before
+sending the first @samp{+++ATH} to the modem.
+I know that some modems need quite a lot time after a reset, so this
+should go away if you add more delays before sending the first string
+to the modem:
+
+In @file{conf_mg.c} (line 38 or so) change
+
+@example
+char *def_init_chat_seq[] =
+           @{ "", "\\d\\d\\d+++\\d\\d\\d\r\\dATQ0V1H0", "OK",
+@end example
+
+to
+
+@example
+char *def_init_chat_seq[] =
+           @{ "", "\\d\\d\\d\\d\\d\\d+++\\d\\d\\d\r\\dATQ0V1H0", "OK",
+                   ^^^^^^^^^ additional delays here
+@end example
+
+Or, if you don't want to modify the code, just set the @code{init-chat}
+sequence in @file{mgetty.config} accordingly.
+
+Alternatively, you can just switch off the toggling of DTR
+(since the HUPCL flag is set, it should work as well) by setting
+@code{toggle-dtr no} in @file{mgetty.config}.
+
+@item
+Some operating systems send their commands too fast for some modems (Linux
+is known to do this). In that case it may be necessary to increase the
+delay times for @code{DO_CHAT_SEND_DELAY} and @code{FAX_COMMAND_DELAY} in
+@file{policy.h}.
+
+@item
+Some Modems toggle DCD between pages, possibly correlated to the presence of
+the ``high speed'' page transmission carrier. @code{sendfax} normally runs
+carrier-sensitive, and will then get a lot error messages in the
+@code{read} and @code{write} calls, logging them as @code{I/O Error} or
+something similar when sending the first or second page. To work around
+this, set @code{ignore-carrier true} in @file{sendfax.config}.
+
+If you run into this problem, @code{sendfax} will complain about
+@samp{Error +FHNG:-5 (Unexpected hangup / read() error / write() error)}
+and abort.
+
+@item
+Some modems do not understand @code{ATH0}, responding with @samp{ERROR} to
+that. Just modify the @code{init-chat} setting in @file{mgetty.config} to
+send @code{ATH} instead of @code{ATH0}. This will fix it.
+
+@item
+Faxing to some modems works very well, faxing to ``normal'' fax machines
+fails all the time.
+
+In most cases, this error is caused by badly created G3 files. If you use
+the old @code{pbm2g3} program, or an old copy of @code{hp2hig3}, it will
+cause bad G3 files. 
+
+Recently, a new problem appeared for postscript files created by certain
+programs that insist on setting their ideas of the page size (some
+versions of WinWord, FrameMaker, and dvipsk). If used together with
+ghostscript 3.*, the resulting G3 file's width isn't correct. For a
+fix, try creating the postscript file with a different program, use a
+newer version of ghostscript, or an older one (2.62 is fine). Quite often
+it helps to add @code{-sPAPERSIZE=a4} to Ghostscript's command line (in
+@code{faxspool}).
+
+With a @code{mgetty} version later than June 1996, the @code{g3cat}
+program should take care of this problem, fixing the line width
+on-the-fly. It will print a warning, to tell you about the problem,
+though. So if you get this warning, faxing should work, but you'd better
+check all your programs anyway.
+
+@item
+Some other Modems cannot (or not properly) distinguish between calling
+faxes and calling modems.
+
+Some of them just refuse to answer both, only recognizing one and failing
+on the other (NO CARRIER) --- in that case, there's nothing you can do to
+make it receive both (except making the manufacturer fix it). What you can
+do is to force it to receive always fax or always data (what is more
+important for you). Data-Only can be set by the @code{data-only} keyword in
+the configuration file, and Fax-Only with the @code{fax-only} keyword.
+
+In some cases, those problems may be caused by the modem forgetting the
+@code{AT+FAA=1} command if it receives any other command after it. To fix
+it, it may help to change the ``answer chat command'' in the config file to
+
+@example
+answer-chat "" AT+FAA=1;A CONNECT \c \r
+@end example
+
+if this helps for your modem, please tell me so, and I'll include it into
+the documentation.
+
+Some other modems can distinguish the different call types @emph{most of
+the time}, but some 2400 bps modems mysteriously fail. That may be caused
+by some -- strange -- modems sending a certain tone when @emph{calling} the
+other side, and the receiving end mistaking that for the fax calling tone.
+Arne Marschall said about that: ``...Or try calling your modem with your
+phone and whistle. If it says ``+fcon'' it is one one those which can't
+deal with modems using a calling tone'' - try it.
+
+Another, quite simplistic approach of some modem manufacturers is that
+they distinguish Fax by waiting until the time specified in register
+@code{S7} (time to carrier) runs out, and then switching from data to
+fax carrier. That normally works quite well - if the other side is patient
+enough to wait that long @dots{}. For example, if the modem
+switches to fax after 60 seconds have passed, and the caller has a timeout
+of 50 seconds, it will definitely fail. If in doubt, try setting
+@code{ATS7=30} (but only if all else fails - and don't ask @emph{me} why it
+doesn't work...)
+
+@item
+Except if you feel sure that your modem needs less, do not try to
+send or receive faxes with a port speed of less than 19200 bps. Since fax
+transmission is synchronous (no start and stop bit!), you need at least
+12000 bps on the Computer-Modem line to transmit 9600 bps on the line.
+
+@item
+For some modems, incoming faxes are detected properly, but mgetty times out
+about two minutes later in @code{fax_wait_for(OK)}. Most likely, the
+@code{switchbd} (@file{mgetty.config}) speed is set wrongly.  A number of 
+cheap modems (e.g. Rockwell-Chip based ones) step to 19200 bps upon fax 
+reception, and
+setting this option to @samp{19200} will tell mgetty about it. Better
+modems have no need for that, so if you have defined it and your modem
+does *not* change bit rates, it won't work either.
+
+If you have this problem, your log file for an incoming fax call will look
+like this:
+
+@example
+09/21 09:55:48 yS1  waiting for ``RING''
+09/21 09:55:48 yS1  got: [0d][0a]RING ** found **
+09/21 09:55:48 yS1  send: ATA[0d]
+09/21 09:55:48 yS1  waiting for ``CONNECT''
+09/21 09:55:48 yS1  got: [0d][0a]ATA[0d][0d][0a]FAX
+09/21 09:55:50 yS1  found action string: ``FAX''
+09/21 09:55:50 yS1  start fax receiver...
+09/21 09:55:50 yS1  fax receiver: entry
+09/21 09:55:50 yS1  fax_wait_for(OK)
+09/21 09:55:56 yS1  fax_wait_for: string '+FCON'
+09/21 09:57:50 yS1  Warning: got alarm signal!
+09/21 09:57:50 yS1  fax_read_byte: read returned -1: Interrupted system call
+09/21 09:57:50 yS1  fax_get_line: cannot read byte, return: Interrupted system call
+@end example
+
+@item
+For a couple of modems, you can find initialization and setup hints in the
+file @file{doc/modems.db}. Just browse through it, maybe you'll find
+something helpful. (You're welcome to provide entries for modems not yet
+in the list).
+
+@item
+Sometimes, very weird things happen upon login (that is, long after
+@code{mgetty} has done its work), for example, /bin/login blocks
+infinitely, the caller is thrown out immediately again, or the shell won't
+notice a logout, etc.
+
+Quite often, this is caused by a modem not setting the data carrier detect
+(DCD) line properly (properly meaning here "reflecting the actual line
+conditions"). On most modems this is done with the @code{AT&C1} command.
+
+Another possibility are too long or otherwise broken modem cables that
+corrupt the signals, and introduce noise on the modem control lines. Flat
+cables are famous for this, use round, shielded modem cables, no longer
+than necessary.
+
+@item
+@code{mgetty} will complain loudly if you switch off your modem.
+
+Well, what should I say, this is a feature :-) -- I think that mgetty
+should detect and complain if a modem is not working, and if you switch it
+off, it is most definitely not working.
+
+For most modems, there is an easy way out.  @code{mgetty} can query the
+modem's DSR line at startup, and wait until that line comes active.  For
+that to work, you need to set DSR to ``always on'' with @code{AT&S0&W}
+(entered from a terminal program), and then switch on @code{need-dsr yes}
+in @file{mgetty.config}.  Check the log file (with @code{debug 6}) to see
+whether it's working.  It won't work for old unix systems where you can't
+query the state of the serial port control lines (DSR, DCD, etc.).
+
+For modems or unix systems that have problems with DSR, there's another
+approach: You just create a file, @file{/etc/nomodem.ttyS1},
+or however you want to name it, when you intend to switch off your modem.
+Instead of running @code{mgetty} from @file{/etc/inittab}, you run a 
+``wrapper'' script that will wait until the nomodem file disappears, 
+and then starts @code{mgetty}. That way, you can just prevent
+@code{mgetty} from starting when you don't want it to.
+
+The wrapper is easy:
+
+@example
+#!/bin/sh
+#
+while test -f /etc/nologin.ttyS1
+do
+   sleep 60
+   done
+exec /usr/local/sbin/mgetty ttyS1
+@end example
+
+@item
+I have been asked about ``superfine'' fax mode recently (using 392/408 dpi
+instead the usual 198/204 dpi).  It is not yet implemented.  It would not
+be not overly hard, but you need a modem that supports it - no class 2 
+modems that I know of support it, and only very few 2.0/2.1 modems 
+(MultiTech).  So it hasn't been done yet.
+
+@item
+Similar to the last bullet, V34 fax (using transfer speeds up to 28.800
+bps) isn't fully implemented yet.  My modems do not support it, and nobody 
+has asked for it yet.  It should be really easy, though.
+
+@end itemize
+
+
+@node Zyxel, TelelinkIMS08, Common, Modems
+@subsection ZyXEL
+
+First of all, yes, ZyXELs tend to somewhat non-deterministic behaviour -
+most modems work perfectly with @code{mgetty+sendfax}, a few don't, and I
+do not always find out what's wrong.
+
+If it works first, and then suddenly stops working, it does quite often
+help do to a @strong{full} modem reset, that is, switch it off, press the
+DATA/VOICE key, switch it on again and hold the key for about 20 Seconds.
+(That's for the 1496E and E+, for other models, it works differently,
+check you manual). That cured the problems in many cases.
+
+The same holds true after a firmware change: always do a full modem reset
+in case you change the ROM version!
+
+Do not use non-plus ZyXELs (the ``slower'' ones) for faxing with DTE
+speeds above 38400 bps, I got a report that it won't work.
+
+Do not use the @code{S18} register, set it to 0. Its purpose is for dumb
+@code{getty} programs where the modem has to change its baud rate back to a
+certain value if some other program has modified it. Since @code{mgetty}
+will reinitialize the modem anyway if another program has dialed out, the
+@code{S18} register cannot improve anything, it can only harm (e.g., if it
+is set to @code{3}, the modem will send any @code{RING} with 19200 bps ---
+imagine what happens if @code{mgetty} sets the port to 38400 @dots{})
+
+If you want to use Caller ID (and have subscribed to it), add S40.2=1 to
+the modem initialization string [For the ZyXEL 2864, this might be S84.4=0,
+but check with your modem manual!].
+
+@strong{Warning:} If you use a very old ZyXEL and try to send some complex
+graphics (the ``tiger.ps'' example file in the GhostScript package is
+known to produce this), it may lock up. This is because the old ZyXEL
+firmware had @emph{lots} of bugs concerning hardware flow
+control---sometimes the ZyXEL just forgot to raise CTS when it can
+accept data again. The symptoms are that the transmission hangs, no
+modem LEDs are flashing any more, the logfile won't grow any more and
+the receiving machines hangs up after printing a partial page.
+
+This bug has been fixed in ROM release 6.01, so you should consider
+upgrading your eproms if you run into this. With ROM release 6.01 and
+6.11a, it works correctly (a hundred-odd faxes sent without problems).
+
+Rom releases I've never been able to make @code{sendfax} work reliably are
+6.00 and 6.10 (6.10a works), and various 5.0x releases.
+
+Fax polling (both server and client side) is broken in ROM 6.11a.
+
+The very latest ROM releases, 6.12, 6.13 and 6.15, work perfectly in every
+possible aspect. I tried fax sending, receiving, polling, data calls,
+@dots{} - and everything simply @emph{works}!
+
+The latest ZyXEL roms can normally be found on ftp.zyxel.com, in
+@file{/pub/other/zyxel/r*}.
+
+Some models, seemingly only the @samp{EG+} (german telekom approved),
+toggle the DCD line during the pre-page handshake, thus causing
+@code{sendfax} to abort (with a ``I/O error'' during read/write
+operations). You can work around this by defining
+@code{ignore-carrier true} in @file{sendfax.config}.
+
+ZyXEL modems can do security callback (@code{AT*Gi} with @code{i} > 0).
+With ROM releases up to 6.11a, this doesn't interact very well with
+mgetty. If you want to use it anyway, send me a note and I'll describe
+what to change (but be warned, mgetty operation will become somewhat
+unreliable by those changes!). With 6.12, it works very good.
+
+Oh, one additional note: ZyXELs can do voice recording and playback. Klaus
+Weidner and Marc Eberhard have written voice handling tools, to turn your
+modem into a sophisticated answering machine. Yo can finde this tools in
+the @file{voice} subdirectory. (NOTE: In version 1.0, I haven't included
+the stuff, because the docs are heavily lacking and Marc thinks it's not
+ready yet. Get 0.99 or 1.1-betas to play with voice).
+
+Josef Wolf (jw@@raven.inka.de) has added some comments about the ZyXEL 
+Eproms (I don't know whether it's true or not, ask him or 
+support@@zyxel.com):
+
+Most EPROMs require /PGM and Vpp to be Vcc while in ROM-Mode. On ZyXELs
+these two pins are removed in the socket so the pins are _floating_. This
+treatment is @strong{out of spec} for @emph{any} EPROM. The TI-Types 
+originally used by ZyXEL seem to tolarate this treatment. But most other 
+EPROMS won't work properly. There are two solutions to this problem:
+
+1.) use the types which zyxel used. (could be troublesome to find some)
+
+2.) take two sockets, solder jumpers between pins 1, 31 and 32 (these are
+    /PGM, Vpp and Vcc) and place them into the original sockets before
+    inserting the EPROMs.
+
+@strong{NEWS:} ZyXEL has a new modem line out in the market, the
+@emph{ZyXEL COMET 336} modem.  This is a fairly standard Rockwell-based
+junk modem.  It can't do class 2 or class 2.0 fax.  Don't buy it.
+
+@node TelelinkIMS08, Rockwell, Zyxel, Modems
+@subsection Telelink IMS 08 Faxline+ Modems
+
+Thanks to friendly support by MVS, Germany, I got a Telelink IMS 08 modem
+for testing and was able to adapt @code{mgetty} accordingly.
+
+The modems factory defaults are very good, so it's sufficient for
+@code{mgetty} operations to set @code{init-chat} (in @file{mgetty.config})
+to @var{ATQ0V1E0 OK AT&F2S0=0&D3X6&K3 OK}, and @code{switchbd} to
+@var{19200} (yep, it switches baud rate.  Stupid, but true). After that,
+receiving fax + data calls works fine.
+
+Fax sending is not that trivial. Basically, it works after setting
+@code{modem-handshake} to @code{AT&K3}. @code{FAX_SEND_FLOW} (in
+@file{policy.h}) can be anything that the host machine supports (because
+the modem does both Xon/Xoff and RTS/CTS handshake simultaneously).
+
+Unfortunately, a few problems remain:
+
+-- faxing multi-page faxes to ZyXELs with ROM release 6.11a doesn't work
+(fails on the receiving end with +FHNG:100 and on the sending side with
++FHNG:50).
+
+-- faxing to some paper fax machines fails completely, for others, ``only''
+complex graphics (like the Ghostscript-``tiger.ps'') fail. This one can be
+partially cured by adding lots of padding zeroes into the fax data
+(@code{g3cat -p 24}) - but that's unelegant, not complying to class 2
+specs, and not supported (besides, it still doesn't work all the
+time). Maybe later versions of @code{sendfax} will do the padding
+automatically.
+
+I recommend against using this modem with sendfax. In addition to the
+technical problems, their customer support (at least, that of the german
+distributor MVS) is basically non-existant. (I wrote them four times
+describing my problems with the modem, and never got an answer).
+
+@node Rockwell, Zoom-vfast, TelelinkIMS08, Modems
+@subsection Rockwell-based modems, e.g. Supra
+
+As far as I know, sending or receiving are no problem (although you have to
+use 19200 baud when in class 2 faxmode - set @code{speed} to @code{19200}
+in @file{sendfax.config}, and set @code{switchbd} to @code{19200} in
+@file{mgetty.config}. Remember to change the modem initialization strings
+to the proper values for your modem, that is, @var{ATQ0V1E0 OK AT&K3S0=0 OK}.
+
+Especially for the @samp{SupraFax} modem, I've been told that you have to
+set @code{modem-handshake} to @code{AT&K3} and initialize the modem with
+@code{AT&S0&D2&K3}. Since the modem does not like being reset with DTR->low
+(do @strong{not} use @code{&D3}!), an @code{ATZ} in the first
+initizalization string in @file{mgetty.c}, to reset the modem into a known
+state, is a good idea, too.
+
+(Thanks to Christof Junge, chris@@cj.in-berlin.de, for trying out several
+weeks until everything worked!)
+
+Some other SupraFAX Rom releases seem to forget that they are set to use
+RTS/CTS handshake if a @code{+FCLASS=0} is sent to them. I think it should
+help to store the @code{AT&K3} into NVRAM, but maybe you have to patch
+@file{mgetty.c}. See @file{contrib/readme.supra} for details.
+
+Fax polling does not work because the Rockwell chipset does not support it.
+
+@strong{NEWS:} Most recent Rockwell 33.600 modems do not support any
+decent fax operation anymore -- they added ``simultaneous Voice over Data''
+(SVD) to their modem firmware, and because the Eproms are not large
+enough, they threw out their class 2 firmware.  Don't buy such a modem, 
+it won't work properly with @code{mgetty+sendfax}.
+
+If you buy a Rockwell-based modem (they are usually quite cheap), make
+sure that you get one that can do class 2 or (better) class 2.0.  Even if
+it's written on the box, some recent models just can't do it!
+
+Together with @code{vgetty}, many Rockwell modems can distinguish between
+different types of incoming ``RING'' tones (usually called ``distinguished
+RING'' by the local Telco).  Use the command @code{AT#SDR=n} (n between 0
+and 7) to enable this feature.  If in doubt, check with your modem
+manual whether your modem can do this at all.
+
+@node Zoom-vfast, Best14496EC, Rockwell, Modems
+@subsection Zoom VFP/VFX 24K FaxModem (V.FAST modem, 24,000 bps)
+
+For the Zoom V.FAST 24,000 modem, you should change @code{init-chat} to
+@code{ATE1Q0V1 OK AT&FS0=0&C1&D2W1 OK} (see the manual for the meaning of
+the commands). After that, everything should work. (I got very euphoric
+reports).
+
+My own experience with my Zoom VFX 28.800 is also quite good, but it
+doesn't seem to like automatic fax/data distinction too much, that is, some
+data calls are ``recognized'' as fax and fail miserably. Dunno how to fix
+it, I run my Zoom as data-only.
+
+Fax polling doesn't work.
+
+@node Best14496EC, GVC, Zoom-vfast, Modems
+@subsection Best 14496 EC fax modem
+
+Works quite well. Use @code{FLOW_HARD} for all flow control settings (in
+@file{policy.h}, use 19200 bps for sending and receiving. Set
+@code{modem-init} to @code{ATE1Q0V1 OK ATS7=60&D3\\Q3%C1\\N7 OK}
+(@file{mgetty.config}), and @code{modem-handshake} to @code{AT\\Q3&S0}
+(@file{sendfax.config}).
+
+After that it should work. Kudos to Sami Koskinen (tossu@@krk.fi).
+
+@node GVC, creatix, Best14496EC, Modems
+@subsection GVC FM-144Vbis+/1 (Rockwell-based)
+
+Basically, the modem is similar to the SupraFax modem.
+
+Change @code{speed} in @file{mgetty.config} and @file{sendfax.config} 
+to @code{19200} and set @code{modem-handshake} to @var{AT&K4}.
+
+Further, if your model toggles DCD betwen fax pages (@code{sendfax} fails
+mysteriously between pages), @code{ignore-carrier true} in
+@file{sendfax.config}.
+
+After that, it should work.
+
+Note: If your modem doesn't properly distinguish incoming fax from data
+calls (i.e., a 2400 bps caller is repeatedly ``identified'' as fax caller),
+upgrade your firmware. I've been told (thanks to John Watson,
+watson%carssdf@@rutgers.edu) that a new firmware release, @strong{v1.69}
+exists that will fix those problems.
+
+@node creatix, Telekom, GVC, Modems
+@subsection CREATIX Modem (Rockwell-Based)
+
+For the new CREATIX modem, use the following settings in @file{mgetty.config}
+(thanks to Jens Hektor, jens@@physiology.rwth-aachen.de):
+
+@example
+speed 38400
+init-chat "" ATE1Q0V1 OK ATS0=0&D3&K3
+@end example
+
+and @code{modem-handshake} @var{AT&K3} in @file{sendfax.config}.
+
+The modem has a voice mode, too, and it should work with @code{vgetty} by
+now. As the docs for vgetty are out-of-date, I don't really know how to
+get it to work, though.
+
+@node Telekom, Dallas, creatix, Modems
+@subsection German Telekom approved GVC modems
+
+(GM-144VBIS+  RC9696/14 (?))
+
+This modem does @emph{not(!)} use Xon/Xoff flow control. Further, the default
+modem profile sets @samp{&S1}, which makes the modem disable DSR all the
+time. On systems using the FAS serial driver, this will @emph{disable
+CTS flow control}!
+
+So, #define @code{FAX_MODEM_HANDSHAKE "AT\\Q3&S0"} in @file{policy.h}, do not
+define @code{FLOW_SOFT} for flow control, and fax sending should work. (It
+does for me!)  Changing @code{FAX_SEND_BAUD} to @code{B19200} is not
+necessary, it works with @code{B38400}.
+
+Fax receiving... I did not fully test it. It's somewhat difficult since
+that modem insists on using auto-answer, but it should be possible to let
+it auto-answer if you set mgetty's ring counter high enough. Or, you can
+trick the modem, by changing mgetty's answer command (@code{ATA}) into
+@code{ATS0=1} -- upon the next RING, the modem will ``auto-answer''.
+
+@node Dallas, Everex, Telekom, Modems
+@subsection Dallas Fax 14.4
+
+Change @code{FAX_SEND_BAUD} and @code{DEFAULT_PORTSPEED} to
+@code{B19200}, change all occurances of @samp{AT&H3} to @samp{AT&K5}, remove
+@samp{AT&N0} and @samp{&K4} in @file{policy.h}.
+
+@node Everex, Exar, Dallas, Modems
+@subsection Everex
+
+All I programmed is strictly to everex specs, thus, it should work.
+Most likely, some fiddling with the initialization strings is necessary.
+(If you have an Everex modem, please report to me what you did change).
+
+@node Exar, Tornado, Everex, Modems
+@subsection Exar 9624 fax modem
+
+This modem needs two stop bits (when sending), so you have to add
+@code{CSTOPB} to @code{tio.c_cflag = @dots{}} in @file{tio.c}
+/ @code{tio_mode_sane()}.
+
+Also, use @code{#define FAX_SEND_BAUD B19200} and, for fax reception,
+@code{#define DEFAULT_PORTSPEED B19200}.
+
+Further, the modem is a little bit timing critical - please insert
+@code{delay(500)} calls at the end of @code{fax_open_device()}
+(@file{sendfax.c}, line 122) and before sending the page punctuation
+(@code{fax_command("+FET=...")} in @file{sendfax.c}, @code{main()}, around
+line 540).
+
+Also, for at least one Exar 9624 (built into a Compaq notebook), it's been
+necessary to add two delays (@code{\\d\\d}) before the @code{AT+FCLASS=0}
+initialization string in @file{mgetty.c}.
+
+@node Tornado, Zoltrix, Exar, Modems
+@subsection Tornado / Lightspeed modems
+
+Here is a suggested setting for the default profile for these modems.
+@xref{Common}.
+
+For Lightspeed store profile:
+@example
+at&f
+at&c1
+at&d3
+ats0=0
+at%c2
+atw1
+at&w
+@end example
+
+and for tornado store profile:
+
+@example
+at&f
+at&d3
+ats0=0
+at&w
+@end example
+
+Then just initialize the modem with @code{init-chat} set to
+@code{"" ATZ OK}.
+
+@node Zoltrix, MultiTech, Tornado, Modems
+@comment  node-name,  next,  previous,  up
+@subsection Zoltrix Platinum Series 14.4
+
+This modem is also Rockwell-based, so don't expect anything unusual... - it
+works quite well, both fax sending and fax/data answering. You should use
+the following settings in @file{policy.h} (suggested by las@@io.org, Laszlo
+Herczeg)
+
+@example
+#define DATA_FLOW	FLOW_HARD
+#define FAXREC_FLOW	FLOW_SOFT
+#define FAXSEND_FLOW	FLOW_SOFT
+#define FAX_SEND_BAUD B38400
+#define FAX_MODEM_HANDSHAKE "AT&K3"
+#define MODEM_INIT_STRING	"ATS0=0V1Q0&D3&K3%C1W1"
+@end example
+
+In some circumstances, sending of @strong{large} graphics files (the
+well-known @file{tiger.ps}) may fail.
+
+@node MultiTech, ELSA, Zoltrix, Modems
+@subsection MultiTech modems (MT1432BG and MT2834BG)
+
+First of all, I want to thank MultiTech Munich for their support (borrowing
+me two test modems w/o charge).
+
+Second, I can only strongly recommend these modems, they are @strong{great}
+(but expensive). Got it, unpacked it, switched it on, set mgetty's init
+string (@code{MODEM_INIT}) to @code{ATS0=0&S1} -- and everything simply
+worked. Flawlessly. (Warning: usually I recommend @code{AT&S0} to force the
+DSR line high -- needed, because otherwise some O/Ses won't do hardware
+flow control -- but that doesn't seem to work on my model. AT&S1 means that
+H/W flow control only works when a carrier is present, but then, who needs
+flow control in command mode?)
+
+The modems do very reliably distinguish incoming fax and data calls, and
+outgoing fax works also very good (unfortunately, it's limited to 9600 bps
+fax rate, but that's no big problem).
+
+The only problem I've seen is that those modem do the fax bit order on
+reception @strong{right} (everybody else does it wrong, to be compatible
+with Rockwell, who botched it in the first place). Thus, @code{g32pbm}
+won't be able to decode the data, unless you call it as @code{g32pbm -r}.
+(You can see if the bit order is wrong if g32pbm complains in every single
+line). I'll work something out for one of the next releases to work around
+this (@var{modem-quirks 02}).
+
+BUT: There seems to be a way to tell the modem to behave like a Rockwell
+one and use the "wrong" byte order. Carlos Fonseca found the following
+text on ftp.multitech.com:
+
+@example
+Function          Command       Description
+
+PROCESS           +FRBOR        Maintaining compatibility with
+DATA IN                         Rockwell Class 2 chip set for fax data
+DIRECT OR                       reception .
+REVERSE ORDER                   FRBOR=0 - Process received fax data in
+                                direct order.
+                                FRBOR=1 - Process received fax data in
+                                reverse order.
+@end example
+
+so, with AT+FRBOR=1 added to the modem initialization string, it should be
+possible to get fax reception on the MultiTechs going without tricks.
+
+Glenn Thobe suggested the following definitions for @file{policy.h} (which
+mostly are factory defaults anyway, but it wouldn't harm to set them)
+
+@example
+#define MODEM_INIT_STRING	"ATS0=0Q0&D3&E1&E4&E13&E15"
+#define FAX_MODEM_HANDSHAKE "AT&E4"
+@end example
+
+My @file{mgetty.config} for those modems looks like this (everything not
+mentioned is set to the defaults I ship in @file{policy.h}).
+
+@example
+# MultiTech MT1432BG
+port <whatever1>
+  init-chat "" \d\d\d+++\d\d\dATE0E1V1H0 OK ATL0M0S0=0 OK
+  modem-type cls2
+
+# MultiTech MT2834BG
+port <whatever2>
+  init-chat "" \d\d\d+++\d\d\dATH0&F OK ATX4&D3 OK ATQ0L0M0S0=0 OK
+  modem-type cls2
+@end example
+
+Some of the newer 56k-capable MultiTech modems have voice functionality,
+but some firmware versions are very much broken.  Others seem to work more
+or less.  So make sure you can return your modem to the dealer if it
+doesn't work - and if the dealer isn't willing to do this, get a different
+modem.  Russell King told me that the firmware version 0316D should be
+working ok, but I got some negative reports as well. Hmmm.
+
+@strong{News} The most recent series of MultiTech modems (MT5634ZBA-V92
+external, or MT5634ZPX-PCI-V92 / ISI5634PCI internal), based on the
+Lucent/Agere Venus chipset, seem to be really good for fax, data and 
+voice support.  Older firmware releases had bugs in the voice area, but 
+if you use the most recent firmware version, they should be fine.  For 
+vgetty, you might need to set "forceV253 true" and "rec_compression 6" 
+in @file{voice.conf}  (Contributed by Lee Howard, <faxguy@@howardsilvan.com>
+-- thanks).
+
+@node ELSA, USR, MultiTech, Modems
+@subsection ELSA voice/fax modems
+
+ELSA makes a nice series of Data/Fax/Voice products, both for POTS
+lines and for ISDN.  In general, all of them are supported fairly well by
+@code{mgetty+sendfax} (fax works, fax polling works(!), voice works), but 
+here are a couple of notes for different products:
+
+@itemize @bullet
+@item MicroLink 56k/56k pro -- standard analogue voice/fax/data modem.
+Pretty good for about everything, but make sure you use the latest firmware
+version (1.58), as earlier versions have bugs switching between voice and
+fax mode.
+@item MicroLink Office -- in addition to being a nice modem, this thing can
+do fax reception and answering machine functionality in "standalone mode",
+without a computer.  Received voice calls and faxes can be downloaded via
+X-Modem to the computer.  I'm working on a nice GUI application to ease
+using the standalone mode.  The ML Office seems to be the only non-ISDN
+ELSA modem that can do Caller ID (CLIP).
+@item MicroLink TL/V.34 -- this is an ISDN terminal adaptor that can also
+do V.34 modem calls and fax.  Works nicely.
+@item TanGo -- this an ISDN only terminal adaptor.  Works, but it's pretty
+boring stuff.
+@item MicroLink 28.8/33.6 TQV -- this is the old voice/fax/modem series.
+Works, but uses a different command to got to hardware flow control mode
+(@code{AT\Q3} instead of @code{AT+IFC=2,2}) so you'll see some errors in
+the voice log files.  Don't worry about that.
+@end itemize
+
+If you have any problems with ELSA modems and mgetty concerning fax/voice
+support, report them to me first, and let me report them to ELSA - I'm
+actively working together with them to iron out bugs, and it's easier if
+all the reports come from only one contact person (me).
+
+@node USR, Elink-ISDN, ELSA, Modems
+@subsection US Robotics (now 3com) Courier/Sportster Fax/Data modems
+
+There are a number of major lines of 3com/US Robotics modems:
+
+@itemize @bullet
+@item USR Courier V.34/V.everything -- those are quite expensive, but 
+really, really good modems.  I think those are the best V.34/X.2/V.90 
+modems around, and they are also very good for class 2.0 faxing.   But 
+make sure that you use a recent firmware, as older versions had very 
+bad (and stooopid) bugs in the fax department.  You can find out the
+firmware version with the @code{ATI7} modem command.  The 
+@samp{Supervisor rev} version listed should be at least @samp{6.5.3}, 
+better @samp{7.1.8} (this is the @samp{X.2 upgrade}).
+
+Fax polling still doesn't work, and if you send faxes to a modem that can
+only accept fax with 7200 bps, it will fail with @code{+FHS:25} unless you
+specify @code{sendfax -M 7200}.
+
+The Courier series does not have voice features.
+
+@item USR I-Modem -- this is an ISDN Terminal Adaptor with built in
+V.34/fax mode (``ISDN Modem'').  Nice product.  Works.  The same stuff
+said for the Courier V.34/V.everything is true for the I-Modem.
+
+@item older USR Courier modems -- older series without flash ROM, and
+possibly not upgradable to V.34/X.2 at all, might give problems.  Fax was
+added fairly late, and the first fax-capable releases are very buggy.  If
+you have such a modem, and @code{ATI7} does not list @samp{V34} in the
+@samp{Options} line, you might try the FAX_USRobotics option in
+@file{policy.h}.  Maybe it helps.  But don't expect too much.
+
+@item USR Sportster series -- the ``Sportster'' is actually a range of
+many different low-end modems.  Most of them can do voice stuff, some of
+them have flash ROM to be upgraded to newer firmware.  For data, this
+modem is quite good.  For fax, it might work, and it might not -- I have
+received a very high number of ``it doesn't work at all'' reports, and
+also a number of ``it works very well for me'' reports.  If you plan to
+buy one, make sure you can return it if it doesn't work.  (See below for
+some specific issues and workarounds).
+
+@item Internal PC card -- I haven't been able to find out yet whether that
+is a ``Sportster'' or a ``Courier'', but it seems to be a Sportster, with
+all its negative habits.
+@end itemize
+
+Some older USR firmware versions had severe bugs when doing RTS/CTS (that 
+is, hardware) flow control. Occasionally, a byte got lost, and sometimes 
+this confuses the modem enough to abort transmission with the error message
+@example
+Transmission error: +FHNG:44 (Unrecognized Transparent data command)
+@end example
+Sam Leffler recommends using Xon/Xoff flow control for both fax sending and
+fax receiving (@code{#define FAX_SEND_FLOW FLOW_SOFT} and @code{#define
+FAX_REC_FLOW FLOW_SOFT} in @file{policy.h}).
+
+Some day in the future, I'll make those "quirks" configurable from the
+config file, but until then, you'll have to live with recompiling. Sorry.
+(Upgrade your firmware!).
+
+Fax polling with the USRs is @emph{not} working, even though the modem
+claims so. It will work half-way through, but fail miserably later.
+
+
+When sending faxes with an USR faxmodem, set @code{ignore-carrier yes} in
+@file{sendfax.config}.  Otherwise it will fail after the first page with a
+read error and error code -5.  (But that is default anyway, if you use
+mgetty 1.1.16 and up).
+
+For some fax receivers, a problem remains: the USR modems do not want
+to negotiate 7200 bps transmission speed.  If the receiving modem won't 
+accept 9600 bps, transmission will fail after sending three DCS frames,
+with the error code +FHS:25.  In that case, try setting 
+@code{fax-max-speed 7200} in @file{sendfax.config}.
+
+@code{RSPEC errors}: some series of USR Sportsters and early Couriers 
+have bugs in the handling of the @code{AT+FCC} command.  It's meant to specify
+the maximum transmission speed, like ``14400'', but these modems interpret
+it as @strong{minimum} speed, so they fail if sending to a machine that
+can only do 9600 bps.  If you see RSPEC errors in the sendfax log (+FHS:24), 
+try the setting @code{modem-quirks 0x20} in @file{sendfax.config}.  This
+will tell @code{sendfax} not to set the corresponding @code{AT+FCC} parameter.
+
+
+The USR modems support Caller ID delivery (both the I-Modem series and the
+analog ones).  Switch it on with @code{AT#CID=1} and mgetty should
+automatically be able to recognize the incoming caller ID.  If not, show
+me a detailed log file...
+
+Firmware upgrades and documentation are available on @code{ftp.usr.de}
+in the directory @file{/pub/USRobotics/modem/...}.
+
+@node Elink-ISDN, i4l, USR, Modems
+@subsection Elink ISDN Terminal Adaptors 293, 310, 393 with X.75 and V.110
+
+The TA's are connected to national German ISDN (1TR6) or Euro-ISDN. The
+host side is a standard serial port with an AT-command set, letting them
+look like a conventional modem. Therefore they are often (wrongly) called
+'ISDN modems'.
+
+It is strongly recommended to feed them with 115k2 bps, else only V.110
+(38k4 bps) is available. Configuration may differ slightly, depending on
+which of those Elinks is used, wether it is connected to Euro-ISDN or 1TR6
+and last but not least they are still under developement, so you're on your
+own with that.
+
+ISDN generally supports two nice features: first it is now possible to
+check callers number, which may be used to identify callers, second ist
+the charge service, where it is possible to request the amount of charge
+units for the call. For mgetty the second one is only from minor interest,
+but the first one is.  The opposite phone number will be shown with the
+command @code{AT\O}. If a call comes in, @code{AT\OA} will answer the
+call, display caller's id in a 'digit only' (e.g. @samp{04419808550}) form
+and then print out the @code{CONNECT}-String.
+
+To enable mgetty to utilize this, the "get caller ID" sequence must be set
+up accordingly and the @samp{CND} feature must be enabled:
+
+Use @code{get-cnd-chat "" AT\\O OK} in @file{mgetty.config}, and make
+sure that @code{#define CNDFILE "@dots{}/dialin.config"} at the 
+end of @file{policy.h} is enabled.  
+
+If you only want to grab the phone
+number and not check it against @file{dialin.config}, you can try playing
+with something like  @code{answer-chat "" AT\\OA CONNECT \c \r} 
+in @file{mgetty.config}.
+
+Having a glance at the output of @code{AT I4}-output of the Elink, it looks
+as if it is able to support Fax-Service too, but there is no hint in the
+manual. So mgetty will likely put itself into data-only mode. (I got some
+information from the Elink people that some of the Elinks have a data/fax
+analog modem built in, which should work nicely with the fax part of
+@code{mgetty}, but I didn't try yet.)
+
+(Thanks to Ulrich Tieman, lord@@olis.north.de, for this section. Don't ask
+me, ask him if you use an ELINK)
+
+@node i4l, i4l-capi, Elink-ISDN, Modems
+@subsection ISDN 4 Linux support
+
+@code{mgetty} and @code{sendfax} work with isdn4linux (i4l), but there
+are a number if things to point out.
+
+For data calls via ISDN V.110 or X.75 async modem emulation, you can put
+mgetty on a @file{/dev/ttyI*} device and mgetty will handle so-called
+"asynchronous ISDN" connections fine.  To make sure that mgetty will 
+pick up the phone, set your local ISDN number with @code{AT&E<number>}
+from @code{init-chat} (otherwise isdn4linux will just ignore incoming
+calls).
+
+As far as I can see, i4l will always signal the caller ID for incoming
+calls as "CALLER NUMBER: ..." to mgetty.  Mgetty can handle this
+just fine.
+
+If you want to see the destination number for incoming calls, add
+@code{ATS23.2=1} to the @code{init-chat}.  This will make i4l signal
+the dialed MSN number as @code{CALLED NUMBER: 12345}, and mgetty will 
+then pass it on as $CALLED_ID to fax scripts and so on.  This is
+implemented since Linux 2.4.10, or in earlier Versions with Jan
+Oberlaender's patch
+(http://www.stud.uni-karlsruhe.de/~uslk/i4l-callednumber.tar.gz).
+(@strong{NOTE}: This doesn't seem to work for at least Linux 2.4.20
+as shipped by RedHat 8.0 - anyone with some details??!)
+
+Alternatively, you can set @code{ATS23.0=1}. This will make i4l signal
+the dialed MSN number as @code{RING/12345}.  This was problematic in the
+past, as lots of other modems have a similar format to report the Caller ID
+(like @code{RING;4321} in ELSA modems) but recent mgetty versions handle 
+this properly.  With this, you can run a single mgetty instance for all
+your telephone numbers: just set @code{AT&L*} in your init string - this
+tells isnd4linux that @strong{all} incoming calls are to be signalled
+to mgetty, not only specific MSN.
+
+@c init-chat "" ATZ OK AT&L* OK ATS23.0=1S23.2=1S0=0 OK
+@c fax-only yes
+@c rings 2
+@c modem-quirks 1
+
+For the full list of available AT commands, consult the i4l docs
+(for example in @file{/usr/src/linux/Documentation/isdn/README}.
+
+For ISDN PPP calls with synchronous PPP (which is the "normal" way to do
+PPP over ISDN), you do @strong{not} need @code{mgetty}.  PPPoISDN calls
+are handled by @code{ipppd}, which is part of isdn4linux.  Mgetty can
+only handle PPP-over-X.75 or PPP-over-V110, which is something that is 
+only used for WAP connections or with old terminal adaptors.
+
+Fax support with isdn4linux is a tricky issue.  For most ISDN cards,
+this will @strong{NOT WORK}.  It only works for cards that have a fax
+chip (or separate CPU) on board, and can be accessed with the fax 
+class 2/2.0 command set.  It will work fine with the Diehl Server BRI
+ISDN card (active), and that's the only card I know that will work as of
+June 2001.  Accessing ISDN fax via CAPI is NOT supported (see below).
+
+There's a small catch: modem autodetection will make mgetty think that
+your ttyI device doesn't support fax (because most cards can't do it).  So 
+you need to set @code{modem-type cls} in @file{mgetty.config} and/or
+@file{sendfax.config} to force class 2 mode.  Class 2.0 mode is not
+supported.
+
+Voice support with @code{vgetty} should work (use your ttyI device 
+as an answering machine, etc.).  I have not tried it yet - talk to the
+mgetty or i4l mailing lists if it doesn't work.
+
+@node i4l-capi, Class 1, i4l, Modems
+@subsection ISDN 4 Linux with CAPI
+
+Some of the ISDN card manufacturers have pushed to adapt the windows 
+Common ISDN API (CAPI) to Linux.  This in itself is not bad, but it has a
+nasty side effect: less energy is invested to provide a useful Fax Class 2
+support for the active ISDN cards that can do fax.  Some cards don't have
+Fax Class 2 at all, and for some cards the Class 2 support is quite
+broken.
+
+So you might end up with a nice fax-capable card and no ttyI / Fax Class 2 
+support for it...
+
+@code{mgetty+sendfax} will, as of 1.1.31, @strong{NOT} work with a CAPI
+interface.  
+
+One of the problems with CAPI is that it is the wrong sort of 
+abstraction for the purpose of sending a fax.  The call setup part
+(dialing up) needs far too much attention for ISDN protocol details, and
+the actual fax transmission part is far too automated - the CAPI doesn't
+provide proper feedback about what's going on in the fax layer, like ``the
+client requested a retransmission of page 2, and the connection was lost
+in the middle of page 4'' - all you get is ``success/failure'' and the
+number of pages transmitted (including retransmissions -- which makes this
+figure less than useful).
+
+If you need to use fax with CAPI, take a look at the ``capifax'' software 
+available on @file{ftp://ftp.isdn4linux.de/pub/capi4linux} (not written
+by me, but it works).  The stuff works with a CAPI-specific file format 
+called ``SFF''.  
+
+Conversion to SFF can be done with recent ghostscripts (cfax driver), 
+and conversion from SFF to G3 can be done with the @code{sff2g3} program 
+which comes with mgetty.  (I needed something like this for a customer 
+project, and the existing SFF-to-something converters were all much to 
+heavyweight - requiring tons of additional libraries, C++ converters, 
+and whatnot.  My sff2g3 is 330 lines of code, needs no external libraries 
+and only an ANSI C compiler.  Beat that :-) ).
+
+Chances are good that I will eventually hack @code{capifax} into something 
+that's call-compatible to @code{mgetty} (for fax reception) and
+@code{sendfax} (for fax sending).  But this depends somewhat on customer
+demand, read: paid-for time.
+
+@node Class 1,  , i4l-capi, Modems
+@subsection Class 1 Faxmodems
+
+These do not work. They are not going to be supported (class 1 faxing is
+a mess, and the timing is extremely critical---nearly impossible in a
+unix environment---read the comments to the FlexFax package for
+details).
+
+@node Systems, General, Modems, Problems
+@section Operating Systems
+
+This section describes problems that have occured while porting the
+package to various operating systems.
+
+@menu
+* OS-Generic::      Problems and mistakes common to all operating systems
+* SCO-322::         SCO Unix 3.2.2 (ODT 1.0 / 1.1)
+* SCO-324::         SCO Unix 3.2v4 (ODT 2.0 / 3.0) 
+* Linux::           Linux
+* ISC::             ISC
+* SVR4::            SVR4 Unix
+* SVR42::           SVR4.2 Unix - Onsite, UnixWare, ...
+* BSD::             BSD-like flavours of Unix
+* AIX::             IBM's AIX Operating System
+* SunOS::           SunOS 4.1.1 and up
+* Solaris2::        SunSoft Solaris 2.3 and up
+* 3b1::             AT&T 3b1
+* HP-UX::           The HP-UX operating system
+* NEXTSTEP::        The NEXTSTEP operating system
+* Darwin::          Apple's MacOS X / Darwin operating system
+@end menu
+
+If your system is not in the list, that doesn't mean it won't work. It
+just means that I didn't get a report (or a port) for that system yet.
+
+mgetty+sendfax should work on most unixoid operating systems, as long as
+they provide @code{SysV termio} or @code{POSIX termios} call for tty
+management. @code{BSD sgtty} support isn't finished yet.
+
+For best results, your system should have @code{select(S)} or
+@code{poll(S)}, but if both functions are not available or don't work on
+ttys (@code{poll(S)} is known to do this on SVR3.1 and earlier), you can
+use a kludge, @code{-DUSE_READ}.
+
+Besides that, you'll need some fiddling with the header files to get all
+defines and prototypes right.
+
+Further, you'll have to check @file{tio.c}, function
+@code{tio_set_flow_control()}, whether the way hardware flow control is
+activated works on your system. Most likely, it won't --- that's one of the
+major portability problems. If you change something and get it to work,
+please send me patches. (You're welcome to do so anyway).
+
+@node OS-Generic, SCO-322, Systems, Systems
+@subsection Generic problems and common mistakes
+
+There are a few things that can go wrong on all supported operating
+systems. This section is meant to give a few hints how to find them.
+
+@itemize @bullet
+@item
+@code{mgetty} is correctly set up in @file{/etc/inittab}, but @code{ps}
+doesn't list @code{mgetty} anyway.
+
+This is usually caused by not notifying the @code{init} of your changes to
+@file{/etc/inittab} (or @file{/etc/ttytab} on BSD). You have to signal
+@code{init} with a HUP signal (@code{kill -1 1}) that it should re-read this
+file.
+
+@item
+@code{mgetty} is setup correctly, runs a while, then stops being listed by
+@code{ps}, and @code{init} complains something like @samp{respawning to
+fast, disabling @dots{}}.
+
+This means, there is an error in the mgetty set up. If the @code{mgetty}
+process quits too fast (because of an error), and too often in a row,
+@code{init} will assume that something is going crazy, and disable the
+process. You can re-enable it with @code{kill -1 1}, but you should check
+the mgetty log file (!!!!!) before, to find out @strong{why} it failed in
+the first place
+@end itemize
+
+
+@node SCO-322, SCO-324, OS-Generic, Systems
+@subsection SCO Unix 3.2.2 (ODT 1.0 / 1.1)
+
+No major twiddling needs to be done. If your @code{select()} refuses to
+sleep less than one second, use poll(S) instead (set @code{-DUSE_POLL} in
+the CFLAGS section of @file{Makefile}).
+
+Use the modem-control devices for mgetty and dial-outs (e.g.
+@file{/dev/tty2A}), or (far better), use FAS with minor number of 80+port,
+using full RTS + CTS handshake, and non-blocking opens (@file{/dev/ttyF01})
+- the original SCO serial driver is slow, unreliable and doesn't do proper
+hardware flow control. @xref{SCO-324}.
+
+Ignore all the warnings about ``passing arg 2 of signal from
+incompatible pointer type''. They are caused because the SCO 3.2.2
+development system header files are somewhat unusual.
+
+If it doesn't work, or some weird things happen on login (e.g., zmodem
+downloads do not work), try compiling with -DSYSV_TERMIO. I had some
+problems with Posix termios on SCO ODT 1.0.
+
+@node SCO-324, Linux, SCO-322, Systems
+@subsection SCO Unix 3.2.4 (ODT 2.0 and ODT 3.0)
+
+I'm using mgetty on SCO 3.2v4(.2) (in fact, developing it there), so be
+assured: it works.
+
+I consider the way that hardware flow control is handled on SCO to be
+broken, so I @emph{strongly} recommend using the @code{FAS} serial driver
+(version 2.11 or higher, earlier versions may crash the system), to be
+found on your nearest comp.sources.unix archive. With @code{fas}, use the
+devices with a minor number of @samp{80+port number} for best results. Make
+sure that your modem enables the @samp{DSR} line, because otherwise,
+@code{FAS} won't do hardware handshake.
+
+If you don't use @code{fas}, I've been told that you have to use the
+@samp{modem control} lines, that is, the ``uppercase'' lines, e.g.
+@file{/dev/tty1A}, because SCO's serial driver won't do any hardware flow
+control at all on the ``lowercase'' lines. Be warned, the driver will also
+disable hardware flow control if you use Xon/Xoff flow control (no way to
+use both). Since I do not have a SCO system without @code{fas}, I'd like to
+hear very much about results on one.
+
+Also, you've to define @code{LOCKS_LOWERCASE}, since that's the convention
+on SCO Unix and most other programs expect it.
+
+If mgetty works only partially, but hangs the moment @file{/etc/issue}
+is printed, before the `system!login:' prompt is output, you may have to
+change the following line of @file{mgetty.c} (around line 780):
+
+@example
+        /* honor carrier now: terminate if modem hangs up prematurely
+         */
+        tio_carrier( &tio, TRUE );
+@end example
+
+to:
+
+@example
+        tio_carrier( &tio, FALSE );
+@end example
+
+But before you do this, make sure that your modem enables the CD line
+while a carrier is present (Hayes modems: @samp{AT&C1}) and also enables
+the DSR line (otherwise the port will block once @code{CLOCAL} is
+removed).
+
+This could have been a problem specific to Uwe's dumb AST-compatible
+fourport card, but I do not think so.
+
+
+Compilation issues:
+
+Ignore warnings about @samp{struct utimbuf} and @samp{struct timeb}, they
+are caused by improper include files. On SCO 3.2v4.2, ignore the warnings
+about the getopt() prototype, or change prototype or include files.
+
+
+Installation:
+
+SCO provides two utilities to manipulate @file{/etc/inittab},
+@code{enable} and @code{disable}. Those tools work only if you have
+specified a gettydefs tag on the @code{mgetty} command line, otherwise
+they will complain about ``not a valid tty''. So, either append the
+gettydefs tag (@code{mgetty} will ignore it if not compiled with
+@code{USE_GETTYDEFS}) or change @file{/etc/inittab} manually.
+
+@node Linux, ISC, SCO-324, Systems
+@subsection Linux
+
+
+In current stable kernels (i.e. the latest 2.0.xx release or even
+one of the 1.2.xx series) and current shared libraries (libc version
+5.x) there should be no bug to interfere with this software.
+
+If you have a really old Linux system, notice that Linux kernel
+versions prior to 0.99pl15 have a bug in the serial handshake code,
+that is, if the `CRTSCTS' flag is set, software flow control (XON/XOFF)
+won't work. The alarm() call is broken in 4.1 and 4.4.2 libraries,
+which sometimes results in aborting the fax receiving.
+
+On very recent systems using the GNU Libc, you @strong{must} use 
+mgetty 1.1.10 or higher, as the timeout handling on all previous 
+versions doesn't work under glibc.  Unfortunately, this means that 
+the version of mgetty shipped with RedHat 5.0 (1.1.9) won't work. Upgrade!
+
+Hardware handshake (RTS+CTS) on Linux works flawlessly (but only if mgetty
+is compiled with POSIX_TERMIOS, but that is default on Linux
+anyway). Nevertheless, the @code{scrts.c} program in @file{contrib/} is
+still provided, it has some other uses, too.
+
+Linux has no poll(S), so, don't #define @code{USE_POLL}, and the default,
+@code{USE_SELECT}, will be used.
+
+@strong{Important note:} Use the @file{/dev/ttyS*} devices for getty and
+for dial-out (that is, for kermit, uucico, cu, seyon, ...) - @strong{never}
+use @file{/dev/cua*}. Dialing out on @file{/dev/cua*} will result in the
+error message ``device busy''. (There are reasons why @code{mgetty} cannot
+use the ``@file{ttyS*} vs. @file{cua*} kernel locking mechanism'', see
+below). If @strong{all} programs agree on using @file{/dev/cua*} only,
+it will work, too - but they have to agree on one variant.
+
+For some background about @file{ttyS} vs. @file{cua}, you might want
+to read a mail from the author of the Linux serial drivers, Ted Ts'o,
+posted to the Linux-PPP mailing list. I have included it in 
+@file{doc/ttyS-cua.txt}.
+
+Some guys seemingly can't resist posting misinformation to the net all the
+time, don't believe 'em. The @file{/dev/cua*} devices are @strong{not}
+different from the @file{/dev/ttyS*} devices concerning data flow or modem
+control lines. The only difference is how the device reacts if you do an
+@code{open()}: Opening @file{/dev/ttyS*} normally blocks until the ``carrier
+detect'' line goes active (unless @code{open()} is called with the
+@code{O_NDELAY} flag; @code{mgetty} and all dial-out programs do that), and
+opening @file{/dev/cua*} will return an error message (@code{errno=EBUSY})
+if another process has the device already open, thus @emph{preventing
+dial-out on @file{/dev/cua*}} if @code{mgetty} is active on
+@file{/dev/ttyS*}.
+
+We use @file{/dev/ttyS*} all the time for dial-in @emph{and} for dial-out,
+and believe me, it works, and it's the @emph{only} combination that will
+work properly. The kernel locking mechanism only works if you use modem
+auto-answer (the getty process sleeps until the modem gets a carrier), and
+mgetty uses manual answer (it waits for the RING message from the modem),
+which will save your callers a lot of grief because their calls will
+only be answered if your computer is ready to receive a call. Part of the
+motivation for writing mgetty was being tired of losing lots of money
+for useless calls to a hung machine.
+
+I'd recommend against using @file{/dev/modem} as a link to the real
+device, but if you do that, make it a @strong{hard link} to the
+appropriate @file{/dev/ttyS*}. A soft link will cause problems with the
+device ownership because of a peculiarity in the linux @code{chown()}
+implementation (that I refuse to work around).
+
+If you get into trouble with write permissions on ttySx, you may add
+a new group @samp{dialout} to @file{/etc/group}, then 
+@code{chown .dialout /dev/ttySx} your device, and add your users to 
+the dialout group. Don't forget to add the system user @samp{uucp} to 
+that group (UUCP needs to have modem access), and make sure,
+@code{port-group} in mgetty's configuration file is set up correctly.
+The concept of such a dialout group is already used in most Linux 
+distributions today.
+
+There are various different @code{init} and @code{last} programs out there,
+some work with mgetty, some don't. If you get some strange output from
+@code{who} or @code{last} and are using a different @code{init} program
+than the @code{sysv init}, try to define @code{-DNO_SYSVINIT}. That should
+help.
+
+I've been told that it's necessary to do that if you use the
+@code{simple-init}.
+
+Anyway, I can only @strong{strongly} recommend to switch over to
+@code{SysVinit} if you use @code{simple init}, since the latter seems to
+be severely broken regarding utmp and controlling tty handling.
+
+If you have problems because of an uninitialized @code{TERM} environment
+variable (which really isn't getty's job, but @code{getty_ps} insists on
+doing it, and people rely on it), use the @code{term @dots{}} config file
+option to set it according to your needs.
+
+If you're experiencing problems with hanging @code{/bin/login} processes,
+@xref{login-hang}.
+
+Recently, I have received a number of bug reports concerning operation in
+systems using one or more @strong{Cyclades serial boards}.  There is some
+incompatibility between the standard Cyclades driver and the GNU CC
+2.7.2, which can result in system lockups.  Upgrade to the very latest
+Linux driver, which can be found on ftp.cyclades.com.  I have received
+reports that the driver version 2.1 works fine (85 modems on one system,
+connected to 3 Cyclom Ye boards!).
+
+@node ISC, SVR4, Linux, Systems
+@subsection ISC
+
+The ISC port has been done by Russell Brown, russell@@lutton.lls.com. Thanks!
+
+First of all, define @code{-DISC} in the Makefile. This will take care
+of some minor problems. Then, link with @code{-linet -lpt}.
+
+If you have a ISC Unix 4.0, you may have to define @code{-D_POSIX_SOURCE}
+to get around some include file problems and link @code{-lcposix}.
+
+If you have problems with the AWK programs in the @file{fax/} shell
+scripts, try defining @code{AWK=nawk} in the @file{Makefile}. That should
+take care of those problems.
+
+Again, for best results I recommend using the FAS serial driver, and
+using a port with a minor number of 80+portno (ttyF01 etc.)
+
+If you use a Digiboard smart serial cart (e.g. the digiboard pc/8e), use
+the @file{/dev/ttyi*} devices instead of @file{/dev/cui*}, becaus only the
+former ones honour carrier drops (If you use @file{cui*}, your processes
+won't die if the modem unexpectedly hangs up)
+
+
+@node SVR4, SVR42, ISC, Systems
+@subsection SVR4 Unix
+
+mgetty has been ported to SVR4 now (many thanks to Bodo Bauer,
+<bodo@@hal.nbg.sub.org>, Martin Husemann, <martin@@bi-link.owl.de> and Marc
+Boucher <marc@@cam.org>).
+
+As far as I know, it's sufficient to add @samp{-DSVR4} to the CFLAGS in
+Makefile. If you have any problems or suggestions, please report them also
+to the people above, since I do not have a SVR4-System to run tests on.
+
+If you use the @code{SAS} serial driver (streams-version of @code{FAS}) and
+want to force @code{sas} to use hardware-handshake all the time, use a
+device with a minor device number of @code{80+port number} (see the
+@code{sas} manual for explantations). If you use a port with a minor device
+number of @code{7*16+i}, @code{mgetty} is able to switch hardware handshake
+on and off according to the flags set in policy.h, using
+@file{sys/termiox.h}. (Well, it works - but apparently fax reception
+doesn't work with this minor device number. Symptom: only one byte is
+received during fax reception (0x00). Anybody any clue?). 
+
+If you use @code{FAS}, use the devices with a minor device number of
+@code{80+port number} (as usual).
+
+@node SVR42, BSD, SVR4, Systems
+@subsection SVR4.2 - Onsite Unix, UnixWare, ...
+
+Basically, SVR4.2 is quite similar to SVR4, but you have to watch out for
+some details (defining @code{-DSVR42} in the Makefile will do it for you).
+
+Most important, the @emph{termiox} interface via the @code{TCGETX} /
+@code{TCSETX} @code{ioctl()}s does not seem to work any longer - the calls
+return an error, and the port behaves strangely. If you're experiencing
+this, please try commenting out the corresponding code in @file{tio.c},
+funtion @code{tio_set_flow_control()} and mail me whether that make it
+work.
+
+Further, ussing @code{USE_POLL} or @code{USE_READ}, won't work. The default
+of @code{USE_SELECT} is OK.
+
+To enable hardware handshake, use the tty device with the trailing ``h'',
+e.g.  @file{tty01h}. On the other one (@file{tty01}), the driver won't do
+H/W handshake.
+
+Depending on the configuration, parallel dial-out with Taylor-UUCP may fail
+(uucico complaining that it cannot set @code{CLOCAL}), in that case, you've
+to recompile Taylor with different settings for the @code{termio} selection
+(POSIX vs. SYSV).
+
+Many thanks to Joerg Weber (joerg@@interface-business.de) for finding all
+those problems.
+
+@c FAX_SEND_IGNORE_CARRIER --> UnixWare bug!
+
+Ed Hall (edhall@@rand.org) found another major glitch on UnixWare 4.2: if
+you run @code{sendfax} without setting
+@code{ignore-carrier true} in @file{sendfax.config}, and @code{sendfax}
+switches off carrier detection at the end of the very last page, the
+kernel code messes up something and bytes get lost. The modem then returns 
+funny error codes, like, for example,
+@example
+Transmission error: +FHNG:44 (Unrecognized Transparent data command)
+@end example
+If you're experiencing this, just set @code{ignore-carrier true}
+and everything should work just fine (please tell me in any case whether
+it was necessary, because if it happens for other people as well, I'll
+make this permanent on SVR42).
+
+@xref{Solaris2}.
+
+@node BSD, AIX, SVR42, Systems
+@subsection BSD-like flavours of Unix
+
+A port to 386BSD, NetBSD, FreeBSD has been done by Martin Husemann,
+martin@@bi-link.owl.de, and Gunther Shadow, gusw@@fub46.zedat.fu-berlin.de.
+
+I think it works quite well, except that the @code{VTIME} mechanism to
+timeout @code{read()} calls doesn't work in older *BSD versions. If
+@code{mgetty} hangs, with the last line in the log file being something
+like ``waiting for line to clear'', upgrade your kernel, or, if you can't
+do that, compile @code{mgetty} with @code{-DBROKEN_VTIME} (in that case,
+select() will be used).
+
+For older versions of BSD Unix that do not have @file{termios.h}, you'll
+have to complete the unfinished support for @file{sgtty.h} in @file{tio.c}
+and @file{tio.h}.
+
+Generally, BSD Unices do not have a @file{/etc/inittab} as system V has.
+Instead, they have @file{/etc/ttys} (or sometimes @file{/etc/ttytab} on
+really old BSD systems). Thus, you have to enter a line like
+@example
+cua0    "@SBINDIR@/mgetty -x 3 cua0"       vt100
+@end example
+or
+@example
+cua00	"@SBINDIR@/mgetty -x 3"    vt100 on insecure
+@end example
+there. See the corresponding manpage for an exect description of the files
+format on your system. Don't forget to remove (or comment out) the
+original getty on the corresponding @file{/dev/tty*} line.
+
+@node AIX, SunOS, BSD, Systems
+@subsection IBM's AIX Operating System
+
+Chris Lewis, Harald Milz and Michael Staats have done excellent work on
+porting @code{mgetty} to AIX.   Since then, I have taken over and actively 
+use mgetty+sendfax on AIX for customer systems, and everything is very
+well tested now.
+
+On AIX, many people do not want to manipulate @file{/etc/inittab} directly,
+instead,  use some system administration tools (like 'smit'). To ease
+@code{mgetty} installation on AIX, Michael Staats has provided a small
+shell script, @code{inittab.aix}, that will help you setup your
+@file{inittab} after you've run @code{make install}. Just call it with the
+name of the tty you're modem is connected to, e.g. 
+
+@code{./inittab.aix tty0}.
+
+I have received a couple of problem reports on AIX 4.1 where ``suddenly''
+the modem line stopped working and all mgetty reported were error
+messages. If that happens to you, set @code{toggle-dtr no} in
+@file{mgetty.config}. AIX 4.1 doesn't seem to like programs that fiddle
+with the modem control lines.
+
+Christoph Brinck (cb@@medat.de) has also reported that it's
+necessary to enable the ``dtropen line discipline'' for the serial line
+you're using (whatever that may mean). This is done with the command:
+
+@example
+chdev -l 'tty1' -a flow_disp='rts'
+chdev -l 'tty1' -a open_disp='dtropen'
+@end example
+
+or via the @samp{chgtty} part of @code{SMIT} (but I think that's the
+default setting for new ttys anyway).
+
+Hardware and Software flow control work fine on AIX 3.x and AIX 4.x now.
+
+@node SunOS, Solaris2, AIX, Systems
+@subsection SunOS 4.1.1 and up
+
+mgetty has been ported to SunOS, and seems to work quite well.  If you use
+SunOS, please send me a brief report about your results.
+
+Thanks to Earl Hartwig, earl@@fozzi.ocunix.on.ca, for the initial port.
+
+For compilation, please define @code{-Dsunos4}.
+
+In @file{policy.h}, you've to adapt the location of the LOCK files.
+
+In the Makefile, set @code{ECHO='...'} to
+@code{/usr/5bin/echo}, because the standard one doesn't
+support escape codes like @samp{\n} or @samp{\c}. Alternatively, if you
+don't have the System5 options installed, use @code{mg.echo}.
+
+If a fax reception hangs shortly after the @samp{+FCON} is seen, please try
+setting @code{FAXREC_FLOW} to Xon/Xoff (@code{FLOW_SOFT}). Hardware
+handshake has problems on SunOS versions without the ``Jumbo TTY'' patch.
+
+If fax sending hangs mysteriously between the first and the second page,
+you're likely to have a modem that drops DCD during pages. As SunOS'
+serial drivers are dumb, reception of data will fail if DCD is low and
+handshake is set to RTS/CTS. So, set @code{ignore-carrier yes} in
+@file{sendfax.config} @strong{and} @code{#define FAXSEND_FLOW FLOW_SOFT} 
+in @file{policy.h} and fax sending should work.
+
+Please use the ``outgoing'' devices (@file{/dev/cua*}) for mgetty and
+dial-outs, using the ``incoming'' devices (@file{/dev/tty*}) will make
+dialout impossible. Further, carrier detect (DCD) is only honoured
+on the @file{cua*} lines.
+
+It is @strong{very} strongly recommended that you install the 
+``jumbo tty patch'' (patch number 100513-05 for 4.1.2 or .3, patch 
+number 101621-01 for 4.1.3_u1 and up) because it will fix a lot 
+misbehaviour of the serial line drivers.
+
+Please read also the generic BSD section.
+
+@node Solaris2, 3b1, SunOS, Systems
+@subsection Solaris 2.3 and up
+
+mgetty runs successfully and without trouble under Solaris 2.3, 2.4 and
+2.5.1 (later versions should also work, but I didn't get any report so far).
+For compilation use @code{-Dsolaris2}. With Solaris 2.3 it's recommended to use
+GNU gcc, but with Solaris 2.4 it compiles fine with the SPARCompiler C 3.0.1.
+Define @code{CC=cc}.
+
+In @file{policy.h} you have to define @samp{term/a} or @samp{term/b} as
+@code{FAX_MODEM_TTYS}. Don't use the outgoing devices @samp{/dev/cua/*}!!
+
+As @code{DEVICE_GROUP} you should configure @samp{uucp}.  If you want allow
+to normal users to dial out, add all users allowed to do that, to the group
+@samp{uucp}. Then it's important to change the permissions of
+@file{/var/spool/locks} from the default permissions @samp{drwxr-xr-x} to
+@samp{drwxrwsr-x}. Make sure that it's owned by @samp{uucp.uucp}.
+Otherwise no one wanting to dial out is able to create a lock file.  The
+@code{FILE_MODE} in @file{policy.h} must be @samp{0660} as well.
+
+If you don't want allow anyone to dial out you should set @code{FILE_MODE}
+to @samp{0640} or @samp{0600}.
+
+For the "notify mail" message to look best, define @code{MAILER} in
+@file{policy.h} to @var{/usr/lib/sendmail} and define
+@code{NEED_MAIL_HEADERS}. So a proper subject header is created.
+Nevertheless, @code{/usr/bin/mailx} works, as it is the default for SVR4.
+
+If everything compiled well and you did @code{make install}, you have to
+add an entry to @file{/etc/inittab} like the following:
+
+@example
+ya:234:respawn:/usr/local/sbin/mgetty -s 38400 -x 3 term/a
+@end example
+
+@emph{Don't use the Solaris @code{admintool} to create any port monitoring
+entries in @file{/etc/saf/_sactab} and @file{/etc/saf/zsmon/_pmtab}.}
+
+Many thanks to Stefan Muehlenweg (muehlenw@@samhh.hanse.DE) for this section.
+
+Solaris (as all Sun operating systems) seems to be somewhat weird
+concerning its handling of the RTS line.  I have received two reports that
+'sometimes' a modem hangs during initialization, and won't talk to mgetty
+anymore.  In these cases, the problem went away when the modem (an USR
+Sportster) was set to @code{AT&R1}, which means 'ignore RTS line'.  Thanks
+to Valerio Di Giampietro for detailing this.
+
+@node 3b1, HP-UX, Solaris2, Systems
+@subsection AT&T 3b1
+
+Glenn Thobe and Chris Lewis have ported mgetty+sendfax to AT&T's 3B1
+machines, it should compile without changes to the source (but define
+-D_3B1_ in the Makefile).
+
+These ports are to two different environments:
+
+Glenn's port was with GCC (ANSI C) and an add-on select() library routines. 
+Chris's port was with stock 3b1 C, without select().
+Both seem reliable.
+
+Some further hints concerning a select() library and the pbmplus tools can
+be found in the file @file{contrib/3b1} which are the notes from Glenn's
+port.
+
+Chris's port relies simply on the suggested definitions (especially
+@code{-DUSE_READ}) in the Makefile.  Chris suggests that you use select()
+if you already have it for some other reason, but that it seems to work
+just fine without it.
+
+Right now, I think mgetty won't compile with the standard C compiler (it
+will with gcc), because the stuff I do in the @file{conf_*.c} source files
+is a little bit too hard for it. I'll work on it.
+
+@node HP-UX,  NEXTSTEP, 3b1, Systems
+@subsection The HP-UX operating system
+
+@code{mgetty} runs on HP-UX, but that's very much all I can say about it (I
+don't know anything about HPs, except that they are somewhat strange).
+
+Currently, documentation for HP-UX is a bit lacking - if you know
+something about @code{mgetty} on HP-UX, please contribute.
+
+@node NEXTSTEP, Darwin, HP-UX, Systems
+@subsection The NEXTSTEP operating system
+
+NEXTSTEP is lacking quite a few commands used by mgetty and its
+tools: Luckily, they are available from the GNU project
+(please mail me if I forgot any),
+e.g. gawk, cut (from textutils), id and logname (from sh-utils). All of
+them can be compiled for NEXTSTEP without problems, and it's certainly
+a good idea to install them anyway. ghostscript needs some fiddling for
+NEXTSTEP, but it's available precompiled on the arcives as GSPrintFilter.
+If you don't intend to use faxspool and friends, you may succeed without
+installing the forementioned utilities.
+
+Having said this, there are two different ways to compile @code{mgetty}
+for NEXTSTEP, each with their pros and contras:
+
+@itemize @bullet
+@item
+With termios interface: To use @code{mgetty}'s termios interface (the
+default), you have to link against NEXTSTEP's buggy POSIX library.
+
+In the Makefile, add "-posix -DBSD" to CFLAGS and LDFLAGS.
+
+Drawbacks: The log file will be corrupted due to an append bug in libposix.
+
+Use this only if you want to try vgetty. In all other cases it's probably
+better to choose the second variant:
+
+@item
+With sgtty interface: Ben Stuyts @samp{benst@@stuyts.nl} has done an
+effort to make a @code{mgetty} port using the BSD sgtty style interface
+to the serial ports. This port doesn't need the POSIX library.
+
+In the Makefile, add "-DNEXTSGTTY -DBSD".
+
+This port has been tested with m68k and i386 machines.
+
+For i386 machines, you may want to use the /bin/login replacement
+@samp{modem-login} in @code{mgetty}'s contrib directory. NEXTSTEP's login
+has problems with 8-bit logins. I've got one report from Ben Stuyts,
+though, that @samp{modem-login} does fix problems on ``Black NeXT''s as
+well. Just try it.
+
+Drawback: You can't compile vgetty with sgtty support yet! If you want to use
+vgetty with NEXTSTEP, you'll have to stick with the termios port. There are
+problems with the LNOHANG bit not being acknowledged
+correctly, therefore hanging the modem when the caller hangs up.
+@end itemize
+
+For i386 machines, it's wise to use the /dev/cudfX (hardware flow
+control,...) devices. I'm using them with NeXT's most recent serial port
+driver, Mark Salyzyn's Mux driver also supports them.
+
+For m68k machines, you have to stick with /dev/cufa.
+
+This are the settings I use in the Makefile:
+
+@example
+CC=cc
+CFLAGS=-DNEXTSGTTY -DBSD -O2  (-posix -DBSD for termios port)
+INSTALL=install -c -o root -g wheel
+spool=/usr/spool
+SBINDIR=$(prefix)/etc
+ECHO="mg.echo"
+INSTALL_MECHO=mg.echo
+AWK=gawk
+@end example
+
+Furthermore, you should define binary lock files, in policy.h:
+
+@example
+#define LOCKS_BINARY 1
+@end example
+
+Finally, when using NEXTSTEP's cc, you need to run "make noident" in
+the first place to remove the #ident directives from the source files.
+
+If you have questions, comments or suggestions regarding @code{mgetty} with
+NEXTSTEP, feel free to contact Gregor Hoffleit
+@samp{flight@@mathi.uni-heidelberg.de} or Ben Stuyts
+@samp{benst@@stuyts.nl}.
+
+@itemize @bullet
+@item
+Coming real soon now:
+
+How to use @code{mgetty} to send faxes via the NEXTSTEP fax panel
+
+(using Kevin Peckover's ps2g3 package, available as
+@samp{ftp://peanuts.leo.org/pub/next/Tools/postscript/ps2g3.s.tar.gz}).
+
+@item
+Coming soon:
+
+How to patch and use @code{mgetty} to spool received faxes in the NEXTSTEP
+fax system.
+@end itemize
+
+@node Darwin, , NEXTSTEP, Systems
+If I understand this correctly, "Darwin" is the underlying operating
+system that Apple MacOS X is based upon.
+
+Edwin C Wirth <ecwirth@@mac.com> gave me an account to his "Darwin Kernel
+Version 5.1" machine (running MacOS 10.1.1 on top of it) so I could port 
+@code{mgetty+sendfax} to that OS.  Thanks to that, Darwin is supported 
+from 1.1.28 on.
+
+Compilation is pretty straightforward: use the default CFLAGS and LIBS
+settings in the Makefile, set @code{CC=cc}, and then run @code{make}.  It
+will spit out a ton of warnings about @samp{undefined or invalid #
+directive} - but those are harmless, it's just cpp not understanding
+@code{#ident}.
+
+At run time, as far as I could see, the internal Mac modem is available on
+@file{/dev/tty.modem}.  The macintosh I had for testing also had "KeyUSA"
+USB-to-Serial ports that appeared as @file{/dev/tty.KeyUSA28X913.1} and
+@file{.2} - so other serial ports should also appear as @file{/dev/tty.*}
+devices.  Note: there seem to be ''cu'' devices as well
+(@file{/dev/cu.modem}), as in older Linux variants.  I did only try
+sending faxes via @file{tty.modem} yet, but to resolve locking issues, 
+it might be neccesary to use @file{cu.*} devices.  To be continued...
+
+Mgetty should be run from @file{/etc/ttys} as in other BSDs, see 
+@code{man ttys} (there is no @file{/etc/inittab}).
+
+Open issues:
+@itemize @bullet
+@c @item how to access external serial ports?
+@item is it better to use @file{/dev/cu.*} or @file{/dev/tty.*}?
+@item how is tty locking done?  Couldn't find UUCP lock files
+@item any tricky things about logging in remotely?  utmp/wtmp?
+@item where should the log files go to?  /var/log doesn't seem to exist.
+@end itemize
+
+@node General, logfiles, Systems, Problems
+@section General problems
+
+@menu
+* pbmtog3::         pbmtog3
+* Locks::           Lock files
+* login-hang::      
+* ecu::             ecu (extended cu) 3.20 collides with mgetty
+@end menu
+
+@node pbmtog3, Locks, General, General
+@subsection pbmtog3
+The @code{pbmtog3} program from the @file{pbmplus} distribution produces G3
+data that does not adhere to the T.4 standard. The initial EOL code is
+missing, and the lines are not always 1728 pixels wide.  So, some fax
+machines won't accept the output at all (not printing even one line), and
+others will complain.
+
+A fix for this problem is available: I have included a patch for pbmtog3,
+called @file{patches/pbmtog3.p1}, that will fix the problems. (Oh, by the
+way, if you try to send a fax generated with an unpatched pbmtog3, sendfax
+will complain that it doesn't like the file @dots{} I've added a small
+sanity check to spare me the time browsing through the logfiles guessing
+@emph{why} sendfax failed (won't work if the file has been processed by
+@code{g3cat}, though!)). If you use the @code{pbm2g3} program that is
+shipped with @code{mgetty}, there is @strong{no need to patch anything}.
+
+Basically, there is no need at all to use @file{pbmplus}' @code{pbmtog3}
+program any more, since @code{mgetty} includes an own copy. I just wanted
+to warn you.
+
+Anyway, my program is lots faster @dots{}.
+
+@node Locks, login-hang, pbmtog3, General
+@subsection Lock files
+Kermit et.al. cannot dial out while mgetty is running (modem responses
+are eaten by mgetty)---what's wrong?
+
+Most propably, you have not configured the @code{LOCK} and
+@code{LOCKS_BINARY} defines in @file{policy.h} properly. Make sure that
+the lockfiles kermit (or cu, pcomm, seyon,@dots{}) expect are in the
+path specified in @code{LOCK} and set @code{LOCKS_BINARY} to 1 if they do
+not write the PID of the locking process in ascii (10 bytes) to the lock
+file but as a 4-byte integer instead. Mgetty and Sendfax will understand
+both types of lock files, but if @code{LOCKS_BINARY} is not set properly,
+other programs may not understand the lock file.
+
+Also, make sure that both processes use the same name for the device.
+(i.e., mgetty locking @file{/dev/ttyS0} and kermit locking
+@file{/dev/modem} will definitely fail.)
+
+@node login-hang, ecu, Locks, General
+@subsection mgetty works, /bin/login hangs
+
+A problem seen fairly often on directly connected serial lines
+(@code{mgetty -r}), and seldomly on modem lines, is that @code{mgetty}
+works flawlessly, but @code{/bin/login} just hangs instead of prompting for
+the user password.
+
+The reason for this is that many @code{login} programs reopen
+@file{/dev/tty} (the controlling tty of a process) to make sure they have
+full control over the password entered by the user (for example, to prevent
+snooping). This will block on some systems if the DCD (carrier detect) line
+coming from the modem or the other machine is low. Notably those systems
+are those that have callin/callout device pairs for one serial device, e.g.
+Linux, SunOS, SCO/FAS, etc.
+
+The fix is easy: make sure that the DCD line is high. 
+
+If you use a modem, the command to do this is usually @code{AT&C1} (but
+check with your modem manual). 
+
+If you're using a direct null-modem connection to another host, the
+recommended solution is to wire DCD on your side to the DTR line on the
+other side and vice versa. That way, when the remote machine ``hangs up''
+(calling program exits and DTR drops), your host will get notified as
+well. This is what a properly wired (!) ``null-modem cable'' does anyway.
+
+If you don't have free lines in your serial cable (classic three-wire
+approach), wire DCD to the DTR line on your own host, and make sure that
+mgetty won't toggle DTR upon startup (causing a hangup signal!), e.g. by
+setting @code{toggle-dtr no} in @file{mgetty.config}.
+
+@node ecu,  , login-hang, General
+@subsection ECU 3.20 or earlier on SCO collides with mgetty
+
+ECU releases 3.20 and earlier had a severe bug in the utmp handling that
+prevented dialing out on a port that mgetty uses. It has been fixed in ECU
+3.27. If you run into that problem, please get a newer release.
+Alternatively, you can use the patch that Uwe Fuerst provided, it can be
+found in @file{patches/ecu320.p1}.
+
+@node logfiles, ftp, General, Problems
+@section Sample Log files
+
+Both mgetty and sendfax can provide logfiles that can be very helpful for
+debugging and accounting purposes. The amount that is logged is controlled
+with the default set in @file{policy.h} and the command line argument
+@code{-x <level>}. Higher numbers give more details.
+
+At this place, I want to show you some typical cases, so you can compare
+your log files to those given here and check what is different.
+
+(Note: naturally all the modem initializations, and also some of the modem
+responses, vary between modem brands!)
+
+All the mgetty log files have been done with log level @code{L_MESG}, that is,
+@code{-x 4}. The sendfax log file was done with @code{L_NOISE}, @code{-x 5}.
+
+@menu
+* log-mgetty-data::  mgetty log file, incoming data call
+* log-mgetty-fax::  mgetty log file, incoming fax call (one page)
+* log-mgetty-syslog::  mgetty logging to syslog
+* log-sendfax::     sendfax log file, sending one page
+@end menu
+
+@node log-mgetty-data, log-mgetty-fax, logfiles, logfiles
+@subsection mgetty, incoming data call
+
+This is a log file of a typical data connection, ZyXEL-to-ZyXEL modems,
+connect with 19200 bps on a port speed of 38400, login as "Uartinet", the
+login program called is @code{/usr/lib/uucp/uucico} (controlled by
+@file{LOGIN_CFG_FILE}, which directs all login names starting with "U" to
+uucico)
+
+@example
+03/03 22:40:15  check for lockfiles
+03/03 22:40:15  locking the line
+03/03 22:40:16  lowering DTR to reset Modem
+03/03 22:40:16  send: \d\d\d+++\d\d\d[0d]\dATQ0V1H0[0d]
+03/03 22:40:20  waiting for ``OK'' ** found **
+03/03 22:40:20  send: ATS0=0Q0&D3&H3&N0&K4[0d]
+03/03 22:40:20  waiting for ``OK'' ** found **
+03/03 22:40:20  send: AT+FCLASS=0[0d]
+03/03 22:40:20  waiting for ``OK'' ** found **
+03/03 22:40:20  send: AT+FAA=1;+FBOR=0;+FCR=1[0d]
+03/03 22:40:20  waiting for ``OK'' ** found **
+03/03 22:40:20  send: AT+FLID="49 89 3243328"[0d]
+03/03 22:40:20  waiting for ``OK'' ** found **
+03/03 22:40:20  send: AT+FDCC=1,5,0,2,0,0,0[0d]
+03/03 22:40:20  waiting for ``OK'' ** found **
+03/03 22:40:20  fax_command: send 'AT+FLPL=1'
+03/03 22:40:20  fax_wait_for(OK)** found **
+03/03 22:40:21  waiting...
+03/03 22:41:28  waiting for ``RING'' ** found **
+03/03 22:41:28  send: ATA[0d]
+03/03 22:41:28  waiting for ``CONNECT'' ** found **
+03/03 22:41:42  send: 
+03/03 22:41:42  waiting for ``
+'' ** found **
+03/03 22:41:43 ##### data dev=tty4c, pid=6470, caller=none, conn='38400/ZyX  16800/V42b', name='', cmd='/usr/lib/uucp/uucico', user='Uartinet'
+@end example
+
+@node log-mgetty-fax, log-mgetty-syslog, log-mgetty-data, logfiles
+@subsection mgetty, incoming fax call
+
+This is a log file of a fax call I got today. It was a fax call with 14400
+bps (actually, the call came from another faxmodem, but you won't see that
+in the log file), using high resolution. One page was received, the
+connection time was 33 seconds. No errors occured.
+
+(All the stuff up to "waiting@dots{}" is identical to the example above, so
+I don't list it again)
+
+@example
+[...]
+03/03 21:39:32  waiting...
+03/03 21:46:22  waiting for ``RING'' ** found **
+03/03 21:46:22  send: ATA[0d]
+03/03 21:46:22  waiting for ``CONNECT''
+03/03 21:46:32  found action string: ``+FCON''
+03/03 21:46:32  action is A_FAX, start fax receiver...
+03/03 21:46:32  fax_wait_for(OK)
+03/03 21:46:36  fax_id: '+FTSI:+31 20 6147110       '
+03/03 21:46:36  transmission par.: '+FDCS:1,5,0,2,0,0,0,0'** found **
+03/03 21:46:36  fax_command: send 'AT+FDR'
+03/03 21:46:36  fax_wait_for(CONNECT)
+03/03 21:46:37  fax_id: '+FTSI:+31 20 6147110       '
+03/03 21:46:37  transmission par.: '+FDCS:1,5,0,2,0,0,0,0'** found **
+03/03 21:46:38  fax_get_page_data: receiving /usr/spool/fax/incoming/ffd764c9e4d-+31-20-6147110.01...
+03/03 21:46:51  fax_get_page_data: page end, bytes received: 24933
+03/03 21:46:51  fax_wait_for(OK)
+03/03 21:46:51  page status: +FPTS:1** found **
+03/03 21:46:53  fax_wait_for(CONNECT)
+03/03 21:46:55  connection hangup: '+FHNG:000'** found **
+03/03 21:46:56 ##### fax dev=tty4d, pid=4807, caller=none, name='', id='+31 20 6147110       ', +FHNG=000, pages=1, time=00:00:33
+@end example
+
+@node log-mgetty-syslog, log-sendfax, log-mgetty-fax, logfiles
+@subsection mgetty, logging into syslog
+
+If your system has a @code{syslogd} and the @code{syslog()} C function,
+mgetty can send parts of its log files to the @file{syslog} (For details,
+see comments in @file{policy.h}). Not all the information from the log file
+is logged here (to avoid clobbering the syslog), just errors and so-called
+"audit" messages (seen in the log file as lines with "####" at the
+beginning). These have a fixed format, and could easily be parsed by a
+program. Let me list a few, and then comment them.
+
+@example
+Mar  3 18:36:16 greenie mgetty[673]: failed A_FAIL dev=tty4d, pid=673, caller=none, conn='', name=''
+Mar  3 18:41:56 greenie mgetty[1866]: fax dev=tty4d, pid=1866, caller=none, name='', id='49 89 3243328        ', +FHNG=100, pages=1, time=00:00:29 
+Mar  3 21:46:56 greenie mgetty[4807]: fax dev=tty4d, pid=4807, caller=none, name='', id='+31 20 6147110       ', +FHNG=000, pages=1, time=00:00:33 
+Mar  3 20:45:59 greenie mgetty[4038]: data dev=tty4d, pid=4038, caller=none, conn='38400/V.32  9600/MNP5', name='', cmd='/bin/login', user='mbox'
+Mar  3 22:41:43 greenie mgetty[6470]: data dev=tty4c, pid=6470, caller=none, conn='38400/ZyX  16800/V42b', name='', cmd='/usr/lib/uucp/uucico', user='Uartinet'
+@end example
+
+Those five lines are one failed call, two fax calls, one of them failed and
+one successful, and two data calls, one of a human caller, loggin into the
+BBS system, and one of a calling uucico.
+
+It looks very confusing until you understand the system behind it. The
+first fields specify date and time, originating host (greenie is my
+machine) and program (mgetty). The next field specifies the type of the
+connection made: @samp{fax}, @samp{data} or @samp{failed} - the latter one
+usually means failure to initialize the modem or failure to connect to a
+calling modem, resulting in the well-known @samp{NO CARRIER} message...
+
+The @samp{dev} and @samp{pid} fields specify the line and process ID of the
+mgetty process writing that line.
+
+The @samp{caller} and @samp{name} fields give caller ID information - if
+none is available (as it is here in Germany), or if your modem doesn't
+handle it, it will list @samp{none} and @samp{''}, respectively.
+
+For fax calls, additional informations given are the remote station ID
+(@samp{id='@dots{}'}), the hangup code (@samp{+FHNG=@dots{}}, 0 means "ok"),
+the number of pages and the connection time.
+
+For data calls, the string that the modem returned after @samp{CONNECT} is
+listed as @samp{conn='@dots{}'}. The string that was entered at the login
+prompt is listed as @samp{user='@dots{}'}, and the program that is called
+to do the login is given as @samp{cmd='@dots{}'}. Usually this will be
+@code{@LOGIN@} unless you have some special system setup for fido or
+uucp callers - as I have here, as you can see above.
+
+@node log-sendfax,  , log-mgetty-syslog, logfiles
+@subsection sendfax, sending a single page
+
+This is a simple one-page fax that I sent some days ago. Just a single
+page, f1.g3, to the phone number 2710834. No errors of any kind occured.
+
+@example
+02/18 11:10:05  sending fax to 2710834
+02/18 11:10:06  checking f1.g3
+02/18 11:10:06  makelock(tty4c) called
+02/18 11:10:06  do_makelock: lock='/usr/spool/uucp/LCK..tty4c'
+02/18 11:10:06  lock made
+02/18 11:10:06  fax_open_device succeeded, tty4c -> 4
+02/18 11:10:06  fax_command: send 'AT'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:06  fax_wait_for: string 'AT'
+02/18 11:10:06  fax_wait_for: string 'OK'** found **
+02/18 11:10:06  fax_command: send 'AT+FCLASS=2'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:06  fax_wait_for: string 'AT+FCLASS=2'
+02/18 11:10:06  fax_wait_for: string 'OK'** found **
+02/18 11:10:06  fax_command: send 'AT+FLID="49 89 3243328"'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:06  fax_wait_for: string 'AT+FLID="49 89 3243328"'
+02/18 11:10:06  fax_wait_for: string 'OK'** found **
+02/18 11:10:06  fax_command: send 'ATL7M1'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:06  fax_wait_for: string 'ATL7M1'
+02/18 11:10:06  fax_wait_for: string 'OK'** found **
+02/18 11:10:06  fax_command: send 'AT+FDCC=1,5,0,2,0,0,0,0'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:06  fax_wait_for: string 'AT+FDCC=1,5,0,2,0,0,0,0'
+02/18 11:10:06  fax_wait_for: string 'OK'** found **
+02/18 11:10:06  fax_command: send 'AT+FBOR=0'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:06  fax_wait_for: string 'AT+FBOR=0'
+02/18 11:10:06  fax_wait_for: string 'OK'** found **
+02/18 11:10:06  fax_command: send 'AT&H3D2710834'
+02/18 11:10:06  fax_wait_for(OK)
+02/18 11:10:07  fax_wait_for: string 'AT&H3D2710834'
+02/18 11:10:39  fax_wait_for: string '+FCON'
+02/18 11:10:39  fax_wait_for: string '+FNSF:00 00 00 00 '
+02/18 11:10:39  fax_wait_for: string '+FCSI:       49 89 2710834 '
+02/18 11:10:39  fax_id: '+FCSI:       49 89 2710834 '
+02/18 11:10:39  fax_wait_for: string '+FDIS:1,3,0,2,0,0,0,4'
+02/18 11:10:39  fax_wait_for: string 'OK'** found **
+02/18 11:10:39  fax_send_page("f1.g3") started...
+02/18 11:10:39  fax_command: send 'AT+FDT'
+02/18 11:10:39  fax_wait_for(CONNECT)
+02/18 11:10:39  fax_wait_for: string 'AT+FDT'
+02/18 11:10:45  fax_wait_for: string '+FDCS:1,3,0,2,0,0,0,4'
+02/18 11:10:45  transmission par.: '+FDCS:1,3,0,2,0,0,0,4'
+02/18 11:10:45  fax_wait_for: string 'CONNECT'** found **
+02/18 11:10:45  waiting for XON, got:[0a][11]
+02/18 11:10:45  sending f1.g3...
+02/18 11:11:03  sending DLE ETX...
+02/18 11:11:03  fax_wait_for(OK)
+02/18 11:11:16  fax_wait_for: string 'OK'** found **
+02/18 11:11:16  fax_command: send 'AT+FET=2'
+02/18 11:11:16  fax_wait_for(OK)
+02/18 11:11:16  fax_wait_for: string 'AT+FET=2'
+02/18 11:11:25  fax_wait_for: string '+FPTS:1'
+02/18 11:11:25  page status: +FPTS:1
+02/18 11:11:26  fax_wait_for: string '+FHNG:00'
+02/18 11:11:26  connection hangup: '+FHNG:00'
+02/18 11:11:26  (Normal and proper end of connection)
+02/18 11:11:26  fax_wait_for: string 'OK'** found **
+02/18 11:11:26  fax_send: 'AT+FCLASS=0^M'
+02/18 11:11:26  removing lock file
+@end example
+
+@node ftp, get-uucp, logfiles, Problems
+@section How to get the mentioned software by FTP?
+
+Most of the software mentioned in this document should be available on most
+major ftp sites. Nevertheless, I've got so many questions about the
+software that I'll list some ftp sites here.
+
+Furthermore, I'll list some other software that may be interesting if you
+plan to use @code{mgetty+sendfax} in different environments than I do.
+
+@itemize @bullet
+@item
+@code{mgetty+sendfax}
+
+The current release can usually be found at:
+
+sunsite.unc.edu:@file{/pub/Linux/system/serial/getty/mgetty+sendfax*}
+
+tsx-11.mit.edu:@file{/pub/linux/sources/sbin/mgetty+sendfax*}
+
+alpha.greenie.net:@file{/pub/mgetty/source/*}
+
+ftp.leo.org:@file{/pub/comp/os/unix/networking/mgetty/*}
+
+ftp.mathematik.th-darmstadt.de:@file{/pub/linux/mirrors/misc/mgetty/*}
+
+linux.nrao.edu:@file{/pub/src/mgetty/*}
+
+ftp.chem.tue.nl:@file{/pub/mgetty/*}
+
+http://linux.mit-lab.co.kr/mgetty/*
+
+ftp.uvt.ro:@file{/pub/mgetty/*}
+
+... and on all sites that mirror SunSITE.unc.edu or tsx-11.
+
+The most recent beta release is always placed in the listed directories
+on alpha.greenie.net, ftp.leo.org and their mirrors on th-darmstadt.de 
+and linux.nrao.edu.  
+
+On SunSITE and TSX-11, you'll only find ``stable'' releases (even 
+version numbers, no date stamp in the file name).
+
+Use betas on your own risk!
+
+@item
+@code{pbmplus}
+
+I found the pbmplus package (bitmap manipulation tools) at the following
+places (most other sites mirroring X11 should also have them):
+
+src.doc.ic.ak.uk:@file{/computing/graphics/pbmplus10dec91.tar.Z}
+
+wuarchive.wustl.edu:@file{/packages/X11R5/contrib-pub/pbmplus10dec91.tar.Z}
+
+ftp.germany.eu.net:@file{/X11/contrib/pbmplus10dec91.tar.Z}
+
+ftp.leo.org:@file{/pub/comp/os/unix/networking/mgetty/}
+
+The @code{pbmplus} package has been superceded by the @code{NetPBM}
+package which has some more conversion tools (but also some more bugs). It
+should be available on the same sites. You could also check:
+
+wuarchive.wstl.edu:@file{/graphics/graphics/packages/NetPBM}
+
+ftp.rahul.net:@file{/pub/davidsen/source}
+
+ftp.informatik.uni-oldenburg.de:@file{/???}
+
+The @code{pbmtodot} program mentioned in the ``fax'' chapter can be found,
+if nowhere else, in the @file{mgetty} directory on ftp.leo.org (see above).
+
+@item
+@code{FAS}
+
+Some sites carrying the @code{fas} serial driver for SCO Unix, ISC, @dots{}:
+
+ftp.fu-berlin.de:@file{/pub/unix/driver/fas/fas-2.11.tar.gz}
+
+ftp.germany.eu.net:@file{/pub/newsarchive/comp.sources.unix/volume27/fas-2.11.0/*}
+
+src.doc.ic.ac.uk:@file{/usenet/comp.sources.unix/volume27/fas-2.11.0/*}
+
+As far as I know, the current version is 2.12, but you should find 2.12 at
+the same places as 2.11. I never upgraded, 2.11 works very fine for me :)
+
+@item
+@code{GhostScript}
+
+The GNU GhostScript postscript interpreter can be found at all sites
+carrying GNU Software. The ``main'' GNU site is @emph{prep.ai.mit.edu}.
+
+The new version 3.x isn't GNU software anymore, but uses a special
+license. You can find it in @file{/pub/ghost/aladdin} on
+@emph{ftp.cs.wisc.edu}, and on various other mirror sites (e.g. ftp.leo.org).
+
+@item
+@code{hp2pbm}
+
+GhostScript is huge and slow... if you don't need it for other purposes,
+you could use Chris Lewis' hp2pbm package, placed at
+
+ftp.leo.org as @file{hp2pbm*} (in the mgetty directory mentioned above).
+
+This package contains all you need to convert ASCII or LJ PCL4 -> PBM, G3,
+PS, X windows, Epson 24 pin. Coupled with mgetty's @code{g32pbm}, it's all
+you need to send ASCII or HP LJ via FAX, and display/print FAXes on X, PS,
+LJ, Epson, or via PBM utilities
+
+It performs better than most of the equivalent PBMPLUS utilities.  Indeed,
+if your application can generate both LJ and PS, generating LJ and
+converting to G3 via @code{hp2pbm} is *much* faster than generating PS and
+converting via GhostScript.
+
+[Citing Chris: Incidentally, "g32pbm" plus my "pbm2lj" is much faster
+than g3tolj.  Am not entirely sure why yet.  May have something to do
+with scaling, which g32pbm and pbm2lj don't do.]
+
+@item
+@code{psroff}
+
+ftp.uunet.ca:@file{/distrib/chris_lewis/psroff3.0pl17/*}
+
+[Chris: It should be ...psroff/*, but they never answer when I ask them to
+fix my symlink]
+
+Contains all you need to generate PS, LJ, or ditroff from ditroff or CAT
+troff or groff. Together with hp2pbm, you can generate FAXes.  Contains
+quite a number of LJ fonts, font manipulation, and font scaling utilities.
+
+With the last two tools, you can send, receive, and print FAXes using
+_just_ mgetty and hp2pbm (and a Laserjet printer ;-), without needing
+pbmplus or GhostScript or anything else.
+
+@item
+@code{Ifmail}
+
+Ifmail is Eugene Crosser's FidoNet (tm) compatible mailer + gateway
+software for Unix and Linux. Together with @code{mgetty}, it provides the
+perfect modem solution, allowing incoming Fido calls as well as Unix-Login
+and fax. It can be found on:
+
+tsx-11.mit.edu:@file{/pub/linux/sources/usr.bin/ifmail*}
+
+sunsite.unc.edu:@file{/pub/Linux/system/Fido/ifmail*}
+
+@item
+@code{dialog}
+
+Dialog is a very nice shell tool to simplify input/output functions in
+shell scripts. All the programs in @file{mgetty/frontends/dialog/} rely on
+it. It runs on most operating systems (except FreeBSD), as long as they
+have a @code{curses} library. The source can be found on
+
+sunsite.unc.edu:@file{/pub/Linux/utils/shell/dialog*}
+
+@item
+@code{ps2g3}
+
+is a small package to integrate @code{mgetty+sendfax} into the NeXTStep
+operating system. It can be found on ftp.leo.org in the directory
+@file{/pub/comp/platforms/next/Tools/postscript/ps2g3.s.tar.gz}.
+
+@item
+@code{dvips5.47}
+
+Dvips 5.x and up create a strange kind of postscript that, when converted
+with Ghostscript 3.x, produces Fax files that can not be faxed to paper
+fax machines (modems work fine) because the line width isn't exactly 1728
+pixels. Dvips 5.47 doesn't do this. It can be found on:
+
+@file{ftp.leo.org:/pub/comp/os/unix/networking/mgetty/dvips*}
+
+@file{midway.uchicago.edu:pub/tex/dvips/dvips547.tar.Z}
+
+@item
+@code{g3vga}
+
+Is a nice, fast G3 viewer for Linux and SVGALIB (standard console mode, no
+X11). You can find it in @file{.../apps/graphics/viewers} on all mirrors
+of SunSITE.unc.edu.
+
+@end itemize
+
+@node get-uucp,  , ftp, Problems
+@section How to get the mentioned software by UUCP
+
+For those of you that do not have FTP access: all the software mentioned in
+the last section can also be found on the following UUCP sites:
+
+@itemize @bullet
+@item
+GREENIE (my system): ++49-89-35663089, V32bis/V.34, get greenie!~/green.files.gz
+
+@item
+CameloT (Frank Bartels): ++49-89-8948040, V34+, get /pub/ls-lR.gz
+
+@end itemize
+
+@node Thanks,  , Problems, Top
+@chapter Thanks
+Many thanks to (in no special order):
+
+@itemize @bullet
+@item
+Peter Bechtold, peter@@fns.greenie.muc.de, for sending me dozens of faxes
+to test mgetty, for calling me back numerous times after failed
+attempts to send him a fax with sendfax, @dots{}
+
+Further, for the idea to use the remote fax id as part of the filename on
+received faxes.
+
+@item
+Klaus Weidner, klaus@@greenie.muc.de, for the original linux port,
+testing dozens of pre-releases, writing the original texinfo
+documentation, and finally for writing @code{vgetty}.
+
+@item
+Lawrence 'dreamer' Chen, lawrence@@combdyn.com, for the initial ISC port,
+and for testing the package with a SupraFAX-Modem.
+
+@item
+Kay Schulz, kschulz@@gold.t-informatik.ba-stuttgart.de, for testing on ISC
+--- and telling me that it's possible to ask dozens of questions without
+having ever read the README file @dots{}
+
+@item
+Georg Edelmann, georg@@alpha.saar.de, for testing on Linux, and finding
+some stupid bugs.
+
+@item
+Uwe S. Fuerst, uwe@@phiger.com, for testing on SCO 3.2v4 (and helping me a
+lot nailing down the problem with dial-in/dial-out)
+
+@item
+Bodo Bauer, bodo@@hal.nbg.sub.org, for porting mgetty to SVR4 (though he
+did quite confuse me by insisting that the fax receiver does
+not work @dots{}), and later, bodo@@suse.de, for his @code{faxrunqd}
+daemon.
+
+@item
+Christoph Adomeit, for bugging me long enough to implement XON / XOFF
+flow control in fax sending / receiving, and for lending me one of
+his GVC modems long enough to make faxing (well, fax sending) work with it.
+
+@item
+Christopher M. Ward, for testing on SCO with another GVC modem.
+
+@item
+Ralf Stephan, for finding a problem in sendfax whith some modems that
+lower CD too soon.
+
+@item
+John C. Peterson, for correcting a similar problem in mgetty / faxrec.
+
+@item
+Chel van Gennip, for the @code{pbmscale}, @code{g3toxwd} and
+@code{g3tolj} programs.
+
+@item
+Glenn Thobe and Chris Lewis, for doing the 3B1 port(s).
+
+@item
+Chris Lewis, for doing all the @file{/etc/gettdefs} stuff, CallerID,
+space limiting, making the source look really awful (K&R C support),
+miscellaneous minor fixes,
+and tolerating my sometimes very unfriendly reactions to his suggestions.
+
+@item
+Caz Yokoyama, for his suggestions concerning faxspool and the mail-to-fax
+gateway
+
+@item
+Martin Husemann, for SVR4 testing (damn ESIX) and the NetBSD 386 port
+
+@item
+Michael A. Meiszl, mam@@mamunx.werries.de, because he asked me to (*grin*)
+- and because he found + changed lots of small, nevertheless annoying
+things.
+
+@item
+Brent Mosbrook from ZyXEL USA, brentm@@zyxel.com, who has been
+@strong{very} helpful solving some ZyXEL-specific and generic fax
+questions.
+
+@item
+ELSA Computer GmbH, Germany, for giving me a number of test modems and
+being pretty suportive overall concering questions of modem firmware,
+protocol handling, and so on.  A big thanks!
+
+@item
+Sam Leffler, sam@@sgi.com, for many interesting discussions and insights.
+
+@item
+Christian Starkjohann, cs@@ds1.kph.tuwien.ac.at, for important parts of
+the NeXT port.
+
+@item
+Geoffrey Collyer and Henry Spencer, for writing the @code{newslock.c} program
+I use in @code{faxrunq}.
+
+@item
+Simone ``Neko'' Demmel, for going to bed early, giving me time to proof
+read this manual and correct all the nasty bugs.
+
+@item
+Russel Nelson, nelson@@crynwr.com, for hosting the mgetty mailing list
+since December '96.
+
+@item
+Medat Computer GmbH, Munich, for using mgetty+sendfax and paying me for
+improvements (faxrunqd rewrite and lots of detail work).
+
+@item
+SpaceNet GmbH, Munich, for sponsoring IP connectivity for alpha.greenie.net.
+Should you ever need an Internet Service Provider in Germany, look at
+http://www.space.net/...
+
+@item
+Wiebke Baars, for being a really good friend, and for a number of
+wonderful days spent together.
+
+@item
+@dots{} and to all others who contributed in some way.
+
+@end itemize
+
+@contents
+@bye
+
+@c Local Variables:
+@c fill-column: 75
+@c texinfo-column-for-description: 20
+@c End:
+

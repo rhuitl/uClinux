@@ -1,0 +1,311 @@
+.TH viewfax 1 "14 November 2004" "Frank\'s Hacks" "Local commands"
+.SH NAME
+viewfax \- display fax files in an X11 window
+.SH SYNOPSIS
+.B viewfax
+.RB [ -fnluirvW24 ]
+.RB [ -h\fIheight ]
+.RB [ -w\fIwidth ]
+.RB [ -z\fIzoom ]
+.RB [ -d\fIdisplay ]
+.RB [ -g\fIwxh+x+y ]
+.RB [ -b\fIbell ]
+.RB [ -m\fImemory ]
+.I filename...
+.br
+.SH DESCRIPTION
+.B viewfax
+displays one or more fax files in an X11 window.  The input
+files may be either raw, single-page faxes received by a fax modem
+with a program such as
+.B mgetty(1),
+or tiff files such as those used by
+.B hylafax.
+The first (or only) page of "PC-Research"-style (DigiFAX) files
+produced by the
+.B ghostscript
+dfaxhigh or dfaxlow drivers can also be displayed.
+
+Input files using any common fax encoding such as group 3 (1 and 2
+dimensional) and group 4 can be displayed.
+
+The fax images are rendered at full resolution and then successively
+scaled down by a linear factor of 2 prior to display, until they fit
+on the screen.  The display can be controlled interactively using
+mouse and keyboard commands.  The left mouse button expands the image
+by a factor of two and the right button reduces it by the same factor.
+If the image is bigger than the available window size, the middle
+mouse button can be used to reposition it within the window.  Hold
+down the middle button while dragging the image to its new position.
+
+If the mouse has a scroll-wheel it can be used to move an oversized
+image vertically.  With the shift key depressed, the wheel scrolls
+through the pages.  The shift sense is inverted if
+.B viewfax
+is started with
+.B -W
+on the command-line.
+
+Further interaction is controlled by single-key commands:
+.TP
+.B
+h or Help
+displays a page of help information.  Type 'q' to return to the
+original document.
+.TP
+.B
+p or Prior or PgUP or - or BackSpace
+displays the previous page from the command-line list.
+.TP
+.B
+n or Next or PgDn or + or space
+displays the next page from the command-line list.
+.TP
+.B Shift HOME
+displays the first page from the command-line list.
+.TP
+.B Shift END
+displays the last page from the command-line list.
+.TP
+.B z
+zoom in (same as right mouse button).
+.TP
+.B Shift Z
+zoom out (same as left mouse button).
+.TP
+.B u
+turns the image upside down, which is useful if the fax was originally
+fed the wrong way into the machine.
+.TP
+.B Shift U
+turns this and all following pages upside down.
+.TP
+.B l
+turns the image through 90 degrees, to view landscape text.
+.TP
+.B Shift L
+turns this and all following pages sideways.
+.TP
+.B m
+produce a left/right mirror image of the page.
+.TP
+.B Shift M
+mirror this and all following pages.
+.TP
+.B cursor arrows
+reposition the displayed image if it exceeds the window size.
+.TP
+.B HOME
+repositions so that the top left corner is visible.
+.TP
+.B END
+makes the bottom right corner visible.
+.TP
+.B Print
+if the environment variable VIEWFAX_PRINT is defined, the current page
+is printed.  All pages are printed with Shift Print.
+.TP
+.B e
+if the environment variable VIEWFAX_EDIT is defined, the current page
+is passed to the editor.  All input files can be edited with Shift e.
+.TP
+.B q
+terminates the program.
+.TP
+.B Shift Q
+terminates the program with non-zero exit status.  Can be used to
+abort a shell script, e.g. when the user is previewing an outbound fax
+and decides not to send it.
+.SH OPTIONS
+.B viewfax
+is designed to "do the right thing" when given just a filename.
+Special cases can be handled with the following options.  (Note that
+tiff-files contain a header which overrides the \fB-f, -n, -h, -w, -l,
+-m, \fRand \fB-u \fRflags.)
+.TP
+.B -f
+indicates that raw input files are fine resolution (7.7 lines/mm)
+faxes.  This is the default unless the filename begins with "fn".
+Tiff and "PC-Research" (DigiFAX) files are self-specifying.
+.TP
+.B -n
+indicates that raw input files are normal resolution (3.85 lines/mm)
+faxes.  Each fax line is duplicated in the displayed image to give
+approximately equal vertical and horizontal scales.
+.TP
+.B -h\fIheight
+specifies the number of fax lines.  If this option is missing,
+.B viewfax
+counts the number of lines in the input file.
+.TP
+.B -w\fIwidth
+specifies the number of pixels in each scan-line.  The default value is 1728.
+.TP
+.B -l
+display in landscape mode.
+.TP
+.B -u
+turn the image upside down.
+.TP
+.B -i
+invert pixels (black/white).
+.TP
+.B -b
+preferred warning style: 'a' for audible bell (console beep), 'v' for
+visible bell (flash the window), 'n' for neither.  'v' is the default.
+.TP
+.B -d or -display
+use specified X server
+.TP
+.B -g or -geometry
+the preferred size and position of the window, specified as
+\fIwidth\fRx\fIheight\fR+\fIx\fR+\fIy\fR.  If a position is given (x
+and y values),
+.B viewfax
+asks the window manager to place the window there.  The initial size
+of the window is constrained to be at most \fIwidth\fRx\fIheight\fR.
+
+If the window is subsequently resized due to the user zooming in or
+out, the geometry is taken as a constraint on the screen area which
+may be used by
+.B viewfax.
+
+If you do not supply a geometry value, everything works fine with
+ICCCM-compliant window managers like \fBolwm, mwm, twm, \fRand
+\fBtvtwm\fR.  When fully zoomed out the
+.B viewfax
+window will occupy the entire screen.
+
+Users of
+.B fvwm
+will notice that the title bar and left border are moved off screen when
+.B viewfax
+repositions the window to (0,0).  A workaround is to use -geometry
++5+23 when using
+.B fvwm.
+The proper fix would be for someone to update the routine
+HandleConfigureRequest() in fvwm/events.c to correspond to the code in
+twm/events.c.
+.TP
+.B -m\fImemory limit
+each page is kept in memory after being fetched and expanded, which
+saves time if the user returns to it in the same session.  To prevent
+viewfax from using all the available swap space, a limit is placed on
+the total size of cached images.  This defaults to 4 MBytes, enough
+for about 6 typical pages.  If the memory limit is exceeded, old images
+are discarded and must be reloaded from disk if the user returns to
+them.  The operation of this mechanism is transparent apart from the
+occasional delays due to reloading.  The value specified on the
+command line can be suffixed
+.B k
+or
+.B m
+for kilo- or megabytes.
+.TP
+.B -r
+the bit order of the bytes in the input file is reversed.  The fax
+specification deals only with serial data transmission.  Modem
+manufacturers have to decide whether the first bit received should be
+placed in the most significant or the least significant position in a
+byte.  The consensus is to pack most significant first, but the -r
+flag is available to deal with the opposite order.
+.TP
+.B -v
+produce some informative messages (verbose mode).
+.TP
+.B -z\fIzoom
+specifies an initial zoom factor.  A full-scale fax will usually not
+fit on the screen.  If the
+.B -z
+option is not specified,
+.B viewfax
+scales the image by a power of 2 such that it is fully visible at a
+reduced size.  The user can then use the mouse buttons (see above) to
+view expanded portions of the image.
+.TP
+.B -2
+Assume that raw input files use group 3 two dimensional coding.
+.TP
+.B -4
+Assume that raw input files use group 4 coding.  The number of fax
+lines (-h option) is required in this case.
+.SH ENVIRONMENT
+.TP
+.B VIEWFAX_PRINT
+Defines a command that will print one or more fax pages.
+
+.TP
+.B VIEWFAX_EDIT
+Defines a command that will calls an editor on one or more
+fax pages.
+
+.P
+These two variables are optional.  If a variable is undefined, the
+corresponding keyboard command is ignored.  If the variable is
+defined, it should contain the name of a command or executable script
+that performs the desired function.  The command should process a
+single page if called with a -p\ \fIpage-number\fR
+argument.  Alternatively, if can be called with just a list of
+filenames, meaning that all pages should be processed.
+
+Here is an oversimplified example of a print command.  Note that it
+assumes that the format is tiff and will fail when handed a raw fax
+file.
+.nf
+  VIEWFAX_PRINT=printfax
+ 
+  /usr/local/bin/printfax:
+  #!/bin/sh
+  case "$1" in
+  -p) shift
+      dopt=`expr $1 - 1`
+      shift
+      tiff2ps -d ${dopt} -2 -h 11.69 -w 8.27 "$1" | lp
+      ;;
+  *)  tiff2ps -2 -h 11.69 -w 8.27 "$*" | lp
+      ;;
+  esac
+.fi
+
+.SH SEE ALSO
+.B mgetty
+(http://alpha.greenie.net/mgetty/) controls data/fax/voice modems.
+
+.B hylafax
+(http://www.hylafax.org/) is a full-function fax client/server system.
+
+.B g3topbm(1)
+and
+.B xv(1)
+can be used in a pipeline to view faxes.  This will usually be slower
+than using
+.B viewfax,
+but
+.B xv
+has many capabilities for manipulating the image and saving it
+in other formats.
+
+.B faxview.tcl,
+(ftp://ftp.leo.org/pub/comp/os/unix/networking/mgetty/faxview.tcl.gz)
+a simple dialog for viewing FAX messages by Ralph Schleicher
+(rs@purple.in-ulm.de).  This is a useful tool which provides a file
+menu from which incoming faxes can be selected for display with
+.B viewfax.
+
+
+CCITT (now ITU) Recommendation T.4,
+.I Standardization of Group 3 Facsimile Apparatus for Document
+.I Transmission. 
+
+CCITT (now ITU) Recommendation T.6,
+.I Facsimile Coding Schemes and Coding Control Functions for Group 4
+.I Facsimile Apparatus.
+.SH BUGS
+The user interface does not comply with any known style guide.
+.br
+The help text looks moth-eaten because it is encoded as a fax.  This
+avoids dealing with X11 fonts.
+.br
+The program does not refer to the X resources database.
+.SH AUTHOR
+Frank D. Cringle (fdc@cliwe.ping.de).

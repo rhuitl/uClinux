@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# faxcvt <format> <filename(s)>
+#
+# convert input files to g3 data (just to give you an idea how to do it)
+#
+# - DVI-Files: dvialw <file>, -> gs <file>
+# - PostScript: gs -sDEVICE=dfaxhigh
+# - ASCII-Files: pbmtext -fount cour25.pbm
+#
+# SCCSID: $Id: faxcvt,v 4.1 1997/01/12 14:53:58 gert Exp $ (c) 1993 Gert Doering
+#
+if [ $# -lt 2 ]
+then
+    echo "$0: syntax is: $0 <format> <filename>"
+    echo "currently supported <format>s: -dvi, -ascii, -ps, -pbm"
+    exit 1
+fi
+
+format=$1
+shift
+
+for file
+do
+    tgt=/tmp/$file.g3
+    case "$format" in
+	-ascii)	tgt=/tmp/$file
+		pbmtext -font cour25.pbm <$file | pbm2g3 >$tgt-1.g3
+		;;
+	-ps)	tgt=/tmp/`basename $file .ps`
+	        cat $file |
+		gs -dNOPAUSE -sDEVICE=dfaxhigh -sOutputFile=$tgt-%d.g3 -
+		;;
+	-dvi)	tgt=/tmp/`basename $file .dvi`
+		dvialw <$file |
+	        gs -dNOPAUSE -sDEVICE=dfaxhigh -sOutputFile=$tgt-%d.g3 - 
+		;;
+	-pbm)	tgt=/tmp/`basename $file .pbm`
+		pbm2g3 $file >$tgt-1.g3
+		;;
+	*) echo "$0: unknown format: $format!" ;;
+    esac &&
+    echo "successfully spooled $file to $tgt-??.g3"
+done
+

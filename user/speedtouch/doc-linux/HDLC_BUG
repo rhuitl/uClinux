@@ -1,0 +1,110 @@
+Benoit PAPILLAULT, 24/04/2001
+
+=== PATCHING YOUR KERNEL ===
+
+cd /usr/src/linux
+patch -p1 < n_hdlc.c.diff
+
+recompile your kernel. If HDLC was compiled as a module, you only need to do:
+make dep modules modules_install
+rmmod n_hdlc
+modprobe n_hdlc
+
+to get the new HDLC code working.
+
+=== EXPLANATION ===
+
+We consider the case where two process are communicating over a pseudo tty
+ allocated with :
+
+master_tty = open(/dev/ptmx,O_RDWR)
+grantpt(master_tty);
+unlockpt(master_tty);
+
+pts = ptsname (master_tty);
+slave_tty = open(pts,O_RDWR|O_NOCTTY);
+
+If either master_tty or slave_tty are closed, the other side read() or selec() returns -1 with errno = EIO.
+
+Now, if I add:
+
+   int disc = N_HDLC;
+    if (ioctl(0,TIOCSETD,&disc) < 0)
+      perror("ioctl");
+
+When the slave tty is closed, the master tty receives NO notification at all.
+This cause pppoa2 not to exit, preventing other pppoa2 to be executed properly.
+Why?
+
+When slave tty is closed, <tty_io.c>
+tty_release() calls release_dev()
+ o_tty = tty->link
+
+it calls :
+
+ wake_up(&tty->read_wait);
+ wake_up(&tty->write_wait);
+ wake_up(&o_tty->read_wait);
+ wake_up(&o_tty->write_wait);
+
+tty_poll <tty_io.c>:
+	if (tty->ldisc.poll)
+		return (tty->ldisc.poll)(tty, filp, wait);
+
+normal_poll <n_tty.c>:
+
+	poll_wait(file, &tty->read_wait, wait);
+	poll_wait(file, &tty->write_wait, wait);
+
+n_hdlc_tty_poll <n_hdlc.c>
+	poll_wait(filp,&n_hdlc->read_wait,wait);
+	poll_wait(filp,&n_hdlc->write_wait,wait);
+
+[root@hansolo]# ls -la /dev/ptmx
+crw-rw-rw-    1 root     root       5,   2 avr 24 00:49 /dev/ptmx
+
+=> major = 5, minor = 2.
+
+cat /proc/devices:
+  2 pty
+
+pty.c : call tty_register_driver() define in tty_io.c
+avec PTY_MASTER_MAJOR = 2.
+
+Thus : open("/dev/ptmx",O_RDWR) calls tty_open <tty_io.c>
+
+	which call init_dev() for the ptm_driver major/minor.
+	which contains : 
+
+		/* Establish the links in both directions */
+		tty->link   = o_tty;
+		o_tty->link = tty;
+
+	and filp->private_data = tty.
+	tty is allocated by alloc_tty_struct() 	
+	 & initialized by initialize_tty_struct() which setup
+	 a default line disciplineof N_TTY, init tty->write_wait &
+	 tty->read_wait	queues.
+
+Thus : select() calls tty_poll(), which calls ldisc->poll.
+
+In the normal case (N_TTY default line discipline), when one side is closed,
+if the other side was blocked in read(), the process is awaken and EIO
+is returned:
+
+read_chan <n_tty.c>:
+
+		if (!input_available_p(tty, 0)) {
+			if (test_bit(TTY_OTHER_CLOSED, &tty->flags)) {
+				retval = -EIO;
+				break;
+			}
+
+In the N_HDLC case, the code was waiting on different waitqueues and 
+is awaken, only return an error code is a signal was received:
+
+n_hdlc_tty_read <n_hdlc.c>:
+		interruptible_sleep_on (&tty->read_wait);
+		if (signal_pending(current))
+			return -EINTR;
+

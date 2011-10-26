@@ -1,0 +1,68 @@
+#
+# This makefile contains the make stuff for pam_smb v1.0
+# Run configure to produce a Makefile
+#
+#
+
+EXTRALIBS = @LIBS@
+
+LDFLAGS = @LDFLAGS@
+CC = @CC@
+
+SHELL=/bin/sh
+
+INSTALL= @INSTALL@
+
+SHLIB_LD = @SHLIB_LD@
+
+@SET_MAKE@
+
+CFLAGS = @CFLAGS@ @DEFS@ @SHLIB_CFLAGS@
+
+LIBAUTHSH = pam_smb_auth.so
+
+LIBAUTHOBJ = pam_read_conf.o pam_smb_auth.o support.o
+LIBAUTHSRC = pam_read_conf.c pam_smb_auth.c support.c
+LIBOBJ = $(LIBAUTHOBJ) 
+LIBSRC = $(LIBAUTHSRC)
+
+LIBSHARED = $(LIBAUTHSH) 
+
+LIBOBJD = $(addprefix dynamic/,$(LIBOBJ))
+LIBOBJS = $(addprefix static/,$(LIBOBJ))
+
+export CFLAGS CC
+
+dynamic/%.o : %.c
+	$(CC) $(CFLAGS) $(DYNAMIC) $(CPPFLAGS) -c $< -o $@
+
+
+########################### don't edit below #######################
+
+dummy: all
+info:
+	@echo
+	@echo
+
+all: dirs smbvalid info $(LIBSHARED) 
+
+dirs:
+	mkdir -p ./dynamic
+
+$(LIBOBJD): $(LIBSRC)
+
+$(LIBAUTHSH):	$(LIBAUTHSRC) $(LIBOBJD) smbvalid
+		$(SHLIB_LD) $(LD_FLAGS) -o $@ $(addprefix dynamic/,$(LIBAUTHOBJ)) smbval/smbvalid.a $(EXTRALIBS)
+
+smbvalid: 
+	set -e; $(MAKE) -C smbval
+
+clean:
+	set -e ; $(MAKE) -C smbval clean
+	rm -f $(LIBAUTHSH) $(LIBOBJD) $(LIBOBJS) a.out core *~
+
+extraclean: clean
+	rm -f *.a *.out *.o *.so *.bak config.log config.cache config.status config.h Makefile
+
+.c.o:	
+	$(CC) -c $(CFLAGS) $<

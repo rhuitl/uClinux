@@ -1,0 +1,429 @@
+Release notes for SIP Express Router (ser)
+***********************************************
+
+$Id: NEWS,v 1.38.2.3 2005/09/06 13:22:43 andrei Exp $
+
+0.9.4 fixes/improvements (0.9.4 is a bug fix release for 0.9.3)
+ 
+general:
+ - gcc 4.0 support
+ - mutlicast options are set for all the sockets
+ - mediaproxy: memory leak, unchecked memory allocations
+ - postgress: some bugs and cleanups (compiles cleanly now)
+ - tm: shm cloned lumps (SER-55) 
+ - tm: t_fifo: 64-bit fix
+ - tm: dst_uri clone fix
+ - tm: t_newtran/t_restransmit* races  (!)
+ - usloc: memory leak
+
+solaris:
+ - serctl, better ISA detection, signals
+*bsd:
+ - multicast options are properly set
+openbsd:
+ - tcp 64 bit fix
+
+
+
+0.9.3 changes
+
+
+new archs:
+ - alpha experimental support
+ - mips2/cobalt experimental support
+ - x86_64 support
+ - OS X (darwin) support
+ - sparc32 single cpu highly experimental support
+ - ppc64 experimental support
+
+modules:
+ - enum - support for more than one NAPTR
+ - msilo - explicit multidomain support -- recipient's user ID is stored in
+   the columns username and domain -- r_uri column kept for compatibility
+   reasons (will be removed in future) but not filled by this version of
+   module
+ - mysql - implements a connection pool, all modules will use same connection
+   to access the database
+ - nathelper received port  test (flag 16 for nat_uac_test): compares the
+   source port of the message with sip port in the first Via and returns
+   true if different.
+ - permsions - support for multiple allow/deny files, allow_register function
+ - TM has a new parameter: restart_fr_on_each_reply. If set (default)
+   fr_inv timer will be restarted for each provisional reply, if not set
+   it will be restarted only for the first reply and for replies >=180
+   (but only if increasing, eg.: 180, 181 ...). Usefull when dealing with bad
+   UAs that re-transmit 180s.
+ - TM saves the avp list into transactions, and make it available into
+   callbacks, failure and reply routes.
+ - TM contains new command - t_write_unix("/tmp/sems.sock", "announcement")
+   sends a message using unix socket interface instead of FIFO interface.
+ - TM contains new config variable - unix_tx_timeout -- it specifies the
+   transmit timeout of t_write_sock
+ - VM functionality was transfered into TM module. Instead of fetching the
+   email value from DB (as VM), TM looks for the "email" attribute to get the
+   value.
+   vm() function was replaced with t_write_req()
+   vm_reply() fifo functions was replcated by TM with t_reply() fifo function
+   NOTE!! because current version of SEMS/AA try to send reply via vm_reply,
+   it will not work with the TM version.
+ - xlog - printing the body of any header by specifying the name; new
+   specifiers for user-agent, message buffer, message length, message's flags,
+   message id.
+
+new modules:
+ - avp / avp_db / avp_radius - load and check avps per caller or callee
+ - avpops - flexible module for operations with avps and database, introducing
+   a pseudo-varible support in SER configuration file
+ - cpl-c - implementation of Call Processing Language
+ - dispatcher - implements a dispatcher for incoming requests using hashes
+   over parts of the request to select the destination
+ - diversion - implements the Diversion extensions as per 
+   draft-levy-sip-diversion-08
+ - flatstore - simple module that implements very fast inserts for accounting
+   purposes
+ - gflags - keeps a bitmap of flags in shared memory and may be used to change
+   behaviour of server based on value of the flags
+ - options - answer server options requests
+ - speeddial - provides on-server speed dial facilities
+ - uri_db - split from uri module, performs various checks related to SIP URI
+   over database fields
+
+removed modules:
+ - vm - the functionality was transfered to tm module (see t_write_req(...)
+   method)
+
+core:
+ - new parts:
+       UNIX domain socket server implemented
+ - changes: 
+    - command line: removed -p port and extended -l:
+       -l [proto:]addr[:port] , where proto=udp|tcp and 
+       addr= host|ip_address|interface_name. The format is the same
+       as for listen in the config file. ipv6 addresses must be enclosed in
+       [].
+    - added from_uri & to_uri: behave exactly like uri but use the
+      "From:"/"To:" uris
+       (e.g.: if (from_uri==myself) ..., if (to_uri=~"^sip:test@")... )
+    - config: better escape support in strings (e.g. \", \<cr>, \x0a, \012)
+    - bad network addresses are now automatically fixed
+      (e.g. 192.168.1.80/27 => 192.168.1.64/27)
+    - avp (Attribute-Value Pair) support added
+    - avp alias support added
+    - multicast support added (see mcast_loopback & mcast_ttl)
+    - saving of procces group id enabled, if the -G option is specified
+      (a safe way to quickly kill all ser processes)
+    - core dump-ing is enabled by default, see also disable_core_dump
+    - protocol and port can be specified in the alias and listen lines, e.g.:
+        alias= tcp:foo.bar:* udp:test.bar:5080 foo.com
+        listen= eth0   tcp:eth0:5065 udp:127.0.0.1 [3ffe::1]
+    - multiple operator support: ==, != for special operations (e.g myself, ip)
+                              ==, !=, ~= for strings
+                              ==, !=, >, <, >=, <= for integers
+    - database api changed to support usage of different drivers
+      simultaneously. The database URL must start now with the name of the
+      driver (module). Example: for mysql the DB URL
+      'sql://user:password@dbhost:port/database' must be specified now as
+      'mysql://user:password@dbhost:port/database'
+ - new config variables:
+   mcast_loopback = <yes/no> - loopback sent multicast datagram, default no.
+   mcast_ttl = number - set multicast ttl, default OS specific (usually 1).
+   sock_mode = <permissions> (e.g. sock_mode=0600:  default value = 0660)
+       ser unix sockets and fifo will be created with this permissions
+       (old name fifo_mode is still supported, but deprecated)
+   sock_user = username|"uid"
+   sock_group = groupname|"gid"
+      change the owner and/or group of the ser unix sockets or fifo
+      Short example config snippet:
+           sock_mode=0600        # ser socket/fifo mode
+           sock_user="www-data"  # ser socket/fifo owner
+           sock_group=nogroup  
+           user=nobody       # ser user (ser will suid to it)
+   disable_core_dump= yes|no 
+       by default core dump limits are set to unlimited or a high enough
+       value, set this config variable o yes to disable core dump-ing
+       (will set core limits to 0)
+   open_files_limit= number
+       if set and bigger than the current open file limit, ser will try
+       to increase its open file limit to this number. Note: ser must be
+       started as root to be able to increase a limit past the hard limit
+       (which, for open files, is 1024 on most systems)
+   tcp_connect_timeout= seconds
+       time before an ongoing connect will be aborted
+   tcp_send_timeout= seconds
+       time after a tcp connection will be closed if it is not available 
+       for writing in this interval (and ser wants to send something on it)
+   tcp_accept_aliases= yes|no
+       if a message received over a tcp connection has "alias" in its via
+       a new tcp alias port will be created for the connection the message
+       came from (the alias port will be set to the via one).
+       Based on draft-ietf-sip-connect-reuse-00.txt, but using only the port
+       (host aliases are too dangerous IMHO, involve extra DNS
+        lookups and the need for them is questionable)
+       See force_tcp_alias for more details.
+   log_facility = LOG_LOCAL0
+       if ser logs to syslog, you can control the facility for logging. Very
+       useful when you want to divert all ser logs to a different log file.
+       See man page syslog(3) for more detailes.
+   unix_sock = "/tmp/ser.sock"
+       The name of the socket the unixsock server should listen on.
+   unix_sock_children = 1
+       The number of children that will listen on the unix domain socket.
+   unix_tx_timeout = 2000
+       Timeout (in ms) used when sending replies through unix sockets.
+ - new script commands:
+   force_send_socket([proto:]address[:port])
+       sends the message from the specified socket (it _must_ be one of the
+       sockets ser listens on). If the protocol doesn't match (e.g. udp
+       message "forced" to a tcp socket) the closest socket of the same
+       protocol is used.
+   force_tcp_alias()
+   force_tcp_alias(port)
+       adds a tcp port alias for the current connection (if tcp).
+       Usefull if you want to send all the trafic to port_alias through
+       the same connection this request came from [it could help 
+       for firewall or nat traversal].
+       With no parameters adds the port from the message via as the alias.
+       When the "aliased" connection is closed (e.g. it's idle for too
+       much time), all the port aliases are removed.
+       Note: by default ser closes idle connection after 3 minutes (stable)
+       or 1 minute (unstable) so to take full advantage of tcp aliases for
+       things like firewall and nat traversal, redefine TCP_CON_*TIMEOUT
+       in tcp_conn.h and recompile. Also right now there can be maximum
+       3 port aliases to a connection (you shouldn't need more than one).
+       To change this redefine TCP_CON_MAX_ALIASES in the same file
+       (set it to you desired value + 1; 1 is needed for the real port).
+
+utilities:
+ - ngrep patch for displaying new lines in captured SIP messages is no longer
+   needed; use ngrep V 1.42 with the option "-W byline"
+
+
+
+***********************************************
+* Changes/fixes introduced in 0.8.12
+***********************************************
++--------------------------------------------------------+
+| WARNING: if you want to use a 0.8.11 config script     |
+| with 0.8.12, replace if ( len_gt(number) ) with:       |
+|                      if ( msg:len > bumber )           |
++--------------------------------------------------------+
+
+New Features
+============
+
+texops:
+ - subst('s/re/repl/flags') support
+core:
+ - added switch to check the config file (-c)
+ - changes: removed len_gt() and replaced with if (msg:len op number|max_len)
+ - multiple operator support: ==, != for special operations (e.g myself, ip)
+                              ==, !=, ~= for strings
+                              ==, !=, >, <, >=, <= for integers
+ - new config variables:
+     advertised_address= ip | string
+       address advertised in via and in the DST_* lumps (e.g RR)
+       This is the default value, if empty (default) the socket
+       address will be used.
+       WARNING: - don't set it unless you know what you are doing
+                 (e.g. nat traversal)
+               - you can set anything here, no check is made
+                (e.g. foo.bar will be accepted even if 
+                 foo.bar doesn't exist)
+    advertised_port= no
+       port advertised in via and in the DST_*lumps (e.g. RR)
+       This is the default value, if empty (default) the socket
+       port will be used.
+       Same warnings as above.
+ - new script commands:
+    set_advertised_address(ip|string)
+       same as advertised_address but it affects only the current message:
+       Message host/lump address= the set_advertised one if
+       present, else advertised_address else socket address.
+    set_advertised_port(no)
+       same as advertised_port but it affects only the current
+       message; see set_advertised_address & s/address/port/g
+
+usrloc:
+ - usernames are case insensitive
+ 
+registrar:
+ - lookup function succeeds when appending of a branch failed
+
+auth_db:
+ - support for rpid stored in database (thanks to Jakob Schlyter)
+
+Bug fixes
+=========
+- memory leak in digest credentials parser fixed
+- authenticathion ha1 didn't include domain if username was of the form
+  user@domain and calculate_ha1 was set to yes (modules/auth_db)
+- tm reply processing race condition (modules/tm), special thanks go to
+ Dong Liu
+- Many bugs in pa module fixed, works with registrar again.
+ 
+Security updates
+================
+ 
+- fifo processing code will write responses only to other
+ fifos and only if they are not hard-linked, also default
+ ser fifo persmissions were changed to 0600.
+                                                                                
+Performance improvements
+========================
+- tuned internal malloc implementation parameters to better reflect the
+actual workload (malloc is a little bit faster now)
+
+
+
+***********************************************
+* Changes introduced in 0.8.11
+***********************************************
+
++--------------------------------------------------------+
+| CAUTION: the 0.8.11 release include changes which      |
+| are incompatible with scripts and databases used       |
+| in previous versions. Care is advised when upgrading   |
+| from previous releases to 0.8.11.                      |
++--------------------------------------------------------+
+
+New features
+=============
+- RFC3261 support
+	- TCP support and cross-transport forwarding [core]
+	- loose routing support [rr module]
+- New modules
+	- vm -- voicemail interface [vm]
+	- ENUM support [enum]
+	- presence agent [pa]
+	- dynamic domain management -- allows to manipulate 
+	  hosting of multiple domains in run-time [module]
+	- flat-text-file database support [dbtext]
+	- rich access control lists [permissions]
+- Feature Improvements
+	- click-to-dial, which is based on improved tm/FIFO 
+	  that better supports external applications [tm module]
+	- web accounting -- acc module can report to serweb
+  	  on placed calls [acc module]
+	- improved exec module (header fields passed now
+      as environment variables to scripts) [exec module]
+- Architectural Improvements
+	- powerpc fast locking support
+	- netbsd support
+	- 64 bits arch. support (e.g. netbsd/sparc64).
+- New Experimental Features (not tested at all yet)
+	- nathelper utility for Cisco/ATA NAT traversal [nathelper]
+	- another NAT traversal utility [mangler]
+	- postgress support [postgress]
+	- fcp module [fcp]
+	- pdt module (prefix2domain) [pdt]
+
+Changes to use of ser scripts
+=============================
+
+About Multiple Transport Support
+--------------------------------
+SER now suports multiple transport protocols: UDP and TCP. As there
+may be UAs which support only either protocol and cannot speak to
+each other directly, we recommend to alway record-route SIP requests,
+to keep the transport-translating SER in path. Also, if a destination
+transport is not known, stateful forwarding is recommended -- use of
+stateless forwarding for TCP2UDP would result in loss of reliability.
+
+
+core
+----
+- reply_route has been renamed to failure_route -- the old name caused
+  too much confusion
+- forward_tcp and forward_udp can force SER to forward via specific
+  transport protocol
+
+acc module:
+-----------
+- radius and sql support integrated in this module; you need to
+  recompile to enable it
+- acc_flag is now called log_flag to better reflect it relates
+  to the syslog mode (as opposed to sql/radius); for the same
+  reasons, the accounting action is now called "acc_log_request"
+  and the option for missed calls "log_missed_calls"
+- log_fmt allows now to specify what will be printed to syslog
+
+auth module:
+------------
+- auth module has been split in auth, auth_db, auth_radius, group
+  group_radius, uri and uri_radius 
+- all the parameters that were part of former auth module are now 
+  part of auth_db module
+- auth_db module contains all functions needed for database
+  authentication
+- auth_radius contains functions needed for radius authentication
+- group module contains group membership checking functions
+- group_radius contains radius group membeship checking functions
+- is_in_group has been renamed to is_user_in and places to groups
+  module
+- check_to and check_from have been moved to the uri module
+ 
+
+im module:
+----------
+- im is no longer used and has been obsoleted by TM
+
+exec module:
+------------
+- exec_uri and exec_user have been obsoleted by exec_dset; 
+  exec_dset is identical to exec_uri in capabilities; it 
+  additionaly passes content of request elements (header 
+  fields and URI parts) in environment variables; users of 
+  exec_user can use exec_dset now and use the "URI_USER"  
+  variable to learn user part of URI
+- exec_dset and exec_msg return false, if return value of 
+  script does not euqal zero
+- exec_dset takes an additional parameter, which enables 
+  validation of SIP URIs returned by external application
+
+jabber module:
+--------------
+- presence support for Jabber users is enabled loading the PA
+  module and using handle_subscribe("jabber") for SUBSCRIBE 
+  requests to jabber user 
+
+msilo module:
+-------------
+- m_store has now a parameter to set what should be considered
+  for storing as destination uri. This enables support for saving
+  the messages on negative replies.
+
+radius_acc module:
+------------------
+- radius_acc module has been removed and radius accounting 
+  is now part of acc module
+
+registrar/usrloc modules:
+-------------------------
+- multi domain support, the modules user username@domain as AOR
+  if enabled
+- descent modification time ordering of contacts
+- case sensitive/insensitive comparison of URI can be enabled
+
+rr module:
+----------
+- addRecordRoute has been replaced with record_route
+- rewriteFromRoute has been replaced with loose_route()
+- a new option, "enable_full_lr" can be set to make life
+  with misimplemented UAs easier and put LR in from "lr=on"
+- rr module can insert two Record-Route header fields when
+  necesarry (disconnected networks, UDP->TCP and so on)
+
+tm module:
+----------
+- t_reply_unsafe, used in former versions within reply_routes,
+  is deprecated; now t_reply is used from any places in script
+- t_on_negative is renamed to t_on_failure -- the old name just
+  caused too much confusion
+- FIFO t_uac used by some applications (like serweb) has been
+  replaced with t_uac_dlg (which allows easier use by dialog-
+  oriented applications, like click-to-dial) 
+- if you wish to do forward to another destination from 
+  failure_route (reply_route formerly), you need to call t_relay
+  or t_relay_to explicitely now
+- t_relay_to has been replaced with t_relay_to_udp and t_relay_to_tcp
+

@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# ---------------------------------------------------------------------
+#
+# LIRC starter (called 'lircs' for simplicity)
+#
+# A simple shell script to make the configuration of LIRC more comfortable.
+#
+# It may be necessary to change the script if ...
+# - you have a non-standard installation or
+# - you use more or other client applications (see below) or
+# - the init scripts are located elsewhere on your Linux system (see below).
+#
+# ---------------------------------------------------------------------
+#
+# author: Michael Kammerer <M.Kammerer@gmx.de>
+#
+# PLEASE send me your comments, ideas, bug reports, ... via E-Mail.
+#
+# ---------------------------------------------------------------------
+
+# location of the LIRC config file
+# change this if your LIRC config file is located elsewhere
+CONFIG_FILE=${HOME}/.lircrc
+
+# any editor to edit LIRC config file
+FILE_EDITOR=vim
+
+
+
+# function declarations
+
+start_clients () {
+	if [ -s ${CONFIG_FILE} ]; then
+		echo -n Starting LIRC clients ...
+
+		# add more clients HERE or change the ones I put here as a start
+		irxevent &
+		irexec --daemon
+
+		echo " done"
+	else
+		echo "LIRC config file not found in ${CONFIG_FILE}"
+		exit 1
+	fi
+}
+
+restart_lircd () {
+	if [ "${USER}" = "root" ]; then
+		# change this if your Linux system keeps the init scripts elsewhere
+		/sbin/init.d/lircd restart
+	else
+		echo "`basename ${0}`: you must be 'root' to restart the LIRC daemon (lircd)."
+		exit 1
+	fi
+}
+
+stop_lircd () {
+	if [ "${USER}" = "root" ]; then
+		# change this if your Linux system keeps the init scripts elsewhere
+		/sbin/init.d/lircd stop
+	else
+		echo "`basename ${0}`: you must be 'root' to stop the LIRC daemon (lircd)."
+		exit 1
+	fi
+}
+
+edit_config_file () {
+	${FILE_EDITOR} ${CONFIG_FILE}
+}
+
+print_info () {
+	echo "LIRC starter version 0.2, 09/2000 "
+	echo "Written by Michael Kammerer <M.Kammerer@gmx.de>."
+	echo "Visit 'www.crosswinds.net/~michaelkammerer/lircs' for updates."
+}
+
+print_help () {
+	echo "LIRC starter usage: lirc [option]"
+	echo "'option' can be:"
+	echo "as any user:"
+	echo "-h | --help     print this short help text"
+	echo "-c | --clients  start LIRC clients (necessary if lircd was restarted)"
+	echo "-e | --edit     edit LIRC config file '${CONFIG_FILE}'"
+	echo "-v | --version  print script version and other info"
+	echo "only as 'root':"
+	echo "-r | --restart  restart LIRC daemon (lircd) "
+	echo "-s | --stop     stop LIRC daemon"
+}
+
+
+# processing of command line arguments
+
+case $1 in
+	-r)
+		restart_lircd
+		;;
+	--restart)
+		restart_lircd
+		;;
+	-s)
+		stop_lircd
+		;;
+	--stop)
+		restart_lircd
+		;;
+	-c)
+		start_clients
+		;;
+	--clients)
+		start_clients
+		;;
+	-h)
+		print_help
+		;;
+	--help)
+		print_help
+		;;
+	-e)
+		edit_config_file
+		;;
+	--edit)
+		edit_config_file
+		;;
+	-v)
+		print_info
+		;;
+	--version)
+		print_info
+		;;
+	*)
+		print_help
+		;;
+esac

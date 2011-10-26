@@ -1,0 +1,129 @@
+This adds the --ignore-case option, which makes rsync compare filenames
+in a case-insensitive manner.
+
+--- orig/lib/wildmatch.c	2005-01-28 21:01:21
++++ lib/wildmatch.c	2004-08-13 16:43:27
+@@ -53,6 +53,8 @@
+ #define ISUPPER(c) (ISASCII(c) && isupper(c))
+ #define ISXDIGIT(c) (ISASCII(c) && isxdigit(c))
+ 
++extern int ignore_case;
++
+ #ifdef WILD_TEST_ITERATIONS
+ int wildmatch_iteration_count;
+ #endif
+@@ -76,9 +78,19 @@ static int domatch(const uchar *p, const
+ 	    ch = *++p;
+ 	    /* FALLTHROUGH */
+ 	  default:
+-	    if (*text != ch)
+-		return FALSE;
+-	    continue;
++	    if (*text == ch)
++		continue;
++	    if (ignore_case) {
++		if (ISUPPER(*text)) {
++		    if (tolower(*text) == ch)
++			continue;
++		}
++		else if (ISUPPER(ch)) {
++		    if (*text == tolower(ch))
++			continue;
++		}
++	    }
++	    return FALSE;
+ 	  case '?':
+ 	    /* Match anything but '/'. */
+ 	    if (*text == '/')
+--- orig/options.c	2005-07-28 18:48:38
++++ options.c	2005-05-03 16:47:52
+@@ -101,6 +101,7 @@ int max_delete = 0;
+ OFF_T max_size = 0;
+ int ignore_errors = 0;
+ int modify_window = 0;
++int ignore_case = 0;
+ int blocking_io = -1;
+ int checksum_seed = 0;
+ int inplace = 0;
+@@ -332,6 +333,7 @@ void usage(enum logcode F)
+   rprintf(F,"     --include-from=FILE     read include patterns from FILE\n");
+   rprintf(F,"     --files-from=FILE       read list of source-file names from FILE\n");
+   rprintf(F," -0, --from0                 all *-from/filter files are delimited by 0s\n");
++  rprintf(F,"     --ignore-case           ignore case when comparing filenames\n");
+   rprintf(F,"     --address=ADDRESS       bind address for outgoing socket to daemon\n");
+   rprintf(F,"     --port=PORT             specify double-colon alternate port number\n");
+   rprintf(F,"     --blocking-io           use blocking I/O for the remote shell\n");
+@@ -392,6 +394,7 @@ static struct poptOption long_options[] 
+   {"include",          0,  POPT_ARG_STRING, 0, OPT_INCLUDE, 0, 0 },
+   {"exclude-from",     0,  POPT_ARG_STRING, 0, OPT_EXCLUDE_FROM, 0, 0 },
+   {"include-from",     0,  POPT_ARG_STRING, 0, OPT_INCLUDE_FROM, 0, 0 },
++  {"ignore-case",      0,  POPT_ARG_NONE,   &ignore_case, 0, 0, 0 },
+   {"safe-links",       0,  POPT_ARG_NONE,   &safe_symlinks, 0, 0, 0 },
+   {"help",            'h', POPT_ARG_NONE,   0, 'h', 0, 0 },
+   {"backup",          'b', POPT_ARG_NONE,   &make_backups, 0, 0, 0 },
+@@ -1410,6 +1413,9 @@ void server_options(char **args,int *arg
+ 		args[ac++] = arg;
+ 	}
+ 
++	if (ignore_case)
++		args[ac++] = "--ignore-case";
++
+ 	if (partial_dir && am_sender) {
+ 		if (partial_dir != partialdir_for_delayupdate) {
+ 			args[ac++] = "--partial-dir";
+--- orig/t_stub.c	2005-01-25 10:39:14
++++ t_stub.c	2004-08-13 17:19:56
+@@ -28,6 +28,7 @@
+ 
+ int modify_window = 0;
+ int module_id = -1;
++int ignore_case = 0;
+ char *partial_dir;
+ struct filter_list_struct server_filter_list;
+ 
+--- orig/util.c	2005-07-28 18:48:39
++++ util.c	2004-08-13 16:40:34
+@@ -31,6 +31,7 @@ extern int verbose;
+ extern int dry_run;
+ extern int module_id;
+ extern int modify_window;
++extern int ignore_case;
+ extern char *partial_dir;
+ extern struct filter_list_struct server_filter_list;
+ 
+@@ -1029,11 +1030,23 @@ int u_strcmp(const char *cs1, const char
+ {
+ 	const uchar *s1 = (const uchar *)cs1;
+ 	const uchar *s2 = (const uchar *)cs2;
++ 	
++	if (ignore_case) {
++		uchar c1, c2;
++		while (1) {
++			c1 = islower(*s1) ? toupper(*s1) : *s1;
++			c2 = islower(*s2) ? toupper(*s2) : *s2;
++			if (!c1 || c1 != c2)
++				break;
++			s1++, s2++;
++		}
+ 
+-	while (*s1 && *s2 && (*s1 == *s2)) {
+-		s1++; s2++;
++		return (int)c1 - (int)c2;
+ 	}
+ 
++	while (*s1 && *s1 == *s2)
++		s1++, s2++;
++
+ 	return (int)*s1 - (int)*s2;
+ }
+ 
+--- orig/wildtest.c	2004-02-07 18:40:52
++++ wildtest.c	2004-08-13 17:19:34
+@@ -16,6 +16,7 @@ int fnmatch_errors = 0;
+ #endif
+ 
+ int wildmatch_errors = 0;
++int ignore_case = 0;
+ 
+ typedef char bool;
+ 

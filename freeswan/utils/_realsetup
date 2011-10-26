@@ -1,0 +1,356 @@
+#!/bin/sh
+# IPsec startup and shutdown command
+# Copyright (C) 1998, 1999, 2001  Henry Spencer.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: _realsetup,v 1.7.2.2 2002/04/11 01:19:05 mcr Exp $
+
+me='ipsec setup'		# for messages
+
+# Misc. paths (some of this should perhaps be overrideable from ipsec.conf).
+plutopid=/var/run/pluto.pid
+subsyslock=/var/lock/subsys/ipsec
+lock=/var/run/ipsec_setup.pid
+info=/var/run/ipsec.info
+sysflags=/proc/sys/net/ipsec
+modules=/proc/modules
+ipforward=/proc/sys/net/ipv4/ip_forward
+ipsecversion=/proc/net/ipsec_version
+
+# make sure output of (e.g.) ifconfig is in English
+unset LANG LANGUAGE LC_ALL LC_MESSAGES
+
+# check we were called properly
+if test " $IPSEC_confreadsection" != " setup"
+then
+	echo "$me: must be called by ipsec_setup" >&2
+	exit 1
+fi
+
+
+
+# function to set up manually-keyed connections
+manualconns() {
+	if test " $IPSECmanualstart" != " "
+	then
+		for tu in $IPSECmanualstart
+		do
+			ipsec manual --up $tu
+		done
+	fi
+}
+
+# function for no-stdout logging
+logonly() {
+	logger -p $IPSECsyslog -t ipsec_setup
+}
+
+killklips() {
+	for i in `ifconfig | awk '/^ipsec/ { print $1 }'`
+	do
+		ifconfig $i down
+		ipsec tncfg --detach --virtual $i
+	done
+
+	if test -r /proc/net/ipsec_klipsdebug
+	then
+		ipsec klipsdebug --none
+	fi
+	ipsec eroute --clear
+	ipsec spi --clear
+	i=`lsmod 2>&1 | awk '$1 == "ipsec" { print $1 }'`
+	if test " $i" = " ipsec"
+	then
+		rmmod ipsec
+	fi
+}
+
+
+# misc. backward compatibility
+if test " $IPSECdump" = " yes" -a " $IPSECdumpdir" = " "
+then
+	IPSECdumpdir=/var/tmp
+fi
+if test " $IPSECpacketdefault" = " "
+then
+	case "$IPSECno_eroute_pass" in
+	''|no)	IPSECpacketdefault=drop	;;
+	yes)	IPSECpacketdefault=pass	;;
+	*)	echo "unknown (not yes/no) no_eroute_pass value \`$IPSECno_eroute_pass'"
+		IPSECpacketdefault=drop
+		;;
+	esac
+fi
+
+
+
+# do it
+case "$1" in
+  start|--start|_autostart)
+	# First, does it seem to be going already?
+	if test -f $lock
+	then
+		echo "FreeS/WAN IPsec apparently already running, start aborted"
+		exit 1
+	fi
+
+	# announcement
+	# (Warning, changes to this log message may affect barf.)
+	version="`ipsec --version | awk 'NR == 1 { print $NF }'`"
+	case "$1" in
+	start|--start)	echo "Starting FreeS/WAN IPsec $version..."	;;
+	_autostart)	echo "Restarting FreeS/WAN IPsec $version..."	;;
+	esac
+
+	# preliminaries
+	rm -f $lock
+	if test ! -r /dev/random
+	then
+		echo "...unable to start FreeS/WAN IPsec, no /dev/random!"
+		exit 1
+	fi
+	if test ! -r /dev/urandom
+	then
+		echo "...unable to start FreeS/WAN IPsec, no /dev/urandom!"
+		exit 1
+	fi
+	echo $$ >$lock
+	if test ! -s $lock
+	then
+		echo "...unable to create $lock, aborting start!"
+		rm -f $lock		# might be there but empty
+		exit 1
+	fi
+	>$info
+
+	# here we go
+	ipsec _startklips --info $info --debug "$IPSECklipsdebug" \
+		--omtu "$IPSECoverridemtu" --fragicmp "$IPSECfragicmp" \
+		--hidetos "$IPSEChidetos" --default "$IPSECpacketdefault" \
+		--log "$IPSECsyslog" $IPSECinterfaces || (rm -f $lock; exit 1)
+
+	# misc pre-Pluto setup
+	if test -d `dirname $subsyslock`
+	then
+		touch $subsyslock
+	fi
+	fw=`cat $ipforward`
+	if test " $IPSECforwardcontrol" = " yes" -a " $fw" = " 0"
+	then
+		echo "enabling IP forwarding:" | logonly
+		echo "ipforwardingwas=$fw" >>$info
+		echo 1 >$ipforward
+	fi
+	manualconns
+
+	# Pluto
+	case "$1" in
+	start|--start)	re=	;;
+	_autostart)	re=--re	;;
+	esac
+	if test " $IPSECpluto" != " no"
+	then
+		if ipsec _plutorun $re --debug "$IPSECplutodebug" \
+			--uniqueids "$IPSECuniqueids" \
+			--nocrsend "$IPSECnocrsend" \
+			--nat_traversal "$IPSECnat_traversal" \
+			--keep_alive "$IPSECkeep_alive" \
+			--force_keepalive "$IPSECforce_keepalive" \
+			--disable_port_floating "$IPSECdisable_port_floating" \
+			--virtual_private "$IPSECvirtual_private" \
+			--dump "$IPSECdumpdir" --load "$IPSECplutoload" \
+			--start "$IPSECplutostart" --wait "$IPSECplutowait" \
+			--pre "$IPSECprepluto" --post "$IPSECpostpluto" \
+			--log "$IPSECsyslog" --pid "$plutopid" 
+		then
+		    : everything okay
+		else
+		    killklips
+		    rm -f $lock
+		    exit 1
+		fi
+	fi
+
+	# done!
+	echo "...FreeS/WAN IPsec started" | logonly
+	;;
+
+  stop|--stop|_autostop)		# _autostop is same as stop
+	# Shut things down.
+	echo "Stopping FreeS/WAN IPsec..."
+	if test -r $lock
+	then
+		status=0
+		. $info
+	else
+		echo "stop ordered, but IPsec does not appear to be running!"
+		echo "doing cleanup anyway..."
+		status=1
+	fi
+	if test " $IPSECforwardcontrol" = " yes" -a " $ipforwardingwas" = " 0"
+	then
+		echo "disabling IP forwarding:" | logonly
+		echo 0 >$ipforward
+	fi
+	if test ! -f $plutopid
+	then
+		: nothing
+	elif test ! -s $plutopid
+	then
+		echo "Removing empty $plutopid -- pluto still running?"
+		rm -f $plutopid
+	elif ps -p `cat $plutopid` >/dev/null		# process exists
+	then
+		ipsec whack --shutdown | awk '$1 != "002"'
+		sleep 1			# general paranoia
+		if test -s $plutopid
+		then
+			echo "Attempt to shut Pluto down failed!  Trying kill:"
+			kill `cat $plutopid`
+			sleep 5
+		fi
+		rm -f $plutopid		# harmless if already gone
+	else
+		echo "Removing orphaned $plutopid:"
+		rm -f $plutopid
+	fi
+
+	killklips
+
+	if test -d `dirname $subsyslock`
+	then
+		rm -f $subsyslock
+	fi
+	rm -f $info $lock
+	echo "...FreeS/WAN IPsec stopped" | logonly
+	exit $status
+	;;
+
+  status|--status)
+	if test -f $info
+	then
+		hasinfo=yes
+	fi
+	if test -f $lock
+	then
+		haslock=yes
+	fi
+	if test -f $subsyslock
+	then
+		hassublock=yes
+	fi
+
+	if test -s $plutopid
+	then
+		if ps -p `cat $plutopid` >/dev/null
+		then
+			plutokind=normal
+		elif ps -C pluto >/dev/null
+		then
+			plutokind=illicit
+		fi
+	elif ps -C pluto >/dev/null
+	then
+		plutokind=orphaned
+	else
+		plutokind=no
+	fi
+
+	if test -r /proc/net/ipsec_eroute
+	then
+		if test " `wc -l </proc/net/ipsec_eroute`" -gt 0
+		then
+			eroutes=yes
+		fi
+	fi
+
+	if test -r $ipsecversion
+	then
+		klips=yes
+	elif test -r $modules
+	then
+		klips=maybe
+	else
+		klips=none
+	fi
+		
+	if test "$haslock"
+	then
+		echo "IPsec running"
+		# might not be a subsystem lock dir, ignore that issue
+		if test "$plutokind" = "normal" -a "$klips" = "yes" -a "$hasinfo"
+		then
+			echo "pluto pid `cat $plutopid`"
+			exit 0
+		fi
+		echo "but..."
+		if test "$plutokind" != "normal"
+		then
+			echo "$plutokind Pluto running!"
+		fi
+		if test ! "$hasinfo"
+		then
+			echo "$info file missing!"
+		fi
+		case $klips in
+		maybe)	echo "KLIPS module is not loaded!"	;;
+		none)	echo "no KLIPS in kernel!"		;;
+		esac
+		if test "$eroutes"
+		then
+			echo "some eroutes exist"
+		fi
+		exit 1
+	else
+		echo "IPsec stopped"
+		if test ! "$hassublock" -a ! "$hasinfo" -a "$plutokind" = "no" \
+								-a ! "$eroutes"
+		then
+			exit 0
+		fi
+		echo "but..."
+		if test "$hassublock"
+		then
+			echo "has subsystem lock ($subsyslock)!"
+		fi
+		if test "$hasinfo"
+		then
+			echo "has $info file!"
+		fi
+		if test "$plutokind" != "normal"
+		then
+			echo "$plutokind Pluto is running!"
+		fi
+		if test "$eroutes"
+		then
+			echo "some eroutes exist!"
+		fi
+		exit 1
+	fi
+	;;
+
+  --version)
+	echo "$me $IPSEC_VERSION"
+	exit 0
+	;;
+
+  --help)
+	echo "Usage: $me {--start|--stop|--restart|--status}"
+	exit 0
+	;;
+
+  *)
+	echo "Usage: $me {--start|--stop|--restart|--status}" >&2
+	exit 2
+esac
+
+exit 0

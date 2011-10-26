@@ -1,0 +1,331 @@
+.TH faxrunqd 1 "23 Nov 02" "greenie" "mgetty+sendfax manual"
+.IX faxrunqd
+.SH NAME
+faxrunqd \- daemon to send fax jobs queued by faxspool(1)
+.SH SYNOPSIS
+.B faxrunqd [-v] [-d] [-l <ttys>] [-u <user>] [-V]
+.SH DESCRIPTION
+Runs in the background, and regularily checks the fax queue set up by
+faxspool(1).  Sends all jobs that are due, records results, and takes
+appropriate action (notify mails etc).
+
+.I faxrunqd
+basically does the same as faxrunq(1), just more so.  Please read the
+faxrunq(1) man page if you're not already familiar with the concept.
+
+The advantages of
+.I faxrunqd
+are:
+
+- runs all the time, so you don't have to set up a cron job (but you have
+to set up an entry in /etc/inittab or start it from /etc/rc*)
+
+- quicker response to new faxes in queue
+
+- can sensibly handle more than one modem
+
+- can handle prioritized fax jobs
+
+- can do 'policy routing' of faxes depending on the fax number
+
+The disadvantages are:
+
+- needs more system ressources if you have only little fax traffic
+
+- requires Perl 5.004
+
+- more tricky to set up and to debug
+
+.SH SETUP
+
+.I faxrunqd
+is started at system boot from /etc/rc.*, or from /etc/inittab.  You can
+also start it from the command line. It does
+.B not
+put itself in the background, so you have to start it with an "&", or from
+a ":respawn:" line in /etc/inittab.   Using /etc/inittab has the advantage
+that
+.I faxrunqd
+is restarted automatically if something goes wrong and faxrunqd is
+stopped.
+
+.I faxrunqd
+will first read a global configuration file (see below), then (optionally)
+the faxrunqd policy file (see further below).  From then on, it will sit
+in a loop. It will check the fax queue every 60 seconds for new jobs, and
+will then distribute them over all available modems.  If the job is sent,
+or fails, it will do the same thing
+.I faxrunq(1)
+would do (send a mail, delete the JOB directory, execute a named program,
+etc.).  Both programs are fully compatible in this respect.
+
+.B faxrunqd [-v] [-d] [-l <ttys>] [-u <user>] [-V]
+.SH OPTIONS
+.TP
+.B -v
+Tells
+.I faxrunqd
+to write progress information to the log file.
+.TP
+.B -d
+Tells
+.I faxrunqd
+to write debugging information to stdout and the log file (usually used
+together with -v)
+.TP
+.B -l <ttyS>
+Specifies the list of modem devices to use.  Multiple devices are
+separated with ':', e.g. '-l ttyS0:ttyS1'.
+.TP
+.B -u <user>
+.I faxrunqd
+can now (since 1.1.29) run as unprivileged user.  If you start it as root
+from /etc/inittab or from one of the /etc/rc* scripts, it's strongly
+recommended to use '-u @FAX_OUT_USER@' (to be precise: the user that is 
+owning the outgoing fax spool directory).  This will make 
+.I faxrunqd
+drop all its privileges at startup, and run as the specified user.  Running
+.I faxrunqd
+as root user might lead to security problems - don't do it.
+.TP
+.B -V
+print version number and exit
+
+.SH CONFIGURATION FILE
+
+Some aspects of the behaviour of 
+.I faxrunqd
+can be controlled by a configuration file, usually named 
+@CONFDIR@/faxrunq.config (this is the same file that
+.I faxrunq(1)
+uses, but there are additional options for
+.I faxrunqd).  In
+this file, you can use the following options:
+.TP
+.B success-send-mail [y/n]
+A boolean parameter that controls whether a mail will be sent after
+successful completition of the fax job.
+
+.TP
+.B failure-send-mail [y/n]
+A boolean parameter that controls whether a mail will be sent after
+the fax job has failed more than the maximum number of times.
+
+.TP
+.B success-call-program <name>
+Here, you can specify a program that will be run when the fax has been
+successfully sent. It will be passed two command line parameters. The
+first is the full path to the fax JOB file (see faxq(5)), the second
+is the last exit code from
+.I sendfax
+(for success-call-program, this is always "0").
+
+.TP
+.B failure-call-program <name>
+Similar to the "success-call-program", this program will be run when the
+fax has been failed too often and 
+.I faxrunqd
+gives up. This script could, for example, print out the fax on a printer
+so that it can be sent manually on a paper fax machine.
+
+.TP
+.B update-call-program <name>
+This is, again, similar to "success-call-program".  It will be called for
+interim status updates ("we've tried and it was BUSY"), so that frontend
+programs can display this information.  "update-call-program" will only
+be called for jobs that will be
+.I kept
+in the fax queue for at least one more try.
+
+.TP
+.B maxfail-costly <n>
+This specifies the number of times that a fax may fail "fatally", that
+is, causing telephone costs (explained above). The default value is 5.
+
+.TP
+.B maxfail-total <m>
+This is the absolute maximum number of times that 
+.I faxrunqd
+will try to send any given fax. The default value is 10.
+
+.TP
+.B delete-sent-jobs [y/n]
+Determines whether
+.I faxrunqd
+should delete jobs after sending, or leave them in the fax queue (while
+moving the "JOB" file to "JOB.done") so that they can be seen at by
+"faxq -o". The default value is "do not delete sent faxes".
+
+.TP
+.B acct-log <path>
+Specifies where
+.I faxrunqd
+should protocol success and failure of each try to send a fax job.
+The default location is @FAX_SPOOL_OUT@/acct.log.
+
+.LP
+The options that are specific to
+.I faxrunqd
+are:
+
+.TP
+.B fax-devices [tty(s)]
+Specifies which ttys should be used for sending jobs.  
+.I faxrunqd
+will always explicitely tell
+.I sendfax
+which modem to use, so the settings in sendfax.config are ignored.
+If you use policy routing (see below), this applies only to fax jobs that
+do not have a tty set by faxrunqd.policy.
+
+.TP
+.B faxrunqd-log [filename]
+Specifies where logging information is written to.  This is only used if
+.I faxrunqd
+is called with the
+.B -v
+or
+.B -d
+option.
+
+.TP
+.B policy-config [filename]
+Specifies a file containing rules for "policy routing", see below.
+Default is "no file".
+
+.TP
+.B faxrunqd-max-pages [n]
+If this is set to something greater 1 (default is 10), 
+.I faxrunqd
+will combine multiple jobs to the same receipient telephone number into
+one telephone call.  The maximum number of pages that the resulting job
+may have is specified here.  Usually it makes no sense to increase this,
+but in some surroundings it might make sense to turn off this feature by
+setting it to 1.
+
+.TP
+.B sendfax-tty-map [tty] [program path] [args]
+Some special cases might require running a non-default
+.I sendfax
+binary for specific ttys (like "testing new version" or "some other
+call-compatible sendfax applications for non-class-2 modems").  If you 
+want mappings for more than one "special" tty devices, just use the
+option multiple times.  Example: 
+
+sendfax-tty-map capi0 /usr/sbin/sendfax.capi
+
+
+.SH POLICY ROUTING
+.I faxrunqd
+can do some things differently, depending on the phone number where the
+fax is supposed to be sent to.  For example, this might be useful to:
+
+- send in-house faxes over a specific modem connected to a PABX (to avoid
+paying telco charges)
+
+- send long-distance faxes to the US over a special LD provider, that is,
+use a specific dial-prefix for those
+
+- use extra high debugging when sending to a known-to-be problematic
+receipient
+
+etc.
+
+This feature is controlled by a file, containing match / substitute
+rules.  The name of the file is specified with the "policy-config"
+option in faxrunq.config.
+
+The file is read from top to bottom.  Each line starting with a "#" sign
+is a comment, and is skipped.  In every other line, the first field of
+the line is interpreted as a "match" clause, and compared to the
+telefone number of an to-be-sent fax job.  Regular expressions can be
+used (see perlre(1)).
+
+If the telefone number is matched, the second field is used to
+substitute parts of the telefone number, for example, cut off a local
+prefix, or change a digit, or whatever.  If you do not want any
+substitutions, put a "-" in that field.
+
+The third field specifies the tty lines to use for faxes matched by this
+line (for example, you might have one modem connected to a long-distance
+provider, and others for local use or so).  Put a "-" in this field if
+you want to use the default fax modems.
+
+The remaining part of the line are appended to the sendfax command line.
+With those, you can set a different dial-string ("-D ATD"), or a higher
+debug level ("-x 9"), or whatever else you can imagine. Do NOT set a
+tty to use here ("-l ttyS1"), because that would confuse the internal
+tty handling of
+.I faxrunqd,
+leading to weird effects processing the fax queue!!
+
+Examples:
+
+# 12345-nnn is sent to "nnn" over a local PABX, modem on tty2
+
+^12345		s/12345//	tty2
+
+# fax to 56789 (exact match) is sent with higher debugging
+
+^56789$		-		-	-x 8
+
+
+.SH FILES
+.TP
+.B @FAX_SPOOL_OUT@/stop
+if this file exists, 
+.I faxrunqd
+will stop whatever it's doing at the moment, wait for all outstanding
+jobs, and then fall asleep until the file is removed.  You can use this 
+to stop queue processing while testing something, or if you know that 
+the modem(s) are unavailable and do not want to run into any error 
+messages, etc.
+
+.TP
+.B @FAX_SPOOL_OUT@/faxqueue_done
+Every time
+.I faxrunqd
+runs the fax queue, a time stamp is written into that file.
+It is used by
+.I faxspool
+to display a warning if the queue hasn't been run recently (so faxes may
+get stuck).
+
+.SH SIGNALS
+To control
+.I faxrunqd's 
+behaviour, you can send it the following signals:
+
+.TP
+.B SIGINT
+.TP
+.B SIGTERM
+remove lock file, remove pid file, terminate immediately.
+
+.TP
+.B SIGHUP
+finish all fax jobs that are currently being sent, then terminate  (this
+is used to signal faxrunqd "I want you to terminate" without disturbing
+the normal flow of operation - SIGINT/TERM etc. can lead to some faxes being
+sent twice).
+
+.TP
+.B SIGUSR1
+close, roll, and re-open log file.
+
+.TP
+.B SIGUSR2
+dump current modem success/failure statistics to log file.
+
+.IX fax
+.SH BUGS
+.I faxrunqd
+does not report if a modem goes bad - instead it will just stop using it
+(which is good for reliable faxing, but bad for error recovery).
+
+.SH "SEE ALSO"
+faxspool(1), sendfax(8), faxq(1), faxrunq(1), faxqueue(5)
+.SH AUTHOR
+.I faxrunqd
+is Copyright (C) 1997-2004 by Gert Doering, <gert@greenie.muc.de>.  It was
+inspired by Bodo Bauer's initial faxrunqd, but completely rewritten.

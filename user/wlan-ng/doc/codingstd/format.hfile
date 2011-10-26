@@ -1,0 +1,142 @@
+/* aheader.h: [one line description of the file]
+*    --------------------------------------------------------------------
+*
+*   [Project Name]
+*
+*   [License Statement, eg.
+*   The contents of this file are subject to the Mozilla Public
+*   License Version 1.0 (the "License"); you may not use this file
+*   except in compliance with the License. You may obtain a copy of
+*   the License at http://www.mozilla.org/MPL/ ]
+*
+*   [Warranty Statement, eg.
+*   Software distributed under the License is distributed on an "AS
+*   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+*   implied. See the License for the specific language governing
+*   rights and limitations under the License. ]
+*
+*   [Author contact, eg.
+*   Copyright (C) 1998 AbsoluteValue Software, Inc.  All Rights Reserved.
+*
+*   Inquiries regarding the linux-wlan Open Source project can be
+*   made directly to:
+*
+*   AbsoluteValue Systems Inc.
+*   info@linux-wlan.com
+*   http://www.linux-wlan.com ]
+*
+*   [Change History]
+*
+*   [Verbose Description]
+*
+*   [Implementation and usage notes]
+*
+*   [References]
+*
+*    --------------------------------------------------------------------
+*/
+
+#ifndef _AHEADER_H
+#define _AHEADER_H
+
+/*=============================================================*/
+/*------ Constants --------------------------------------------*/
+
+/*--- Fixed memory offsets --------------------------*/
+#define SU_OFF_LAST_TXDESC        0x3ec
+#define SU_OFF_RSVD1              0x400
+#define SU_OFF_BANNER             0x480
+#define SU_OFF_CMD_BLK            0x4a0
+#define SU_OFF_CNTL_STATUS_BLK    0x4f0
+#define SU_OFF_VBM                0x500
+#define SU_OFF_BUFFER             0x600
+
+/*--- Global Sizes ----------------------------------*/
+#define SU_LEN_BANNER             32
+
+
+
+/*=============================================================*/
+/*------ Macros -----------------------------------------------*/
+
+/*--- next testing macro (applies to Rx and Tx) -------*/
+#define SUTXD_ISLAST(x)            ((x) & BIT31)
+#define SURXD_ISLAST(x)            ((x) & BIT31)
+
+
+/*=============================================================*/
+/*------ Types and their related constants --------------------*/
+
+/*--- Last Completed Tx Descriptor Block ---------------*/
+__WLAN_PRAGMA_PACK1__
+typedef struct am930txcmplt_blk
+{
+    volatile UINT32    last_bcast    __WLAN_ATTRIB_PACK__;
+    volatile UINT32    last_mgmt     __WLAN_ATTRIB_PACK__;
+    volatile UINT32    last_data     __WLAN_ATTRIB_PACK__;
+    volatile UINT32    last_pspoll   __WLAN_ATTRIB_PACK__;
+    volatile UINT32    last_cfpoll   __WLAN_ATTRIB_PACK__;
+} am930txcmplt_blk_t;
+__WLAN_PRAGMA_PACKDFLT__
+
+#define TXCMPLT_OFF_BCAST     0
+#define TXCMPLT_OFF_MGMT      4
+#define TXCMPLT_OFF_DATA      8
+#define TXCMPLT_OFF_PSPOLL    12
+#define TXCMPLT_OFF_CFPOLL    16      
+
+typedef void (*am930hw_scan_callback_t)(void *);
+
+/*=============================================================*/
+/*--- Function Declarations -----------------------------------*/
+/*=============================================================*/
+/* public: */
+am930hw_t*    
+am930hw_construct(UINT32 irq, UINT32 iobase,
+                  UINT32 membase, am930mac_t *mac);
+
+void        
+am930hw_destruct(am930hw_t *hw);
+
+int
+am930hw_init_rx_tx( am930hw_t *hw );
+
+void
+am930hw_ISR( am930hw_t *hw );
+
+UINT32
+am930hw_joinbss( am930hw_t *hw, UINT32 ch, UINT32 newBSS, 
+                 UINT8 *bssid, wlan_ie_ssid_t *ssid, UINT32 bcn_int,
+                 wlan_bss_ts_t ts, UINT32 sutro_ref_time );
+
+UINT32
+am930hw_scan( am930hw_t *hw, UINT32 cntl, UINT8 *bssid, 
+              UINT32 ch, UINT32 duration,
+              am930hw_scan_callback_t cb, void *callback_arg );
+
+UINT32
+am930hw_reset( am930hw_t *hw );
+
+/*=============================================================*/
+/*--- Inline Function Definitions (if supported) --------------*/
+/*=============================================================*/
+
+/*----------------------------------------------------------------
+*	am930hw_reset
+*
+*   Perform reset of am930 part and test for valid operation
+*   operation following reset.
+*
+*	returns: zero on success, non-zero if part fails to come up
+*            after reset.
+----------------------------------------------------------------*/
+__INLINE__ UINT32 am930hw_reset( am930hw_t* hw)
+{
+	UINT32   result = 0;
+
+	/* perform reset */
+	/* test part */
+	return result;
+}
+
+#endif /* _AHEADER_H */

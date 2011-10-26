@@ -1,0 +1,82 @@
+This is the user utilities package for the Linux SMB client
+filesystem.
+
+With smbfs you can mount drives exported by Windows for Workgroups,
+Lan Manager, Windows NT or compatible systems running tcp/ip. smbfs is
+usable with Linux kernels 1.2 and above. For safe usage of smbfs, I
+strongly recommend to use Linux 2.0.28 and above.
+
+For the latest versions of smbfs & co., you might want to look at
+http://www.kki.org/linux-lan/.
+
+In release 2.0.0 of smbfs, I removed the kernel module for Linux
+1.2.x. If you are still using 1.2.x, please get smbfs-0.10 from
+ftp://ftp.gwdg.de/pub/linux/misc/smbfs.
+
+
+INSTALLATION
+
+For using smbfs, I _strongly_ suggest to upgrade to Linux kernel
+2.0.28. It fixes bugs in smbfs that severely affect the stability of
+your machine. To use smbfs, you have to enable it when you configure
+your kernel. If you have Windows 95 machines to connect to, please
+enable the switch in the configuration when you are asked for it. It
+slows down the listing of directories, to give Windows 95 a chance to
+answer the requests. If you will never connect to Windows 95, you can
+disable the option.
+
+smbfs is an on-going effort. When I find bugs that affect the
+machine's stability, then I send the fixes to Linus. But there are
+others that fix problems with specific servers. I regard these as low
+priority fixes, which are not immediately sent to Linus. I will
+release them together with the smbfs packages. The patches are
+distributed as smbfs-2.0.xx-y.diff. Please do the following steps
+before configuring and building your kernel. Please always use a
+fresh, unpatched 2.0.28 source tree.
+
+cd /usr/src/linux
+patch -p1 </path/to/smbfs/smbfs-2.0.xx-y.diff
+
+After this, you can build your kernel.
+
+To compile and install the smbfs utilities smbmount and smbumount,
+please do a
+
+make
+make install
+
+in the directory you find this README in. To do the make install, you
+have to be root. Please note that smbmount and smbumount are installed
+setuid root to allow normal users to mount their own shares.
+
+
+LIMITATIONS
+
+The limitations smbfs has are the natural limitations of the SMB
+protocol, which was designed with MS-DOS based PCs in mind. The first
+limitation is the lack of uid, gid and permission information per
+file. You have to assign those values once for a complete mounted
+directory.
+
+The second limitation is just as annoying as the first: You cannot
+re-export a smb-mounted directory by nfs. It is not possible because
+the NFS protocol defines access to files through unique file handles,
+which can be mapped to the device and inode numbers in unix NFS
+servers. SMB does not have unique numbers per file, you only have the
+path name. I implemented a caching scheme for inode numbers, which
+gives unique inode numbers for every open file in the system. This is
+just sufficient for local use of the files, because you can tell when
+an inode number can be discarded. With NFS the situation is
+different. You can never know when the client will access the file-id
+you offered, so you would have to cache the inode numbers
+indefinitely long. I think this should not be done in kernel mode, as
+it would require an unlimited amount of RAM.
+
+
+AUTOMOUNTING
+
+I received the following amd map file entries from Andrew Tridgell:
+
+laplandc type:=program;mount:="/sbin/smbmount smbmount //lapland/c ${fs} -P XXXX -u 148";unmount:="/sbin/umount umount ${fs}"
+
+laplandd type:=program;mount:="/sbin/smbmount smbmount //lapland/d ${fs} -P XXXX -u 148";unmount:="/sbin/umount umount ${fs}"

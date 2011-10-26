@@ -1,0 +1,2129 @@
+1#  -*- mode: Outline -*-
+# 
+#  klips2-design-api.txt
+#	Richard Guy Briggs <rgb@conscoop.ottawa.on.ca>
+#
+#  RCSID $Id: klips2-design-api.txt,v 1.21 2001/06/26 20:29:25 rgb Exp $
+#
+
+* Outline Commands cheat sheet (C-c C-s to see this)
+        C-c C-t         Hide EVERYTHING in buffer
+        C-c C-a         Show EVERYTHING in buffer
+
+        C-c C-d         Hide THIS item and subitems (subtree)
+        C-c C-s         Show THIS item and subitems (subtree)
+
+        C-c C-c         Hide ONE item
+        C-c C-e         Show ONE item
+
+* Introduction
+	This document describes all the APIs used in this design.
+	Please see klips2-design.txt for an overview of the
+	architecture.  This document is divided into an emacs outline
+	mode cheat sheet, Introduction, Generic Iptables
+	interfaces, KLIPS2 Interfaces, Definitions and Data structures
+	used, and document version.
+
+** Interface:
+	interface description, listing origin and destination
+	entities, separated by an ">->" with diagram label, if it
+	exists within double quotes ``"''
+
+** Label:
+	diagram label
+
+** Name:
+	the name of the function used and a very brief description
+
+** Synopsis:
+	function form, argument position, type and return type
+
+** Arguments:
+	description of each argument
+
+** Description:
+	description of interface and function
+
+** Implementation notes:
+	caveats and side effects
+
+** Return value:
+	function return values
+
+** Example:
+	usage example
+
+** See also:
+	related documentation or further explanation
+
+
+
+* Generic Iptables interfaces
+
+** iptables(8) >-> generic match iptables(8) library
+** ip6tables(8) >-> generic match ip6tables(8) library
+
+	Interface:
+
+		iptables(8) >-> generic match iptables(8) library
+		ip6tables(8) >-> generic match ip6tables(8) library
+
+	Label:
+
+	Name:
+
+		(*generic_parse) - parse, convert and check generic options
+
+	Synopsis:
+
+		static int
+		generic_parse(
+			int c,
+			char **argv,
+			int invert,
+			unsigned int *flags,
+			const struct ipt_entry *entry,
+			unsigned int *nfcache,
+			struct ipt_entry_match **match
+		)
+
+	Arguments:
+
+		c
+			argument count
+
+		argv
+			text arguments to be parsed by this match
+
+		invert
+			invert this match?
+
+		flags
+			bitmap to indicate which arguments have been processed
+
+		entry
+			pointer to table entry associated with match
+
+		nfcache
+			bitmap of skb parts examined by this match
+
+		match
+			match data -- customised match data is contained in
+			"data" member
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line "generic" text
+		arguments for use by the "generic" match NetFilter kernel
+		module.
+
+		Input is expected to be in the form of a text string
+		specifying a "generic" characteristic associated with the
+		packet.
+
+	Implementation notes:
+
+		A data structure to store parsed and converted
+		arguments in a form consumable by the corresponding
+		kernel module is pointed to by match->data.  Replace
+		ipt_generic_info with the customised data structure.
+
+	Return value:
+
+		1 if an option was eaten, 0 if not.
+
+	Example:
+
+		static int
+		generic_parse(
+			int c,
+			char **argv,
+			int invert,
+			unsigned int *flags,
+			const struct ipt_entry *entry,
+			unsigned int *nfcache,
+			struct ipt_entry_match **match
+		) {
+			struct ipt_generic_info *info = (struct ipt_generic_info*)(*match)->data;
+
+			/* parse option arguments */
+			...
+			return 1;
+		}
+
+		struct iptables_match generic_match_lib = {
+			NULL,
+			"generic",
+			NETFILTER_VERSION,
+			IPT_ALIGN(sizeof(struct ipt_generic_info)),
+			IPT_ALIGN(sizeof(struct ipt_generic_info)),
+			&generic_help,
+			&generic_init,
+			&generic_parse,
+			&generic_final_check,
+			&generic_print,
+			&generic_save,
+			generic_opts
+		};
+
+		void
+		_init(void)
+		{
+			register_match(&generic_match_lib);
+		}
+
+	See also:
+
+
+
+** iptables(8) >-> GENERIC target iptables(8) library
+** ip6tables(8) >-> GENERIC target ip6tables(8) library	
+
+	Interface:
+
+		iptables(8) >-> GENERIC target iptables(8) library
+		ip6tables(8) >-> GENERIC target ip6tables(8) library
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+		static int generic_parse(
+			int c,
+			char **argv,
+			int invert,
+			unsigned int *flags,
+			const struct ipt_entry *entry,
+			struct ipt_entry_target **target
+		)
+
+	Arguments:
+
+		c
+			argument count
+
+		argv
+			text arguments to be parsed by this target
+
+		invert
+			invert flag (doesn't make sense for targets)
+
+		flags
+			bitmap to indicate which arguments have been processed
+
+		entry
+			pointer to table entry associated with target
+
+		target
+			target data -- customised target data is contained in
+			"data" member
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line "GENERIC" text
+		arguments for use by the "GENERIC" target NetFilter kernel
+		module.
+
+		Input is expected to be in the form of a text string
+		specifying a "generic" characteristic to be applied to the
+		packet.
+
+	Implementation notes:
+
+		A data structure to store parsed and converted
+		arguments in a form consumable by the corresponding
+		kernel module is pointed to by target->data.  Replace
+		ipt_generic_target_info with the customised data
+		structure, if there is any.
+
+	Return value:
+
+		1 if an option was eaten, 0 if not.
+
+	Example:
+
+		static int
+		generic_parse(
+			int c,
+			char **argv,
+			int invert,
+			unsigned int *flags,
+			const struct ipt_entry *entry,
+			struct ipt_entry_target **target
+		) {
+			struct ipt_generic_target_info *info = (struct ipt_generic_target_info*)(*target)->data;
+
+			/* parse option arguments */
+			...
+			return 1;
+		}
+
+		struct iptables_target generic_target_lib = {
+			NULL,
+			"GENERIC",
+			NETFILTER_VERSION,
+			IPT_ALIGN(sizeof(struct ipt_generic_target_info)),
+			IPT_ALIGN(sizeof(struct ipt_generic_target_info)),
+			&generic_help,
+			&generic_init,
+			&generic_parse,
+			&generic_final_check,
+			&generic_print,
+			&generic_save,
+			generic_opts
+		};
+
+		void
+		_init(void)
+		{
+			register_target(&generic_target_lib);
+		}
+
+	See also:
+
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** NetFilter >-> generic match NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> generic match NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*generic_match) - does the packet match the generic
+		specifications?
+
+	Synopsis:
+
+		static int generic_match(
+			const struct sk_buff *skb,
+			const struct net_device *in,
+			const struct net_device *out,
+			const void *matchinfo,
+			int offset,
+			const void *hdr,
+			u_int16_t datalen,
+			int *hotdrop
+		)
+
+	Arguments:
+
+		skb
+			skb to test for match
+
+		in
+			incoming network interface
+
+		out
+			outgoing network interface
+
+		matchinfo
+			match information
+
+		offset
+			packet offset
+
+		hdr
+			transport layer header pointer
+
+		datalen
+			length of skb
+
+		hotdrop
+			flag to immediately drop packet
+
+	Description:
+
+		This function checks if the skb supplied matches
+		the generic packet characteristics specified in
+		matchinfo.
+
+	Implementation notes:
+
+		Replace ipt_generic_info with the customised data
+		structure.
+
+	Return value:
+
+		It returns true (1) for	match, false (0) for no match.
+
+	Example:
+
+		static int
+		generic_match(
+			const struct sk_buff *skb,
+			const struct net_device *in,
+			const struct net_device *out,
+			const void *matchinfo,
+			int offset,
+			const void *hdr,
+			u_int16_t datalen,
+			int *hotdrop
+		) {
+			struct ipt_generic_info *info = (struct ipt_generic_info*)matchinfo;
+
+			if(/* test skb for match to matchinfo data */) {
+				return 1;
+			}
+			return 0;
+		}
+
+		static struct ipt_match generic_match_mod = {
+			{ NULL, NULL },
+			"generic",
+			&generic_match,
+			&generic_checkentry,
+			NULL,
+			THIS_MODULE
+		};
+
+		static int __init
+		init(void)
+		{
+			return ipt_register_match(&generic_match_mod);
+		}
+
+		static void __exit
+		fini(void)
+		{
+			ipt_unregister_match(&generic_match_mod);
+		}
+
+	See also:
+
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** NetFilter >-> GENERIC target NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> GENERIC target NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*generic_target) - process outgoing packet with
+		"generic" information supplied
+
+	Synopsis:
+
+		static unsigned int
+		generic_target(
+			struct sk_buff **pskb,
+			unsigned int hooknum,
+			const struct net_device *in,
+			const struct net_device *out,
+			const void *targinfo,
+			void *userinfo
+		)
+
+	Arguments:
+
+		pskb
+			skb to be processed by target
+
+        	hooknum
+			which hook from which it was called
+
+		in
+			network device it came from
+
+		out
+			network device to which it is headed
+
+		targinfo
+			data used by target for processing
+
+		userinfo
+			optional user data passed in from mainline
+			hook
+
+	Description:
+
+		This is a NetFilter target.  It applies the generic
+		information supplied with the target to the outgoing
+		packet.
+
+	Implementation notes:
+
+		Replace ipt_generic_target_info with the customised data
+		structure, if there is one.
+
+	Return value:
+
+	       It returns <verdict>.
+
+	Example:
+
+		File net/ipv4/netfilter/ipt_GENERIC.c:
+		#include <linux/netfilter_ipv4/ip_tables.h>
+
+		static unsigned int
+		generic_target(struct sk_buff **pskb,
+			unsigned int hooknum,
+			const struct net_device *in,
+			const struct net_device *out,
+			const void *targinfo,
+			void *userinfo)
+		{
+			struct ipt_generic_target_info *info = (struct ipt_generic_target_info*)targinfo;
+			/* do target processing */
+			return <verdict>;
+		}
+
+		static struct ipt_target generic_target_mod = {
+			{ NULL, NULL },
+			"GENERIC",
+			generic_target,
+			generic_checkentry,
+			NULL,
+			THIS_MODULE
+		};
+
+		static int __init init(void)
+		{
+			if (ipt_register_target(&generic_target_mod))
+				return -EINVAL;
+			return 0;
+		}
+
+		static void __exit fini(void)
+		{
+			ipt_unregister_target(&generic_target_mod);
+		}
+
+	See also:
+
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+* KLIPS2 Interfaces
+
+** KMd >-> iptables(8) "Policy"
+** KMd >-> ip6tables(8) "Policy"
+
+	Interface:
+
+		KMd >-> iptables(8)
+		KMd >-> ip6tables(8)
+
+	Label:
+
+		"Policy"
+
+	Name:
+
+		system(3) call to iptables(8) - execute a shell
+		command to do IP packet filter administration to set
+		ipsec policy
+
+	Synopsis:
+
+		#include <stdlib.h>
+
+		int system(const char * "iptables \
+			--table ipsec \
+			--new-table chain ");
+		int system(const char * "iptables \
+			--table ipsec \
+			--policy chain target");
+		int system(const char * "iptables \
+			--table ipsec \
+			--{append,delete,insert,replace} chain \
+			--protocol protocol \
+			--source src \
+			--destination dst \
+			--jump target \
+			--in-interface IPSECdev \
+			--out-interface IPSECdev \
+			--source-port SPORT \
+			--destination-port DPORT \
+			--uid-owner UID \
+			--gid-owner GID \
+			--pid-owner PID \
+			--sid-owner SID \
+			--espspi SPI \
+			--seclev seclevstr \
+			--salist SAList \
+		");
+
+	Arguments:
+
+		--table ipsec
+			specify ipsec SPDB NetFilter kernel table
+
+		--new-chain chain
+			create new chain in ipsec SPDB
+
+		--policy chain target
+			set default target for specified chain
+
+		--{append,delete,insert,replace} chain
+			manipulate a rule in the specified chain
+
+		--protocol protocol
+			protocol for the matching rule
+
+		--source src
+			source address for the matching rule
+
+		--destination dst
+			destination address for the matching rule
+
+		--in-interface IPSECdev
+			incoming ipsec device for the matching rule
+
+		--out-interface IPSECdev
+			outgoing ipsec device for the matching rule
+
+		--source-port SPORT
+			source port for the matching rule (tcp or udp)
+
+		--destination-port DPORT
+			destination port for the matching rule (tcp or udp)
+
+		--uid-owner UID
+			user ID for the matching rule
+
+		--espspi SPI
+			Encapsulation Security Payload Security Parameters
+			Index for the matching rule
+
+		--seclev seclevstr
+			security or sensitivity level or label for the
+			matching rule
+
+		--salist SAList
+			Security Association IDentifier list for the matching
+			rule
+
+		--jump target
+			target for a matching packet
+
+	Description:
+
+		This is the SPDB (or as yet undefined PF_POLICY)
+		interface from the key management daemons to the
+		kernel via netfilter.
+
+		The default chains of in and out are created when the
+		table is created.  Additional chains can be created as
+		needed with the iptables --new-chain command and can
+		be listed as targets to match entries.
+
+		The default policy of each chain can be changed from
+		the initialised value of DROP (TRAP?) with the
+		iptables --policy command.  The default policy of each
+		chain is one of the standard NetFilter targets of
+		ACCEPT, DROP, REJECT.  IPSec adds the targets TRAP,
+		HOLD (internal), PEEK and IPSEC.  Only the IPSEC
+		target takes any arguments, which consists of a list
+		of SAs to be used for processing.
+
+		Rules are appended, inserted, deleted or replaced to
+		set the IPSec policy.
+
+		Packets can be matched on IP transport protocol,
+		source or destination address, incoming or outgoing
+		ipsec device, source or destination port for tcp or
+		udp, user ID, Encapsulation Security Payload or
+		Authentication Header Security Parameters Index,
+		security or sensitivity level or label, Security
+		Association IDentifier list.  A target must be
+		specified for each matching rule using the iptables
+		--jump option.
+
+	Implementation notes:
+
+		If the in and out chains don't yet exist, they must be
+		created with the iptables --new-chain command.  (These
+		will most likely be created by loading the module and
+		so this paragraph may disappear.)  
+
+		An alternative may be to have the KMd link directly
+		with iptables.o rather than invoking system(3) to call
+		iptables(8).
+
+		It looks like it may be possible to call the libipt
+		functions directly, which will be a big help in
+		speeding things up since text conversion and parsing
+		won't have to be done.  This will change most of the
+		char fields to binary fields and change the calling
+		function and return codes.
+
+	Return value:
+
+		system(3) returns:
+		The value returned is 127 if the execve() call for
+		/bin/sh fails, -1 if there was another error.
+
+		iptables(8) returns:
+		Various error messages are printed to standard error.
+		The exit code is 0 for correct functioning.  Errors
+		which appear to be caused by invalid or abused command
+		line parameters cause an exit code of 2, and other
+		errors cause an exit code of 1.
+
+	Example:
+
+		#include <stdlib.h>
+		int return;
+
+		...
+
+		if((return = system("iptables \
+			--table ipsec \
+			--insert out \
+			--source this-subnet.example.com \
+			--destination that-subnet.example.com \
+			--jump IPSEC \
+			--use-salist esp.12345678@that-sg.example.com \
+			"))){
+			fprintf(stderr, "error $d calling iptables\n");
+			exit 1;
+		}
+
+	See also:
+
+		system(3), iptables(8)
+
+
+
+** iptables(8) >-> seclev match iptables(8) library
+** ip6tables(8) >-> seclev match ip6tables(8) library
+
+	Interface:
+
+		iptables(8) >-> seclev match iptables(8) library
+		ip6tables(8) >-> seclev match ip6tables(8) library
+
+	Label:
+
+	Name:
+
+		(*seclev_parse) - parse, convert and check security level options
+
+	Synopsis:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	Arguments:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line security level text
+		arguments for use by the seclev match NetFilter kernel
+		module.
+
+		Input is expected to be in the form of "--seclev
+		seclevstr" where seclevstr is the security (or
+		sensitivity) level (or label) associated with the
+		packet.
+
+	Implementation notes:
+
+		I don't actually what form security level data takes,
+		but that can be sorted out later.
+
+		Use the data structure ipt_seclev_info.
+
+	Return value:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	Example:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	See also:
+
+		iptables(8) >-> generic match iptables(8) library
+
+
+
+** iptables(8) >-> salist match iptables(8) library
+** ip6tables(8) >-> salist match ip6tables(8) library
+
+	Interface:
+
+		iptables(8) >-> salist match iptables(8) library
+		ip6tables(8) >-> salist match ip6tables(8) library
+
+	Label:
+
+	Name:
+
+		(*salist_parse) - parse, convert and check security
+		association list options
+
+	Synopsis:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	Arguments:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line security association
+		list level text arguments for use by the salist match
+		NetFilter kernel module.
+
+		Input is expected to be in the form of "--salist
+		SAList" where SAList is the security association list
+		associated with the packet.
+
+	Implementation notes:
+
+		Use the data structure ipt_salist_info.
+
+	Return value:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	Example:
+
+		see: iptables(8) >-> generic match iptables(8) library
+
+	See also:
+
+		iptables(8) >-> generic match iptables(8) library
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** iptables(8) >-> TRAP target iptables(8) library
+** ip6tables(8) >-> TRAP target ip6tables(8) library	
+
+	Interface:
+
+		iptables(8) >-> TRAP target iptables(8) library
+		ip6tables(8) >-> TRAP target ip6tables(8) library
+
+	Label:
+
+	Name:
+
+		(*trap_parse) - parse, convert and check TRAP options
+
+	Synopsis:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Arguments:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line TRAP text
+		arguments for use by the TRAP target NetFilter kernel
+		module.
+
+		No input is expected.
+
+	Implementation notes:
+
+	Return value:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Example:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	See also:
+
+		iptables(8) >-> GENERIC target iptables(8) library
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** iptables(8) >-> HOLD target iptables(8) library
+** ip6tables(8) >-> HOLD target ip6tables(8) library	
+
+	Interface:
+
+		iptables(8) >-> HOLD target iptables(8) library
+		ip6tables(8) >-> HOLD target ip6tables(8) library
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Arguments:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line HOLD text
+		arguments for use by the HOLD target NetFilter kernel
+		module.
+
+		No input is expected.
+
+	Implementation notes:
+
+	Return value:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Example:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	See also:
+
+		iptables(8) >-> GENERIC target iptables(8) library
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** iptables(8) >-> PEEK target iptables(8) library
+** ip6tables(8) >-> PEEK target ip6tables(8) library	
+
+	Interface:
+
+		iptables(8) >-> PEEK target iptables(8) library
+		ip6tables(8) >-> PEEK target ip6tables(8) library
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Arguments:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line PEEK text
+		arguments for use by the PEEK target NetFilter kernel
+		module.
+
+		No input is expected.
+
+	Implementation notes:
+
+	Return value:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Example:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	See also:
+
+		iptables(8) >-> GENERIC target iptables(8) library
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** iptables(8) >-> IPSEC target iptables(8) library
+** ip6tables(8) >-> IPSEC target ip6tables(8) library	
+
+	Interface:
+
+		iptables(8) >-> IPSEC target iptables(8) library
+		ip6tables(8) >-> IPSEC target ip6tables(8) library
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Arguments:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Description:
+
+		This function parses, converts and checks iptables(8)
+		and ip6tables(8) command line IPSEC text arguments for
+		use by the IPSEC target NetFilter kernel module.
+
+		Input is expected to be in the form of "--salist
+		SAList" where SAList is the security association list
+		to be applied to packets sent to the IPSEC target.
+
+	Implementation notes:
+
+		Use the data structure ipt_ipsec_target_info.
+
+	Return value:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	Example:
+
+		see: iptables(8) >-> GENERIC target iptables(8) library
+
+	See also:
+
+		iptables(8) >-> GENERIC target iptables(8) library
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** iptables(8) >-> NetFilter
+** ip6tables(8) >-> NetFilter
+
+	Interface:
+
+		iptables(8) >-> NetFilter
+		ip6tables(8) >-> NetFilter
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+	Arguments:
+
+		match->data = struct ipt_seclev_info
+		match->data = struct ipt_salist_info
+		target->data = struct ipt_ipsec_target_info
+
+	Description:
+
+		This I/F is already defined in NetFilter using
+		get/set_sockopt().  We don't call it directly.  In
+		addition, it will need structures to pass the
+		arguments above.  This interface provides a mechanism
+		for iptables to update the kernel netfilter tables.
+
+	Implementation notes:
+
+	Return value:
+
+	Example:
+
+	See also:
+
+		iptables-1.2.2/libiptc/
+
+
+
+** NetFilter >-> seclev match NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> seclev match NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*seclev_match) - does the packet match Security
+		Level?
+
+	Synopsis:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	Arguments:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	Description:
+
+		This function checks if the skb supplied matches
+		the security level specified in matchinfo.
+
+	Implementation notes:
+
+		Use the data structure ipt_seclev_info.
+
+	Return value:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	Example:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	See also:
+
+		NetFilter >-> seclev match NetFilter kernel module
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** NetFilter >-> salist match NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> salist match NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*salist_match) - does the packet match the Security
+		Association List?
+
+	Synopsis:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	Arguments:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	Description:
+
+		This function checks if the skb supplied matches
+		the Security Association list specified in matchinfo.
+
+	Implementation notes:
+
+		Use the data structure ipt_salist_info.
+
+	Return value:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	Example:
+
+		see: NetFilter >-> generic match NetFilter kernel module
+
+	See also:
+
+		NetFilter >-> generic match NetFilter kernel module
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** NetFilter >-> TRAP target NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> TRAP target NetFilter kernel module
+
+	Label:
+
+		TRAP
+
+	Name:
+
+		(*trap_target) - TRAP outgoing packets to initiate
+		opportunism
+
+	Synopsis:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Arguments:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Description:
+
+		This is a NetFilter target.  It TRAPs packets to notify the
+		key management daemons to acquire a new set of
+		Security Associations and to set up a HOLD to save it
+		until the acquire has succeeded.
+
+	Implementation notes:
+
+	Return value:
+
+		It returns NF_STOLEN.
+
+	Example:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	See also:
+
+		NetFilter >-> GENERIC target NetFilter kernel module
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** TRAP target NetFilter kernel module >-> KMds "PF_KEYv2 ACQUIRE"
+
+	Interface:
+
+		TRAP target NetFilter kernel module >-> KMds "PF_KEYv2 ACQUIRE"
+
+	Label:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Name:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Synopsis:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Arguments:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Description:
+
+		This interface is used to make requests from the
+		kernel to key management daemons for a set of Security
+		Associations to cover the specified traffic named to a
+		remote host.
+
+	Implementation notes:
+
+	Return value:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Example:
+
+	See also:
+
+
+
+** TRAP target NetFilter kernel module >-> NetFilter
+
+	Interface:
+
+		TRAP target NetFilter kernel module >-> NetFilter
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+	Arguments:
+
+		struct sk_buff *skb
+
+	Description:
+
+		This interface is used by the NetFilter TRAP target
+		kernel module to set up a HOLD to save outgoing
+		packets until the acquire has succeeded, limiting the
+		demand on the PF_KEYv2 ACQUIRE interface.
+
+	Implementation notes:
+
+		At present, this looks really ugly.  The table can
+		only be modified from userspace by reading the entire
+		table and then replacing the entire table atomically.
+
+		It will have to use the get/set_sockopt() interface
+		similar to what userspace uses, except from
+		kernelspace, duplicating some of the libiptc code,
+		taking a copy of the entire table and atomically
+		replacing all of the copies on all the CPUs.
+
+		There is talk about iptables being rewritten so that
+		the table is updated more gracefully.
+
+		There have been suggestions of using ippool, but this
+		appears to take a huge amount of memory for what we
+		need to be able to do.
+
+		Queue to userspace has also been suggested, but we
+		don't want to send the packet to userspace.  We are
+		trying to avoid that by doing a HOLD.
+
+		After the HOLD is in place, the packet would be
+		re-injected.
+
+	Return value:
+
+	Example:
+
+	See also:
+
+
+
+** NetFilter >-> HOLD target NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> HOLD target NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*hold_target) - HOLD packets to prevent key
+		management daemon flooding
+
+	Synopsis:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Arguments:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Description:
+
+		This is a NetFilter target.  It discards the 
+		previous held packet and holds onto the
+		last packet packet pending replacement by an SPDB
+		change that deletes this HOLD and releases the packet.
+
+	Implementation notes:
+
+		There sound like there will be problems with this
+		because of the atomic complete replacement of the
+		table at which point any data stored with the target
+		will be lost.
+
+	Return value:
+
+		It returns NF_STOLEN.
+
+	Example:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	See also:
+
+		NetFilter >-> GENERIC target NetFilter kernel module
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** KMd >-> SADB "PF_KEYv2 ADD/UPDATE"
+
+	Interface:
+
+		KMd >-> SADB "PF_KEYv2 ADD/UPDATE"
+
+	Label:
+
+		see RFC2367, PF_KEYv2 ADD/UPDATE
+
+	Name:
+
+		see RFC2367, PF_KEYv2 ADD/UPDATE
+
+	Synopsis:
+
+		see RFC2367, PF_KEYv2 ADD/UPDATE
+
+	Arguments:
+
+		see RFC2367, PF_KEYv2 ADD/UPDATE
+
+	Description:
+
+		This interface is used by key management daemons to
+		set incoming or outgoing Security Associations in the
+		kernel to/from a remote host.
+
+	Implementation notes:
+
+	Return value:
+
+		see RFC2367, PF_KEYv2 ADD/UPDATE
+
+	Example:
+
+	See also:
+
+
+
+** HOLD target NetFilter kernel module >-> NetFilter
+
+	Interface:
+
+		HOLD target NetFilter kernel module >-> NetFilter
+
+	Label:
+
+	Name:
+
+		ip_finish_output - re-submit the packet to the output
+		queue, now that the HOLD has been cleared.
+
+		NF_HOOK(PF_INET, NF_IP_POST_ROUTING, skb, NULL, rt->u.dst.dev, ip_finish_output2);
+
+	Synopsis:
+
+		int
+		ip_finish_output(
+			struct sk_buff *skb
+		)
+
+	Arguments:
+
+		skb
+			packet to be re-submitted
+
+	Description:
+
+		This interface provides a method for previously held
+		packets to be released and re-submitted once the
+		HOLD SPDB entry has been replaced or deleted, usually
+		pointing to newly created Security Associations that
+		were aquired to cover that packet stream.
+
+		The packet is re-submitted just before
+		NF_IP_POST_ROUTING.
+
+	Implementation notes:
+
+		I don't know the best way to show this on the diagram,
+		since the skb is stored with the eroute and not the
+		HOLD target module.  The best way to implement this
+		might be when the table gets replaced, release all
+		held packets and let them be re-caught by the table.
+
+		int ip_finish_output(struct sk_buff *skb) is a good
+		possibility since all it does is call
+		NF_IP_POST_ROUTING hook and that is where the packet
+		would have been HOLD'ed.
+
+	Return value:
+
+		0 if everything worked out, -ENOMEM if the kernel ran
+		out of buffers, -EPERM if a verdicet of NF_DROP was
+		returned because the firewall refused to let it pass.
+		Other errors are possible from other output functions
+		associated with firewall targets.
+
+	Example:
+
+		ip_finish_output(skb);
+
+	See also:
+
+
+
+** NetFilter >-> IPSEC target NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> IPSEC target NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*ipsec_target) - process outgoing packet with
+		specified Security Associations
+
+	Synopsis:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Arguments:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Description:
+
+		This is a NetFilter target.  It looks up the Security
+		Associations listed as an argument, in the Security
+		Association DataBase, and applies them in sequence to
+		the outgoing packet.
+
+	Implementation notes:
+
+		Use the data structure ipt_ipsec_target_info.
+
+	Return value:
+
+	       It returns NF_STOLEN.
+
+	Example:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	See also:
+
+		NetFilter >-> GENERIC target NetFilter kernel module
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	Interface:
+
+		IPSEC target NetFilter kernel module >-> SADB
+
+	Label: 
+
+		SAID
+
+	Name:
+
+		ipsec_getsa - get an SA from the SADB by SAID
+
+	Synopsis: 
+
+		#include <ipsec_sadb.h>
+
+		struct ipsec_sa *
+		ipsec_getsa(
+			struct ipsec_said asaid
+		);
+
+	Arguments:
+
+		asaid
+			Security Association IDentifier to try to
+			match in SADB
+
+
+	Description:
+
+		Retrieve a Security Association from the system
+		Security Association DataBase that matches the
+		supplied Security Association IDentifier.
+
+		The Security Association IDentifier must be supplied
+		as a completely filled struct ipsec_said.  ipsec_getsa() attempts
+		to exactly match the SAID structure of an SA
+		entry in the global SADB hash table ipsec_sadb with
+		the SAID argument.  If this succeeds, 
+		a pointer to the matching SA is returned.
+
+	Implementation notes:
+
+		The reference count of the matching SA is atomically
+		incremented by ipsec_getsa() and must be atomically
+		decremented when the caller of ipsec_getsa() has
+		finished with the SA.
+
+		The global SADB hash table struct
+		ipsec_sa*ipsec_sadb[] is locked by ipsec_getsa()
+		during lookup.
+
+	Return values:
+
+		A pointer to a valid Security Association is returned
+		if a match was found, otherwise NULL is returned.
+
+	Example:
+
+		struct ipsec_sa *sa;
+		struct ipsec_said said;
+		...
+		sa = ipsec_getsa(said);
+		...
+		if(atomic_dec_and_test(sa->refcount)) {
+			ipsec_sa_free(sa);
+		}
+
+	See also:
+
+
+
+** IPSEC target NetFilter kernel module >-> NetFilter
+
+	Interface:
+
+		IPSEC target NetFilter kernel module >-> NetFilter
+
+	Label:
+
+	Name:
+
+		ip_queue_xmit - re-submit the packet to the output
+		queue, now that the packet has been IPSec pocessed.
+
+		NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, ip_queue_xmit2);
+
+		NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev, ip_send);
+
+	Synopsis:
+
+		int
+		ip_queue_xmit(
+			struct sk_buff *skb
+		)
+
+	Arguments:
+
+		skb
+			socket buffer to be sent
+
+	Description:
+
+		This interface is to re-inject packets before
+		NF_IP_LOCAL_OUT after the packet has been processed.
+
+	Implementation notes:
+
+		int ip_queue_xmit(struct sk_buff *skb) is another possibility...
+
+	Return value:
+
+		0 if everything worked out.  -ENOMEM if the kernel ran
+		out of buffers.  -EPERM if a verdicet of NF_DROP was
+		returned because the firewall refused to let it pass.
+		-EHOSTUNREACH if routing failed.
+		Other errors are possible from other output functions
+		associated with firewall targets.
+
+	Example:
+
+		struct salist SAs;
+		...
+
+		skb->salist = SAs;
+		ip_queue_xmit(skb);
+
+	See also:
+
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** SADB >-> KMd "PF_KEYv2 EXPIRE"
+
+	Interface:
+
+		SADB >-> KMd "PF_KEYv2 EXPIRE"
+
+	Label:
+
+		see RFC2367, PF_KEYv2 EXPIRE
+
+	Name:
+
+		see RFC2367, PF_KEYv2 EXPIRE
+
+	Synopsis:
+
+		see RFC2367, PF_KEYv2 EXPIRE
+
+	Arguments:
+
+		see RFC2367, PF_KEYv2 EXPIRE
+
+	Description:
+
+		This interface is used by the kernel to notify key
+		management daemons that a security association has
+		either soft or hard expired and to negotiate a
+		replacement.
+
+	Implementation notes:
+
+	Return value:
+
+		see RFC2367, PF_KEYv2 EXPIRE
+
+	Example:
+
+	See also:
+
+
+** Routing Table >-> IPSEC target NetFilter kernel module "IPSECdev"
+
+	Interface:
+
+		Routing Table >-> IPSEC target NetFilter kernel module
+
+	Label:
+
+		 "IPSECdev"
+
+	Name:
+
+	Synopsis:
+
+	Arguments:
+
+	Description:
+
+		This interface provides a way of routing packets
+		through a specific IPSec virtual tunnel.  This is
+		standard linux network routing.
+
+	Implementation notes:
+
+	Return value:
+
+	Example:
+
+	See also:
+
+
+
+** KMd >-> Routing Table "Routing"
+
+	Interface:
+
+		KMd >-> Routing Table
+
+	Label:
+
+		"Routing"
+
+	Name:
+
+		system(3) call to route(8) - execute a shell
+		command to do IP packet routing administration to set
+		ipsec policy
+
+	Synopsis:
+
+		#include <stdlib.h>
+
+		int
+		system(
+			const char * "route \
+			{add,del} -{host,net} \
+			{<host>,<net>[/mask]} \
+			gw <gateway> \
+			dev <device> \
+		");
+
+	Arguments:
+
+		add
+			add an entry to the routing table
+
+		del
+			delete an entry from the routing table
+
+		-host
+			add or delete a host
+
+		-net
+			add or delete a network
+
+		<host>
+			host FQDN or IPv4 or IPv6 address
+
+		<net>[/mask]
+			network FQDN or IPv4 or IPv6 address with netmask
+
+		gw <gateway>
+			nexthop gateway address
+
+		dev <device>
+
+		char[] IPSECdev
+		unsigned char exit_code
+
+	Description:
+
+		This is an interface from the key management daemon to
+		explicitly route traffic through an IPSEC virtual
+		device which is defined by a pair of IPSEC tunnel
+		endpoints and a set of Security Associations.
+
+	Implementation notes:
+
+		currently done by system(3) calls to _updown.
+
+	Return value:
+
+	Example:
+
+	See also:
+
+		system(3), route(8), iproute2(8)
+
+
+
+** Transport Layer De-mux >-> IPSec DECRYPT kernel module
+
+	Interface:
+
+		Transport Layer De-mux >-> IPSec DECRYPT kernel module
+
+	Label:
+
+	Name:
+
+		ipsec_rcv - process an incoming IPSec packet
+	Synopsis:
+		
+		#include <ipsec_rcv.h>
+
+		int
+		ipsec_rcv(
+			struct sk_buff *skb,
+			unsigned short xlen
+		)
+
+	Arguments:
+
+		skb
+			skb to be processed
+
+		xlen
+			length of skb buffer
+
+	Description:
+
+		This interface is to call the IPSEC ESP transport
+		layer protocol handler to process (decrypt) an
+		incoming packet.
+
+		The packet is freed, being re-injected before the
+		NF_IP_PRE_ROUTING hook.
+
+	Implementation notes:
+
+	Return value:
+
+	       ipsec_rcv() returns zero (0).
+
+	Example:
+
+	See also:
+
+
+
+** IPSec DECRYPT kernel module >-> SADB "SAID"
+
+	Interface:
+
+		IPSec DECRYPT kernel module >-> SADB
+
+	Label:
+
+		see "SAID"
+
+	Name:
+
+		ipsec_getsa - get an SA from the SADB by SAID
+
+	Synopsis:
+
+		see: IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	Arguments:
+
+		see: IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	Description:
+
+		see: IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	Implementation notes:
+
+		see: IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	Return value:
+
+		see: IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	Example:
+
+		see: IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+	See also:
+
+		IPSEC target NetFilter kernel module >-> SADB "SAID"
+
+
+** IPSec DECRYPT kernel module >-> NetFilter
+
+	Interface:
+
+		IPSec DECRYPT kernel module >-> NetFilter
+
+	Label:
+
+	Name:
+
+		int netif_rx(struct sk_buff *skb) - post  buffer to the network code, always succeeds
+
+		ip_rcv - receive an IP packet for input processing
+
+		NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL, ip_rcv_finish);
+
+	Synopsis:
+
+		int
+		ip_rcv(
+			struct sk_buff *skb,
+			struct net_device *dev,
+			struct packet_type *pt
+		)
+
+	Arguments:
+
+		skb
+			packet to be re-injected
+
+		dev
+			incoming device, virtual if there is one.
+
+		pt
+			packet type (not used)
+
+
+	Description:
+
+		This interface is to re-start the packet input
+		processing procedure once an IPSec layer has been
+		peeled away.  The packet is made available to the
+		input stream before NF_IP_PRE_ROUTE to check policy
+		with processed (decrypted) connection information.
+
+	Implementation notes:
+
+	Return value:
+
+		0 if everything worked out, -ENOMEM if the kernel ran
+		out of buffers, -EPERM if a verdicet of NF_DROP was
+		returned because the firewall refused to let it pass.
+		Other errors are possible from other output functions
+		associated with firewall targets.
+
+	Example:
+
+		struct salist SAs;
+		...
+
+		skb->salist = SAs;
+		ip_rcv(skb, skb->dev, NULL)
+
+	See also:
+
+
+
+** NetFilter >-> PEEK target NetFilter kernel module
+
+	Interface:
+
+		NetFilter >-> PEEK target NetFilter kernel module
+
+	Label:
+
+	Name:
+
+		(*peek_target) - PEEK at packets to initiate opportunism
+
+	Synopsis:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Arguments:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	Description:
+
+		This interface is used by the kernel netfilter table
+		as a target for packets to be PEEKed at to notify the
+		key management daemons to acquire a new set of
+		Security Associations and to set up an ACCEPT to allow
+		packets in and avoid overloading the KMds.
+
+	Implementation notes:
+
+	Return value:
+
+		It returns NF_ACCEPT.
+
+	Example:
+
+		see: NetFilter >-> GENERIC target NetFilter kernel module
+
+	See also:
+
+		NetFilter >-> GENERIC target NetFilter kernel module
+		http://netfilter.samba.org/unreliable-guides/netfilter-hacking-HOWTO/netfilter-hacking-HOWTO.linuxdoc-4.html
+
+
+
+** PEEK target NetFilter kernel module >-> KMds "PF_KEYv2 ACQUIRE"
+
+	Interface:
+
+		PEEK target NetFilter kernel module >-> KMds
+
+	Label:
+
+		"PF_KEYv2 ACQUIRE"
+
+	Name:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Synopsis:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Arguments:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Description:
+
+		This interface is used to make requests from the
+		kernel to key management daemons for a set of Security
+		Associations to cover the specified traffic named to a
+		remote host.
+
+	Implementation notes:
+
+	Return value:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+	Example:
+
+	See also:
+
+		see RFC2367, PF_KEYv2 ACQUIRE
+
+
+
+** New I/F section template
+
+	Interface:
+
+	Label:
+
+	Name:
+
+	Synopsis:
+
+	Arguments:
+
+	Description:
+
+	Implementation notes:
+
+	Return value:
+
+	Example:
+
+	See also:
+
+
+
+* Definitions and Data structures used
+
+SAList := <SAID>[,<SAID>[,<SAID>[,<SAID>]]]
+
+<SAID> := <proto><PF><spi>@<dstaddr>
+
+<proto> := ah | esp | comp | tun
+
+<PF> := . | : (indicates IPv4 or IPv6 respectively)
+
+<spi> := <8-digit hexadecimal string>
+
+<dstaddr> := <any valid FQDN or IP address of the appropriate family>
+
+
+const struct ipt_entry is already defined in netfilter.
+
+struct ipt_entry_match is already defined in netfilter.
+
+struct ipsec_seclev remains to be defined.
+
+struct ipt_seclev_info {
+	struct ipsec_seclev;		/* Security Level data */
+	u_int8_t  invert;	/* Invert match */
+};
+
+struct ipsec_salist {
+	struct ipsec_said said1;
+	struct ipsec_said said2;
+	struct ipsec_said said3;
+	struct ipsec_said said4;
+}
+
+struct ipt_salist_info {
+	struct ipsec_salist salist;	/* Security Association List data */
+	u_int8_t  invert;	/* Invert match */
+};
+
+struct ipt_ipsec_target_info {
+	struct ipsec_said said1;
+	struct ipsec_said said2;
+	struct ipsec_said said3;
+	struct ipsec_said said4;
+};
+
+struct ipsec_said{		/* to identify an SA, we need: */
+	ip_address dst;		/* A. destination host */
+	ipsec_spi_t spi;	/* B. 32-bit SPI, assigned by dest. host */
+#		define	SPI_PASS	256	/* magic values... */
+#		define	SPI_DROP	257	/* ...for use... */
+#		define	SPI_REJECT	258	/* ...with SA_INT */
+#		define	SPI_HOLD	259
+#		define	SPI_TRAP	260
+	int proto;		/* C. protocol */
+#		define	SA_ESP	50	/* IPPROTO_ESP */
+#		define	SA_AH	51	/* IPPROTO_AH */
+#		define	SA_IPIP	4	/* IPPROTO_IPIP */
+#		define	SA_COMP	108	/* IPPROTO_COMP */
+#		define	SA_INT	61	/* IANA reserved for internal use */
+};
+
+typedef struct {
+	union {
+		struct sockaddr_in v4;
+		struct sockaddr_in6 v6;
+	} u;
+} ip_address;
+
+struct ipsec_sa {
+	/* copy most from struct tdb */
+};
+
+struct ipsecinfo {
+	struct ipt_entry_target t;
+	struct ipt_ipsec_target_info salist;
+};
+
+struct trapinfo {
+	struct ipt_entry_target t;
+};
+
+struct peekinfo {
+	struct ipt_entry_target t;
+};
+
+struct holdinfo {
+	struct ipt_entry_target t;
+};
+
+* Version:
+
+	$Id: klips2-design-api.txt,v 1.21 2001/06/26 20:29:25 rgb Exp $

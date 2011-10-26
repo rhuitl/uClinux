@@ -1,0 +1,131 @@
+Tips for using lrpStat:
+
+Windows users: Running the application without the Java console-window
+
+    To my great embarrasment, Guido Muesch pointed out to me that this 
+    "tip" was totally unnecessary - since the jdk includes the jawaw.exe 
+    executable, which does exactly that.
+    So, the short version of this tip is, use javaw.exe instead of 
+    java.exe. My Windows installation also includes wjview.exe, which 
+    seems to be working just fine as well.
+    So there's really no need to be "hacking" your java.exe, but I'll 
+    leave this tip as an example how it could be done (and also, so it 
+    doesn't seem like I'm trying to cover my tracks...)
+
+    <OBSOLETE>
+      Getting this to work requires that you have Microsoft Visual Studio 
+      (or rather the editbin-executable that comes with Visual-Studio).
+      To generate a special java.exe that doesn't show a console, open a 
+      command prompt, go to the directory java.exe resides in and do the 
+      following:
+
+      copy java.exe java_gui.exe
+      editbin /SUBSYSTEM:WINDOWS java_gui.exe
+
+      That's all, you now have a special version of your java.exe 
+      (java_gui.exe) that will not open a console-window. Of course, that also
+      means you won't see any error-messages...
+    </OBSOLETE>
+
+All users: Using the application to monitor several servers at once
+
+    Even though this is in the documentation, I wanted to point this out again.
+    It is possible (but only using the application, not by using the applet) to
+    monitor several different servers with one instance of the program.
+
+    To do this, all you need to do is to specify several [-configfile
+    htmlFilename] -hostname routername [paramName paramValue] [paramName
+    paramValue] blocks. For example, if you want to monitor router1 and
+    router2, and you have separate html-files for those, the syntax would be:
+
+    java LrpStatApplication 
+            -hostname router1 
+            -configfile router1.html 
+            -hostname router2 
+            -configfile router2.html
+
+
+All users of non-LRP machines: Extended script for the server
+
+	This script was sent to my by Andrew Hoying. It will not work with LEAF or LRP machines (at least not without
+	adding awk and maybe also bash).
+	This is provided "as is", I can't provide any support whatsoever (since I can't test this on my lrp box and also because I
+	know so little shell scripting).
+
+	#!/bin/sh -e
+	trap "exit 1" 1
+	trap "exit 1" 2
+
+	cpu1=`awk '/cpu / {printf "%i %i",$2+$3+$4,$2+$3+$4+$5}' /proc/stat`
+	ctxt1=`awk '/ctxt/ {print $2}' /proc/stat`
+	ctxt=0
+	cpu=0
+	connects=0
+	uniq=0
+	sleep 1
+
+	while [ 1 ]
+	do
+	  cpu2=`awk '/cpu / {printf "%i %i",$2+$3+$4,$2+$3+$4+$5}' /proc/stat`
+	  ctxt2=`awk '/ctxt/ {print $2}' /proc/stat`
+	  cputest=`echo $cpu1' '$cpu2|awk '{printf "%i", (($3-$1)/($4-$2))*100}'`
+	  cpu=$(($cpu+$cputest))
+	  cpu1=$cpu2
+	  ctxttest=$((($ctxt2-$ctxt1)/10))
+	  ctxt=$(($ctxt+$ctxttest))
+	  ctxt1=$ctxt2
+	  connects=$(($connects + `cat /proc/net/ip_conntrack|wc -l`))
+	  uniq=$(($uniq + `cat /proc/net/ip_conntrack |cut -d= -f 2|cut -d' ' -f 1|sort -u|wc -l`))
+	  cat /proc/net/dev
+	  echo cpu0:$cpu $cputest 0 0 0 0 0 0 $ctxt $ctxttest 0 0 0 0 0 0
+	  echo conn0:$connects 0 0 0 0 0 0 0 $uniq 0 0 0 0 0 0 0
+	  echo
+	  echo "#"
+	  sleep 1
+	done
+
+	The corresponding html file looks like this: 
+
+	<HTML>
+	<TITLE>Test page for lrp-Status monitor</TITLE>
+	<BODY>
+	<H3>lrp-Status monitor</H3>
+	<APPLET CODE="LrpStatApplet.class"  ARCHIVE="lrpStat09.jar" WIDTH="100%" HEIGHT="100%">
+
+		<PARAM NAME=INFOPORT VALUE="60182">
+		<PARAM NAME=CONTROL_FOREGROUND_COLOR VALUE="333366">
+		<PARAM NAME=DATA_BACKGROUND_COLOR VALUE="333366">
+		<PARAM NAME=DATA_FOREGROUND_COLOR1 VALUE="FFFFFF">
+		<PARAM NAME=DATA_FOREGROUND_COLOR2 VALUE="cc9900">
+		<PARAM NAME=GRID_COLOR VALUE="63659c">
+
+		<PARAM NAME=DEV0_NAME VALUE="eth1">
+		<PARAM NAME=DEV0_LABEL VALUE="Internet Traffic">
+		<PARAM NAME=DEV0_TYPE VALUE="static">
+		<PARAM NAME=DEV0_MAX VALUE="auto">
+		<PARAM NAME=DEV0_MODE VALUE="line">
+		<PARAM NAME=DEV0_GRID_INTERVAL VALUE="50000">
+		<PARAM NAME=DEV0_DRAW_LEGEND VALUE="1">
+
+		<PARAM NAME=DEV1_NAME VALUE="cpu0">
+		<PARAM NAME=DEV1_LABEL VALUE="Cpu Usage/Context Switches">
+		<PARAM NAME=DEV1_TYPE VALUE="static">
+		<PARAM NAME=DEV1_MAX VALUE="100">
+		<PARAM NAME=DEV1_MODE VALUE="line">
+		<PARAM NAME=DEV1_GRID_INTERVAL VALUE="10">
+		<PARAM NAME=DEV1_DRAW_LEGEND VALUE="0">
+		<PARAM NAME=DEV1_DONT_NORMALIZE VALUE="1">
+		<PARAM NAME=DEV1_ABSOLUTE VALUE="1">
+
+		<PARAM NAME=DEV2_NAME VALUE="conn0">
+		<PARAM NAME=DEV2_LABEL VALUE="Current Connections/Unique IPs">
+		<PARAM NAME=DEV2_TYPE VALUE="static">
+		<PARAM NAME=DEV2_MAX VALUE="auto">
+		<PARAM NAME=DEV2_MODE VALUE="line">
+		<PARAM NAME=DEV2_GRID_INTERVAL VALUE="100">
+		<PARAM NAME=DEV2_DRAW_LEGEND VALUE="0">
+		<PARAM NAME=DEV2_DONT_NORMALIZE VALUE="1">
+		<PARAM NAME=DEV2_ABSOLUTE VALUE="1">
+
+	</APPLET></BODY>
+	</HTML>

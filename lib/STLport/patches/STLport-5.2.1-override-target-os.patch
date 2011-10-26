@@ -1,0 +1,59 @@
+Use CC/CXX/AR from environment.
+
+diff -Nuar STLport-5.2.1.orig/build/Makefiles/gmake/gcc.mak STLport-5.2.1/build/Makefiles/gmake/gcc.mak
+--- STLport-5.2.1.orig/build/Makefiles/gmake/gcc.mak	2008-12-10 19:56:51.000000000 +1000
++++ STLport-5.2.1/build/Makefiles/gmake/gcc.mak	2010-10-07 17:44:13.562307064 +1000
+@@ -9,28 +9,32 @@
+ # Licensed under the Academic Free License version 3.0
+ #
+ 
++ifndef CXX
+ ifndef _FORCE_CXX
+ CXX := c++
+ else
+ CXX := ${_FORCE_CXX}
+ endif
++ifdef TARGET_OS
++CXX := ${TARGET_OS}-${CXX}
++endif
++endif
+ 
++ifndef CC
+ ifndef _FORCE_CC
+ CC := gcc
+ else
+ CC := ${_FORCE_CC}
+ endif
++ifdef TARGET_OS
++CC := ${TARGET_OS}-${CC}
++endif
++endif
+ 
+ ifeq ($(OSNAME), cygming)
+ RC := windres
+ endif
+ 
+-ifdef TARGET_OS
+-CXX := ${TARGET_OS}-${CXX}
+-CC := ${TARGET_OS}-${CC}
+-AS := ${TARGET_OS}-${AS}
+-endif
+-
+ CXX_VERSION := $(shell ${CXX} -dumpversion)
+ CXX_VERSION_MAJOR := $(shell echo ${CXX_VERSION} | awk 'BEGIN { FS = "."; } { print $$1; }')
+ CXX_VERSION_MINOR := $(shell echo ${CXX_VERSION} | awk 'BEGIN { FS = "."; } { print $$2; }')
+diff -Nuar STLport-5.2.1.orig/build/Makefiles/gmake/linux/targetsys.mak STLport-5.2.1/build/Makefiles/gmake/linux/targetsys.mak
+--- STLport-5.2.1.orig/build/Makefiles/gmake/linux/targetsys.mak	2008-12-10 19:56:51.000000000 +1000
++++ STLport-5.2.1/build/Makefiles/gmake/linux/targetsys.mak	2010-10-06 13:51:06.642627113 +1000
+@@ -13,9 +13,9 @@
+ 
+ ARCH := a
+ ifdef TARGET_OS
+-AR := ${TARGET_OS}-ar
++AR ?= ${TARGET_OS}-ar
+ else
+-AR := ar
++AR ?= ar
+ endif
+ AR_INS_R := -rs
+ AR_EXTR := -x

@@ -1,0 +1,36 @@
+#!/bin/sh
+
+hostname cobra5329
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t tmpfs ramdisc /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+
+# Don't disturb the userspace with kernel messages after
+# this point
+echo " 0 1 2 3 4" > /proc/sys/kernel/printk
+echo 1 > /sys/class/graphics/fb0/blank
+
+# Network configuration
+ifconfig lo 127.0.0.1
+# set up the ip address of the target:
+ifconfig eth0 192.168.4.33 up
+
+# Try to mount the "data" partition on
+# the flash, this is where the user
+# may store his files
+echo "Trying to mount user data: "
+mount -t romfs /dev/mtdblock3 /opt/
+if [ $? -eq 0 ]; then
+	echo " * Userdata mounted"
+fi
+
+cat /etc/motd
+cat /etc/support
+cat /etc/version
+
+demo-select &

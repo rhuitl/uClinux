@@ -1,0 +1,97 @@
+https://sourceforge.net/tracker/?func=detail&aid=2888817&group_id=146814&atid=766244
+
+--- STLport-5.2.1/src/c_locale_dummy/c_locale_dummy.c
++++ STLport-5.2.1/src/c_locale_dummy/c_locale_dummy.c
+@@ -24,9 +24,13 @@
+ */
+ 
+ #include <string.h>
++#ifndef _STLP_NO_CWCHAR
+ #include <wchar.h>
++#endif
+ #include <ctype.h>
++#ifndef _STLP_NO_CWCHAR
+ #include <wctype.h>
++#endif
+ #include <limits.h>
+ 
+ #if defined (_STLP_USE_SAFE_STRING_FUNCTIONS)
+--- STLport-5.2.1/src/c_locale.h
++++ STLport-5.2.1/src/c_locale.h
+@@ -33,11 +33,16 @@
+ 
+ #include "stlport_prefix.h"
+ 
++#ifndef _STLP_NO_CWCHAR
+ #include <wchar.h> /* for mbstate_t */
++#endif
+ #include <stl/c_locale.h>
+ 
+ struct _Locale_name_hint;
+ 
++#ifdef __UCLIBC__
++# undef __GLIBC__
++#endif
+ #if defined (_GNU_SOURCE) && defined (__GLIBC__) && \
+     ((__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 2))
+ #  define _STLP_USE_GLIBC2_LOCALIZATION
+--- STLport-5.2.1/src/time_facets.cpp
++++ STLport-5.2.1/src/time_facets.cpp
+@@ -165,17 +165,21 @@
+ static void __append(__iostring &buf, const string& name)
+ { buf.append(name.data(), name.data() + name.size()); }
+ 
++#ifndef _STLP_NO_NATIVE_WIDE_FUNCTIONS
+ static void __append(__iowstring &buf, const wstring& name)
+ { buf.append(name.data(), name.data() + name.size()); }
++#endif
+ 
+ static void __append(__iostring &buf, char *first, char *last, const ctype<char>& /* ct */)
+ { buf.append(first, last); }
+ 
++#ifndef _STLP_NO_NATIVE_WIDE_FUNCTIONS
+ static void __append(__iowstring &buf, char *first, char *last, const ctype<wchar_t>& ct) {
+   wchar_t _wbuf[64];
+   ct.widen(first, last, _wbuf);
+   buf.append(_wbuf, _wbuf + (last - first));
+ }
++#endif
+ 
+ #if defined (__GNUC__)
+ /* The number of days from the first day of the first ISO week of this
+@@ -456,10 +460,12 @@
+                                        const _Time_Info& table, const tm* t)
+ { __write_formatted_timeT(buf, ct, format, modifier, table, t); }
+ 
++#ifndef _STLP_NO_NATIVE_WIDE_FUNCTIONS
+ void _STLP_CALL __write_formatted_time(__iowstring &buf, const ctype<wchar_t>& ct,
+                                        char format, char modifier,
+                                        const _WTime_Info& table, const tm* t)
+ { __write_formatted_timeT(buf, ct, format, modifier, table, t); }
++#endif
+ 
+ static time_base::dateorder __get_date_order(_Locale_time* time) {
+   const char * fmt = _Locale_d_fmt(time);
+--- STLport-5.2.1/stlport/stl/_cstdlib.h
++++ STLport-5.2.1/stlport/stl/_cstdlib.h
+@@ -62,8 +62,10 @@
+ // these functions just don't exist on Windows CE
+ using _STLP_VENDOR_CSTD::abort;
+ using _STLP_VENDOR_CSTD::getenv;
++#ifndef _STLP_NO_NATIVE_WIDE_FUNCTIONS
+ using _STLP_VENDOR_CSTD::mblen;
+ using _STLP_VENDOR_CSTD::mbtowc;
++#endif
+ using _STLP_VENDOR_CSTD::system;
+ using _STLP_VENDOR_CSTD::bsearch;
+ #    endif
+@@ -76,7 +78,9 @@
+ using _STLP_VENDOR_CSTD::atof;
+ using _STLP_VENDOR_CSTD::atoi;
+ using _STLP_VENDOR_CSTD::atol;
++#ifndef _STLP_NO_NATIVE_WIDE_FUNCTIONS
+ using _STLP_VENDOR_CSTD::mbstowcs;
++#endif
+ using _STLP_VENDOR_CSTD::strtod;
+ using _STLP_VENDOR_CSTD::strtol;
+ using _STLP_VENDOR_CSTD::strtoul;

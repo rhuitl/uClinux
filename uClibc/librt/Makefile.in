@@ -1,0 +1,52 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2005 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+CFLAGS-librt := -DNOT_IN_libc -DIS_IN_librt $(SSP_ALL_CFLAGS)
+
+LDFLAGS-librt.so := $(LDFLAGS)
+
+LIBS-librt.so := $(LIBS)
+
+librt_FULL_NAME := librt-$(VERSION).so
+
+librt_DIR := $(top_srcdir)librt
+librt_OUT := $(top_builddir)librt
+
+librt_SRC := $(wildcard $(librt_DIR)/*.c)
+librt_OBJ := $(patsubst $(librt_DIR)/%.c,$(librt_OUT)/%.o,$(librt_SRC))
+
+ifeq ($(DOPIC),y)
+librt-a-y += $(librt_OBJ:.o=.os)
+else
+librt-a-y += $(librt_OBJ)
+endif
+librt-so-y += $(librt_OBJ:.o=.os)
+
+lib-a-y += $(top_builddir)lib/librt.a
+lib-so-y += $(top_builddir)lib/librt.so
+objclean-y += librt_clean
+
+ifeq ($(DOPIC),y)
+$(top_builddir)lib/librt.so: $(top_builddir)lib/librt.a $(libc)
+else
+$(top_builddir)lib/librt.so: $(librt_OUT)/librt_so.a $(libc)
+endif
+	$(call link.so,$(librt_FULL_NAME),$(MAJOR_VERSION))
+
+$(librt_OUT)/librt_so.a: $(librt-so-y)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+$(top_builddir)lib/librt.a: $(librt-a-y)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+librt_clean:
+	$(RM) $(librt_OUT)/*.{o,os,a}

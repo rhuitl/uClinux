@@ -1,0 +1,318 @@
+#!/bin/sh
+#***********************************************************************
+#
+# adsl-setup
+#
+# All-purpose slicing/dicing shell script to configure rp-pppoe.
+#
+# Copyright (C) 2000 Roaring Penguin Software Inc.
+#
+# $Id: adsl-setup.in,v 1.1.1.1 2000-11-17 05:28:41 davidm Exp $
+#***********************************************************************
+
+# From AUTOCONF
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+# Paths to programs
+IFCONFIG=/sbin/ifconfig
+PPPD=@PPPD@
+PPPOE=@sbindir@/pppoe
+LOGGER="/usr/bin/logger -t `basename $0`"
+
+CONFIG=/etc/ppp/pppoe.conf
+
+copy() {
+    cp $1 $2
+    if [ "$?" != 0 ] ; then
+	echo "*** Error copying $1 to $2"
+	echo "*** Quitting."
+	exit 1
+    fi
+}
+
+echo "Welcome to the Roaring Penguin ADSL client setup.  First, I will run"
+echo "some checks on your system to make sure the PPPoE client is installed"
+echo "properly..."
+echo ""
+
+# Must be root
+if [ "`id -u`" != 0 ] ; then
+    echo "$0: Sorry, you must be root to run this script"
+    exit 1
+fi
+
+# Prototype config file must exist
+if [ ! -r "$CONFIG" ] ; then
+    echo "Oh, dear, I don't see the file '$CONFIG' anywhere.  Please"
+    echo "re-install the PPPoE client."
+    exit 1
+fi
+
+# Must have pppd
+if [ ! -x $PPPD ] ; then
+    echo "Oops, I can't execute the program '$PPPD'.  You"
+    echo "must install the PPP software suite, version 2.3.10 or later."
+    exit 1
+fi
+
+. $CONFIG
+
+if [ "$DEMAND" = "" ] ; then
+    DEMAND=no
+fi
+
+# pppoe must exist
+if [ ! -x "$PPPOE" ] ; then
+    echo "Oh, dear, I can't execute the program '$PPPOE'.  Please"
+    echo "re-install the rp-pppoe client."
+    exit 1
+fi
+
+echo "Looks good!  Now, please enter some information:"
+
+while [ true ] ; do
+    echo ""
+    echo "USER NAME"
+    echo ""
+    echo -n ">>> Enter your PPPoE user name (default $USER): "
+    read U
+
+    if [ "$U" = "" ] ; then
+	U="$USER"
+    fi
+
+    echo ""
+    echo "INTERFACE"
+    echo ""
+    echo ">>> Enter the Ethernet interface connected to the ADSL modem"
+    echo "For Solaris, this is likely to be something like /dev/hme0."
+    echo "For Linux, it will be ethn, where 'n' is a number."
+    echo -n "(default $ETH): "
+    read E
+
+    if [ "$E" = "" ] ; then
+	E="$ETH"
+    fi
+
+    echo ""
+    echo "Do you want the link to come up on demand, or stay up continuously?"
+    echo "If you want it to come up on demand, enter the idle time in seconds"
+    echo "after which the link should be dropped.  If you want the link to"
+    echo "stay up permanently, enter 'no' (two letters, lower-case.)"
+    echo "NOTE: Demand-activated links do not interact well with dynamic IP"
+    echo "addresses.  You may have some problems with demand-activated links."
+    echo -n ">>> Enter the demand value (default $DEMAND): "
+    read D
+    if [ "$D" = "" ] ; then
+	D=$DEMAND
+    fi
+
+    echo ""
+    echo "DNS"
+    echo ""
+    echo "Please enter the IP address of your ISP's primary DNS server."
+    echo "If your ISP claims that 'the server will provide DNS addresses',"
+    echo "enter 'server' (all lower-case) here."
+    echo "If you just press enter, I will assume you know what you are"
+    echo "doing and not modify your DNS setup."
+    echo -n ">>> Enter the DNS information here: "
+
+    read DNS1
+
+
+    if [ "$DNS1" != "" ] ; then
+        if [ "$DNS1" != "server" ] ; then
+	    echo "Please enter the IP address of your ISP's secondary DNS server."
+	    echo "If you just press enter, I will assume there is only one DNS server."
+	    echo -n ">>> Enter the secondary DNS server address here: "
+	    read DNS2
+	fi
+    fi
+
+    while [ true ] ; do
+	echo ""
+	echo "PASSWORD"
+	echo ""
+	stty -echo
+	echo -n ">>> Please enter your PPPoE password:    "
+	read PWD1
+	echo ""
+	echo -n ">>> Please re-enter your PPPoE password: "
+	read PWD2
+	echo ""
+	stty echo
+	if [ "$PWD1" = "$PWD2" ] ; then
+	    break
+	fi
+
+	echo -n ">>> Sorry, the passwords do not match.  Try again? (y/n)"
+	read ANS
+	case "$ANS" in
+	    N|No|NO|Non|n|no|non)
+		echo "OK, quitting.  Bye."
+		exit 1
+	esac
+    done
+
+    # Firewalling
+    echo ""
+    echo "FIREWALLING"
+    echo ""
+    if test `uname -s` != "Linux" ; then
+	echo "Sorry, firewalling is only supported under Linux.  Consult"
+	echo "your operating system manuals for details on setting up"
+	echo "packet filters for your system."
+	FIREWALL=NONE
+    else
+	echo "Please choose the firewall rules to use.  Note that these rules are"
+	echo "very basic.  You are strongly encouraged to use a more sophisticated"
+	echo "firewall setup; however, these will provide basic security.  If you"
+	echo "are running any servers on your machine, you must choose 'NONE' and"
+	echo "set up firewalling yourself.  Otherwise, the firewall rules will deny"
+	echo "access to all standard servers like Web, e-mail, ftp, etc.  If you"
+	echo "are using SSH, the rules will block outgoing SSH connections which"
+	echo "allocate a privileged source port."
+	echo ""
+	while [ true ] ; do
+	    echo "The firewall choices are:"
+	    echo "0 - NONE: This script will not set any firewall rules.  You are responsible"
+	    echo "          for ensuring the security of your machine.  You are STRONGLY"
+	    echo "          recommended to use some kind of firewall rules."
+	    echo "1 - STANDALONE: Appropriate for a basic stand-alone web-surfing workstation"
+	    echo "2 - MASQUERADE: Appropriate for a machine acting as an Internet gateway"
+	    echo "                for a LAN"
+	    echo -n ">>> Choose a type of firewall (0-2): "
+	    read a
+	    if [ "$a" = 0 -o "$a" = 1 -o "$a" = 2 ] ; then
+		break
+	    fi
+	    echo "Please enter a number from 0 to 2"
+	done
+
+	case "$a" in
+	    0)
+		FIREWALL=NONE
+		;;
+	    1)
+		FIREWALL=STANDALONE
+		;;
+	    2)
+		FIREWALL=MASQUERADE
+		;;
+	esac
+    fi
+
+    echo ""
+    echo "** Summary of what you entered **"
+    echo ""
+    echo "Ethernet Interface: $E"
+    echo "User name:          $U"
+    if [ "$D" = "no" ] ; then
+	echo "Activate-on-demand: No"
+    else
+	echo "Activate-on-demand: Yes; idle timeout = $D seconds"
+    fi
+
+    if [ "$DNS1" != "" ] ; then
+        if [ "$DNS1" = "server" ] ; then
+	    echo "DNS addresses:      Supplied by ISP's server"
+        else
+	    echo "Primary DNS:        $DNS1"
+	    if [ "$DNS2" != "" ] ; then
+		echo "Secondary DNS:      $DNS2"
+	    fi
+        fi
+    else
+	echo "DNS:                Do not adjust"
+    fi
+    echo "Firewalling:        $FIREWALL"
+    echo ""
+    while [ true ] ; do
+        echo -n '>>> Accept these settings and adjust configuration files (y/n)? '
+        read ANS
+	case "ANS" in
+	    Y|y|yes|Yes|oui|Oui)
+		ANS=y
+		;;
+            N|n|no|No|non|Non)
+		ANS=n
+		;;
+	esac
+	if [ "$ANS" = "y" -o "$ANS" = "n" ] ; then
+	    break
+        fi
+    done
+    if [ "$ANS" = "y" ] ; then
+	break
+    fi
+done
+
+# Adjust configuration files.  First to $CONFIG
+
+echo "Adjusting $CONFIG"
+
+copy $CONFIG $CONFIG-bak
+if [ "$DNS1" = "server" ] ; then
+    USEPEERDNS=yes
+else
+    USEPEERDNS=no
+fi
+
+# Some #$(*& ISP's use a slash in the user name...
+sed -e "s&^USER=.*&USER='$U'&" \
+    -e "s/^ETH=.*/ETH='$E'/" \
+    -e "s/^FIREWALL=.*/FIREWALL=$FIREWALL/" \
+    -e "s/^DEMAND=.*/DEMAND=$D/" \
+    -e "s/^USEPEERDNS=.*/USEPEERDNS=$USEPEERDNS/" \
+    < $CONFIG-bak > $CONFIG
+
+if [ $? != 0 ] ; then
+    echo "** Error modifying $CONFIG"
+    echo "** Quitting"
+    exit 1
+fi
+
+if [ "$DNS1" != "" ] ; then
+    if [ "$DNS1" != "server" ] ; then
+	echo "Adjusting /etc/resolv.conf"
+	grep -s "MADE-BY-RP-PPPOE" /etc/resolv.conf > /dev/null 2>&1
+	if [ "$?" != 0 ] ; then
+	    echo "  (But first backing it up to /etc/resolv.conf-bak)"
+	    copy /etc/resolv.conf /etc/resolv.conf-bak
+	fi
+	echo "# MADE-BY-RP-PPPOE" > /etc/resolv.conf
+	echo "nameserver $DNS1" >> /etc/resolv.conf
+	if [ "$DNS2" != "" ] ; then
+	    echo "nameserver $DNS2" >> /etc/resolv.conf
+	fi
+    fi
+fi
+
+echo "Adjusting /etc/ppp/pap-secrets and /etc/ppp/chap-secrets"
+if [ -r /etc/ppp/pap-secrets ] ; then
+    echo "  (But first backing it up to /etc/ppp/pap-secrets-bak)"
+    copy /etc/ppp/pap-secrets /etc/ppp/pap-secrets-bak
+else
+    cp /dev/null /etc/ppp/pap-secrets-bak
+fi
+if [ -r /etc/ppp/chap-secrets ] ; then
+    echo "  (But first backing it up to /etc/ppp/chap-secrets-bak)"
+    copy /etc/ppp/chap-secrets /etc/ppp/chap-secrets-bak
+else
+    cp /dev/null /etc/ppp/chap-secrets-bak
+fi
+
+egrep -v "^$U|^\"$U\"" /etc/ppp/pap-secrets-bak > /etc/ppp/pap-secrets
+echo "\"$U\"	*	\"$PWD1\"" >> /etc/ppp/pap-secrets
+egrep -v "^$U|^\"$U\"" /etc/ppp/chap-secrets-bak > /etc/ppp/chap-secrets
+echo "\"$U\"	*	\"$PWD1\"" >> /etc/ppp/chap-secrets
+
+echo ""
+echo ""
+echo ""
+echo "Congratulations, it should be all set up!"
+echo ""
+echo "Type 'adsl-start' to bring up your ADSL link and 'adsl-stop' to bring"
+echo "it down.  Type 'adsl-status' to see the link status."
+exit 0

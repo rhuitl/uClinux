@@ -1,0 +1,397 @@
+.\" Copyright (C) 2001-2007 Peter Selinger.
+.\" This file is part of ccrypt. It is free software and it is covered
+.\" by the GNU General Public License. See the file COPYING for details.
+.\" 
+.\" $Id: potrace.1.in 147 2007-04-09 00:44:09Z selinger $
+.TH potrace 1 "@DATE@" "Version @VERSION@"
+.SH NAME
+potrace \- transform bitmaps into vector graphics.
+.SH SYNOPSIS
+.nf
+.B potrace [\fIoptions\fP] [\fIfilename...\fP]
+.fi
+.SH DESCRIPTION
+
+\fBpotrace\fP is a utility for tracing a bitmap, which means,
+transforming a bitmap into a smooth, scalable image. The input is a
+bitmap, which means, a pixel-based image composed of the two colors
+black and white only. The default output is an encapsulated PostScript
+file (EPS). A typical use is to create EPS files from scanned data,
+such as company or university logos, handwritten notes, etc. The
+resulting image is not "jaggy" like a bitmap, but smooth. It can then
+be rendered at any resolution.
+
+\fBpotrace\fP can read bitmaps in the following formats: PBM, PGM, PPM
+(collectively known as PNM, see pnm(5)), as well as BMP (Windows and
+OS/2 bitmap formats). The input image should only use the two colors
+black and white. If other pixel values appear in the input, they will
+be converted to black and white using a simple threshold method.
+
+\fBpotrace\fP can currently produce the following output formats: EPS,
+PostScript, PDF, SVG, PGM, and XFIG. An experimental gimppath backend
+is also available. Additional backends might be added in the future.
+.SH OPTIONS
+
+The following options are supported. Dimensions (arguments of type
+\fIdim\fP) can have optional units, e.g. 6.5in, 15cm, 100pt.
+The default unit is inches (or centimeters, if this was configured at
+compile time, see COMPILE TIME CONFIGURATION below). For pixel-based
+output formats such as PGM and gimppath, the default unit is pixels.
+.SS General options:
+.TP 15
+.B -h, --help
+print help message and exit.
+.TP
+.B -v, --version
+print version info and exit.
+.TP
+.B -l, --license
+print license info and exit.
+.TP
+.B -V, --show-defaults
+print the defaults which were compiled into this version of \fBpotrace\fP,
+and exit.
+.TP
+.B --progress
+display a progress bar for each bitmap that is processed. This is
+useful for interactive use, and requires a terminal. The default
+behavior is not to show any progress information.
+.PD
+.SS Input/output options:
+.TP 15
+.B \fIfilename\fP
+If filename arguments are given, then \fBpotrace\fP will by default
+create one output file for each input filename given. The name of the
+output file is obtained from the input filename by changing its suffix
+according to the chosen backend. If changing the suffix is impossible
+because the names of the input and output files would be identical,
+then the output filename is created by adding the "-out" suffix to the
+name of the input file. If no filename arguments are given, then
+\fBpotrace\fP acts as a filter, reading from standard input and
+writing to standard output. A filename of "-" may be given to specify
+reading from standard input.
+.TP
+.B -o \fIfilename\fP, --output \fIfilename\fP
+write output to this file. All output is directed to the specified
+file. If this option is used, then multiple input filenames are
+allowed only for those backends which can handle multiple bitmaps;
+these are currently the PostScript and PGM backends. In this case,
+each input file may contain one or more bitmaps, and all the bitmaps from
+all the input files are processed and the output concatenated into a
+single file. A filename of "-" may be given to specify writing to
+standard output. 
+.PD
+.SS Backend selection:
+.TP 15
+.B -b \fIname\fP, --backend \fIname\fP
+Select backend by name, where \fIname\fP is one of eps, postscript,
+ps, pdf, svg, pgm, gimppath, xfig. Backend names can be abbreviated by
+an unambiguous prefix.
+.TP
+.B -e, --eps
+Encapsulated PostScript backend (default). The input is a single
+bitmap; the output is a stand-alone, encapsulated PostScript file
+which can be included in other documents.
+.TP
+.B -p, --postscript
+PostScript backend. For this backend, the input may consist of
+multiple concatenated bitmaps, which will be turned into a multi-page
+PostScript document. 
+.TP
+.B -b pdf, --backend pdf
+PDF backend. For this backend, the input may consist of multiple
+concatenated bitmaps, which will be turned into a multi-page PDF
+document.
+.TP
+.B -s, --svg
+SVG backend. This backend produces a scalable vector graphics (SVG)
+file. This backend can process one bitmap per output file. 
+.TP
+.B -g, --pgm
+PGM backend. This backend produces a portable greymap (PGM) file. It
+is a convenient backend for antialiasing a bitmap image. The input may
+consist of multiple concatenated bitmaps, in which case multiple greymaps
+will be written to the output. 
+.TP
+.B -b gimppath, --backend gimppath
+Experimental gimppath backend. This backend produces a path which can
+be imported by the GNU Image Manipulation Program (Gimp) (in the
+Layers, Channels & Paths dialog, select Paths, then right-click and
+select Import Path). Note that Gimp's paths have some peculiar
+features: they have no bounding box, they cannot be scaled, and all
+control points are forced to be integers. For these reasons, it is
+difficult to produce good Gimp paths at low resolutions. The gimppath
+backend ignores almost all scaling and placement options; instead, the
+\fB--unit\fP option must be used to set the desired magnification. The
+\fB--rotate\fP option is also recognized. Note that the imported path
+can lie outside the bounds of the current image in Gimp; in this case,
+one needs to move the path (alt-click) or work with a larger image.
+.TP
+.B -b xfig, --backend xfig
+XFig backend. Note that XFig uses X-splines instead of
+Bezier curves, thus it is not possible to translate the output of
+\fBpotrace\fP into the XFig format with absolute accuracy. This backend
+does a reasonable approximation using two control points for each Bezier
+curve segment. Note that the \fB-u\fP option has no effect for this
+backend, as control points are always rounded to the nearest 1/1200 of
+an inch in XFig. Rotation and color are implemented. Curve
+optimization is disabled.
+.PD
+.SS Algorithm options:
+For more detailed information on these options, see TECHNICAL
+DOCUMENTATION below.
+.TP 15
+.B -z \fIpolicy\fP, --turnpolicy \fIpolicy\fP
+specify how to resolve ambiguities in path decomposition. Must be one of
+black, white, right, left, minority, majority, or random. Default is
+minority. Turn policies can be abbreviated by an unambigous prefix,
+e.g., one can specify min instead of minority. 
+.TP
+.B -t \fIn\fP, --turdsize \fIn\fP
+suppress speckles of up to this many pixels.
+.TP
+.B -a \fIn\fP, --alphamax \fIn\fP
+set the corner threshold parameter. The default value is 1. The
+smaller this value, the more sharp corners will be produced. If this
+parameter is negative, then no smoothing will be performed and the
+output is a polygon. The largest useful value is 4/3 or 1.334, which
+suppresses all corners and leads to completely smooth output. 
+.TP
+.B -n, --longcurve
+turn off curve optimization. Normally \fBpotrace\fP tries to join
+adjacent Bezier curve segments when this is possible. This option
+disables this behavior, resulting in a larger file size.
+.TP
+.B -O \fIn\fP, --opttolerance \fIn\fP
+set the curve optimization tolerance. The default value is
+0.2. Larger values allow more consecutive Bezier curve segments to be
+joined together in a single segment, at the expense of accuracy. 
+.TP
+.B -u \fIn\fP, --unit \fIn\fP
+set output quantization. Coordinates in the output are rounded to
+1/unit pixels. The default of 10 usually gives good results. For some
+of the debug modes, a value of 100 gives more accurate output. In the
+case of the \fBgimppath\fP backend, the \fI-u\fP option is used to set
+the desired magnification. This option has no effect for the XFig
+backend, which always rasterizes to 1/1200 inch.
+.TP
+.B -d \fIn\fP, --debug \fIn\fP
+produce debugging output of type n. This has different effects for
+different backends. For the PostScript/EPS backends, the values
+n=1,2,3 illustrate the intermediate stages of the \fBpotrace\fP
+algorithm.
+.PD
+.SS Scaling and placement options:
+.TP 15
+.B -W \fIdim\fP, --width \fIdim\fP
+set the width of output image. If only one of width and height is specified,
+the other is adjusted accordingly so that the aspect ratio is
+preserved.
+.TP
+.B -H \fIdim\fP, --height \fIdim\fP
+set the height of output image. See \fB-W\fP for details.
+.TP
+.B -r \fIn\fP[x\fIn\fP], --resolution \fIn\fP[x\fIn\fP]
+set the resolution (in dpi). One inch in the output image corresponds
+to this many pixels in the input. Note that it follows that a larger
+value results in a smaller output image. It is possible to specify
+different resolutions in the x and y directions by giving an argument
+of the form \fIn\fPx\fIn\fP.  This option has no effect for the PGM
+backend.
+.TP
+.B -x \fIn\fP[x\fIn\fP], --scale \fIn\fP[x\fIn\fP]
+set the scaling factor (PGM backend only). A value greater than 1
+enlarges the output, a value between 0 and 1 makes the output
+smaller. It is possible to specify different scaling factors in the x
+and y directions by giving an argument of the form \fIn\fPx\fIn\fP.
+.TP
+.B -S \fIn\fP, --stretch \fIn\fP
+set the aspect ratio. A value greater than 1 means the image will be
+stretched in the y direction. A value between 0 and 1 means the image
+will be stretched in the x direction.
+.TP
+.B -A \fIangle\fP, --rotate \fIangle\fP
+set the rotation angle (in degrees). The output will be rotated
+counterclockwise by this angle. This is useful for compensating for
+images that were scanned not quite upright.
+.TP
+.B -M \fIdim\fP, --margin \fIdim\fP
+set all four margins. The effect of this depends on the backend. For
+variable-sized backends (EPS, PGM, SVG), the margins will simply
+be added around the output image (or subtracted, in case of negative
+margins). For fixed-size backends (PostScript, XFig), the margins
+settings can be used to control the placement of the image on the
+page. If only one of the left and right margin is given, the image
+will be placed this distance from the respective edge of the page, and
+similarly for top and bottom. If margins are given on opposite sides,
+the image is scaled to fit between these margins, but not if the
+scaling is already determined explicitly by one or more of the
+\fB-W\fP, \fB-H\fP, \fB-r\fP, or \fB-x\fP options.
+.TP
+.B -L \fIdim\fP, --leftmargin \fIdim\fP
+set the left margin. See \fB-M\fP for details.
+.TP
+.B -R \fIdim\fP, --rightmargin \fIdim\fP
+set the right margin. See \fB-M\fP for details.
+.TP
+.B -T \fIdim\fP, --topmargin \fIdim\fP
+set the top margin. See \fB-M\fP for details.
+.TP
+.B -B \fIdim\fP, --bottommargin \fIdim\fP
+set the bottom margin. See \fB-M\fP for details.
+.PD
+.SS Output options:
+These options are only supported by certain backends.
+.TP 15
+.B -C \fI#rrggbb\fP, --color \fI#rrggbb\fP
+set the foreground color of the output image. The default is
+black. This option works for the PS/EPS, SVG, and XFig backends.
+.TP
+.B --fillcolor \fI#rrggbb\fP
+set the fill color of the output image, i.e., the color of the "white"
+parts. The default is to leave these parts transparent. This option
+works for the PS/EPS, SVG, and XFig backends. Implies \fB--opaque\fP.
+.TP
+.B --opaque
+fill in the white parts of the image opaquely, instead of leaving
+them transparent. This only applies to interior white parts, i.e.,
+those which are enclosed inside a black outline. This option
+works for the PS/EPS and SVG backends. Opaqueness is always in effect
+for the XFig backend.
+.TP
+.B --group
+try to group related paths together in the SVG output. Each path is
+grouped together with all paths that are contained inside it, so that
+they can be moved around as a unit with an SVG editor. This makes
+coloring individual components slightly more cumbersome, and thus it
+is not the default.
+.PD
+.SS PostScript/EPS options:
+.TP 15
+.B -P \fIformat\fP, --pagesize \fIformat\fP
+set page size. This is primarily used for the PostScript backend. In
+case of the EPS backend, it may influence the default image size. The
+following formats can be specified: a4, a3, a5, b5, letter, legal,
+tabloid, statement, executive, folio, quarto, 10x14. Also, an argument
+of the form \fIdim\fPx\fIdim\fP is accepted to specify arbitrary
+dimensions. The default page size is letter (or a4, if this was
+configured at compile time, see COMPILE TIME CONFIGURATION below).
+Page format names can be abbreviated by an unambigous prefix.
+.TP
+.B -c, --cleartext
+do not compress the output. This option disables the use of
+compression filters in the PostScript output. If the \fB-q\fP option
+is also used, the resulting output can be easily read by other
+programs or even by humans.
+.TP
+.B -2, --level2
+use PostScript level 2 compression (default). The resulting file size
+is ca. 40% smaller than if the \fB-c\fP option is used.
+.TP
+.B -3, --level3
+use PostScript level 3 compression, if available. This gives slightly
+smaller files than using \fB-2\fP, but the resulting files may not
+print on older PostScript level 2 printers. If support for PostScript
+level 3 compression has been disabled at compile time, a warning
+message is printed and level 2 compression is used instead.
+.TP
+.B -q, --longcoding
+turn off optimized numerical coding. Normally, \fBpotrace\fP uses a
+very compact numerical format to represent Bezier curves in
+PostScript, taking advantage of some redundancy in the curve
+parameters. This option disables this behavior, resulting in longer,
+but more readable output (particularly if the \fB-c\fP option is also
+used).
+.PD
+.SS PGM options:
+.TP 15
+.B -G \fIn\fP, --gamma \fIn\fP
+set the gamma value for anti-aliasing (default is 2.2). Most computer
+displays do not render shades of grey linearly, i.e., a grey value of
+0.5 is not displayed as being exactly half-way between black and
+white. The gamma parameter corrects for this, and therefore leads to
+nicer looking output. The default value of 2.2 is appropriate for most
+normal CRT displays.
+.PD
+.SS Frontend options:
+.TP 15
+.B -k \fIn\fP, --blacklevel \fIn\fP
+set the threshold level for converting input images to bitmaps. The
+\fBpotrace\fP algorithm expects a bitmap, thus all pixels of the input
+images are converted to black or white before processing begins.
+Pixels whose brightness is less than \fIn\fP are converted to black,
+all other pixels to white. Here \fIn\fP is a number between 0 and
+1. One case is treated specially: if the input is in an indexed color
+format with exactly 2 colors, then the blacklevel is ignored and the
+darker of the two colors is mapped to black.
+
+Note: the method used by \fBpotrace\fP for converting greymaps to
+bitmaps is very crude; much better results can be obtained if a
+separate program, such as \fBmkbitmap\fP(1), is used for this
+purpose. In particular, \fBmkbitmap\fP(1), which is distributed with
+\fBpotrace\fP, has the ability to scale and interpolate the image
+before thresholding, which results in much better preservation of
+detail. 
+.TP
+.B -i, --invert
+invert the input bitmap before processing.
+.PD
+.SH "COMPILE TIME CONFIGURATION"
+
+Certain aspects of the behavior of \fBpotrace\fP can be configured at
+compile time by passing the following options to the ./configure
+script.
+.TP 15
+.B --disable-zlib
+compile \fBpotrace\fP without the zlib compression library. This means
+PostScript level 3 compression will not be available.
+.TP
+.B --enable-metric
+compile \fBpotrace\fP with centimeters as the default unit instead of
+inches. 
+.TP
+.B --enable-a4
+compile \fBpotrace\fP with A4 as the default page size.
+.PD
+.SH "EXIT STATUS"
+
+The exit status is 0 on successful completion, 1 if the command line
+was invalid, and 2 on any other error. 
+.SH VERSION
+
+@VERSION@
+.SH AUTHOR
+
+Peter Selinger <selinger at users.sourceforge.net>
+.SH "TECHNICAL DOCUMENTATION"
+
+For a detailed technical description of the \fBpotrace\fP algorithm,
+see the file potrace.pdf, which is available from the \fBpotrace\fP
+web site. For information on the Potrace library API, see potracelib.pdf. 
+.SH "WEB SITE AND SUPPORT"
+
+The latest version of \fBpotrace\fP is available from
+http://potrace.sourceforge.net/. This site also contains a list of
+frequently asked questions, as well as information on how to obtain
+support.
+.SH "SEE ALSO"
+
+\fBmkbitmap\fP(1)
+.SH COPYRIGHT
+
+Copyright (C) 2001-2007 Peter Selinger
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307,
+USA. See also http://www.gnu.org/.

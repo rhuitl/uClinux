@@ -1,0 +1,506 @@
+<!DOCTYPE HTML PUBLIC "-//W3C/DTD/ HTML 3.2//EN">
+
+<HTML>
+
+    <HEAD>
+        <TITLE>LIRC - Linux Infrared Remote Control</TITLE>
+        <META NAME="description" CONTENT="LIRC - linux infrared remote control">
+        <META NAME="keywords" CONTENT="linux, kernel module, remote control, animax, multimedia">
+    </HEAD>
+
+    <BODY BACKGROUND="../images/marb18.jpg"
+          BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#7070E0" 
+          VLINK="#808080" ALINK="#8080FF">
+        <TABLE WIDTH="100%" BORDER="0" CELLSPACING="0" CELLPADDING="0">
+            <TR>
+                <TD WIDTH="100%" HEIGHT="150" BGCOLOR="#000080" 
+                    ALIGN="RIGHT" VALIGN="TOP">
+                <IMG SRC="../images/diode.gif" ALT=""
+                     WIDTH="300" HEIGHT="150" BORDER="0" HSPACE="20"
+                     VSPACE="0" ALIGN="LEFT"> 
+                <IMG SRC="../images/lirc.gif" ALT=""
+                     WIDTH="300" HEIGHT="150" BORDER="0" HSPACE="20"
+                     VSPACE="0" ALIGN="RIGHT">
+                </TD>
+            </TR>
+            <TR>
+                <TD WIDTH="100%" ALIGN="LEFT" VALIGN="TOP">&#160;<BR>
+                    <TABLE WIDTH="100%" BORDER="0" CELLSPACING="0" CELLPADDING="0"
+                           HSPACE="0" VSPACE="0">
+                        <TR>
+                            <TD WIDTH="15%">&#160;<BR></TD>
+                            <TD WIDTH="70%" ALIGN="LEFT" VALIGN="TOP">&#160;<BR>
+
+<!-- Text ------------------------------------------------------------------->
+
+
+
+
+   <!-- Dependencies ------------------------------------------------------>
+
+<A NAME="dependencies"><HR></A>
+<H1 ALIGN="CENTER">Dependencies</H1>
+<HR WIDTH="70%">
+
+<P>To use LIRC's <em>setup.sh</em> script you need the dialog package. It
+already should be installed on most systems. The setup.sh script makes
+configuration of LIRC much easier but using it is not obligatory.</P>
+
+<P>If you want to compile and use all tools, you also need an
+installed <em>svgalib</em> (used by <em>smode2</em>) and the X Windows
+header files (needed by <em>irxevent</em> and <em>xmode2</em>). You
+can get svgalib from <A
+HREF="ftp://sunsite.unc.edu/pub/Linux/libs/graphics/">
+ftp://sunsite.unc.edu/pub/Linux/libs/graphics/</A>. The configure
+script will notify you if some necessary files are missing and the
+according tools won't be compiled.</P>
+
+<P><B>Irman (=UIR) :</B> To use your Irman with LIRC you need the
+latest <A
+HREF="http://www.lirc.org/software/snapshots/">
+<em>libirman</em></A> library. At the time this has been written the
+current libirman version was 0.4.2. Former versions won't work. Please
+also read <A HREF="#updating">Updating from lirc-0.5.4</A>.</P>
+
+<A NAME="kernel"></A>
+
+<P><B>Kernel modules:</B> All devices that require a kernel module
+will need the properly configured kernel sources being available
+somewhere in /usr/src/. During the build process of this package the
+kernel Makefile and the current kernel configuration will be used to
+work around some other problems that would arise if we used our own
+Makefile. That means that you will have to build your own kernel which
+is a good idea anyway. Make sure you use the standard kernel which you
+can download at <A HREF="http://www.kernel.org">www.kernel.org</A>.
+Don't use any kernel sources that have been modified for your
+distribution. For example you won't be able to compile some modules
+for kernels that come with S.u.S.E. 7.0. Please refer to the
+documentation of your distribution or read the <em>README</em> file in
+the kernel source directory to get more information on how to compile
+and set up an own kernel. More documentation is available at the <A
+HREF="http://sunsite.unc.edu/LDP/">Linux Documentation
+Project</A>.</P>
+
+<P>If you want to use a home-brew receiver, an Anir Multimedia Magic,
+a Packard Bell receiver or if you want to use the SIR IrDA driver you
+should compile the Linux kernel serial port driver as a module. The
+according kernel option that has to be set to <em>m</em> is
+<em>Standard/generic (dumb) serial support</em> in the <em>Character
+devices</em> section of the kernel configuration dialogue. Usually the
+serial port driver grabs all ports it auto-detects as soon as it is
+loaded and the LIRC modules won't be able to use any of them.</P>
+
+<P>
+There are two solutions for this problem. Either you load the LIRC
+module before the kernel serial port driver is loaded (that's why you
+have to compile it as a module) or you call <em>setserial /dev/ttySx
+uart none</em> to release the according port. setserial usually is
+already called during boot-up in some init script whose location
+depends on the distribution you use.</P>
+
+<P><B>TV cards:</B> To use any TV card remote controls you will need
+either at least kernel version 2.4.0 or you use Gerd Knorr's current
+<A HREF="http://www.strusel007.de/linux/bttv/index.html">bttv</A>
+package together with a kernel version of 2.2.4 or higher. In any case
+bttv version 0.7.45 or higher is required. As LIRC during compilation
+uses the bttv header files you will have to copy the current bttv
+files into your kernel sources. The I2C driver also requires the new
+I2C stack that was introduced in 2.3.x. <A
+HREF="http://www2.lm-sensors.nu/~lm78/">Patches</A> for 2.2.x kernels
+are also available.
+</P>
+<P>
+For most TV cards we rely on bttv autodetection. That way
+you don't have to give any parameters to the module as they are
+selected internally depending on the information the bttv module gives
+us. This means that you should pay attention that your TV card is
+detected correctly by bttv.
+</P>
+<P>
+<B>Technisat MediaFocus I:</B> You will have to install the <A
+HREF="http://www.uni-giessen.de/~gej2/">driver</A> for this card.
+</P>
+    <!-- Supported Hardware ------------------------------------------------>
+
+<A NAME="hardware"><HR></A>
+<H1 ALIGN="CENTER">Supported Hardware</H1>
+<HR WIDTH="70%">
+
+<P>Generally speaking everything that can receive or send infrared
+signals can be supported by LIRC. The project began with support for
+home-brew receivers and transmitters for the serial port and later
+support for analogous hardware for the parallel port was added. At
+that time the focus of the project was to provide an infrared solution
+that is both very cheap and easy to assemble. The following links
+point to instructions how to build your own receiver/transmitter.
+</P>
+
+<UL>
+<LI><A
+HREF="http://www.lirc.org/receivers.html">
+Building a serial port receiver</A></LI>
+
+<LI><A
+HREF="http://www.lirc.org/transmitters.html">
+Building a serial port transmitter</A></LI>
+
+<LI><A HREF="http://www.lirc.org/parallel.html">
+Building a parallel port transceiver</A></LI>
+</UL>
+
+
+<P>Current versions of LIRC now support many more commercially
+available solutions. Examples are the Irman, built-in IrDA ports or TV
+cards. Drivers for even more hardware are likely to appear in the
+future. If you are a programmer who wants to maintain such a driver
+you are welcome to join the project.
+</P>
+
+    <!-- Compiling --------------------------------------------------------->
+
+<A NAME="compiling"><HR></A>
+<H1 ALIGN="CENTER">Compiling</H1>
+<HR WIDTH="70%">
+
+<P>Before compiling the binaries you have to choose which driver to
+use. This can easily be done with the <em>setup.sh</em> script. Just
+type <em>./setup.sh</em> from the shell prompt. After selecting your
+driver you can exit the setup with &quot;Save configuration &amp;
+run configure&quot;.</P>
+
+<P>If you don't have <em>dialog</em> installed you will have to do it
+the hard way and give the correct parameters to the configure script
+manually. See <em>./configure --help</em> for a detailed description
+of the possible parameters. You will have to at least choose a driver
+with the <em>--with-driver=X</em> option.</P>
+
+
+<P>After having configured the package just type <em>make</em> and
+lean back.</P>
+
+
+<P><B>Note:</B> You won't find a configure script in the CVS version
+of LIRC. You will have to generate it first by executing
+<em>./autogen.sh</em>. You need at least libtool-1.3.3, automake-1.4
+and autoconf-2.13 to do this properly.</P>
+
+
+    <!-- Install LIRC ------------------------------------------------------->
+
+<A NAME="installing"><HR></A>
+<H1 ALIGN="CENTER">Installation</H1>
+<HR WIDTH="70%">
+
+<P>Installing the compiled programs is really easy, just type <em>make
+install</em>. All binaries and modules should be installed at the
+usual places. The necessary devices should be generated in the
+<em>/dev/</em> directory and all configuration files should be copied
+to its proper destination if you happen to use some hardware where
+configuration files are already available.</P>
+
+<P>The core program of LIRC is <em>lircd</em>, the LIRC system daemon
+that does all of the decoding of infrared signals. LIRC comes with a
+second daemon program: <em>lircmd</em>. lircmd depends on lircd and
+translates remote control activity to mouse movements. Just like all
+other daemons both lircd and lircmd should be started at system boot
+time and do their work in background. If you want to start them
+automatically at boot time you will have to add an init script for them
+to your system. Unfortunately the syntax and location of this init
+script is highly dependent on the distribution you use so you will
+have to figure it out yourself how this works on your system. Good
+news is that there already are some init scripts available in the
+<em>contrib/</em> directory of the LIRC package.</P>
+
+<P><B>Warning:</B> Never compile daemons with &quot;Disable
+daemonize&quot; turned on and place them in some init script unless
+you have a rescue disc nearby...</P>
+
+<P>Now you should adjust the file permissions of <em>/dev/lircd</em>
+(this is the Unix domain socket that clients use to connect to lircd)
+so others than <em>root</em> can connect to lircd. You can also create
+a special group for this purpose.</P>
+
+<P>If your hardware requires a kernel module you should make sure that
+the kernel will find the correct module if a program tries to access
+<em>/dev/lirc</em>. This can be done by inserting the following line
+to your <em>/etc/conf.modules</em> (<em>/etc/modules.conf</em> for
+current kernel versions):<BR>
+<PRE>
+	alias char-major-61  lirc_driver
+</PRE>
+Note that here <em>driver</em> is a placeholder for the actual driver
+you are using (serial, parallel, etc.).</P>
+
+<P>If your driver requires some special parameters to work you can
+specify them at the same place. For example you can set the IRQ and
+port the serial port drivers shall use by adding the following line to
+<em>/etc/conf.modules</em>:<BR>
+<PRE>
+	options lirc_serial irq=4 port=0x3e8
+</PRE>
+This will override the default values you have selected during setup.
+The configure script will tell you which kernel module you need.</P>
+
+<P>
+Finally you might want to add <em>/usr/local/lib</em> to
+<em>/etc/ld.so.conf</em> so the <em>lirc_client</em> library is found
+by the run-time linker. Don't forget to call <em>ldconfig</em>
+afterwards for the change take effect.
+</P>
+
+
+    <!-- Testing ------------------------------------------------------------>
+
+<A NAME="testing"><HR></A>
+<H1 ALIGN="CENTER">Testing your hardware &amp; configuration</H1>
+<HR WIDTH="70%">
+
+<P>If you have build the infrared hardware yourself you are probably
+eager to find out if it really works. If you have not build the
+hardware yourself you can skip the first test. For most receivers it
+even won't work because it makes no sense. </P>
+
+<P>Type <em>su</em> to get root privileges and start
+<em>mode2</em>. This should load the kernel module into the kernel and
+display the infrared signals. Hold your remote control to your
+infrared receiver and press some buttons. You should see an output
+like this (the values of your remote will probably be different) :</P>
+
+<PRE>
+	pulse 93
+	space 4965
+	pulse 108
+	space 4969
+	pulse 93
+	space 7496
+	pulse 93
+	space 7489
+	pulse 93
+	space 47915
+	pulse 138
+	space 7475
+	pulse 93
+	space 7494
+	pulse 93
+</PRE>
+
+<P>If you don't see anything, try to find out: (a) if you selected the
+correct driver with the correct settings (port, IRQ), (b) if you
+use a remote which works and (c) if your hardware works. The voltage
+input of the infrared receiver should be 5V +/- 0.5V, the output pin
+of the receiver should be about 0.5V less than the input voltage.</P>
+
+<P>From time to time there should be long spaces (>30000). If you can
+see very long pulses this usually means that sense auto detection of
+your serial port IR receiver circuit has failed. You can override
+sense auto detection by loading the device driver with the following
+option:<BR>
+
+<em>insmod lirc_serial sense=0</em> if your receiver circuit is active
+high or<BR>
+
+<em>insmod lirc_serial sense=1</em> if your receiver circuit is active
+low.</P>
+
+<P>Well, the driver seems to work, now let's test if lircd also does
+its job. This only works, if lircd uses a <A
+HREF="configure.html#lircd.conf">config file</A> which fits to your
+remote control. Use <A
+HREF="programs.html#irrecord"><em>irrecord</em></A> in the case the
+LIRC distribution doesn't provide a config file suitable for your
+remote and it still is not available at the LIRC homepage. A more
+detailed discussion of creating new config files is available in the
+section about, you guess it: <A HREF="help.html#new_remote">Adding new
+remote controls</A>.</P>
+
+<P>Then start the decoder daemon with (make sure it is in your path):
+<em>lircd</em> [config file]</P>
+
+<P>The following program dumps the decoded key codes from lircd to
+stdout: <em>irw</em></P>
+
+<P>This looks like this (depending on your remote):
+<PRE>
+	0000000000f40bf0 00 1_DOWN ANIMAX
+	0000000000f40bf0 01 1_DOWN ANIMAX
+	0000000000f40bf0 02 1_DOWN ANIMAX
+	0000000000f40bf0 03 1_DOWN ANIMAX
+	0000000000f40bf0 04 1_DOWN ANIMAX
+	0000000000f40bf0 05 1_DOWN ANIMAX
+	0000000000748bf0 00 1_UP ANIMAX
+	0000000000748bf0 01 1_UP ANIMAX
+	0000000000748bf0 02 1_UP ANIMAX
+	0000000000718ef0 00 RED_BUTTON_UP ANIMAX
+</PRE>
+</P>
+
+<P>If the driver test worked, but you now see nothing, then check
+<em>/var/log/lircd</em>. If you still see nothing suspicious compile
+lircd in DEBUG mode and look at the log file again. In debug mode
+lircd has an additional command line option that lets you choose the
+detail level of debug information.</P>
+
+
+
+    <!-- Uninstall LIRC ----------------------------------------------------->
+
+<A NAME="uninstall"><HR></A>
+<H1 ALIGN="CENTER">Uninstall</H1>
+<HR WIDTH="70%">
+
+<UL>
+<LI>Remove the installed binaries, and device nodes:<BR>
+<BR>
+    <em>make uninstall</em><BR>
+<BR>
+</LI>
+<LI>Remove the config files, if you don't need them anymore:<BR>
+<BR>
+    <em>rm /usr/local/etc/lircd.conf /usr/local/etc/lircmd.conf
+~/.lircrc</em><BR>
+<BR>
+</LI>
+</UL>
+
+    <!-- Module specific information ------------------------------------------->
+
+<A NAME="specific"><HR></A>
+<H1 ALIGN="CENTER">Module specific information</H1>
+<HR WIDTH="70%">
+
+<H3>lirc_gpio</H3>
+
+This module receives scan codes from the GPIO register of bt8[47]8
+chips using polling or interrupts if the card supports this. It is a
+"plugin" for the <em>lirc_dev</em> module. It loads <em>bttv</em> and
+<em>lirc_dev</em> modules if they are not loaded yet.<BR>
+
+<P>
+ Parameters are:
+<UL>
+<LI><B>debug</B> (0) - value other than 0 (zero) enables printing more log
+messages</LI>
+<LI><B>card</B> (0) - number of TV card from which receive scan codes</LI>
+<LI><B>minor</B> (-1) - minor device number for /dev/lirc device</LI>
+
+<LI><B>gpio_mask</B> (0) - bit mask used for extracting usable bits
+from GPIO value<BR> If this parameter is equal to 0 then the module
+tries to autodetect the TV card and the remaining parameters are
+ignored.</LI>
+
+<LI><B>gpio_lock_mask</B> (0) - if this value "anded" with GPIO
+value is non zero than it indicates that scan code is not ready (value
+of 0 of this parameter disables checking)</LI>
+<LI><B>gpio_xor_mask</B> (0) - bitmask applied (by xor operation) to 
+GPIO value before lock_mask is checked</LI>
+<LI><B>soft_gap</B> (0) - minimal gap (in milliseconds) between two
+scan codes (value of 0 disables checking)</LI>
+
+<LI><B>sample_rate</B> (10) - how often (times per second) GPIO will
+be polled, set to 0 for interrupt driven input</LI>
+</UL>
+</P>
+<P>
+ Supported hardware:
+<UL>
+<LI><B>Prolink - PixelView PlayTV pro</B> - parameters: gpio_mask=0x1f00, 
+gpio_lock_mask=0x8000, gpio_xor_mask=0, soft_gap=400, sample_rate=12</LI>
+<LI><B>AVerMedia - TVCapture98 and TVPhone98 (pre 98 also)</B> - parameters: 
+gpio_mask=0xf88000, gpio_lock_mask=0x10000, gpio_xor_mask=0x10000, 
+soft_gap=0, sample_rate=10</LI>
+<LI>many more...</LI>
+</UL>
+
+Autodetection is performed using the API from the <em>bttv</em> module
+- this means that if <em>bttv</em> doesn't properly recognize the card
+type the remote control won't work.
+</P>
+
+    <!-- Updating from lirc-0.5.4 --------------------------------------------->
+
+<A NAME="updating054"><HR></A>
+<H1 ALIGN="CENTER">Updating from lirc-0.5.4</H1>
+<HR WIDTH="70%">
+
+<P>
+This section only describes changes that break compatibility with older
+versions. Please read the <EM>NEWS</EM> file to learn about all new
+features of this release.
+</P>
+<P>
+The config files of <em>lircd</em> and <em>lircmd</em> are now located 
+in <em>/usr/local/etc/</em> instead of <em>/etc/</em> per default. Most 
+people prefer to make <em>/usr/local/etc/</em> a link to <em>/etc/</em>.
+</P>
+<P>
+The modules no longer are uniformly installed as <em>lirc.o</em> but
+are called <em>lirc_<em>driver</em>.o</em> depending on the driver you
+are using. Therefore you might have to edit your
+<em>/etc/conf.modules</em> and change the line
+<pre>
+alias char-major-61 lirc
+</pre>
+to whatever you need.
+</P>
+<P>
+LIRC now supports the Irman directly. <em>lirmand</em> is no longer
+necessary. Before installing this version you should call <NOBR><EM>rm
+/dev/lirc</EM></NOBR> to remove the FIFO that was used in
+lirc-0.5.4. <em>/dev/lirc</em> now should be a link to the device
+the Irman is connected to (e.g. <em>/dev/ttyS1</em>).
+</P>
+
+<A NAME="updating062"><HR></A>
+<H1 ALIGN="CENTER">Updating from lirc-0.6.2</H1>
+<HR WIDTH="70%">
+
+<P>
+The lirc_gpio_p has been renamed to lirc_gpio. I now also contains
+support for TV cards that are able to generate interrupts if infra-red
+commands are received. The lirc_gpio_i driver that implemented this
+has been removed. The lirc_fly98 also has been removed as it is now
+supported by the lirc_gpio driver.
+</P>
+
+<P>
+The <em>lirc_haup</em> module has been renamed to <em>lirc_i2c</em>.
+</P>
+
+<P>
+The transmit code in <em>lirc_serial</em> has been modified
+slightly. If you have problems transmitting decrease the frequency
+value in the lircd config file by approximately 2000.
+</P>
+
+<P>
+There have been major changes to the SIR driver. If you used this
+driver before you may have to generate new config files for your
+remotes. Transmitting is now more likely to work.
+</P>
+
+<P>
+The config file for the old AVerMedia TVCapture and TVPhone cards (pre
+98) has changed. Please use the new config file that you can find in
+<em>remotes/avermedia/lircd.conf.avermedia</em>.
+</P>
+
+<!--------------------------------------------------------------------------->
+
+                        <BR> <BR>
+                        <CENTER>[<A HREF="http://www.lirc.org/">LIRC homepage</A>]<BR>
+                                <I>The LIRC Manual, last update: 10-Sep-2000</I></CENTER>
+                        <BR> <BR>
+                        </TD>
+                        <TD WIDTH="15%">&#160;<BR></TD>
+                    </TR></TABLE>
+                </TD>
+            </TR>
+            <TR>
+                <TD WIDTH="100%" BGCOLOR="#000080" ALIGN="LEFT" 
+                    VALIGN="TOP">&#160;<BR>
+                </TD>
+            </TR>
+        </TABLE>
+    </BODY>
+
+</HTML>

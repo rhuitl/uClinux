@@ -1,0 +1,173 @@
+Path: alphanet.ch!not-for-mail
+From: "Mark A. Haun" <haunma@angwin.ece.uiuc.edu>
+Newsgroups: alphanet.ml.mgetty
+Subject: Kluging a MultiTech 2834ZDXv for voice dial-out
+Date: 20 Feb 1999 00:13:41 +0100
+Organization: ALPHANET NF - Research and information - Not for profit
+Lines: 159
+Distribution: alphanet
+Message-ID: <199902192312.RAA03853@angwin.ece.uiuc.edu>
+NNTP-Posting-Host: vulcan.alphanet.ch
+Content-Type: text
+X-Comment: Mail-to-News 1.0 MSC94
+Xref: alphanet.ch alphanet.ml.mgetty:7458
+
+Hi,
+
+About a month ago I posted to the list looking for help in trying to make my
+new MultiTech 2834ZDXv dial a number and play a voice message.  After some
+difficulties finding a support person at MultiTech who actually understands
+the AT+V voice command set, some issues were cleared up and I now have a
+[messy] solution to the problem.
+
+Apparently the modem understands only a very limited subset of the
+IS-101-defined events.  In particular, it does not know about ringback
+(remote ring), making it difficult to know when someone has answered the
+phone.  It also does not report "silence timeout" unless a record is in
+progress.  So, my current solution is to give it what it wants.  Here's my
+current call-out script (a modified version of the "notify.sh" distributed
+with vgetty), in the hope that it will prove useful to someone: 
+
+#! /usr/local/bin/vm shell
+
+function receive
+     {
+     read -r INPUT <&$VOICE_INPUT;
+     echo "$INPUT";
+     }
+
+#
+# Define the function to send a command to the voice library
+#
+
+function send
+     {
+     echo $1 >&$VOICE_OUTPUT;
+     kill -PIPE $VOICE_PID
+     }
+
+#
+# Check command line options
+#
+
+if [ $# -ne 2 ]; then
+     echo "usage: $0 <phone_number> <filename1> <filename2>" >&2
+     exit 1
+fi
+
+#
+# Let's see if the voice library is talking to us
+#
+ANSWER=`receive`
+if [ "$ANSWER" != "HELLO SHELL" ]; then
+    echo "$0: voice library not answering" >&2
+    exit 1
+fi
+
+send "HELLO VOICE PROGRAM"
+ANSWER=`receive`
+if [ "$ANSWER" != "READY" ]; then
+     echo "$0: initialization failed" >&2
+     exit 1
+fi
+
+#
+# Enable events
+#
+send "ENABLE EVENTS"
+ANSWER=`receive`
+if [ "$ANSWER" != "READY" ]; then
+     echo "$0: could not enable events" >&2
+     exit 1
+fi
+
+#
+# Start dialout
+#
+send "DIAL T$1;"
+ANSWER=`receive`
+if [ "$ANSWER" != "DIALING" ]; then
+     echo "$0: DIAL command failed" >&2
+     exit 1
+fi
+
+ANSWER=`receive`
+if [ "$ANSWER" != "READY" ]; then
+     echo "$0: DIAL command did not return properly" >&2
+     exit 1 
+fi
+
+#
+# Wait for a voice to answer
+#
+send "RECORD /dev/null"
+ANSWER=`receive`
+if [ "$ANSWER" != "RECORDING" ]; then
+     echo "$0: RECORD command failed" >&2
+     exit 1
+fi
+
+ANSWER=`receive`
+if [ "$ANSWER" != "SILENCE_DETECTED" ]; then
+     echo "$0: Never got SILENCE_DETECTED during RECORD command" >&2
+     exit 1
+fi
+
+send "STOP"
+ANSWER=`receive`
+if [ "$ANSWER" != "READY" ]; then
+     echo "$0: STOP command failed" >&2
+     exit 1
+fi
+
+#
+# Play voice message after the fixed delay
+#
+send "PLAY $2"
+ANSWER=`receive`
+if [ "$ANSWER" != "PLAYING" ]; then
+     echo "$0: could not start playing" >&2
+     exit 1
+fi
+
+ANSWER=`receive`
+if [ "$ANSWER" != "READY" ]; then
+     echo "$0: PLAY command did not return properly" >&2
+     exit 1
+fi
+
+send "GOODBYE"
+ANSWER=`receive`
+if [ "$ANSWER" != "GOODBYE SHELL" ]; then
+     echo "$0: could not say goodbye to voice library" >&2
+     exit 1 
+fi
+
+echo "OK: message sent"
+exit 0
+
+
+---
+
+We first record to /dev/null, then stop recording when silence is detected
+and play the desired message.  One drawback to this approach is that the
+silence timeout has to be set large enough not to time out between rings,
+which is about 4.5 seconds for the telephone system here.  That's so long
+that most people answering the phone will keep resetting the timer with
+"Hello?" until they get tired and hang up.  For my purposes, though, the
+callees will be expecting calls in advance, so it isn't such a problem. 
+Still, it would be nice if there were a cleaner solution.
+
+BTW, I have been experiencing problems calling into my MultiTech in data
+mode (the other modem is a Newcom 33.6 faxmodem using the Cirrus Logic
+"fastpath" chipset).  The link is always established just fine, but
+spontaneous retries and finally hangups are common within the first hour of
+the connection.  I know similar problems with other MultiTech modems have
+already been reported here.  Has the FAQ maintainer considered removing
+MultiTech from the list of recommended modems for Data/Fax/Voice?  The voice
+implementation is pretty minimal and the data problems seem to be quite
+common.  I paid good money for mine so I'm not ready to give up, but I did
+expect more from it.
+
+Mark Haun
+markhaun@uiuc.edu

@@ -1,0 +1,205 @@
+-------------------------------------
+This patch is for dip 3.3.7, but *not* for dip 3.3.7-URI!
+-------------------------------------
+From colin!dagoba.priconet.de!strauss Tue Feb  8 07:33:47 1994
+Return-Path: <colin!dagoba.priconet.de!strauss>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0pTm15-0000lwC@greenie.muc.de>; Tue, 8 Feb 94 07:33 MET
+Received: from mail.Germany.EU.net ([192.76.144.65]) by colin.muc.de with SMTP id <135941>; Tue, 8 Feb 1994 00:16:37 +0100
+Received: by mail.Germany.EU.net with UUCP (8.6.5:15/EUnetD-2.4.1.e) via EUnet
+	id AAA29322; Tue, 8 Feb 1994 00:14:56 +0100
+Received: by dagoba.priconet.de (Smail3.1.28.1 #6)
+	id m0pTBos-000EZUC; Sun, 6 Feb 94 16:54 MET
+Date:	Sun, 6 Feb 1994 17:44:32 +0100
+From:	Frank Strauss <strauss@dagoba.priconet.de>
+Subject: mgetty contib (was: Re: Devices fuer mgetty und dip)
+To:	Gert Doering <gert@greenie.muc.de>
+In-Reply-To: <m0pRmuj-00015MC@greenie.muc.de>
+Message-ID: <Pine.3.87.9402061632.A2573-0100000@dagoba.priconet.de>
+MIME-Version: 1.0
+Content-Type: TEXT/PLAIN; charset=US-ASCII
+Status: RO
+
+On Wed, 2 Feb 1994, Gert Doering wrote:
+
+> Hast Du das mit der PID in *allen* Lock-Files schon eingebaut? Wenn ja,
+> koenntest Du mir einen neuen Satz diffs schicken?
+
+Jupp. Da waren ja nur zwei oder drei Zeilen zu loeschen. :-)
+Ich habe nun ein neues context diff erzeugt und eine kurze Beschreibung
+vorne herangehaengt. Dieses File kannst Du so in Dein contrib Verzeichnis
+aufnehmen, wenn Du willst. (Die #-Zeilen am Anfang stoeren "patch" nicht.)
+
+Gruesse...
+		Frank.
+
+###########################################################################
+#
+# dip-locking.patch
+#
+# The following context diffs to the sources of dip-3.3.7 give you the
+# possibility to use ttyS* devices with dip. This makes the concurrent
+# usage of dip and mgetty more clean by no longer using cua* devices for
+# dip. Another useful improvement is the fact that now PIDs are written
+# into the lock files, which is read by some other programs like
+# "uustat -p".
+#
+# Simply go to your dip source directory and appand this patch file by
+#
+#	patch <dip-locking.patch
+#
+# and make and install the new dip binary. Remember to replace the
+# "port cua*" lines by "port ttyS*" in your dip scripts.
+#
+# Thanks to Gert Doering for his very useful hints to make this real.
+#
+# Regards,
+# 
+#	Frank Strauss
+#	(strauss@dagoba.escape.de or strauss@ibr.cs.tu-bs.de)
+#
+###########################################################################
+
+diff -c dip-3.3.7/daemon.c dip-3.3.7.strauss/daemon.c
+*** dip-3.3.7/daemon.c	Mon Aug 16 18:51:43 1993
+--- dip-3.3.7.strauss/daemon.c	Mon Jan 24 00:52:13 1994
+***************
+*** 71,79 ****
+--- 71,83 ----
+  {
+    int i;
+  
++   tty_lock (NULL, 0);
++ 
+    /* First of all, fork off a sub-process. */
+    if ((i = fork()) == -1) return(-1);
+    if (i != 0) exit(0);
++ 
++   tty_lock ("", 1); /* lock the same port again */
+  
+    /* Release any control terminal we might have. */
+    (void) setsid();
+diff -c dip-3.3.7/dip.h dip-3.3.7.strauss/dip.h
+*** dip-3.3.7/dip.h	Mon Dec 13 20:35:29 1993
+--- dip-3.3.7.strauss/dip.h	Mon Jan 24 00:45:27 1994
+***************
+*** 123,127 ****
+--- 123,128 ----
+  extern int	tty_close(void);
+  extern int	tty_open(char *name);
+  extern int	tty_nomesg(void);
++ extern int	tty_lock(char *path, int mode);
+  
+  /* End of DIP.H */
+diff -c dip-3.3.7/tty.c dip-3.3.7.strauss/tty.c
+*** dip-3.3.7/tty.c	Mon Dec 13 20:38:56 1993
+--- dip-3.3.7.strauss/tty.c	Sun Jan 30 22:53:32 1994
+***************
+*** 78,84 ****
+  
+  
+  /* Lock or unlock a terminal line. */
+! static int
+  tty_lock(char *path, int mode)
+  {
+    static char saved_path[PATH_MAX];
+--- 78,84 ----
+  
+  
+  /* Lock or unlock a terminal line. */
+! int
+  tty_lock(char *path, int mode)
+  {
+    static char saved_path[PATH_MAX];
+***************
+*** 85,94 ****
+    static int saved_lock = 0;
+    struct passwd *pw;
+    int fd;
+  
+    if (mode == 1) {	/* lock */
+  	if (path == NULL) return(0);	/* standard input */
+! 	sprintf(saved_path, "%s/LCK..%s", _PATH_LOCKD, path);
+  	if ((fd = creat(saved_path, 0644)) < 0) {
+  		if (errno != EEXIST)
+  			fprintf(stderr, "DIP: tty: lock: (%s): %s\n",
+--- 85,96 ----
+    static int saved_lock = 0;
+    struct passwd *pw;
+    int fd;
++   char apid[16];
+  
+    if (mode == 1) {	/* lock */
+  	if (path == NULL) return(0);	/* standard input */
+! 	if (strlen(path) != 0)
+! 		sprintf(saved_path, "%s/LCK..%s", _PATH_LOCKD, path);
+  	if ((fd = creat(saved_path, 0644)) < 0) {
+  		if (errno != EEXIST)
+  			fprintf(stderr, "DIP: tty: lock: (%s): %s\n",
+***************
+*** 95,100 ****
+--- 97,104 ----
+  						saved_path, strerror(errno));
+  		return(-1);
+  	}
++ 	(void) sprintf(apid, "%10d\n", getpid());
++ 	(void) write(fd, apid, strlen(apid));
+  	(void) close(fd);
+  
+  	/* Make sure UUCP owns the lockfile.  Required by some packages. */
+***************
+*** 521,530 ****
+  	if ((sp = strrchr(name, '/')) != (char *)NULL) *sp++ = '\0';
+  	  else sp = name;
+  	sprintf(path, "/dev/%s", sp);
+! 	if ((fd = open(path, O_RDWR)) < 0) {
+! 		fprintf(stderr, "DIP: tty: open(%s, RW): %s\n",
+  						path, strerror(errno));
+! 		return(-errno);
+  	}
+  	tty_fd = fd;
+  	if (opt_v) printf("DIP: tty: open: %s (%d) ", path, fd);
+--- 525,556 ----
+  	if ((sp = strrchr(name, '/')) != (char *)NULL) *sp++ = '\0';
+  	  else sp = name;
+  	sprintf(path, "/dev/%s", sp);
+! 	if (!strncmp(path, "/dev/ttyS", 9))
+! 	{
+! 		if ((fd = open(path, O_RDWR|O_NDELAY)) < 0) {
+! 			fprintf(stderr, "DIP: tty: open(%s, RW, NDELAY): %s\n",
+! 						path, strerror(errno));
+! 			return(-errno);
+! 		}
+! 
+! 		/* unset O_NDELAY (otherwise waiting for characters */
+! 		/* would be "busy waiting", eating up all cpu) */
+! 
+! 		if (fcntl(fd, F_SETFL, O_RDWR) == -1)
+! 		{
+! 			fprintf(stderr, "DIP: tty: fcntl(%s, F_SETFL, O_RDWR): %s\n",
+! 						path, strerror(errno));
+! 			close(fd);
+! 			return(-errno);
+! 		}
+! 	}
+! 	else
+! 	{
+! 		if ((fd = open(path, O_RDWR)) < 0) {
+! 			fprintf(stderr, "DIP: tty: open(%s, RW): %s\n",
+  						path, strerror(errno));
+! 			return(-errno);
+! 		}
+  	}
+  	tty_fd = fd;
+  	if (opt_v) printf("DIP: tty: open: %s (%d) ", path, fd);
+#####################
+# Hier abschneiden. #
+#####################
+--
+"I made this letter longer than usual because I lack of time to make it shorter."
+Frank Strauss        Email   (home) : strauss@dagoba.{escape|priconet}.de
+Buergerstrasse 13             (uni) : strauss@{ips|ibr}.cs.tu-bs.de
+38118 Braunschweig   /dev/audio     : (0531)-503873
+
+
+

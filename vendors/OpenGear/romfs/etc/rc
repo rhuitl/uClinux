@@ -1,0 +1,150 @@
+#!/bin/sh
+hostname OpenGear
+mount -t proc proc /proc
+
+echo "Mounting /dev/flash/configblock on /etc/config"
+if grep jffs2 /proc/filesystems >&/dev/null; then
+
+    if ! mount -t jffs2 /dev/flash/configblock /etc/config
+    then
+	echo "Bad or corrupted configuration filesystem, recreating..."
+	eraseall /dev/flash/config
+	echo "Mounting /dev/flash/configblock on /etc/config"
+	if ! mount -t jffs2 /dev/flash/configblock /etc/config
+	then
+	    echo "Failed to create new configuration filesystem"
+	    echo "Falling back to temporary config filesystem"
+	    mount -t tmpfs -o size=256k tmpfs /etc/config
+	fi
+    fi # jffs2 mount failed
+
+else
+    echo "No JFFS2 support - mounting tmpfs as /etc/config"
+    mount -t tmpfs -o size=256k tmpfs /etc/config
+fi # jffs2 is present in the kernel
+
+#
+# Remove config if erase has been pressed
+#
+if [ -f /etc/config/.init ]; then
+    (
+	cd /etc/config
+	echo "Cleaning /etc/config filesystem"
+	rm .init
+	find ./ -type f | while read f; do rm -f "$f" >& /dev/null; done
+	find ./ -type d | while read d; do rm -rf "$d" >& /dev/null; done
+    )
+fi
+
+#
+# Copy over missing files
+#
+(
+    cd /etc/default
+    echo "Restoring files from /etc/default to /etc/config"
+    find ./ -type d | while read d;do
+	if [ ! -d /etc/config/"$d" ]; then
+ 	    mkdir -p -m 0755 /etc/config/"$d"
+ 	fi
+    done
+    find ./ -type f | while read f; do
+ 	if [ -f "$f" -a ! -f /etc/config/"$f" ]; then 
+ 	    cp -a "$f" /etc/config/"$f"
+ 	fi
+    done
+#     if [ `find /etc/config/ -type f | wc -l` = 0 ]; then
+#  	echo "Restoring files from /etc/default to /etc/config"
+#  	cp -a . /etc/config
+#     fi
+)
+
+NPORTS=`tail +2 /proc/tty/driver/serial | grep -cv uart:unknown`
+
+# Create the /etc/config filesystem if it isn't present
+# flatfsd -r
+
+# Set the host name to the proper thing
+if [ -f /etc/config/hostname ]; then
+    hostname `cat /etc/config/hostname`
+else
+    # Pull the model name from the version string
+    BUILD=`cut -f1 -d' ' /etc/version  | cut -f2 -d'/' | tr '[A-Z]' '[a-z]'`
+    if echo $BUILD | grep 41xx >& /dev/null; then
+	hostname `echo $BUILD | sed s/41xx/41$NPORTS/`
+    else
+	hostname $BUILD
+    fi
+fi
+
+mount -t tmpfs -o size=256k tmpfs /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+mkdir /var/dev
+
+#
+# if /dev/port01 is a symlink,  then we are on a system that needs to
+# autogen it's port device nodes.
+#
+# skip over the serial console if it has been selected
+#
+
+if [ -L /dev/port01 ]
+then
+	rm -f /var/run/serial-ports
+	CONS=`dmesg | grep console= | sed 's/.*console=\([^ ,][^ ,]*\).*/\1/'`
+	SKIP="$CONS"
+	PORT=1
+	tail +2 /proc/tty/driver/serial | grep -v "uart:unknown" |
+			sed 's/^\([0-9]*\):.*$/\1/' | while read m
+	do
+		if [ "ttyS$m" = "$SKIP" ]
+		then
+			SKIP=""
+			continue
+		fi
+		PNAME=`printf "port%02d" $PORT`
+		mknod /var/dev/$PNAME c 4 `expr $m + 64`
+		echo "$PNAME --> ttyS$m" >> /var/run/serial-ports
+		PORT=`expr $PORT + 1`
+	done
+	#
+	# remove old auto added console entries
+	# add in the current one
+	#
+	if [ "$CONS" ]
+	then
+		touch /etc/config/inittab 
+		cp /etc/config/inittab /tmp/.inittab
+		grep -v "# auto console" < /tmp/.inittab | (
+			cat; echo "$CONS:vt100:/bin/agetty /dev/$CONS 115200 # auto console"
+			) > /etc/config/inittab
+		rm -f /tmp/.inittab
+	fi
+fi
+
+if [ -x /bin/hwclock ]; then
+	hwclock --hctosys
+fi
+
+sh /etc/netstart
+
+if [ -x /sbin/syslogd ]; then
+	echo "Starting syslogd"
+	/sbin/syslogd
+	/sbin/klogd
+fi
+if [ -x /bin/portmap ]; then
+	echo "Starting RPC portmapper"
+	/bin/portmap &
+fi
+if [ -x /bin/ntpd -a -f /etc/ntpd.conf ]; then
+	echo "Starting NTP Daemon"
+	/bin/ntpd -s &
+fi
+if [ -x /bin/portmanager ]; then
+	echo "Starting serial port manager"
+	/bin/portmanager
+fi

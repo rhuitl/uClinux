@@ -1,0 +1,552 @@
+<html> <head>
+<title>3. Routines</title>
+<!-- $Id: cgihtml_3.html,v 1.7 1997/01/21 07:18:26 eekim Exp $ -->
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<h1>3. Routines</h1>
+
+[
+<a href="cgihtml_4.html">Next</a> |
+<a href="cgihtml.html">Up to Table of Contents</a> |
+<a href="cgihtml_2.html">Previous</a>
+]
+
+<hr>
+<a name="1">
+
+<h2>3.1. cgi-lib.h</h2>
+
+<h3>Library Variables</h3>
+
+<p>cgi-lib.h defines constants for the standard CGI environment
+variables.  For instance, the value of the environment variable
+QUERY_STRING is stored in the constant <tt>QUERY_STRING</tt> in
+cgi-lib.h.  Here is a list of the constants:</p>
+
+<ul>
+  <li>SERVER_SOFTWARE
+  <li>SERVER_NAME
+  <li>GATEWAY_INTERFACE
+  <li>SERVER_PROTOCOL
+  <li>SERVER_PORT
+  <li>REQUEST_METHOD
+  <li>PATH_INFO
+  <li>PATH_TRANSLATED
+  <li>SCRIPT_NAME
+  <li>QUERY_STRING
+  <li>REMOTE_HOST
+  <li>REMOTE_ADDR
+  <li>AUTH_TYPE
+  <li>REMOTE_USER
+  <li>REMOTE_IDENT
+  <li>CONTENT_TYPE
+  <li>CONTENT_LENGTH
+  <li>HTTP_USER_AGENT
+</ul>
+
+<h3>Library functions</h3>
+
+<ul>
+  <li><a href="#accept">short accept_image()</a>
+  <li><a href="#unesc">void unescape_url()</a>
+  <li><a href="#parse">int read_cgi_input(llist *entries);</a>
+  <li><a href="#val">char* cgi_val(llist l, char *name);</a>
+  <li><a href="#mval">char **cgi_val_multi(llist l, char *name);</a>
+  <li><a href="#nam">char* cgi_name(llist l, char *value);</a>
+  <li><a href="#mnam">char **cgi_name_multi(llist l, char *value);</a>
+  <li><a href="#pcookies">int parse_cookies(llist *entries);</a>
+  <li><a href="#printenv">void print_cgi_env();</a>
+  <li><a href="#print">void print_entries(llist l);</a>
+  <li><a href="#escape">char* escape_input(char *str);</a>
+  <li><a href="#empty">short is_form_empty(llist l);</a>
+  <li><a href="#fldexists">short is_field_exists(llist l,char *str);</a>
+  <li><a href="#fldempty">short is_field_empty(llist l,char *str);</a>
+</ul>
+
+<hr>
+<a name="accept">
+<tt>short <b>accept_image()</b>;</tt><p>
+
+<p><tt>accept_image()</tt> determines whether the browser will accept
+pictures.  It does so by checking the HTTP_ACCEPT environment variable
+for an image MIME type.  It returns a 1 if the browser will accept
+graphics, a 0 otherwise.</p>
+
+<hr>
+<a name="unesc">
+<tt>void <b>unescape_url()</b>;</tt><p>
+
+<p><tt>unescape_url()</tt> converts escaped URI values into their
+character form.  <tt>read_cgi_input()</tt> calls this function.  You
+will rarely if ever need to access this function directly but it is
+made available in case you do.</p>
+
+<hr>
+<a name="parse">
+<tt>int <b>read_cgi_input(</b>llist <b>*entries)</b>;</tt><p>
+
+<p>This routine parses the raw CGI data passed from the browser to the
+server and adds each associated name and value to the linked list
+<b>entries</b>.  It will parse information transmitted using both the
+GET and POST method.  If it receives no information, it will return a
+0, otherwise it returns the number of entries returned.  If it
+receives a badly encoded string, it will return -1.</p>
+
+<p>If you run your CGI program that calls <tt>read_cgi_input()</tt>
+from the command line, this function will start an interactive mode
+so you can directly input the CGI input string.  Note that this string
+must be properly encoded.</p>
+
+<p><tt>read_cgi_input()</tt> also handles HTTP file upload correctly.
+The file will be uploaded to the directory defined by UPLOADDIR in
+cgi-lib.h (/tmp by default).</p>
+
+<p>
+
+<hr>
+<a name="val">
+<tt>char* <b>cgi_val(</b>llist <b>l</b>, char <b>*name)</b>;</tt><p>
+
+<p><tt>cgi_val()</tt> searches the linked list for the value of the
+entry named <b>name</b> and returns the value if it finds it.
+If it cannot find an entry with name <b>name</b>, it returns NULL.</p>
+
+<hr>
+<a name="mval">
+<tt>char** <b>cgi_val_multi(</b>llist <b>l</b>, char <b>*name)</b>;</tt>
+
+<p>Same as <tt>cgi_val()</tt> except will return multiple values with
+the same name to an array of strings.  Will return NULL if it
+cannot find an entry with name <b>name</b></p>
+
+<hr>
+<a name="nam">
+<tt>char* <b>cgi_name(</b>llist <b>l</b>, char <b>*value)</b>;</tt><p>
+
+<p>Same as <tt>cgi_val()</tt> except searches for value with specified
+name.</p>
+
+<hr>
+<a name="mnam">
+<tt>char** <b>cgi_name_multi(</b>llist <b>l</b>, char <b>*value)</b>;</tt>
+
+<p>Analogous to <tt>cgi_multi_val()</tt>.</p>
+
+<hr>
+<a name="pcookies">
+<tt>int <b>parse_cookies(</b>llist <b>*entries)</b>;</tt>
+
+<p>Parses the environment variable <tt>HTTP_COOKIE</tt> for cookies.
+Returns the number of cookies parsed, zero if there are none.</p>
+
+<hr>
+<a name="printenv">
+<tt>void <b>print_cgi_env()</b>;</tt><p>
+
+<p>Pretty prints the environment variables defined in cgi-lib.h.
+Prints "(null)" if the variables are empty.</p>
+
+<hr>
+<a name="print">
+<tt>void <b>print_entries(</b>llist <b>l)</b>;</tt><p>
+
+<p>This is a generic routine which will iterate through the linked
+list and print each name and associated value in HTML form.  It
+uses the &lt;dl&gt; list format to display the list.</p>
+
+<hr>
+<a name="#escape">
+<tt>char* <b>escape_input(</b>char <b>*str)</b>;</tt><p>
+
+<p><tt>escape_input()</tt> "escapes" shell metacharacters in the
+string.  It precedes all non-alphanumeric characters with a backslash.
+C routines including <tt>system()</tt> and <tt>popen()</tt> open up a
+Bourne shell process before running.  If you do not escape shell
+metacharacters in the input (prefix metacharacters with a backslash),
+then malicious users may be able to take advantage of your system.</p>
+
+<hr>
+<a name="#empty">
+<tt>short <b>is_form_empty(</b>llist <b>l)</b>;</tt><p>
+
+<p><tt>is_form_empty()</tt> checks to see whether no names or values
+were submitted.  Note that this is different from submitting a blank
+form.</p>
+
+<hr>
+<a name="fldexists">
+
+<tt>short <b>is_field_exists(</b>llist <b>l</b>,char <b>*str)</b>;</tt>
+
+<p>Checks to see whether a field actually exists.  Equivalent to
+checking whether cgi_val() returns "" or NULL.  If it returns "", the
+field exists but is empty; if it returns NULL, the field does not
+exist.</p>
+
+<hr>
+<a name="fldempty">
+
+<tt>short <b>is_field_empty(</b>llist <b>l</b>,char <b>*str)</b>;</tt>
+
+<p>Returns 1 (true) if either the field does not exist or the field
+does exist but is empty.</p>
+
+<hr>
+<a name="2">
+
+<h2>3.2. html-lib.h</h2>
+
+<h3>Library functions</h3>
+
+<ul>
+  <li><a href="#header">void html_header();</a>
+  <li><a href="#mime">void mime_header(char *mime);</a>
+  <li><a href="#nph">void nph_header(char *status);</a>
+  <li><a href="#loc">void show_html_page(char *loc)</a>
+  <li><a href="#status">void status(char *status);</a>
+  <li><a href="#pragma">void pragma(char *msg);</a>
+  <li><a href="#scook">void set_cookie(char *name, char *value, char
+      *expires, char *path,char *domain, short secure);</a>
+  <li><a href="#begin">void html_begin(char *title);</a>
+  <li><a href="#end">void html_end();</a>
+  <li><a href="#headline">void h1(char *header); ... void h6(char *header);</a>
+  <li><a href="#hid">void hidden(char *name, char *value);</a>
+</ul>
+
+<hr>
+<a name="header">
+<tt>void <b>html_header()</b>;</tt><p>
+
+<p><tt>html_header()</tt> prints a MIME compliant header which should
+precede the output of any HTML document from a CGI script.  It
+simply prints to STDOUT:</p>
+
+<pre>
+   Content-Type: text/html
+</pre>
+
+<p>and a blank line.</p>
+
+<hr>
+<a name="mime">
+<tt>void <b>mime_header(</b>char <b>*mime)</b>;</tt><p>
+
+<p>Allows you to print any MIME header.  For example, if you are about to
+send a GIF image to the standard output from your C CGI program, precede
+your program with:</p>
+
+<pre>
+   mime_header("image/gif");
+   /* now you can send your GIF file to stdout */
+</pre>
+
+<p><tt>mime_header()</tt> simply prints <tt>Content-Type:</tt> followed by
+your specified MIME header and a blank line.</p>
+
+<hr>
+<a name="nph">
+<tt>void <b>nph_header(</b>char <b>*status)</b>;</tt><p>
+
+<p>Sends a standard HTTP header for direct communication with the
+client using no parse header.  <b>status</b> is the status code
+followed by the status message.  For instance, to send a "No Content"
+header, you could use:
+
+<pre>
+   nph_header("204 No Content");
+   html_header();
+</pre>
+
+<p>which would send:</p>
+
+<pre>
+   HTTP/1.0 204 No Content
+   Server: CGI using cgihtml
+   Content-Type: text/html
+
+</pre>
+
+<p><tt>nph_header()</tt> does not send a blank line after printing the
+headers, so you must follow it with either another header or a blank
+line.  Also, scripts using this function must have "nph-" preceding
+their filenames.</p>
+
+<hr>
+<a name="loc">
+<tt>void <b>show_html_page(</b>char <b>*loc)</b>;</tt><p>
+
+<p>Sends a "Location: " header.  <b>loc</b> is the location of the HTML
+file you wish sent to the browser.  For example, if you want to send the
+root index file from the CGI program:</p>
+
+<pre>
+     show_html_page("/index.html");
+</pre>
+
+<hr>
+<a name="status">
+<tt>void <b>status(</b>char <b>*status)</b>;</tt><p>
+
+<p>Sends an HTTP Status header.  <b>status</b> is a status code
+followed by a status message.  For instance, to send a status code of
+302 (temporary redirection) followed by a location header:</p>
+
+<pre>
+   status("302 Temporarily Moved");
+   show_html_page("http://hcs.harvard.edu/");
+</pre>
+
+<p><tt>status()</tt> does not print a blank line following the header,
+so you must follow it with either another function which does output a
+blank line or an explicit <tt>printf("\r\n");</tt>.</p>
+
+<hr>
+<a name="pragma">
+<tt>void <b>pragma(</b>char <b>*msg)</b>;</tt><p>
+
+<p>Sends an HTTP Pragma header.  Most commonly used to tell the
+browser not to cache the document, ie.:</p>
+
+<pre>
+   pragma("No-cache");
+   html_header();
+</pre>
+
+<p>As with <tt>status()</tt>, <tt>pragma()</tt> does not print a blank
+line folowing the header.</p>
+
+<hr>
+<a name="scook">
+
+<tt>void <b>set_cookie(</b>char <b>*name</b>, char <b>*value</b>, char
+<b>*expires</b>, char <b>*path</b>, char <b>*domain</b>, short
+<b>secure)</b>;</tt>
+
+<p>Sets a cookie using the values given in the parameters.</p>
+
+<hr>
+<a name="begin">
+<tt>void <b>html_begin(</b>char <b>*title)</b>;</tt><p>
+
+<p><tt>html_begin()</tt> sends somewhat standard HTML tags which
+should generally be at the top of every HTML file.  It will
+send:</p>
+
+<pre>
+   &lt;html&gt; &lt;head&gt;
+   &lt;title&gt;<b>title</b>&lt;/title&gt;
+   &lt;/head&gt;
+   &lt;body&gt;
+</pre>
+
+<hr>
+<a name="end">
+<tt>void <b>html_end()</b>;</tt><p>
+
+<p><tt>html_end()</tt> is the complement to <tt>html_begin()</tt>,
+sending the following HTML:</p>
+
+<pre>
+   &lt;/body&gt; &lt;/html&gt;
+</pre>
+
+<p>Note that neither <tt>html_begin()</tt> nor <tt>html_end()</tt>
+are necessary for your CGI scripts to output HTML, but they are
+good style, and I encourage use of these routines.</p>
+
+<hr>
+<a name="headline">
+<tt>void <b>h1(</b>char <b>*header)</b>;</tt><p>
+
+<p>Surrounds <tt>header</tt> with appropriate headline tags.
+Defined for h1() to h6().</p>
+
+<hr>
+<a name="hid">
+<tt>void <b>hidden(</b>char <b>*name</b>, char <b>*value)</b>;</tt><p>
+
+<p>Prints a hidden form field with name <tt>name</tt> and value
+<tt>value</tt>.</p>
+
+<hr>
+<a name="3">
+
+<h2>3.3. cgi-llist.h</h2>
+
+<p>For most scripts, with the exception of <tt>list_end()</tt>, you
+will most likely never have to use any of the link list routines
+available, since cgi-lib.h handles most common linked list
+manipulation almost transparently.  However, you may sometimes want to
+manipulate the information directly or perform special functions on
+each entry, in which case these routines may be useful.</p>
+
+<h3>Library variables</h3>
+
+<pre>
+typedef struct {
+  char *name;
+  char *value;
+} entrytype;
+
+typedef struct _node {
+  entrytype entry;
+  struct _node* next;
+} node;
+
+typedef struct {
+  node* head;
+} llist;
+</pre>
+
+<h3>Library functions</h3>
+
+<ul>
+  <li> <a href="#lcreate">void list_create(llist *l);</a>
+  <li> <a href="#lnext">node* list_next(node* w);</a>
+  <li> <a href="#lon">short on_list(llist *l, node* w);</a>
+  <li> <a href="#londebug">short on_list_debug(llist *l, node* w);</a>
+  <li> <a href="#ltraverse">
+       void list_traverse(llist *l, void (*visit)(entrytype item));</a>
+  <li> <a href="#linsafter">
+       node* list_insafter(llist* l, node* w, entrytype item);</a>
+  <li> <a href="#lclear">void list_clear(llist* l);</a>
+</ul>
+
+<hr>
+<a name="lcreate">
+<tt>void <b>list_create(</b>llist <b>*l)</b>;</tt><p>
+
+<p><tt>list_create()</tt> creates and initializes the list, and it
+should be called at the beginning of every CGI script using this
+library.</p>
+
+<hr>
+<a name="lnext">
+<tt>node* <b>list_next(</b>node* <b>w)</b>;</tt><p>
+
+<p><tt>list_next()</tt> returns the next node on the list.</p>
+
+<hr>
+<a name="lon">
+<tt>short <b>on_list(</b>llist <b>*l</b>, node* <b>w)</b>;</tt><p>
+
+<p><tt>on_list()</tt> returns a 1 if the node <b>w</b> is on the
+linked list <b>l</b>; otherwise, it returns a 0.</p>
+
+<hr>
+<a name="londebug">
+<tt>short <b>on_list_debug(</b>llist <b>*l</b>, node* <b>w)</b>;</tt><p>
+
+<p>The previous routine makes the assumption that my linked list routines
+are bug-free, a possibly bad assumption.  If you are using linked list
+routines and <tt>on_list()</tt> isn't returning the correct value, try
+using <tt>on_list_debug()</tt> which makes no assumptions, is almost
+definitely reliable, but is a little slower than the other routine.</p>
+
+<hr>
+<a name="ltraverse">
+<tt>void <b>list_traverse(</b>llist <b>*l</b>,
+void <b>(*visit)(entrytype item))</b>;</tt><p>
+
+<p><tt>list_traverse()</tt> lets you pass a pointer to a function which
+will manipulate each entry on the list.</p>
+
+<p>To use, you must create a function that will take as its argument
+a variable of type <b>entrytype</b>.  For example, if you wanted to
+write your own <tt>print_entries()</tt> function, you could do
+the following:</p>
+
+<pre>
+void print_element(entrytype item);
+{
+  printf("<b>%s</b> = %s\n",item.name,item.value);
+}
+
+void print_entries(llist entries);
+{
+  list_traverse(&stuff, print_element);
+}
+</pre>
+
+<hr>
+<a name="linsafter">
+<tt>node* <b>list_insafter(</b>llist* <b>l</b>, node* <b>w</b>,
+entrytype <b>item)</b>;</tt><p>
+
+<p><tt>list_insafter()</tt> adds the entry <b>item</b> after the
+node <b>w</b> and returns the pointer to the newly created
+node.  I didn't bother writing a function to insert before
+a node since my CGI functions don't need one.</p>
+
+<hr>
+<a name="lclear">
+<tt>void <b>list_clear(</b>llist* <b>l)</b>;</tt><p>
+
+<p>This routine frees up the memory used by the linked list after
+you are finished with it.  It is <b>imperative</b> that you call
+this function at the end of every program which calls
+<tt>read_cgi_input()</tt>.</p>
+
+<hr>
+<a name="4">
+
+<h2>3.4. string-lib.h</h2>
+
+<h3>Library functions</h3>
+
+<ul>
+  <li><a href="#newstr">char* newstr(char *str);</a>
+  <li><a href="#substr">char* substr(char *str, int offset, int len);</a>
+  <li><a href="#gtlt">char* replace_ltgt(char *str);</a>
+  <li><a href="#lower">char *lower_case(char *buffer);</a>
+</ul>
+
+<hr>
+<a name="newstr">
+<p><tt>char* <b>newstr(</b>char <b>*str)</b>;</tt></p>
+
+<p><tt>newstr()</tt> allocates memory and returns a copy of <tt>str</tt>.
+Use this function to correctly allocate memory and copy strings.</p>
+
+<hr>
+<a name="substr">
+<p><tt>char* <b>substr(</b>char <b>*str</b>, int <b>offset</b>,
+int <b>len)</b>;</tt></p>
+
+<p>Analogous to the Perl <tt>substr</tt> function.  Finds the
+substring of <tt>str</tt> at an offset of <tt>offset</tt> and of
+length <tt>len</tt>.  A negative offset will start the substring
+from the end of the string.</p>
+
+<hr>
+<a name="gtlt">
+<p>char* <b>replace_ltgt(</b>char <b>*str)</b>;</p>
+
+<p>Replaces all instances of &lt; and &gt; in <tt>str</tt> with
+&amp;lt; and &amp;gt;.</p>
+
+<hr>
+<a name="lower">
+<p>char* <b>lower_case(</b>char <b>*buffer)</b>;</p>
+
+<p>Converts a string from upper to lower case.</p>
+
+<hr>
+[
+<a href="cgihtml_4.html">Next</a> |
+<a href="cgihtml.html">Up to Table of Contents</a> |
+<a href="cgihtml_2.html">Previous</a>
+]
+
+<hr>
+<address>
+Copyright &#169; 1997 Eugene Eric Kim /
+<a href="mailto:eekim@eekim.com">
+eekim@eekim.com</a>
+</address>
+<!-- hhmts start -->
+Last modified: Mon Jan 20 22:39:24 PST 1997
+<!-- hhmts end -->
+</body> </html>

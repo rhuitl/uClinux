@@ -1,0 +1,76 @@
+#!/bin/sh
+# @configure_input@
+#***********************************************************************
+#
+# adsl-stop
+#
+# Shell script to bring down an ADSL connection
+#
+# Copyright (C) 2000 Roaring Penguin Software Inc.
+#
+# $Id: adsl-stop.in,v 1.1.1.1 2000-11-17 05:28:41 davidm Exp $
+#
+# This file may be distributed under the terms of the GNU General
+# Public License.
+#
+# Usage: adsl-stop [config_file]
+# If config_file is omitted, defaults to /etc/ppp/pppoe.conf
+#
+#***********************************************************************
+
+ME="`basename $0`"
+LOGGER="/usr/bin/logger -t $ME"
+CONFIG="$1"
+if [ "$CONFIG" = "" ] ; then
+    CONFIG=/etc/ppp/pppoe.conf
+fi
+
+if [ ! -f "$CONFIG" -o ! -r "$CONFIG" ] ; then
+    echo "$ME: Cannot read configuration file '$CONFIG'" >& 2
+    exit 1
+fi
+
+. $CONFIG
+
+PPPOE_PIDFILE="$PIDFILE.pppoe"
+PPPD_PIDFILE="$PIDFILE.pppd"
+
+# Backward config file compatibility
+if test "$DEMAND" = "" ; then
+	DEMAND=no
+fi
+
+# Ignore SIGTERM
+trap "" 15
+
+# Check for pidfile
+if [ -r "$PIDFILE" ] ; then
+    PID=`cat $PIDFILE`
+
+    # Check if still running
+    kill -0 $PID > /dev/null 2>&1
+    if [ $? != 0 ] ; then
+	echo "$ME: The adsl-connect script (PID $PID) appears to have died" >& 2
+	exit 1
+    fi
+
+    # Kill adsl-connect
+    $LOGGER -p daemon.notice "Killing adsl-connect"
+    echo "Killing adsl-connect ($PID)"
+    kill $PID > /dev/null 2>&1
+
+    # Kill pppd, which should in turn kill pppoe
+    if [ -r "$PPPD_PIDFILE" ] ; then
+	PID=`cat "$PPPD_PIDFILE"`
+	$LOGGER -p daemon.notice "Killing pppd"
+	echo "Killing pppd ($PID)"
+	kill $PID > /dev/null 2>&1
+    fi
+
+    rm -f "$PIDFILE" "$PPPD_PIDFILE" "$PPPOE_PIDFILE"
+else
+    echo "$ME: No ADSL connection appears to be running" >&2
+    exit 1
+fi
+
+exit 0

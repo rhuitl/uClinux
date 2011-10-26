@@ -1,0 +1,26 @@
+verbose "Initialising bridged on eth0/eth1"
+set eth0dev [config ref ethernet<devname=eth0>]
+set eth1dev [config ref ethernet<devname=eth1>]
+
+set bridge [config new bridge]
+config set $bridge index 0
+
+set lanelem [config new $bridge.elements interface $eth0dev]
+config set $lanelem fwclass lan
+config set $eth0dev conn $lanelem
+
+set wanelem [config new $bridge.elements interface $eth1dev]
+config set $wanelem fwclass wan
+config set $eth1dev conn $wanelem
+
+set brlan [config new static_ip interface $bridge]
+config set $brlan name "Bridge"
+config set $brlan ipaddr 192.168.0.1
+config set $brlan netmask 24
+config set $brlan fwclass bridge
+config set $bridge conn $brlan
+
+config set firewall.masq lan_wan false
+config set firewall.masq lan_dmz false
+config set firewall.masq dmz_wan false
+

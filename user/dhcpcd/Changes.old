@@ -1,0 +1,146 @@
+07/23/96    1. moved ARP check from just after dhcpcd received a
+  0.2a         DHCPOFFER message to just after dhcpcd received a
+               DHCPACK message.
+            2. added 'Parameter Request List' in the DHCPDISCOVER message.
+            3. added code to output the content of DHCP message option from
+               the server
+07/27/96    added '-i' option specifying the class identifier because
+  0.2a      RFC1541 says "The client implementation of DHCP should
+            provide a mechanism for the user to select directly the
+            'class-identifier' value.".
+
+08/09/96   added the code to make a copy of the DHCP options in the
+  0.2      DHCPOFFER message because Windows NT server does not put
+           DHCP options in the DHCPACK message except for netmask, T1
+           time, and T2time. Other DHCP options are only in the
+           DHCPOFFER message.
+
+09/09/96   added support to the "router" option.
+  0.25a     changed files: options.c, dhcp-options.h, dhcp.h, hostinfo.c,
+                           if.c, client.c
+
+09/11/96   1. fixed a bug in setDefRoute (if.c). rt_flags was RT_UP.
+  0.3a        It should be RT_GATEWAY.
+           2. fixed typos in openRecvSocket (socket-if.c)
+           3. changed the way to invoke a command file from using
+              signal to forking twice
+           4. removed unnecessary socket close/re-open
+
+09/12/96   added the following sample shell scripts:
+  0.3b       1. "network" for pcmcia-cs
+             2. "rc" scripts (rc.inet1, rc.inet2, rc.M)
+             3. "rc.dhcp", a command file which can be executed from dhcpcd
+09/13/96   1. enhanced NTP support. Now dhcpcd creates the file, ntp.conf
+  0.3         in the directory, /etc/dhcpc.
+           2. added the code verifying if router addresses are correct
+09/16/96   fixed a typo in selecting (client.c)
+  0.31
+09/17/96   added the code checking option field to parseDhcpMsg (options.c)
+  0.32
+09/19/96   quick fix to make it work with ISC's dhcpd. I made BROACAST
+  0.33     flag available and added the NEED_BCAST_RESPONSE macro.
+           ISC's DHCP server is the Internet Draft compliant, but
+           dhcpcd is RFC1541 compliant. So this is a "workaround" version.
+
+09/22/96   made dhcpcd compliant to the Internet Draft in order to
+  0.4      work with ISC version of DHCP server.
+           Changed client.c, options.c, socket-if.c
+
+01/13/97   1. added IFF_MULTICAST in initHost (client.c) (Note 1).
+  0.5a     2. fixed the bug that dhcpcd core-dumped when it received a
+              datagram containig the DHCP message option (parseDhcpMsg
+              in options.c) (Note 2).
+           3. added -r option which makes dhcpcd RFC1541 compliant
+              (Note 3).
+           4. changed mkDhcpRequestMsg (client.c) to put the
+              parameter request list option into the DHCPREQUEST
+              message in order to support the CMU version of DHCP
+              server (Note 4). But I do not check whether it works
+              with the CMU version of DHCP server.
+           5. changed the argument to logOpen from LOG_CONS to LOG_PID
+              (Note 5).
+           6. add nextState initialization in rebinding (client.c).
+           7. changed the host information file name from "hostinfo"
+              to "hostinfo-ifname" (saveHostInfo in hostinfo.c)
+              (Note 5). Ifname is actually replaced with the network
+              interface name like "eth0". This is good when multiple
+              dhcpcd's attach to different network interfaces.
+
+01/20/97   changed init, renewing, rebinding (client.c), and
+  0.5a2    rcvAndCheckDhcpMsg (socket-if.c) to fix the bug that dhcpcd
+           exited with holding the assigned IP address when it failed in
+           invoking sendto system call in the RENEWING state. This happened
+           when the server is down in the RENEWING state. It causes
+           hosts to use expired IP addresses (how dangerous!). Now
+           dhcpcd does not exit even when it gets an error from sendto
+           in the RENEWING state. It continues to use the assigned IP
+           address until the lease time is expired, then it
+           initializes the network interface and goes into the INIT
+           state (Note 6).
+
+01/30/97   made version 0.5a2 into 0.5, and released it.
+  0.5
+
+03/07/97   1. fixed the bug that the renewal time and the rebind time
+              are messed up (becomes minus number :p) when dhcpcd gets
+              the lease time whose least significant byte is greater
+              than or equal to 0x80 (setDhcpInfo in client.c) (Note 7).
+              For example, if the lease time is 24 hours, dhcpcd does
+              not work.
+           2. added the hostname option to the parameter request list
+              (mkDhcpDiscoverMsg and mkDhcpRequestMsg in client.c)
+           3. fixed the bug that dhcpcd sends a DHCPREQUEST message
+              which does not have the server identifier option in the
+              SELECTING state (mkDhcpRequestMsg in client.c)
+           4. fixed the bug that dhcpcd uses the information from the
+              DHCPOFFER message for configuring the host (it must use
+              the information from the DHCPREQUEST message) (initHost
+              in client.c) (Note 8).
+
+03/16/97   1. fixed the bug that DHCPDECLINE message was RFC1541
+  0.6         compliant. Now dhcpcd can send both Interned Draft
+              compliant DHCPDECLINE message and RFC1541 compliant
+              one (mkDhcpDeclineMsg).
+           2. fixed the bug that the broadcast address and the
+              subnetmask were set to the wrong value under the
+              following condition:
+                1. dhcpcd is in the REBOOTING state
+                2. received DHCP ACK msg does not include the
+                   broadcast or subnetmask option.
+              (rebooting in client.c)
+           3. fixed the bug that dhcpcd does not send a DHCPDECLINE
+              msg when it detects the duplicate IP adddress
+              (arpCheck in arp.c)..
+           4. changed the way to make a DHCPREQUEST msg in the
+              SELECTING state (selecting, mkDhcpRequestMsg)
+           5. changed the pcmcia/network script to unmount the NFS
+              filesystems before invoking "dhcpcd -k" command when
+              the card service goes down.
+           6. added a new environment variable DHCP_DEVICE, which
+              contains the name of network interface to which
+              dhcpcd is attached.
+04/24/97   changed the source UDP port from a random number to 68
+  0.65     because some servers respond to NOT port 68 but the source
+           UDP port in the received datagram (Note 9).
+
+08/28/97    1. added '-I' (client identifier) option.
+  0.70      2. added '-h' (hostname) option (Note 10).
+
+
+
+Note  1: Koji Okamura suggested this.
+Note  2: This fix was made by Dan Halbert.
+Note  3: Dan Halbert found that dhcpcd-0.4 does not work with some
+         RFC1541 compliant DHCP servers, and made a patch for it.
+         Brandon Mitchell suggested -r option.
+Note  4: N. Komazaki found that CMU's DHCP server (dhcpd-3.3.7
+          +patch) requires the parameter request option in the
+         DHCPREQUEST message.
+Note  5: Ulrich Windl suggested this.
+Note  6: Koji Okamura found this bug.
+Note  7: Andrew Kieschnick found this bug.
+Note  8: Tim Riker found this bug.
+Note  9: I found this problem by using the tcpdump log which
+         Larry Hawkins sent me.
+Note 10: I found some DHCP servers require this option by using the
+         tcpdump log which David Filiatrault sent me.

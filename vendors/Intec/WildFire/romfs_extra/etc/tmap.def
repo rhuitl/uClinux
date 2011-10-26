@@ -1,0 +1,670 @@
+# tmap definition for Intec Wildfire (MCF5282) single board computer.
+# Copyright (C) 2005 by Intec Automation Inc., All Rights Reserved.
+
+# This file maps out the entire physical 4BG memory space of the Coldfire processor.
+# It is broken into segments which are flagged as accessible or inaccessible.
+# This file is used by gdbserver to implement a software access protection scheme
+# that prevents gdbserver from crashing when it accesses hardware-protected
+# memory addresses.
+
+# A segment is defined by a line of text containing three numeric values.
+# The first defines the start address of the segment; the second value
+# defines the size; and the third is a flag that defines access rules.
+
+# Valid flag values are as follow:
+# - If bit zero of the flag is set, the segment is readable.
+# - If bit one of the flag is set, the segment is writable.
+# - If neither bit zero or one is set, the segment is inaccessible.
+
+# Each entry's start address must be equal to the sum of the start address
+# and size in the previous entry. The first entry must have a start address of 0.
+# Numeric values may be in decimal, octal (first digit must be 0) or hex (prefixed with 0x).
+
+0x00000000	0x00080000	1	# Internal Flash (read-only).
+0x00080000	0x0FF80000	0
+0x10000000	0x01000000	3	# SDRAM
+0x11000000	0x0F000000	0
+0x20000000	0x00010000	3	# Internal SRAM
+0x20010000	0x0FFF0000	0
+0x30000000	0x00010000	3	# CPLD
+0x30010000	0x0FFF0000	0
+
+# Internal CPU registers based at IPSBAR. This gets complicated...
+
+# System Control Module.
+0x40000000	4		3	# IPSBAR
+0x40000004	4		0
+0x40000008	4		3	# RAMBAR
+0x4000000c	4		0
+0x40000010	8		3	# CRSR to DMAREQC
+0x40000018	4		0
+0x4000001c	5		3	# MPARK through MPR
+0x40000021	3		0
+0x40000024	5		3	# PACR0 through PACR4
+0x40000029	1		0
+0x4000002a	3		3	# PACR5 through PACR7
+0x4000002d	1		0
+0x4000002e	1		3	# PACR8
+0x4000002f	1		0
+0x40000030	2		3	# GPACR0, GPACR1
+0x40000032	14		0
+
+# SDRAM controller registers.
+0x40000040	2		3	# DCR
+0x40000042	6		0
+0x40000048	16		3	# DACR0 through DMR1
+0x40000058	0x28		0
+
+# Chip select registers.
+0x40000080	2		3	# CSAR0
+0x40000082	2		0
+0x40000084	4		3	# CSMR0
+0x40000088	2		0
+0x4000008a	2		3	# CSCR0
+0x4000008c	2		3	# CSAR1
+0x4000008e	2		0
+0x40000090	4		3	# CSMR1
+0x40000094	2		0
+0x40000096	2		3	# CSCR1
+0x40000098	2		3	# CSAR2
+0x4000009a	2		0
+0x4000009c	4		3	# CSMR2
+0x400000a0	2		0
+0x400000a2	2		3	# CSCR2
+0x400000a4	2		3	# CSAR3
+0x400000a6	2		0
+0x400000a8	4		3	# CSMR3
+0x400000ac	2		0
+0x400000ae	2		3	# CSCR3
+0x400000b0	2		3	# CSAR4
+0x400000b2	2		0
+0x400000b4	4		3	# CSMR4
+0x400000b8	2		0
+0x400000ba	2		3	# CSCR4
+0x400000bc	2		3	# CSAR5
+0x400000be	2		0
+0x400000c0	4		3	# CSMR5
+0x400000c4	2		0
+0x400000c6	2		3	# CSCR5
+0x400000c8	2		3	# CSAR6
+0x400000ca	2		0
+0x400000cc	4		3	# CSMR6
+0x400000d0	2		0
+0x400000d2	2		3	# CSCR6
+0x400000d4	0x2c		0
+
+# DMA module.
+0x40000100	17		3	# Channel 0.
+0x40000111	0x2f		0
+0x40000140	17		3	# Channel 1.
+0x40000151	0x2f		0
+0x40000180	17		3	# Channel 2.
+0x40000191	0x2f		0
+0x400001c0	17		3	# Channel 3.
+0x400001d1	0x2f		0
+
+# UART module.
+# UART0.
+0x40000200	1		3	# Mode register 0
+0x40000201	3		0
+0x40000204	1		3	# Status register 0
+0x40000205	3		0
+0x40000208	1		2	# Mode register 0 (write-only)
+0x40000209	3		0
+0x4000020c	1		3	# TX/RX buffer 0
+0x4000020d	3		0
+0x40000210	1		3	# Input change/aux control reg 0
+0x40000211	3		0
+0x40000214	1		3	# Interrupt status/mask reg 0
+0x40000215	3		0
+0x40000218	1		2	# Upper divider 0 (write-only)
+0x40000219	3		0
+0x4000021c	1		2	# Lower divider 0 (write-only)
+0x4000021d	23		0
+0x40000234	1		1	# input port register 0 (read-only)
+0x40000235	3		0
+0x40000238	1		2	# output port set register 0 (write-only)
+0x40000239	3		0
+0x4000023c	1		2	# output port reset register 0 (write-only)
+0x4000023d	3		0
+
+# UART1.
+0x40000240	1		3	# Mode register 0
+0x40000241	3		0
+0x40000244	1		3	# Status register 0
+0x40000245	3		0
+0x40000248	1		2	# Mode register 0 (write-only)
+0x40000249	3		0
+0x4000024c	1		3	# TX/RX buffer 0
+0x4000024d	3		0
+0x40000250	1		3	# Input change/aux control reg 0
+0x40000251	3		0
+0x40000254	1		3	# Interrupt status/mask reg 0
+0x40000255	3		0
+0x40000258	1		2	# Upper divider 0 (write-only)
+0x40000259	3		0
+0x4000025c	1		2	# Lower divider 0 (write-only)
+0x4000025d	23		0
+0x40000274	1		1	# input port register 0 (read-only)
+0x40000275	3		0
+0x40000278	1		2	# output port set register 0 (write-only)
+0x40000279	3		0
+0x4000027c	1		2	# output port reset register 0 (write-only)
+0x4000027d	3		0
+
+# UART2.
+0x40000280	1		3	# Mode register 0
+0x40000281	3		0
+0x40000284	1		3	# Status register 0
+0x40000285	3		0
+0x40000288	1		2	# Mode register 0 (write-only)
+0x40000289	3		0
+0x4000028c	1		3	# TX/RX buffer 0
+0x4000028d	3		0
+0x40000290	1		3	# Input change/aux control reg 0
+0x40000291	3		0
+0x40000294	1		3	# Interrupt status/mask reg 0
+0x40000295	3		0
+0x40000298	1		2	# Upper divider 0 (write-only)
+0x40000299	3		0
+0x4000029c	1		2	# Lower divider 0 (write-only)
+0x4000029d	23		0
+0x400002b4	1		1	# input port register 0 (read-only)
+0x400002b5	3		0
+0x400002b8	1		2	# output port set register 0 (write-only)
+0x400002b9	3		0
+0x400002bc	1		2	# output port reset register 0 (write-only)
+0x400002bd	3		0
+0x400002c0	0x40		0
+
+# I2C module.
+0x40000300	1		3	# I2ADR.
+0x40000301	3		0
+0x40000304	1		3	# I2FDR.
+0x40000305	3		0
+0x40000308	1		3	# I2CR.
+0x40000309	3		0
+0x4000030c	1		3	# I2SR.
+0x4000030d	3		0
+0x40000310	1		3	# I2DR.
+0x40000311	0x2f		0
+
+# QSPI module.
+0x40000340	2		3	# QMR.
+0x40000342	2		0
+0x40000344	2		3	# QDLYR.
+0x40000346	2		0
+0x40000348	2		3	# QWR.
+0x4000034a	2		0
+0x4000034c	2		3	# QIR.
+0x4000034e	2		0
+0x40000350	2		3	# QAR.
+0x40000352	2		0
+0x40000354	2		3	# QDR.
+0x40000356	0xaa		0
+
+# DMA timers.
+0x40000400	16		3	# Channel 0.
+0x40000410	0x30		0
+0x40000440	16		3	# Channel 1.
+0x40000450	0x30		0
+0x40000480	16		3	# Channel 2.
+0x40000490	0x30		0
+0x400004c0	16		3	# Channel 3.
+0x400004d0	0x730		0
+
+# Interrupt controllers.
+
+# Interrupt controller 0.
+0x40000c00	0x1a		3	# IPR, IMR, IFR, IRLR, IACKLPR
+0x40000c1a	0x27		0
+0x40000c41	7		1	# ICR1-7 (read-only)
+0x40000c48	0x38		3	# ICR8-63
+0x40000c80	0x60		0
+0x40000ce0	1		1	# SWIACK (read-only)
+0x40000ce1	3		0
+0x40000ce4	1		1	# L1IACK (read-only)
+0x40000ce5	3		0
+0x40000ce8	1		1	# L2IACK (read-only)
+0x40000ce9	3		0
+0x40000cec	1		1	# L3IACK (read-only)
+0x40000ced	3		0
+0x40000cf0	1		1	# L4IACK (read-only)
+0x40000cf1	3		0
+0x40000cf4	1		1	# L5IACK (read-only)
+0x40000cf5	3		0
+0x40000cf8	1		1	# L6IACK (read-only)
+0x40000cf9	3		0
+0x40000cfc	1		1	# L7IACK (read-only)
+0x40000cfd	3		0
+
+# Interrupt controller 1.
+0x40000d00	0x1a		3	# IPR, IMR, IFR, IRLR, IACKLPR
+0x40000d1a	0x27		0
+0x40000d41	7		1	# ICR1-7 (read-only)
+0x40000d48	0x38		3	# ICR8-63
+0x40000d80	0x60		0
+0x40000de0	1		1	# SWIACK (read-only)
+0x40000de1	3		0
+0x40000de4	1		1	# L1IACK (read-only)
+0x40000de5	3		0
+0x40000de8	1		1	# L2IACK (read-only)
+0x40000de9	3		0
+0x40000dec	1		1	# L3IACK (read-only)
+0x40000ded	3		0
+0x40000df0	1		1	# L4IACK (read-only)
+0x40000df1	3		0
+0x40000df4	1		1	# L5IACK (read-only)
+0x40000df5	3		0
+0x40000df8	1		1	# L6IACK (read-only)
+0x40000df9	3		0
+0x40000dfc	1		1	# L7IACK (read-only)
+0x40000dfd	3		0
+
+# Global interrupt controller.
+0x40000e00	0x100		0
+0x40000f00	0xe0		0
+0x40000fe0	1		1	# SWIACK (read-only)
+0x40000fe1	3		0
+0x40000fe4	1		1	# L1IACK (read-only)
+0x40000fe5	3		0
+0x40000fe8	1		1	# L2IACK (read-only)
+0x40000fe9	3		0
+0x40000fec	1		1	# L3IACK (read-only)
+0x40000fed	3		0
+0x40000ff0	1		1	# L4IACK (read-only)
+0x40000ff1	3		0
+0x40000ff4	1		1	# L5IACK (read-only)
+0x40000ff5	3		0
+0x40000ff8	1		1	# L6IACK (read-only)
+0x40000ff9	3		0
+0x40000ffc	1		1	# L7IACK (read-only)
+0x40000ffd	3		0
+
+# FEC.
+0x40001000	4		0
+0x40001004	8		3	# EIR, EIMR
+0x4000100c	4		0
+0x40001010	8		3	# RDAR, TDAR
+0x40001018	0xc		0
+0x40001024	4		3	# ECR
+0x40001028	0x18		0
+0x40001040	8		3	# MDATA, MSCR
+0x40001048	0x1c		0
+0x40001064	4		3	# MIBC
+0x40001068	0x1c		0
+0x40001084	4		3	# RCR
+0x40001088	0x3c		0
+0x400010c4	4		3	# TCR
+0x400010c8	0x1c		0
+0x400010e4	12		3	# PALR, PAUR, OPD
+0x400010f0	0x28		0
+0x40001118	16		3	# IAUR, IALR, GAUR, GALR
+0x40001128	0x1c		0
+0x40001144	4		3	# TFWR
+0x40001148	4		0
+0x4000114c	8		3	# FRBR, FRSR
+0x40001154	0x2c		0
+0x40001180	12		3	# ERDSR, ETDSR, EMRBR
+0x4000118c	0x74		0
+0x40001200	0x200		3	# MIB counters
+0x40001400	0xfec00		0
+
+# GPIO.
+0x40100000	0x12		3	# PORTA through PORTUA
+0x40100012	2		0
+0x40100014	0x12		3	# DDRA through DDRUA
+0x40100026	2		0
+0x40100028	0x12		3	# SETA through SETUA
+0x4010003a	2		0
+0x4010003c	0x12		3	# CLRA through CLRUA
+0x4010004e	2		0
+0x40100050	0xd		3	# PBCDPAR through PUAPAR
+0x4010005d	0xffa3		0
+
+# Reset controller module.
+0x40110000	2		3	# RCR, RSR
+0x40110002	2		0
+0x40110004	2		3	# CCR
+0x40110006	1		0
+0x40110007	5		3	# LPCR through CIR
+0x4011000c	0xfff4		0
+
+# Clock module.
+0x40120000	4		3	# SYNCR, SYNSR
+0x40120004	0xfffc		0
+
+# Edge port module.
+0x40130000	7		3	# EPPAR through EPFR
+0x40130007	0xfff9		0
+
+# Watchdog timer module.
+0x40140000	8		3	# WCR through WSR
+0x40140008	0xfff8		0
+
+# Programmable interrupt timers.
+0x40150000	6		3	# PCSR1 through PCNTR1
+0x40150006	0xfffa		0
+0x40160000	6		3	# PCSR1 through PCNTR1
+0x40160006	0xfffa		0
+0x40170000	6		3	# PCSR1 through PCNTR1
+0x40170006	0xfffa		0
+0x40180000	6		3	# PCSR1 through PCNTR1
+0x40180006	0xfffa		0
+
+# QADC module.
+0x40190000	2		3	# QADCMCR
+0x40190002	4		0	# QADCTEST + reserved location.
+0x40190006	14		3	# PORTQA through QASR1
+0x40190014	0x1ec		0
+
+0x40190200	2		3	# CCW table
+0x40190202	2		3
+0x40190204	2		3
+0x40190206	2		3
+0x40190208	2		3
+0x4019020a	2		3
+0x4019020c	2		3
+0x4019020e	2		3
+0x40190210	2		3
+0x40190212	2		3
+0x40190214	2		3
+0x40190216	2		3
+0x40190218	2		3
+0x4019021a	2		3
+0x4019021c	2		3
+0x4019021e	2		3
+0x40190220	2		3
+0x40190222	2		3
+0x40190224	2		3
+0x40190226	2		3
+0x40190228	2		3
+0x4019022a	2		3
+0x4019022c	2		3
+0x4019022e	2		3
+0x40190230	2		3
+0x40190232	2		3
+0x40190234	2		3
+0x40190236	2		3
+0x40190238	2		3
+0x4019023a	2		3
+0x4019023c	2		3
+0x4019023e	2		3
+0x40190240	2		3
+0x40190242	2		3
+0x40190244	2		3
+0x40190246	2		3
+0x40190248	2		3
+0x4019024a	2		3
+0x4019024c	2		3
+0x4019024e	2		3
+0x40190250	2		3
+0x40190252	2		3
+0x40190254	2		3
+0x40190256	2		3
+0x40190258	2		3
+0x4019025a	2		3
+0x4019025c	2		3
+0x4019025e	2		3
+0x40190260	2		3
+0x40190262	2		3
+0x40190264	2		3
+0x40190266	2		3
+0x40190268	2		3
+0x4019026a	2		3
+0x4019026c	2		3
+0x4019026e	2		3
+0x40190270	2		3
+0x40190272	2		3
+0x40190274	2		3
+0x40190276	2		3
+0x40190278	2		3
+0x4019027a	2		3
+0x4019027c	2		3
+0x4019027e	2		3
+
+0x40190280	2		3	# RJURR table
+0x40190282	2		3
+0x40190284	2		3
+0x40190286	2		3
+0x40190288	2		3
+0x4019028a	2		3
+0x4019028c	2		3
+0x4019028e	2		3
+0x40190290	2		3
+0x40190292	2		3
+0x40190294	2		3
+0x40190296	2		3
+0x40190298	2		3
+0x4019029a	2		3
+0x4019029c	2		3
+0x4019029e	2		3
+0x401902a0	2		3
+0x401902a2	2		3
+0x401902a4	2		3
+0x401902a6	2		3
+0x401902a8	2		3
+0x401902aa	2		3
+0x401902ac	2		3
+0x401902ae	2		3
+0x401902b0	2		3
+0x401902b2	2		3
+0x401902b4	2		3
+0x401902b6	2		3
+0x401902b8	2		3
+0x401902ba	2		3
+0x401902bc	2		3
+0x401902be	2		3
+0x401902c0	2		3
+0x401902c2	2		3
+0x401902c4	2		3
+0x401902c6	2		3
+0x401902c8	2		3
+0x401902ca	2		3
+0x401902cc	2		3
+0x401902ce	2		3
+0x401902d0	2		3
+0x401902d2	2		3
+0x401902d4	2		3
+0x401902d6	2		3
+0x401902d8	2		3
+0x401902da	2		3
+0x401902dc	2		3
+0x401902de	2		3
+0x401902e0	2		3
+0x401902e2	2		3
+0x401902e4	2		3
+0x401902e6	2		3
+0x401902e8	2		3
+0x401902ea	2		3
+0x401902ec	2		3
+0x401902ee	2		3
+0x401902f0	2		3
+0x401902f2	2		3
+0x401902f4	2		3
+0x401902f6	2		3
+0x401902f8	2		3
+0x401902fa	2		3
+0x401902fc	2		3
+0x401902fe	2		3
+
+0x40190300	2		3	# LJSRR table
+0x40190302	2		3
+0x40190304	2		3
+0x40190306	2		3
+0x40190308	2		3
+0x4019030a	2		3
+0x4019030c	2		3
+0x4019030e	2		3
+0x40190310	2		3
+0x40190312	2		3
+0x40190314	2		3
+0x40190316	2		3
+0x40190318	2		3
+0x4019031a	2		3
+0x4019031c	2		3
+0x4019031e	2		3
+0x40190320	2		3
+0x40190322	2		3
+0x40190324	2		3
+0x40190326	2		3
+0x40190328	2		3
+0x4019032a	2		3
+0x4019032c	2		3
+0x4019032e	2		3
+0x40190330	2		3
+0x40190332	2		3
+0x40190334	2		3
+0x40190336	2		3
+0x40190338	2		3
+0x4019033a	2		3
+0x4019033c	2		3
+0x4019033e	2		3
+0x40190340	2		3
+0x40190342	2		3
+0x40190344	2		3
+0x40190346	2		3
+0x40190348	2		3
+0x4019034a	2		3
+0x4019034c	2		3
+0x4019034e	2		3
+0x40190350	2		3
+0x40190352	2		3
+0x40190354	2		3
+0x40190356	2		3
+0x40190358	2		3
+0x4019035a	2		3
+0x4019035c	2		3
+0x4019035e	2		3
+0x40190360	2		3
+0x40190362	2		3
+0x40190364	2		3
+0x40190366	2		3
+0x40190368	2		3
+0x4019036a	2		3
+0x4019036c	2		3
+0x4019036e	2		3
+0x40190370	2		3
+0x40190372	2		3
+0x40190374	2		3
+0x40190376	2		3
+0x40190378	2		3
+0x4019037a	2		3
+0x4019037c	2		3
+0x4019037e	2		3
+
+0x40190380	2		3	# LJURR table
+0x40190382	2		3
+0x40190384	2		3
+0x40190386	2		3
+0x40190388	2		3
+0x4019038a	2		3
+0x4019038c	2		3
+0x4019038e	2		3
+0x40190390	2		3
+0x40190392	2		3
+0x40190394	2		3
+0x40190396	2		3
+0x40190398	2		3
+0x4019039a	2		3
+0x4019039c	2		3
+0x4019039e	2		3
+0x401903a0	2		3
+0x401903a2	2		3
+0x401903a4	2		3
+0x401903a6	2		3
+0x401903a8	2		3
+0x401903aa	2		3
+0x401903ac	2		3
+0x401903ae	2		3
+0x401903b0	2		3
+0x401903b2	2		3
+0x401903b4	2		3
+0x401903b6	2		3
+0x401903b8	2		3
+0x401903ba	2		3
+0x401903bc	2		3
+0x401903be	2		3
+0x401903c0	2		3
+0x401903c2	2		3
+0x401903c4	2		3
+0x401903c6	2		3
+0x401903c8	2		3
+0x401903ca	2		3
+0x401903cc	2		3
+0x401903ce	2		3
+0x401903d0	2		3
+0x401903d2	2		3
+0x401903d4	2		3
+0x401903d6	2		3
+0x401903d8	2		3
+0x401903da	2		3
+0x401903dc	2		3
+0x401903de	2		3
+0x401903e0	2		3
+0x401903e2	2		3
+0x401903e4	2		3
+0x401903e6	2		3
+0x401903e8	2		3
+0x401903ea	2		3
+0x401903ec	2		3
+0x401903ee	2		3
+0x401903f0	2		3
+0x401903f2	2		3
+0x401903f4	2		3
+0x401903f6	2		3
+0x401903f8	2		3
+0x401903fa	2		3
+0x401903fc	2		3
+0x401903fe	2		3
+
+
+
+0x40190400	0xfc00		0
+
+# GPT modules.
+0x401a0000	7		3	# GPTIOS through GPTSCR1
+0x401a0007	1		0
+0x401a0008	2		3	# GPTTOV, GPTCTL1
+0x401a000a	1		0
+0x401a000b	17		3	# GPTCTL2 through GPTPACNTL
+0x401a001c	1		0
+0x401a001d	3		3	# GPTPORT through GPTTEST
+0x401a0020	0xffe0		0
+
+0x401b0000	7		3	# GPTIOS through GPTSCR1
+0x401b0007	1		0
+0x401b0008	2		3	# GPTTOV, GPTCTL1
+0x401b000a	1		0
+0x401b000b	17		3	# GPTCTL2 through GPTPACNTL
+0x401b001c	1		0
+0x401b001d	3		3	# GPTPORT through GPTTEST
+0x401b0020	0xffe0		0
+
+# FlexCAN module.
+0x401c0000	2		3	# MCR
+0x401c0002	4		0
+0x401c0006	6		3	# CANCTRL0 through TIMER
+0x401c000c	4		0
+0x401c0010	4		3	# RXGMASK
+0x401c0014	4		3	# RX14MASK
+0x401c0018	4		3	# RX15MASK
+0x401c001c	4		0
+0x401c0020	8		3	# ESR through TXERRCNT
+0x401c0028	0x58		0
+0x401c0080	0x100		3	# Message buffers.
+0x401c0180	0xfe80		0
+
+# CFM flash module.
+0x401d0000	3		3	# CFMMCR, CFMCLKD
+0x401d0003	5		0
+0x401d0008	4		3	# CFMSEC
+0x401d000c	4		0
+0x401d0010	12		3	# CFMPROT through CFMDACC
+0x401d001c	4		0
+0x401d0020	1		3	# CFMUSTAT
+0x401d0021	3		0
+0x401d0024	1		3	# CFMCMD
+
+# End of file.
+0x401d0025	0xbfe2ffdb	0

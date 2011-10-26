@@ -1,0 +1,103 @@
+#!/bin/sh
+
+# tests if mawk has been compiled to correctly handle
+# floating point exceptions
+#
+# $Log: fpe_test,v $
+# Revision 1.3  1995/08/29  14:17:18  mike
+# exit 2 changes
+#
+# Revision 1.2  1994/12/18  18:51:55  mike
+# recognize NAN printed as ? for hpux
+#
+
+PATH=.:$PATH
+
+test1='BEGIN{ print 4/0 }'
+
+
+test2='BEGIN { 
+  x = 100
+  do { y = x ; x *= 1000 } while ( y != x )
+  print "loop terminated"
+}'
+
+test3='BEGIN{ print log(-8) }'
+
+
+echo "testing division by zero"
+echo mawk "$test1"
+mawk "$test1"
+ret1=$?
+echo
+
+echo "testing overflow"
+echo mawk "$test2"
+mawk "$test2"
+ret2=$?
+echo
+
+echo "testing domain error"
+echo mawk "$test3"
+mawk "$test3"  > temp$$
+ret3=$?
+cat temp$$
+echo
+
+
+# the returns should all be zero or all 2
+# core dumps not allowed
+
+trap '
+echo compilation defines for floating point are incorrect
+rm -f temp$$
+exit 1'  0
+
+echo
+echo ==============================
+
+echo return1 = $ret1
+echo return2 = $ret2
+echo return3 = $ret3
+
+
+[ $ret1 -gt 128 ] && { echo test1 failed ; exception=1 ; }
+[ $ret2 -gt 128 ] && { echo test2 failed ; exception=1 ; }
+[ $ret3 -gt 128 ] && { echo test3 failed ; exception=1 ; }
+
+[ "$exception" = 1 ] && { rm -f core temp$$ ; exit 1 ; }
+
+
+same=0
+
+[ $ret1 = $ret2 ] && [ $ret2 = $ret3 ] && same=1
+
+
+if [ $same = 1 ]
+   then
+   if [ $ret1 = 0 ]
+      then 
+	echo results consistent: ignoring floating exceptions
+	# some versions of hpux print NAN as ?
+	if  egrep '[nN][aA][nN]|\?' temp$$  > /dev/null
+	   then :
+	   else
+	     echo "but the library is not IEEE754 compatible"
+	     echo "test 3 failed"
+	     exit 1
+	fi
+      else echo results consistent: trapping floating exceptions
+   fi
+
+   trap  0
+   rm -f temp$$
+   exit 0
+
+   else
+   echo results are not consistent
+echo 'return values should all be 0 if ignoring FPEs (e.g. with IEEE754)
+or all 2 if trapping FPEs'
+
+exit 1
+fi
+

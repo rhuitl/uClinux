@@ -1,0 +1,112 @@
+Document:   Adding-Platform-HOWTO
+Author:     Heiko Degenhardt (linux@sentec-elektronik.de)
+Contents:   Basic steps to implement a new board into uClinux-dist.
+Version:    v02.01
+Date:       Mon Mar  1 22:35:22 CET 2004
+License:    This document is under GNU GPL
+            (see uClinux-dist/COPYING)
+______________________________________________________________________
+
+CHANGES
+040301	 v02.01
+	 - CONFIG_BOOTPARAMS is not special for our platform
+	   anymore (3.)
+	 - Added hint about mcfserial.c (7.)
+	 (hede)
+030312   v02.00 
+         - Changed CONFIG_senTec into CONFIG_COBRA5272
+           (to clean up our part in the dist)
+         (hede)
+020322   v01.00 Creation
+         (hede)
+______________________________________________________________________
+         
+
+About this document
+-------------------
+
+This document describes the steps I took to add the support of our
+COBRA5272 board to the uClinux-dist-20020306. I'm shure I've missed
+something. So if you find errors or have other things to add, please
+feel free to email me.
+
+Introduction
+------------
+
+Our board is quite comparable to the Motorola M5272C3 eval
+board. So I could use their structure as a starting point.
+HINT: Currently I only implemented support in the kernel 2.4.x
+tree!
+
+Steps I did
+-----------
+
+1. I unpacked the original distribution:
+(tar -zxvf uClinux-dist-20020306.tar.gz)
+
+2. I introduced the board in linux-2.4.x/arch/m68knommu/Boards.mk:
+...
+ifdef CONFIG_M5272
+PLATFORM := 5272
+...
++ifdef CONFIG_COBRA5272
++BOARD := senTec
++endif
+endif
+...
+
+3. Now I set some defines in linux-2.4.x/arch/m68knommu/config.in:
+...
+if [ "$CONFIG_M5272" = "y" ]; then
+...
++  bool 'senTec CORA5272 board support' CONFIG_COBRA5272
+   bool 'ROMFS image not RAM resident' CONFIG_ROMFS_FROM_ROM
+fi
+...
+
+4. Next step was to create our own platform directory in
+linux-2.4.x/arch/m68knommu/platform/5272/senTec/ and
+to create/modify the crt0_ram.S and ram.ld there accordingly. 
+I could do:
+...
+cd uClinux-dist/linux-2.4.x/arch/m68knommu/platform/5272/
+cp -a MOTOROLA/ senTec
+vim senTec/crt0_ram.S # modify the file
+vim senTec/ram.ld # modify the file
+...
+
+5. Then I created vendors/senTec/COBRA5272/ under the uClinux-dist
+directory, and added Makefile, config.arch, config.linux-2.4.x and
+config.vendor-2.4.x there.
+
+6. I had to change linux-2.4.x/arch/m68knommu/platform/5272/config.c
+to get some options working, but that is an optional step!
+
+7. I had to include the default baud rate of our board
+in linux-2.4.x/drivers/char/mcfserial.c.
+
+
+Some final words
+----------------
+
+After doing these few steps I could compile uClinux for our board and
+run the image. Some other things that I did to get support of some
+features (for instance MTD/JFFS) I don't want to describe in this
+document. I hope I will have the time to write some other documents
+for that.
+One basic rule for all changes you do should be:
+If you can, do some "#ifdef CONFIG_YourArch" around your changes to
+keep unwanted effects on other platforms at a minimum!
+
+Feedback
+--------
+
+As you easily may find out I'm not a native English speaker. So:
+If you find errors or have suggestions, questions or what ever, 
+please feel free to email me at linux@sentec-elektronik.de.
+
+With kind regards
+Heiko Degenhardt
+______________________________________________________________________
+(c) 2003, 2004 senTec Elektronik GmbH, Heiko Degenhardt
+

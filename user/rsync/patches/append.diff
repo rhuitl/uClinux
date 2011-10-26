@@ -1,0 +1,330 @@
+This patch adds the --append option, which works like a "resume" mode in
+an ftp client, appending new data onto the end of the files it updates.
+
+--- orig/generator.c	2005-07-28 19:00:14
++++ generator.c	2005-03-03 02:59:17
+@@ -54,6 +54,7 @@ extern int delay_updates;
+ extern int update_only;
+ extern int opt_ignore_existing;
+ extern int inplace;
++extern int append_mode;
+ extern int make_backups;
+ extern int csum_length;
+ extern int ignore_times;
+@@ -470,35 +471,42 @@ static void generate_and_send_sums(int f
+ 	OFF_T offset = 0;
+ 
+ 	sum_sizes_sqroot(&sum, len);
++	write_sum_head(f_out, &sum);
++
++	if (append_mode > 0 && f_copy < 0)
++		return;
+ 
+ 	if (len > 0)
+ 		mapbuf = map_file(fd, len, MAX_MAP_SIZE, sum.blength);
+ 	else
+ 		mapbuf = NULL;
+ 
+-	write_sum_head(f_out, &sum);
+-
+ 	for (i = 0; i < sum.count; i++) {
+ 		int32 n1 = (int32)MIN(len, (OFF_T)sum.blength);
+ 		char *map = map_ptr(mapbuf, offset, n1);
+-		uint32 sum1 = get_checksum1(map, n1);
+ 		char sum2[SUM_LENGTH];
++		uint32 sum1;
++
++		len -= n1;
++		offset += n1;
+ 
+-		if (f_copy >= 0)
++		if (f_copy >= 0) {
+ 			full_write(f_copy, map, n1);
++			if (append_mode > 0)
++				continue;
++		}
+ 
++		sum1 = get_checksum1(map, n1);
+ 		get_checksum2(map, n1, sum2);
+ 
+ 		if (verbose > 3) {
+ 			rprintf(FINFO,
+ 				"chunk[%.0f] offset=%.0f len=%ld sum1=%08lx\n",
+-				(double)i, (double)offset, (long)n1,
++				(double)i, (double)offset - n1, (long)n1,
+ 				(unsigned long)sum1);
+ 		}
+ 		write_int(f_out, sum1);
+ 		write_buf(f_out, sum2, sum.s2length);
+-		len -= n1;
+-		offset += n1;
+ 	}
+ 
+ 	if (mapbuf)
+@@ -1007,6 +1015,9 @@ static void recv_generator(char *fname, 
+ 		return;
+ 	}
+ 
++	if (append_mode && st.st_size > file->length)
++		return;
++
+ 	if (!compare_dest && fnamecmp_type <= FNAMECMP_BASIS_DIR_HIGH)
+ 		;
+ 	else if (fnamecmp_type == FNAMECMP_FUZZY)
+@@ -1180,7 +1191,7 @@ void generate_files(int f_out, struct fi
+ 		do_delete_pass(flist);
+ 	do_progress = 0;
+ 
+-	if (whole_file < 0)
++	if (append_mode || whole_file < 0)
+ 		whole_file = 0;
+ 	if (verbose >= 2) {
+ 		rprintf(FINFO, "delta-transmission %s\n",
+@@ -1237,6 +1248,8 @@ void generate_files(int f_out, struct fi
+ 	only_existing = max_size = opt_ignore_existing = 0;
+ 	update_only = always_checksum = size_only = 0;
+ 	ignore_times = 1;
++	if (append_mode)  /* resend w/o append mode */
++		append_mode = -1; /* ... but only longer files */
+ 	make_backups = 0; /* avoid a duplicate backup for inplace processing */
+ 
+ 	if (verbose > 2)
+--- orig/match.c	2005-07-28 18:48:38
++++ match.c	2005-02-11 20:26:31
+@@ -23,6 +23,7 @@ extern int verbose;
+ extern int am_server;
+ extern int do_progress;
+ extern int checksum_seed;
++extern int append_mode;
+ 
+ int updating_basis_file;
+ 
+@@ -330,6 +331,21 @@ void match_sums(int f, struct sum_struct
+ 
+ 	sum_init(checksum_seed);
+ 
++	if (append_mode) {
++		OFF_T j = 0;
++		for (j = CHUNK_SIZE; j < s->flength; j += CHUNK_SIZE) {
++			sum_update(map_ptr(buf, last_match, CHUNK_SIZE),
++				   CHUNK_SIZE);
++			last_match = j;
++		}
++		if (last_match < s->flength) {
++			int32 len = s->flength - last_match;
++			sum_update(map_ptr(buf, last_match, len), len);
++			last_match = s->flength;
++		}
++		s->count = 0;
++	}
++
+ 	if (len > 0 && s->count > 0) {
+ 		build_hash_table(s);
+ 
+@@ -343,7 +359,7 @@ void match_sums(int f, struct sum_struct
+ 	} else {
+ 		OFF_T j;
+ 		/* by doing this in pieces we avoid too many seeks */
+-		for (j = CHUNK_SIZE; j < len; j += CHUNK_SIZE)
++		for (j = last_match + CHUNK_SIZE; j < len; j += CHUNK_SIZE)
+ 			matched(f, s, buf, j, -2);
+ 		matched(f, s, buf, len, -1);
+ 	}
+--- orig/options.c	2005-07-28 18:48:38
++++ options.c	2005-07-28 01:28:22
+@@ -38,6 +38,7 @@ int make_backups = 0;
+  **/
+ int whole_file = -1;
+ 
++int append_mode = 0;
+ int archive_mode = 0;
+ int keep_dirlinks = 0;
+ int copy_links = 0;
+@@ -166,6 +167,7 @@ static int modify_window_set;
+ static int itemize_changes = 0;
+ static int refused_delete, refused_archive_part;
+ static int refused_partial, refused_progress, refused_delete_before;
++static int refused_inplace;
+ static char *max_size_arg;
+ static char partialdir_for_delayupdate[] = ".~tmp~";
+ 
+@@ -274,6 +276,7 @@ void usage(enum logcode F)
+   rprintf(F,"     --suffix=SUFFIX         set backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
+   rprintf(F," -u, --update                skip files that are newer on the receiver\n");
+   rprintf(F,"     --inplace               update destination files in-place (SEE MAN PAGE)\n");
++  rprintf(F,"     --append                append data onto shorter files\n");
+   rprintf(F," -d, --dirs                  transfer directories without recursing\n");
+   rprintf(F," -l, --links                 copy symlinks as symlinks\n");
+   rprintf(F," -L, --copy-links            transform symlink into referent file/dir\n");
+@@ -404,6 +407,7 @@ static struct poptOption long_options[] 
+   {"links",           'l', POPT_ARG_NONE,   &preserve_links, 0, 0, 0 },
+   {"copy-links",      'L', POPT_ARG_NONE,   &copy_links, 0, 0, 0 },
+   {"keep-dirlinks",   'K', POPT_ARG_NONE,   &keep_dirlinks, 0, 0, 0 },
++  {"append",           0,  POPT_ARG_VAL,    &append_mode, 1, 0, 0 },
+   {"whole-file",      'W', POPT_ARG_VAL,    &whole_file, 1, 0, 0 },
+   {"no-whole-file",    0,  POPT_ARG_VAL,    &whole_file, 0, 0, 0 },
+   {"copy-unsafe-links",0,  POPT_ARG_NONE,   &copy_unsafe_links, 0, 0, 0 },
+@@ -579,6 +583,8 @@ static void set_refuse_options(char *bp)
+ 						refused_partial = op->val;
+ 					else if (wildmatch("progress", op->longName))
+ 						refused_progress = op->val;
++					else if (wildmatch("inplace", op->longName))
++						refused_inplace = op->val;
+ 					break;
+ 				}
+ 				if (!is_wild)
+@@ -1126,6 +1132,19 @@ int parse_arguments(int *argc, const cha
+ 			bwlimit_writemax = 512;
+ 	}
+ 
++	if (append_mode) {
++		if (whole_file > 0) {
++			snprintf(err_buf, sizeof err_buf,
++				 "--append cannot be used with --whole-file\n");
++			return 0;
++		}
++		if (refused_inplace) {
++			create_refuse_error(refused_inplace);
++			return 0;
++		}
++		inplace = 1;
++	}
++
+ 	if (delay_updates && !partial_dir)
+ 		partial_dir = partialdir_for_delayupdate;
+ 
+@@ -1133,7 +1152,8 @@ int parse_arguments(int *argc, const cha
+ #ifdef HAVE_FTRUNCATE
+ 		if (partial_dir) {
+ 			snprintf(err_buf, sizeof err_buf,
+-				 "--inplace cannot be used with --%s\n",
++				 "--%s cannot be used with --%s\n",
++				 append_mode ? "append" : "inplace",
+ 				 delay_updates ? "delay-updates" : "partial-dir");
+ 			return 0;
+ 		}
+@@ -1146,7 +1166,8 @@ int parse_arguments(int *argc, const cha
+ 		keep_partial = 0;
+ #else
+ 		snprintf(err_buf, sizeof err_buf,
+-			 "--inplace is not supported on this %s\n",
++			 "--%s is not supported on this %s\n",
++			 append_mode ? "append" : "inplace",
+ 			 am_server ? "server" : "client");
+ 		return 0;
+ #endif
+@@ -1438,7 +1459,9 @@ void server_options(char **args,int *arg
+ 	if (opt_ignore_existing && am_sender)
+ 		args[ac++] = "--ignore-existing";
+ 
+-	if (inplace)
++	if (append_mode)
++		args[ac++] = "--append";
++	else if (inplace)
+ 		args[ac++] = "--inplace";
+ 
+ 	if (tmpdir) {
+--- orig/receiver.c	2005-07-28 18:48:38
++++ receiver.c	2005-02-11 20:26:32
+@@ -45,6 +45,7 @@ extern int remove_sent_files;
+ extern int module_id;
+ extern int ignore_errors;
+ extern int orig_umask;
++extern int append_mode;
+ extern int keep_partial;
+ extern int checksum_seed;
+ extern int inplace;
+@@ -212,6 +213,28 @@ static int receive_data(int f_in, char *
+ 
+ 	sum_init(checksum_seed);
+ 
++	if (append_mode) {
++		OFF_T j;
++		sum.flength = (OFF_T)sum.count * sum.blength;
++		if (sum.remainder)
++			sum.flength -= sum.blength - sum.remainder;
++		for (j = CHUNK_SIZE; j < sum.flength; j += CHUNK_SIZE) {
++			sum_update(map_ptr(mapbuf, offset, CHUNK_SIZE),
++				   CHUNK_SIZE);
++			offset = j;
++		}
++		if (offset < sum.flength) {
++			int32 len = sum.flength - offset;
++			sum_update(map_ptr(mapbuf, offset, len), len);
++			offset = sum.flength;
++		}
++		if (fd != -1 && do_lseek(fd, offset, SEEK_SET) != offset) {
++			rsyserr(FERROR, errno, "lseek failed on %s",
++				full_fname(fname));
++			exit_cleanup(RERR_FILEIO);
++		}
++	}
++
+ 	while ((i = recv_token(f_in, &data)) != 0) {
+ 		if (do_progress)
+ 			show_progress(offset, total_size);
+@@ -417,6 +440,7 @@ int recv_files(int f_in, struct file_lis
+ 			send_msg(MSG_DONE, "", 0);
+ 			if (keep_partial && !partial_dir)
+ 				make_backups = 0; /* prevents double backup */
++			append_mode = 0;
+ 			continue;
+ 		}
+ 
+--- orig/rsync.yo	2005-07-28 19:26:48
++++ rsync.yo	2005-07-28 01:28:24
+@@ -307,6 +307,7 @@ to the detailed description below for a 
+      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
+  -u, --update                skip files that are newer on the receiver
+      --inplace               update destination files in-place
++     --append                append data onto shorter files
+  -d, --dirs                  transfer directories without recursing
+  -l, --links                 copy symlinks as symlinks
+  -L, --copy-links            transform symlink into referent file/dir
+@@ -566,6 +567,14 @@ should not use this option to update fil
+ rsync will be unable to update a file in-place that is not writable by the
+ receiving user.
+ 
++dit(bf(--append)) This causes rsync to update a file by appending data onto
++the end of the file, which presumes that the data that already exists on
++the receiving side is identical with the start of the file on the sending
++side.  If that is not true, the file will fail the checksum test, and the
++resend will do a normal bf(--inplace) update to correct the mismatch.  Any
++file on the receiving side that is longer than a file on the sending side
++is skipped.  Implies bf(--inplace).
++
+ dit(bf(-d, --dirs)) Tell the sending side to include any directories that
+ are encountered.  Unlike bf(--recursive), a directory's contents are not copied
+ unless the directory was specified on the command-line as either "." or a
+--- orig/sender.c	2005-07-28 18:48:38
++++ sender.c	2005-05-19 08:53:05
+@@ -27,6 +27,7 @@ extern int log_before_transfer;
+ extern int log_format_has_i;
+ extern int daemon_log_format_has_i;
+ extern int csum_length;
++extern int append_mode;
+ extern int io_error;
+ extern int allowed_lull;
+ extern int protocol_version;
+@@ -72,6 +73,13 @@ static struct sum_struct *receive_sums(i
+ 			(double)s->count, (long)s->blength, (long)s->remainder);
+ 	}
+ 
++	if (append_mode) {
++		s->flength = (OFF_T)s->count * s->blength;
++		if (s->remainder)
++			s->flength -= s->blength - s->remainder;
++		return s;
++	}
++
+ 	if (s->count == 0)
+ 		return(s);
+ 
+@@ -231,6 +239,7 @@ void send_files(struct file_list *flist,
+ 			/* For inplace: redo phase turns off the backup
+ 			 * flag so that we do a regular inplace send. */
+ 			make_backups = 0;
++			append_mode = 0;
+ 			continue;
+ 		}
+ 

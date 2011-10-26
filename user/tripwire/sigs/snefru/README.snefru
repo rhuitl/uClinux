@@ -1,0 +1,218 @@
+# $Id: README.snefru,v 1.2 1993/08/19 05:28:12 genek Exp $ 
+
+    The Snefru one-way hash function package is copyrighted by
+Xerox Corporation.  The following disclaimer can be found in the
+Snefru C code:  (Comments on changes made to accomodate its use
+within Tripwire follow the disclaimer.)
+
+==================
+
+/*
+  This is an implementation of Snefru. Snefru is a one-way hash
+  function that provides authentication. It does not provide secrecy.
+  
+  Snefru is named after a Pharaoh of ancient Egypt.
+  
+  Copyright (c) Xerox Corporation 1989. All rights reserved.
+  
+  License to copy and use this software is granted provided that it is
+  identified as the "Xerox Secure Hash Function" in all material mentioning
+  or referencing this software or this hash function.
+  
+  License is also granted to make and use derivative works provided that such
+  works are identified as "derived from the Xerox Secure Hash Function" in
+  all material mentioning or referencing the derived work.
+  
+  Xerox Corporation makes no representations concerning either the
+  merchantability of this software or the suitability of this software for
+  any particular purpose.  It is provided "as is" without express or implied
+  warranty of any kind.
+  
+  These notices must be retained in any copies of any part of this software.
+  
+  Updated information about Snefru is available from arisia.xerox.com in
+  directory /pub/hash by anonymous FTP.  The README file provides a quick
+  introduction.
+
+  This is version 2.5a, November 29, 1990.
+  Version 2.5a provides a reasonably understandable and efficient
+	implementation of Snefru.  Further, this version provides
+	8 passes.  While 4 pass Snefru has not been broken, the use
+	of 4 pass Snefru for production use is not recommended at
+	this time.  Further study of the security of Snefru is
+	required before production use is advisable.
+  
+  This program reads from the standard input until EOF is reached (the first
+  "read" that returns 0 bytes).  The data on the standard input is "hashed"
+  with a cryptographically secure one-way hash function (also known as a
+  "message digest", "fingerprint", "Manipulation Detection Code" or "MDC").
+  The hash is then printed on the standard output.
+  
+  The input can be of any size.  The output is 128 bits printed as 32
+  characters in hex.  The output size can be changed to 256 bits be setting
+  the parameter OUTPUT_BLOCK_SIZE to 8.  (The 8 indicates the number of
+  32-bit words in the output).
+  
+  The primary use of one-way hash functions is to determine if there have been
+  any unauthorized, malicious, or accidental changes made to a file.  For
+  example, if an executable program file produces the hash "209884c4
+  2e89d967 5456ac0e 61269550", then any change to that program file will
+  cause the hash to be changed.  Thus, the tampering can be detected by
+  comparing the current output value with the previously computed (and
+  presumably correct) output value.
+  
+  Hash512 is the centrol routine in this program.  It is used in this program in
+  a linear fashion -- i.e., a sequential file is hashed down by repeated
+  applications of Hash512.  Changing a single bit in the file would then
+  require completely re-computing the hash from the point of change onward.
+  
+  Hash512 can be used in a tree-structured fashion to authenticate a large table
+  of data. This would imply that changing a single bit would not force a
+  complete re-computation of the hash value, but would instead require only
+  log n re-computations of Hash512 to "patch up" the changes along the path
+  from the root to the changed leaf entry. A tree-structured application
+  also has the advantage that any single entry in the table can subsequently
+  be authenticated by someone who knows only the "authentication path" from
+  the root of the tree to the leaf entry.  These concepts are discussed more
+  thoroughly in "Secrecy, Authentication, and Public Key Systems" by Ralph
+  C. Merkle, UMI Research Press, 1982 (see particularly Chapter 2, "One Way
+  Hash Functions").  The use of a tree-structured pattern of applications of
+  a one-way hash function is covered by U.S. Patent #4,309,569, "Method of
+  Providing Digital Signatures" (contact Stanford University, Office of
+  Technology Licensing).
+  
+  
+  At the present time (November 29, 1990) the author knows of no method for
+  "breaking" this one-way function, (i.e., finding two input files that
+  produce the same output value).
+  
+  We recommend against the use of output sizes smaller than 128 bits, and
+  against the use of an input that is less than 2 (two) words larger than
+  the size of the output.  When the input size equals the output size,
+  Snefru suffers a serious degradation in security (an observation due to
+  Coppersmith).
+
+  Further study and validation of the security of Snefru is required prior
+  to production use.
+  
+  If anyone using this program finds two different inputs that produce the same
+  output, please contact Ralph C. Merkle via E-mail (merkle@xerox.com) or
+  via normal mail at: Xerox PARC 3333 Coyote Hill Road Palo Alto, CA 94304
+  (415) 494-4000
+  
+  
+  See the paper "A Fast Software One Way Hash Function" by Ralph C. Merkle,
+  to appear in The Journal of Cryptology, for a more detailed explanation.
+  
+  The following test cases were taken directly from a terminal, and can be used
+  to verify the correct functioning of an implementation of Snefru.  The
+  first input is simply a carriage return followed by control-d.  The second
+  input is "1" followed by carriage return followed by control-d, the third
+  input is "12" followed by carriage return followed by control-d, etc.
+  (In some cases, two control-d's will be required).
+
+Note that the test cases given are from 8-pass Snefru (e.g., SECURITY_LEVEL=8)
+
+% ./snefru
+
+ d9fcb317 1c097fbb a8c8f12a a0906bad
+% ./snefru
+1
+ 44ec420c e99c1f62 feb66c53 c24ae453
+% ./snefru
+12
+ 7182051a a852ef6f ba4b6c9c 9b79b317
+% ./snefru
+123
+ bc3a50af 82bf56d6 a64732bc 7b050a93
+% ./snefru
+1234
+ c5b8a049 85a8eadf b4331a89 88752b77
+% ./snefru
+12345
+ d559a2b6 2f6f4411 1324f852 08723707
+% ./snefru
+123456
+ 6cfb5e8f 1da02bd1 67b01e48 16686c30
+% ./snefru
+1234567
+ 29aa4832 5f275a8a 7a01ba15 43c54ba5
+% ./snefru
+12345678
+ be862a6b 68b7df88 7ebe0031 9cbc4a47
+% ./snefru
+123456789
+ 6103721c cd8ad565 d68e90b0 f8906163
+% 
+
+
+The following outputs were obtained after the program was
+compiled with OUTPUT_BLOCK_SIZE set to 8.  This can be done
+by using the -D option on cc, as:
+cc -o snefru256 -DOUTPUT_BLOCK_SIZE=8 snefru.c
+
+Note that the test cases given are from 8-pass Snefru (e.g., SECURITY_LEVEL=8)
+
+% ./snefru256
+
+ 2e02687f 0d45d5b9 b50cb68c 3f33e684 3d618a1a ca2d0689 3d3eb4e3 026b5732
+% ./snefru256
+1
+ bfea4a05 a2a2ef15 c736d114 598a20b9 d9bd4d66 b661e6b0 5ecf6a77 37bdc58c
+% ./snefru256
+12
+ ac677d69 761ade3f 189c7aef 106d5fe7 392d324e 19cc76d5 db4a2c05 f2cc2cc5
+% ./snefru256
+123
+ 061c76aa 1db4a22c 0e42945e 26c48499 b5400162 e08c640b e05d3c00 7c44793d
+% ./snefru256
+1234
+ 1e87fe1d 9c927e9e 24be85e3 cc733598 73541640 a6261793 ce5a9749 53113f5e
+% ./snefru256
+12345
+ 1b59927d 85a9349a 87796620 fe2ff401 a06a7ba4 8794498e bab978ef c3a68912
+% ./snefru256
+123456
+ 28e9d9bc 35032b68 faeda881 01ecb252 4317e9da 111b0e3e 70941072 12d9cf72
+% ./snefru256
+1234567
+ f7fff4ee 74fd1b8d 6b3267f8 4e47e007 f029d13b 8af7e37e 34d13b46 9b8f248f
+% ./snefru256
+12345678
+ ee7d64b0 102b2205 e9892661 3b200185 559d08be 6ad787da 717c9687 44e11af3
+% ./snefru256
+123456789
+ 4ca72639 e40e9ab9 c0c3f523 c4449b39 11632d37 4c124d77 02192ec2 e4e0b7a3
+% 
+
+  Note that "word32" MUST be 32 bits
+  
+  Implementor:  Ralph C. Merkle
+  
+ */
+
+==================
+
+    The Snefru one-way hash function package is copyrighted by
+Xerox Corporation.  The disclaimer from the C code has been
+retained, and is shown above.
+
+    All big-endian/little-endian specific code in snefru.c has
+been replaced by code that can resolve this automatically at
+compile-time.  Tripwire specific code is also in snefru.c to
+to minimize the amount of overhead in collecting signatures from
+within Tripwire.  (We certainly don't want to fork() for every
+file we need to scan!)
+
+    Because of this, snefru.c is no longer identical to the
+virgin Snefru distribution.  I have sent my changes to the
+author, but I am not aware of any buybacks at this time.
+
+    The original Snefru code can be obtained via anonymous FTP
+from arisia.xerox.com.  The original README file has been
+retained in the Tripwire distribution.
+
+
+
+Gene Kim
+September 7, 1992

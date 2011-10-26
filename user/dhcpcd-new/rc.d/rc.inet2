@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# rc.inet2	This shell script boots up the entire INET system.
+#		Note, that when this script is used to also fire
+#		up any important remote NFS disks (like the /usr
+#		distribution), care must be taken to actually
+#		have all the needed binaries online _now_ ...
+#
+# Author:	Fred N. van Kempen, <waltje@uwalt.nl.mugnet.org>
+# Modifier:     Yoichi Hariguchi <yoichi@fore.com>  09/14/96
+# Modifier:     Sergei Viznyuk <sv@phystech.com>  01/31/98
+#
+
+# Constants.
+NET="/usr/sbin"
+IN_SERV="lpd"
+LPSPOOL="/var/spool/lpd"
+
+# At this point, we are ready to talk to The World...
+echo "Mounting remote file systems..."
+/sbin/mount -a -t nfs		# This may be our /usr runtime!!!
+
+echo -n "Starting daemons:"
+
+# Start the SYSLOGD/Klogd daemons.  These must come first.
+if [ -f ${NET}/syslogd ]; then
+  echo -n " syslogd"
+  ${NET}/syslogd
+#  echo -n " klogd"
+  echo " klogd"
+  ${NET}/klogd
+fi
+
+# invoke DHCP client here if I do not use PCMCIA device.
+# you should invoke dhcpcd from /etc/pcmcia/network
+# if you use PCMCIA network card.
+#
+if [ ! -x /etc/rc.d/rc.pcmcia ] ; then
+  if ${NET}/dhcpcd; then
+    if [ -x /etc/rc.d/rc.dhcp ]; then
+      /etc/rc.d/rc.dhcp
+    fi
+  fi
+fi

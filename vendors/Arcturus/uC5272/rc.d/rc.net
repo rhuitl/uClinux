@@ -1,0 +1,59 @@
+#!/bin/sh
+
+echo Configuring local network loopback
+ifconfig lo inet 127.0.0.1 netmask 255.0.0.0
+
+# install cs8900 as a module to solve ethX number problem on 2.6 kernel
+# ignore error if insmod couldn't find it
+if [ "$HWADDR1" != "(null)" ]; then
+    insmod -q cs89x0 1>/dev/null 2>/dev/null
+    if [ "$IPADDR1" != "(null)" ]; then
+        if [ "$IPADDR1" = "dhcp" ]; then
+            /etc/rc.d/rc.dhcpc eth1
+        else
+            echo Configuring stored IP address $IPADDR1 on eth1
+            ifconfig eth1 inet $IPADDR1
+        fi
+    fi
+fi
+
+if [ "$IPADDR0" != "(null)" ]; then
+    if [ "$IPADDR0" = "dhcp" ]; then
+	/etc/rc.d/rc.dhcpc eth0
+    else
+        echo Configuring stored IP address $IPADDR0 on eth0
+        ifconfig eth0 inet $IPADDR0 
+    fi
+else
+    echo Configuring default IP address 192.168.1.200 on eth0
+    ifconfig eth0 inet 192.168.1.200 netmask 255.255.255.0 
+fi
+
+# Set up default route. Note that this could
+# be in addition to one set up by DHCP above
+if [ "$GATEWAY" != "(null)" ]; then
+    echo Adding default route via $GATEWAY
+    route add -net default gw $GATEWAY
+fi
+
+# Add name server. Note again that this could
+# be in addition to one set up by DHCP above
+if [ "$NAMESERVER" != "(null)" ]; then
+    echo Adding name server $NAMESERVER
+    echo nameserver $NAMESERVER >> /etc/resolv.conf
+fi
+
+# Add DNS search path. Note again that this could
+# be in addition to one set up by DHCP above
+if [ "$SEARCHPATH" != "(null)" ]; then
+    echo Adding DNS search path: $SEARCHPATH
+    echo search $SEARCHPATH >> /etc/resolv.conf
+fi
+
+
+if [ "$NFSMOUNT" != "(null)" ]; then
+    echo NFS mounting $NFSMOUNT
+    portmap &
+    mount $NFSMOUNT
+fi
+

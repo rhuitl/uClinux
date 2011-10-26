@@ -1,0 +1,156 @@
+This is a major rewrite of pam_krb5afs.  Call it 2.x, for lack of a better term.
+
+o Compared to the earlier releases, this tree builds a single module which
+  "knows" how to do everything which is knowable at compile-time.
+o Configuration options which can now be set as library defaults in the
+  system-wide krb5.conf are now largely ignored by the module.
+
+Standard options:
+o debug
+  Log debugging messages at LOG_DEBUG priority.
+o debug_sensitive
+  Even log passwords when logging debugging messages at LOG_DEBUG priority.
+o no_warn
+  When authenticating, don't warn the user about an expired password.
+o use_authtok
+  When changing passwords, never prompt for password data.  Instead, use
+  data stored by a previously-called module.
+o use_first_pass
+  When authenticating, never prompt for password data.  Instead, use a
+  password which was stored by a previously-called module.
+o try_first_pass
+  When authenticating, first try to authenticate using the password which
+  was stored by a previously-called module.  If it fails, then prompt for
+  the correct password and try again.
+
+Recognized options (krb5.conf's appdefaults/pam section, and command-line):
+o banner=Kerberos
+  When changing passwords, tell users that they are changing their Kerberos
+  passwords (unset to avoid using any term other than "password").
+o ccache_dir=/tmp
+  Directory in which to store ccache and ticket files.
+o ccname_template=FILE:%d/krb5cc_%U_XXXXXX
+  Location of the user's v5 ccache files.
+o existing_ticket
+  Use the presence of a TGT for the user's realm in the default ccache as
+  sufficient proof of the user's identity.  If you're not also validating
+  credentials every time and in every way they are obtained, then THIS IS VERY
+  DANGEROUS.
+o external
+  external = service1 service2
+  Attempt to reuse credentials stored in a ccache pointed to by the KRB5CCNAME
+  variable in the PAM environment.  This is mainly useful for situations where
+  the calling application authenticated the user using GSSAPI, the user
+  delegated credentials to the calling application, and you're using pam_krb5
+  to obtain a v4 Kerberos ticket via krb524, or AFS tokens.  The calling
+  application MUST ensure that KRB5CCNAME points to a ccache which should be
+  used for the authenticating user.  A default list of services can be set at
+  compile-time.
+o ignore_afs
+  Disable the default behavior of attempting to obtain tokens for the local
+  AFS cell on behalf of clients.
+o ignore_unknown_principals
+  ignore_unknown_spn
+  ignore_unknown_upn
+  Controls whether or not users with unknown principal names should trigger
+  a PAM_IGNORE error instead of a PAM_USER_UNKNOWN error.
+o initial_prompt
+  Controls whether or not pam_krb5 should ask for the user's password, or let
+  libkrb5 do it as needed.
+o keytab=/etc/krb5.keytab
+  Default keytab to use when validating initial credentials.  Can be overridden
+  at configure-time.
+o krb4_convert
+  Obtain Kerberos IV ticket files, even if not required for the sake of AFS.
+o krb4_convert_524
+  If pam_krb5 is configured to obtain Kerberos IV tickets (see krb4_convert,
+  above), this option controls whether or not pam_krb5 attempts to use the
+  krb524 service to obtain them in addition to contacting the KDC.  This
+  option is enabled by default if "krb4_convert" is enabled, but can be
+  disabled using the "no_krb4_convert_524" flag.
+o krb4_use_as_req
+  If pam_krb5 is configured to obtain Kerberos IV tickets (see krb4_convert,
+  above), this option controls whether or not pam_krb5 attempts to use the
+  usual kinit-style network request to obtain them.  This option is enabled by
+  default if "krb4_convert" is enabled, but it can be disabled using the
+  "no_krb4_use_as_req" flag.
+o mappings = regex regex [regex regex...]
+  Specifies that pam_krb5 should derive the user's principal name from the Unix
+  user name by first checking if the user name matches the first regex, and
+  if it matches, formulating a principal name using the second regex.  Multiple
+  pairs of regular expressions can be used.
+  For example,
+    mappings = EXAMPLE\\(.*) $1@EXAMPLE.COM
+  would map any user with a name of the form "EXAMPLE\whatever" to a principal
+  name of "whatever@EXAMPLE.COM".  This is primarily targeted at allowing
+  pam_krb5 to be used to authenticate users whose user information is provided
+  by winbindd.
+  Note that this will frequently require the reverse to be configured by
+  setting up an auth_to_local rule elsewhere in krb5.conf.
+o minimum_uid=NUMBER
+  Minimum UID which the user must have before pam_krb5.so will attempt to
+  authenticate that user, otherwise it will ignore the user.
+o no_user_check
+  Go ahead and authenticate users for whom getpwnam() returns no information.
+  Credential cache and ticket files will be created and owned by the current
+  user and group ID instead of the user's.
+o null_afs
+  Attempt to get credentials for AFS by guessing a service name of the form
+  afs@REALM first, and then one of the form afs/cell@REALM, rather than
+  proceeding in the opposite order.
+o pkinit_identity=LOCATION (Heimdal-specific)
+  Specify the location of the user's private key and certificate information,
+  in the same format which would be passed to kinit as an argument for its
+  -C/--pk-user command-line option.
+o pkinit_flags=NUMBER (Heimdal-specific)
+  Specify a flags value to pass to libkrb5, useful mainly for debugging.
+o preauth_options=OPT=VAL[,...] (MIT-specific)
+  Specify arbitrary preauthentication options to pass to libkrb5, useful
+  mainly for debugging.
+o realm=REALM
+  Override the default realm.
+o renew_lifetime
+  Override the default renewable lifetime (set in libdefaults, else 0).
+o subsequent_prompt
+  Controls whether or not pam_krb5 should just return the PAM_AUTHTOK when
+  libkrb5 requests that pam_krb5 get information from the user.
+o ticket_lifetime
+  Override the default ticket lifetime (24 hours with krb5 1.3, else 10 hours).
+  The actual lifetime of your tickets will most likely be the lowest of 1) this
+  value, 2) the configured maximum lifetime of your ticket-granting principal,
+  3) the configured maximum ticket life for your user principal, and 4) the
+  maximum allowable lifetime specified in your KDC's configuration.
+o tokens
+  tokens = service1 service2
+  Create a new AFS PAG and obtain AFS tokens during the authentication phase.
+  By default, tokens are obtained for the local cell (and the cell which
+  contains the user's home directory, if they're not the same).
+o token_strategy
+  Override how the module attempts to get credentials and set AFS tokens.
+  By default, the module supports these methods:
+    v4    Get krb4 credentials and use the traditional rxkad token format.
+    524   Convert krb5 credentials to krb4 credentials with the help of a
+          running 524 service, and use the traditional rxkad token format.
+    2b    Get krb5 credentials, and use the "2b" rxkad token format, which
+          is only supported in OpenAFS 1.2.8 and later.
+    rxk5  Get krb5 credentials, and use the rxk5 token format, which may be
+          supported in OpenAFS 1.6 and later.
+  The default list of methods, and their order, is noted in the manual pages.
+o use_shmem
+  use_shmem = service1 service2
+  Pass credentials from authentication to session management using shared
+  memory instead of PAM data items.  This allows authentication and session-
+  managment to be performed in different processes, so long as the PAM
+  environment is correctly propagated from one to the other.  A default list
+  of services can be set at compile-time.
+o validate
+  validate = service1 service2
+  Validate initial credentials.  By default, credentials are validated if
+  the specified keytab file can be read, using the first service for which
+  a key is found.
+
+Configuration file only:
+o afs_cells = cell1 cell2 cell3 cell4=afs/cell4@EXAMPLE.COM
+
+This module is hosted on fedorahosted.org.  For more information, point a
+web browser at "http://fedorahosted.org/pam_krb5/".

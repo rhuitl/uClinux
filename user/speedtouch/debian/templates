@@ -1,0 +1,142 @@
+Template: speedtouch/no_usbdevfs
+Type: note
+Description: USB device file system (usbdevfs) unavailable
+ I was unable to find support for the USB device file system in your 
+ current kernel, either compiled in or as a loadable module (part of 
+ usbcore.o). The Speedtouch driver requires support for this to
+ function. This could be because your kernel has no USB support, or
+ because this option was not enabled in your kernel. Install or compile
+ a new kernel that has the following configuration options set to Y
+ (compiled in) or M (modular):
+  * USB (Universal Serial Bus) support (CONFIG_USB)
+  * USB device file system (CONFIG_USB_DEVICEFS)
+
+Template: speedtouch/no_hdlc
+Type: note
+Description: Synchronous HDLC line discipline unavailable
+ I was unable to find support for the synchronous HDLC line discipline 
+ in your current kernel, either compiled in or as a loadable module
+ (n_hdlc.o). The Speedtouch driver requires support for this to
+ function. Install or compile a kernel that has the following 
+ configuration options set to Y (compiled in) or M (modular):
+  * Non-standard serial port support (CONFIG_SERIAL_NONSTANDARD)
+  * Synchronous HDLC line discipline support (CONFIG_N_HDLC)
+
+Template: speedtouch/no_pppsync
+Type: note
+Description: PPP support for sync tty ports unavailable
+ I was unable to find PPP support for synchronous tty ports in your
+ current kernel, either compiled in or as a loadable module
+ (ppp_synctty.o). The Speedtouch driver requires support for this to
+ function. Install or compile a kernel that has the following
+ configuration options set to Y (compiled in) or M (modular):
+  * PPP (point-to-point protocol) support (CONFIG_PPP)
+  * PPP support for sync tty ports (CONFIG_PPP_SYNC_TTY)
+
+Template: speedtouch/start
+Type: boolean
+Default: yes
+Description: Start Speedtouch driver automatically?
+ If you would like the Speedtouch driver to be started now and
+ automatically when your system boots up, answer yes here. The
+ Speedtouch driver will not work if your kernel does not have support
+ for USB, the USB device file system, the synchronous HDLC line
+ discipline, and PPP support for synchronous TTY ports, or if your USB
+ is not correctly configured and both LEDs on the Speedtouch adapter are
+ lit.
+ .
+ If any of the above conditions are not met, it may be safer to say no 
+ here and correct them before attempting to use the driver. It can then 
+ be enabled with 'dpkg-reconfigure speedtouch', where you can answer yes 
+ to this question.
+
+Template: speedtouch/microcode
+Type: select
+Choices: search-cd, search-path, download, ignore
+Default: ignore
+Description: Where can I get the Speedtouch microcode?
+ To function correctly, the Speedtouch driver needs microcode which can 
+ be found within the driver for Windows (in alcaudsl.sys) or in the 
+ management tool for the manufacturer's Linux drivers (in mgmt.o). The 
+ package has the following methods to locate either file:
+  * search-cd: this will attempt to mount /cdrom or /mnt/cdrom and 
+    search for either file on the CD, and is useful if you got a driver
+    disk with your adapter or from your ISP.
+  * search-path: this will prompt for a directory and search the given 
+    location for either file. this is useful if you have already have
+    the file somewhere on disk, or have a CD mounted elsewhere (it must 
+    be already mounted).
+  * download: if you have Internet access by other means, this will 
+    download the Linux management tool and extract mgmt.o from it.
+  * ignore: if you select this option the driver will not work until you 
+    re-run this program (with 'dpkg-reconfigure speedtouch'), or copy a
+    file with the microcode to /usr/share/speedtouch/microcode. this is
+    useful if you just want to get on with configuring and installing
+    other packages.
+
+Template: speedtouch/microcode_loc
+Type: string
+Description: Where should I search for the Speedtouch microcode?
+ Please enter the directory where I should search for alcaudsl.sys or
+ mgmt.o, the files containing the microcode the Speedtouch driver 
+ requires to function.
+
+Template: speedtouch/microcode_failed
+Type: note
+Description: Unable to locate Speedtouch microcode
+ The package configuration script was unable to find the Speedtouch 
+ microcode by the method you specified. If you are configuring 
+ interactively, you will now have the opportunity to choose another
+ method or ignore the problem for the moment. Otherwise, you can 
+ correct the problem by re-running the configuration with
+ 'dpkg-reconfigure speedtouch', or copy the file (alcaudsl.sys or
+ mgmt.o) to /usr/share/speedtouch/microcode yourself.
+
+Template: speedtouch/country
+Type: select
+Choices: austria, belgium, brasil, france, iceland, italy, kuwait, netherlands, portugal, uk, usa, other
+Description: Which country are you in?
+ The Speedtouch driver needs to know which country you are in to 
+ determine which VPI/VCI pair to use. These are the numbers of 
+ the virtual circuits that ATM uses to send and transmit data over your
+ ADSL line. If your country is not listed, or the selection does not
+ appear to work, you will have to determine and set the VPI/VCI pair
+ manually by selecting 'other'.
+
+Template: speedtouch/manual_vpi
+Type: string
+Description: What is your VPI (Virtual Path ID)?
+ The Speedtouch driver needs to know which VPI to use for sending data 
+ over your ADSL line via ATM. Your ISP may be able to help you find this 
+ value, or other Linux users with the same ISP as you.
+
+Template: speedtouch/manual_vci
+Type: string
+Description: What is your VCI (Virtual Circuit ID)?
+ The Speedtouch driver needs to know which VCI to use for sending data 
+ over your ADSL line via ATM. Your ISP may be able to help you find this 
+ value, or other Linux users with the same ISP as you.
+
+Template: speedtouch/user
+Type: string
+Description: What is the username (or login) given to you by your ISP?
+ The Speedtouch driver needs to know the username given to you by your 
+ ISP, to authenticate you for the PPP over ATM connection. This may be 
+ in the format of 'username@authentication.host.name'.
+
+Template: speedtouch/password
+Type: password
+Description: What is the password given to you by your ISP?
+ The Speedtouch driver needs to know the password given to you by your 
+ ISP, to authenticate you for the PPP over ATM connection.
+
+Template: speedtouch/maxfail
+Type: string
+Default: 5
+Description: How many times should the Speedtouch driver retry?
+ Unfortunately, the Speedtouch driver is not infallible, and can loose 
+ it's connection due to many reasons from USB drivers in the kernel or 
+ power fluctuations, to noise on the ADSL line or problems at your ISP, 
+ or even just a boring old software bug. Specify the number of times you 
+ wish pppd to try and restart the connection before closing, or specify 
+ 0 to disable retrying.

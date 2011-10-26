@@ -1,0 +1,49 @@
+uClinux FAQ
+-----------
+
+
+Q: During the link process I get error messages like:
+
+/usr/local/bin/m68k-elf-ld.real: address 0x1069fe of linux section .bss is not
+within region ram
+
+or:
+
+/usr/local/m68k-elf/bin/ld.real: region flatmem is full (../../bin/xxxx.elf
+section .bss)
+
+A: This can be caused by a missconfiguration of the linker description file 
+(1st
+example)as well as by your program exceeding the maximum size (2nd example). 
+The
+linker description file for the kernel can be found under the ./arch directory
+for your specific architecture. It's name is 'ram.ld'. If your application is
+getting to large - or the default setting of 1 MB is to sparse :) - you might
+want to fiddle around with 'elf2flt.ld' within your toolchain's path. A
+description of the linker file syntax can be found at ???(Greg?).
+
+
+Q: What do I need to mount NFS
+
+A: In the Kernel you have to enable
+
+* your network device (should be the default)
+* TCP/IP Networking (should be the default)
+* File systems -> Network file systems -> NFS File system support
+* you might need NFSv3 support (for a SuSE 7.3 server you do)
+
+In the userland:
+
+* Network->Applications->portmap (recommended)
+* the mount / unmount command from Filesystem Applications or the BusyBox
+
+Now you can call:
+
+  mount -t nfs 192.168.0.1:/myexport /mnt -o nolock
+
+To mount a share without the portmapper. If you forget the nolock option the
+command will block. If you have the portmapper call:
+
+  portmap &
+  mount -t nfs 192.168.0.1:/myexport /mnt
+

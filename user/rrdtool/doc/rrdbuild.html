@@ -1,0 +1,212 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>rrdbuild</title>
+<link rev="made" href="mailto:dws@ee.ethz.ch" />
+</head>
+
+<body style="background-color: white">
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<ul>
+
+		<li><a href="#overview">Overview</a></li>
+		<li><a href="#building">Building</a></li>
+	</ul>
+
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+-->
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>rrdbuild - Instructions for building RRDtool</p>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>
+</p>
+<h2><a name="overview">Overview</a></h2>
+<p>If you downloaded the source of rrdtool you have to compile it. This
+document will give some information on how this is done.</p>
+<p>RRDtool relies on services of thrid part libraries. Some of these libraries
+may already be installed on your system. You have to compile copies of the other
+ones before you can build RRDtool.</p>
+<p>This document will tell you about all the necessary steps to get going.</p>
+<p>
+</p>
+<h2><a name="building">Building</a></h2>
+<p>Before you start to build RRDtool, you have to decide two things:</p>
+<ol>
+<li></li>
+In which directory you want to build the software.
+<p></p>
+<li></li>
+Where you want to install the software.
+<p></p></ol>
+<p>Once you have decided. Save the two locations into environment variables.
+Depending on the shell you are using, you can do either (bash,zsh):</p>
+<pre>
+ BUILD_DIR=/tmp/rrdbuild
+ INSTALL_DIR=/usr/local/rrdtool-1.2.10</pre>
+<p>Or if you run tcsh:</p>
+<pre>
+ set BUILD_DIR=/tmp/rrdbuild
+ set INSTALL_DIR=/usr/local/rrdtool-1.2.10</pre>
+<p>Now make sure the BUILD_DIR exists and go there:</p>
+<pre>
+ mkdir -p $BUILD_DIR
+ cd $BUILD_DIR</pre>
+<p>Lets first assume you already have all the necessary libraries
+per-installed. Note that these instructions assume that your copies of
+<strong>tar</strong> and <strong>make</strong> are actually <strong>GNU tar</strong> and <strong>GNU make</strong> respectively. It
+could be that they are installed as <strong>gtar</strong> and <strong>gmake</strong> on your system.</p>
+<pre>
+ wget <a href="http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/rrdtool-1.2.10.tar.gz">http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/rrdtool-1.2.10.tar.gz</a>
+ tar zxf rrdtool-1.2.10.tar.gz
+ cd rrdtool-1.2.10
+ ./configure --prefix=$INSTALL_DIR &amp;&amp; make &amp;&amp; make install</pre>
+<p>Ok, this was very optimistic. This try will probably have ended with
+<strong>configure</strong> complaining about several missing libraries. If you are on a
+Linux or *bsd system you may want to just install the missing bits from your
+software repository. When you do that, make sure you also get the <strong>-dev</strong>
+package for each library you install. Once you have the missing bits on
+board, just re-run the last line of the instructions above.</p>
+<p>But again this may have been too optimistic, and you actually have to
+compile your own copies of the required libraries. Here is how:</p>
+<dl>
+<dt><strong><a name="item_building_cgilib">Building cgilib</a></strong><br />
+</dt>
+<dd>
+<pre>
+ cd $BUILD_DIR
+ wget <a href="http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/cgilib-0.5.tar.gz">http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/cgilib-0.5.tar.gz</a>
+ tar zxf cgilib-0.5.tar.gz
+ cd cgilib-0.5</pre>
+</dd>
+<dd>
+<p>If you are on Mac OSX you want to fix a little header problem here by doing</p>
+</dd>
+<dd>
+<pre>
+ touch malloc.h</pre>
+</dd>
+<dd>
+<p>and now you are ready to build</p>
+</dd>
+<dd>
+<pre>
+ make CC=gcc CFLAGS=&quot;-O3 -fPIC -I.&quot;
+ mkdir -p $BUILD_DIR/lb/include
+ cp *.h $BUILD_DIR/lb/include
+ mkdir -p $BUILD_DIR/lb/lib
+ cp libcgi* $BUILD_DIR/lb/lib</pre>
+</dd>
+<dt><strong><a name="item_building_zlib">Building zlib</a></strong><br />
+</dt>
+<dd>
+<pre>
+ cd $BUILD_DIR
+ wget <a href="http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/zlib-1.2.2.tar.gz">http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/zlib-1.2.2.tar.gz</a>
+ tar  zxf zlib-1.2.2.tar.gz
+ cd zlib-1.2.2
+ env CFLAGS=&quot;-O3 -fPIC&quot; ./configure --prefix=$BUILD_DIR/lb
+ make
+ make install</pre>
+</dd>
+<dt><strong><a name="item_building_libpng">Building libpng</a></strong><br />
+</dt>
+<dd>
+Libpng itself requires zlib to build, so we need to help a bit. If you
+already have a copy of zlib on your system (which is very likley) you can
+drop the settings of LDFLAGS and CPPFLAGS. Note that the backslash (\) at
+the end of line 4 means that line 4 and line 5 are on one line.
+</dd>
+<dd>
+<pre>
+ cd $BUILD_DIR
+ wget <a href="http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/libpng-1.2.8-config.tar.gz">http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/libpng-1.2.8-config.tar.gz</a>
+ tar zxvf libpng-1.2.8-config.tar.gz
+ cd libpng-1.2.8-config
+ env CPPFLAGS=&quot;-I$BUILD_DIR/lb/include&quot; LDFLAGS=&quot;-L$BUILD_DIR/lb/lib&quot; CFLAGS=&quot;-O3 -fPIC&quot; \
+     ./configure --disable-shared --prefix=$BUILD_DIR/lb
+ make
+ make install</pre>
+</dd>
+<p></p>
+<dt><strong><a name="item_building_freetype">Building freetype</a></strong><br />
+</dt>
+<dd>
+<pre>
+ cd $BUILD_DIR
+ wget <a href="http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/freetype-2.1.9.tar.gz">http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/freetype-2.1.9.tar.gz</a>
+ tar zxvf freetype-2.1.9.tar.gz
+ cd freetype-2.1.9
+ env CPPFLAGS=&quot;-I$BUILD_DIR/lb/include&quot; LDFLAGS=&quot;-L$BUILD_DIR/lb/lib&quot; CFLAGS=&quot;-O3 -fPIC&quot; \
+     ./configure --disable-shared --prefix=$BUILD_DIR/lb
+ make
+ make install</pre>
+</dd>
+<dt><strong><a name="item_building_libart_lgpl">Building libart_lgpl</a></strong><br />
+</dt>
+<dd>
+<pre>
+ cd $BUILD_DIR
+ wget <a href="http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/libart_lgpl-2.3.17.tar.gz">http://people.ee.ethz.ch/oetiker/webtools/rrdtool/pub/libs/libart_lgpl-2.3.17.tar.gz</a>
+ tar zxvf libart_lgpl-2.3.17.tar.gz
+ cd libart_lgpl-2.3.17
+ env CFLAGS=&quot;-O3 -fPIC&quot; ./configure --disable-shared --prefix=$BUILD_DIR/lb
+ make
+ make install</pre>
+</dd>
+</dl>
+<p>Now all the dependent libraries are built and you can try again. Since these
+are static libraries, you may have to use <em>ranlib</em> to make them accessible.
+Especially BSD systems like Mac OS X may require this, Linux and Solaris
+will do just fine without since their <em>ar</em> command does ranlibs job as well.</p>
+<pre>
+ ranlib $BUILD_DIR/lb/lib/*.a</pre>
+<p>This time you tell configure where it should be looking for libraries and
+include files. This is done via environment variables. Depending on the
+shell you are running, the syntax for setting environment variables is
+different. Under csh/tcsh you use:</p>
+<pre>
+ set IR=-I$BUILD_DIR/lb/include
+ setenv CPPFLAGS &quot;$IR $IR/libart-2.0 $IR/freetype2 $IR/libpng&quot;
+ setenv LDFLAGS  -L$BUILD_DIR/lb/lib
+ setenv CFLAGS -O3</pre>
+<p>If you are running bash/sh/ash/ksh/zsh use this:</p>
+<pre>
+ IR=-I$BUILD_DIR/lb/include
+ CPPFLAGS=&quot;$IR $IR/libart-2.0 $IR/freetype2 $IR/libpng&quot;
+ LDFLAGS=&quot;-L$BUILD_DIR/lb/lib&quot;
+ CFLAGS=-O3
+ export CPPFLAGS LDFLAGS CFLAGS</pre>
+<p>And finally try building again. We disable the python bindings because it
+seems that a fair number of people have ill configured python setups that
+would prevent rrdtool from building if they are included in their current
+state.</p>
+<pre>
+ cd $BUILD_DIR/rrdtool-1.2.10
+ ./configure --prefix=$INSTALL_DIR --disable-python &amp;&amp; make clean &amp;&amp; make &amp;&amp; make install</pre>
+<p>Now go to <em>$INSTALL_DIR</em><strong>/examples</strong> and run them to see if your
+build has been successful.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<p>Tobias Oetiker &lt;<a href="mailto:oetiker@ee.ethz.ch">oetiker@ee.ethz.ch</a>&gt;</p>
+
+</body>
+
+</html>

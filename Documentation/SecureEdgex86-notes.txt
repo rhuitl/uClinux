@@ -1,0 +1,187 @@
+
+SecureEdgeVPN/x86 NOTES
+-------------------------
+
+This file contains notes on specific details of the SecureEdgeVPN/x86
+source build. It is written in an FAQ style. The section headers are:
+
+1. Kernel source?
+2. Supported target hardware?
+3. FLASH upgrading?
+4. Root filesystem?
+5. Kernel boot arguments?
+6. Serial console?
+7. Kernel profiling?
+8. HIFN crypto accelerator?
+9. BIOS?
+10. FLASH recovery?
+11. Tools required to build?
+
+
+
+OK, here we go...
+
+
+1. Kernel source?
+
+You should only select the linux-2.4.x kernel and either the glibc or uClibc
+library when build for SnapGear/SecureEdge x86 based targets. The current
+kernel is linux-2.4.20.
+
+
+2. Supported target hardware?
+
+Currently the supported platforms are:
+
+. SnapGear SecureEdge2580 VPN router
+. SnapGear SecureEdge2590 VPN router
+. SnapGear SecureEdge/NAS
+. SnapGear SecureEdge/PCMCIA
+
+
+3. FLASH upgrading?
+
+Upgrading the firmware is quite simple on the SecureEdge hardware. The
+simplest method is via the web config pages, point a browser at the 
+SecureEdgeVPN and select the "Advanced" tab and then choose "FLASH upgrade".
+
+Alternatively you can do the update manually using the command line. Follow
+these steps:
+
+    1.  telnet <IP-of-your-SecureEdgeVPN>
+    2.  netflash <IP-address-of-your-server> flash.bin
+
+The upgrade method by default is via TFTP, so your server would have to
+support this. Netflash can also load using HTTP, simply supply the URL
+of the flash.bin file to netflash.
+
+
+4. Root filesystem?
+
+The default build of the SecureEdgeVPN builds the root filesystem as a
+ROMfs type. This is a read only filesystem, within which files cannot be
+modified once within the FLASH of the SecureEdgeVPN. (This is good for
+security).
+
+The filesystem is created under the "romfs" directory of the source tree.
+You can insert any files you wish into the filesystem simply by copying
+them into the romfs directory structure.
+
+Alternatively you can build the SecureEdgeVPN firmware to use a true
+read/write filesystem on the FLASH. This method uses the Journalling
+FLASH Filesystem (JFFS2). At the top level config choose the target as
+"SecureEdge2580-JFFS" to enable this.
+
+
+5. Kernel boot arguments?
+
+You can supply kernel boot line arguments by programming them into the
+boot FLASH. (This is also where the ethernet MAC addresses are stored).
+Use the following command line to set boot arguments:
+
+    flashw -p -o 0x2000 <arg1> <arg2> <arg3> /dev/flash/bootarg
+
+On the next reboot these will be set as the boot arguments.
+
+
+6. Serial console?
+
+You can specify to use a serial console on boot using the kernel boot
+arguments and the /etc/inittab file.
+
+Firstly you need to tell the kernel which device is the console:
+
+    flashw -p -o 0x2000 console=ttyS0,115200 /dev/flash/bootarg
+
+Possible console devices are ttyS0, ttyS1 and null. Setting the console
+to null will disable a kernel console. The kernel will default to using
+the ttyS0 device as a console if no console argument is present on the
+command line.
+
+Then you need to get init to spawn a login on that device by adding a
+line to /etc/config/inittab:
+
+    console::respawn:/bin/getty 115200 -
+
+This will spawn the usual getty style login on your chosen console device.
+To disable the console simply remove this line from your inittab.
+
+
+7. Kernel profiling?
+
+It is possible, and quite simple, to use kernel profiling support. There are
+two things you need to do. Firstly you need to enable profiling within the
+kernel using the "profile=X" kernel boot argument. Secondly you need to use
+the "readprofile" application (a port exists in the "user" directory).
+
+When running with kernel profiling enabled, simply run the readprofile
+command, and it will report profiling information. Example output would look
+like:
+
+ 19%     25 printk                                      0.0675
+  7%      9 try_to_free_buffer                          0.0147
+  6%      8 bdflush                                     0.0121
+  7%      9 generic_file_read                           0.0061
+  9%     12 memset                                      0.3529
+ 15%     20 memcpy                                      0.5555
+  1%      2 memmove                                     0.0285
+---------------------------------------------------------------------------
+        126 total                                       0.0003
+
+If you want to clear the profiling buffer (reset it to 0) then use the "-r"
+switch of readprofile.
+
+If you just want a report on current (or average) CPU utilization then you
+need only look at the information in /proc/stat. You can use the "cpu" program
+to report this in a nice way.
+
+
+8. HIFN crypto accelerator?
+
+The source tree (and standard binary build) contain a driver module for
+the optional HIFN 7951 Crypto accellerator chip. This module implements
+the standard libdes libraries, and is primarily used by IPsec. This driver
+module is proprietary to SnapGear, and the source code is not included in
+this package. 
+
+
+9. BIOS?
+
+The SecureEdge family of hardware products do not use a traditional PC
+BIOS. Instead SnapGear has implemented a BIOS emulator to support generic
+operating system booting. Standard zImage or bzImage kernels are built
+and booted using the SnapGear Boot Loader.
+
+This means the boot time is kept to an absolute minimum, of the order of
+2 or 3 seconds on the SecureEdgeVPN boards.
+
+
+10. FLASH recovery?
+
+The SnapGear Boot Loader also contains the etherboot network boot package.
+To invoke this simply hold in the reset button (on rear of units) and
+turn on power to unit. The loader will detect the depressed button and
+start etherboot, instead of the usual FLASH load and run of the Linux
+kernel.
+
+This mechanism facilitates recovery from programming files into FLASH that
+are in some way non-functional.
+
+
+11. Tools required to build?
+
+The genromfs tool is required to convert the romfs directory structure into
+a flash image.  You can get genromfs from:
+
+http://www.uclinux.org/pub/uClinux/utilities/genromfs-0.3.2.tar.gz
+
+The mknbi-linux tool is used to create network bootable images for etherboot.
+You can get it from:
+
+ http://etherboot.sourceforge.net/distribution.html
+
+You only need mknbi-linux if you want to either make a etherboot recover
+image using the SecureEdge2580-Recover target, or if you want to etherboot
+your kernel (which can speed up kernel development since you don't have to
+reflash it each time).
+

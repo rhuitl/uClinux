@@ -1,0 +1,144 @@
+Francois Rogler, francois@rogler.org, 26/10/2001
+Last update : $Id: FAQ,v 1.7 2002/05/10 22:47:05 rogler Exp $
+
+
+
+                         Speedtouch USB Driver for *BSD
+                           Frequently Asked Questions
+
+--------------------------------------------------------------------------------
+
+the kernel doesn't attach the modem
+modem_run or pppoa2 can't locate the modem
+rates are under those you should have
+modem doesn't connect on first connection
+driver doesn't compile when i type make
+
+--------------------------------------------------------------------------------
+
+Problem  : modem isn't found by the kernel
+
+Solution : check that the option 'Assign IRQ to USB' is checked in your bios
+           and that Not PnP OS is selected.
+
+--------------------------------------------------------------------------------
+
+Problem  : modem_run or pppoa2 doesn't manage to find the modem
+
+Solution : This problem can be due to several things.
+
+1. check that you modem is found by your kernel.
+You should find that in your dmesg :
+            ugen0: ALCATEL Speed Touch USB , rev 1.10/0.00, addr 2
+it can also be ugen1 or ugen2 or ... depending of the usb hardware connected.
+
+2. check that all the entries are created in /dev :
+ a. If you have several usb controler, you might need to create entries for usb1
+    (or usbX where X is a number)
+    cd /dev && ./MAKEDEV usbX (where X is the number of the controler)
+ b. If you have several usb hardware connected, you might need to crate entries
+    for ugen1 (or ugenX where X is a number).
+    cd /dev && ./MAKEDEV ugenX 
+    ugenX must be the same as the one you have in the dmesg.
+
+3. If modem_run still doesn't manage to locate the modem, then you can specify
+   it in the command line with option : -d /dev/ugenX (ugenX still the same 
+   as the one you created just before and also the same as in the dmesg)
+
+   tips : Don't forget to add '-d /dev/ugenX' in the pppoa2 line in ppp.conf
+
+   example : # modem_run -v 1 -m -d /dev/ugen0 -f /usr/local/libdata/mgmt.o
+   and in ppp.conf : device !"pppoa2 -vpi 8 -vci 35 -d /dev/ugen0"
+
+--------------------------------------------------------------------------------
+
+Problem  : rates are under those you should have.
+
+Solution : You can increase the number of mbufs by compiling a new kernel with
+           an increased value of `maxusers' and/or NMBCLUSTERS.
+           You can also change NMBCLUSTERS with kern.ipc.nmbclusters.
+
+Explanation : The driver uses too many mbufs, and sometimes it get out of mbufs.
+              This is a bug of the driver and we are trying to correct that.
+
+Example :
+add the following line in /boot/loader.conf :
+kern.ipc.nmbclusters="4096"
+
+or play wuth thses values in your kernel :
+maxusers        32
+options         NMBCLUSTERS=4096
+
+--------------------------------------------------------------------------------
+
+Problem  : modem doesn't connect on first connection.
+
+Solution : connect a second time.
+
+Explanation : That's another bug of the driver, in some cases, pppoa2 doesn't
+              fork well.
+
+--------------------------------------------------------------------------------
+
+Problem  : connection is ok but i can't access any site.
+
+Solution : 2 possible mistake :
+First, a little test to see if the connection is ok. Try to ping the computer
+you are connected to.
+example:
+`ifconfig tun0' show you :
+tun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1500
+        inet6 fe80::2e0:18ff:fe90:9b25%tun0 prefixlen 64 scopeid 0x7 
+        inet 8.1.1.10 --> 8.1.1.1 netmask 0xffffff00 
+        Opened by PID 666
+Then try to do : `ping 8.1.1.1'
+
+If the ping works, then your connection is ok and you just have a little problem
+of configuration with your network. Else, your connection doesn't work, check
+your ppp and pppoax logs.
+
+* Check your DNS in /etc/resolv.conf
+  that should look like : 
+nameserver xxx.xxx.xxx.xxx
+
+
+* Check that your routing table is ok : `netstat -rn'
+  If your default route doesn't point to the computer you are connected to, you 
+  can specify the default route manually with : 
+`route add default' then the IP of the remote host
+example : `route add default 8.1.1.1'
+
+You can also force ppp to set the default route by changing in ppp.conf :
+`add default HISADDR' by `add! default HISADDR'
+
+--------------------------------------------------------------------------------
+
+Problem  : Driver doesn't compile when i type `make' and I get the following
+           message :
+   "Makefile", line 10: Could not find speedtouch.tmpl
+   make: fatal errors encountered -- cannot continue
+
+Solution : type first : `./configure' then `make'
+
+Explanation : You didn't read the INSTALL notes carefully
+
+--------------------------------------------------------------------------------
+
+Problem  : I can't find the logs of pppoa2 and for modem_run
+
+Solution : You need to add some lines to /etc/syslog.conf or disable this
+           functionality
+
+For syslog.conf, you should add the following lines (FreeBSD) :
+!pppoa2
+*.*                                             /var/log/pppoa2.log
+!modem_run
+*.*                                             /var/log/modem_run.log
+
+I think it's different for OpenBSD (and NetBSD) as you should find log in 
+/var/log/messages
+
+To disable syslog with the driver, you need to do :
+./configure --enable-syslog=no
+the ``make'' and ``make'' install as usually.
+

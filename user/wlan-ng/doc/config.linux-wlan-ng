@@ -1,0 +1,264 @@
+* doc/config.linux-wlan-ng
+*
+* Copyright (C) 1999 AbsoluteValue Systems, Inc.  All Rights Reserved.
+* --------------------------------------------------------------------
+*
+* linux-wlan
+*
+*   The contents of this file are subject to the Mozilla Public
+*   License Version 1.1 (the "License"); you may not use this file
+*   except in compliance with the License. You may obtain a copy of
+*   the License at http://www.mozilla.org/MPL/
+*
+*   Software distributed under the License is distributed on an "AS
+*   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+*   implied. See the License for the specific language governing
+*   rights and limitations under the License.
+*
+*   Alternatively, the contents of this file may be used under the
+*   terms of the GNU Public License version 2 (the "GPL"), in which
+*   case the provisions of the GPL are applicable instead of the
+*   above.  If you wish to allow the use of your version of this file
+*   only under the terms of the GPL and not to allow others to use
+*   your version of this file under the MPL, indicate your decision
+*   by deleting the provisions above and replace them with the notice
+*   and other provisions required by the GPL.  If you do not delete
+*   the provisions above, a recipient may use your version of this
+*   file under either the MPL or the GPL.
+*
+* --------------------------------------------------------------------
+*
+* Inquiries regarding the linux-wlan Open Source project can be
+* made directly to:
+*
+* AbsoluteValue Systems Inc.
+* info@linux-wlan.com
+* http://www.linux-wlan.com
+*
+* --------------------------------------------------------------------
+*
+* Portions of the development of this software were funded by 
+* Intersil Corporation as part of PRISM(R) chipset product development.
+*
+* --------------------------------------------------------------------
+
+1. Summary
+
+This document describes a little more of the detail behind configuring the
+linux-wlan system.  
+
+2. Installed Componenents
+
+The linux-wlan-ng package consists of the following components:
+
+   p80211.o		Kernel module for 802.11 services
+   prism2sta_cs.o	Kernel module for the Prism2 PCMCIA device
+   			driver.
+   wlanctl-ng		User-mode utility for sending commands to
+   			802.11 services and MAC-specific drivers.
+   wland		User-mode daemon for receiving and handling
+   			events from 802.11 services and MAC-specific
+			drivers (not used in this version).
+   /etc/pcmcia/wlan-ng*	PCMCIA event and configuration scripts
+
+   *prism2dl		This utility is used for loading firmware
+   			images into prism2 cards.  DO NOT USE IT! 
+			UNLESS YOU KNOW EXACTLY WHAT YOU ARE DOING.  
+			This utility has the capability to damage a
+			card in a way that can only be repaired by the
+			manufacturer.
+
+When a 'make install' is performed, the modules are copied to the
+/usr/lib/modules/<kernelver>/net and /usr/lib/modules/pcmcia directory,
+the user-mode utilities are copied to /sbin, and the contents of
+linux-wlan-ng/etc/pcmcia are copied to the /etc/pcmcia directory.  If
+necessary, the pcmcia config files are altered to include a reference to
+the wlan-ng.conf file containing the information cardmgr uses to match
+card CIS information to specific device drivers at card insertion time.
+
+NOTE: It is very important that you restart your pcmcia services after
+installing linux-wlan-ng.  cardmgr will not recognize the information
+in the wlan-ng.conf file until after it has been restarted.
+
+	
+3. Configuration Variables
+
+To configure your installation for use, it will probably be necessary
+to edit the /etc/pcmcia/wlan-ng.opts file.  This file contains a
+collection of variable assignments that are used by the wlan-ng script
+to intialize your card at insertion time.  The variables are broken
+into groups: ENABLE, DOWNLOAD, USER MIB, WEP, STA, and AP START.
+
+Many of the choices involved in choosing configuration variable
+settings are dependent on whether you are setting up your system as a 
+Station (STA) or an Access Point (AP).  STA configuration is most
+common.  If you are using a mobile station that will connect to one or
+more APs, STA configuration is all you will need.
+
+3.1 ENABLE Group
+The only variable is this group is:
+
+WLAN_ENABLE=y
+	This variable determines whether the card will be intialized,
+	configured for operation, and your protocol stack configured.
+	Generally, you always want this set to 'y'.  For some cards,
+	you will set this variable to 'n' when performing card
+	maintenance like firmware upgrades.
+
+3.2 DOWNLOAD Group
+
+The DOWNLOAD group contains variables that indicate if code or data
+needs to be downloaded to the card prior to initialization and normal
+operation.  Currently, this is only required for the Prism2 card when
+running in AP mode.
+
+WLAN_DOWNLOAD=n
+	Set this variable to 'y' if code or data must be downloaded
+	into the card prior to operation.
+
+WLAN_DOWNLOADER=/sbin/prism2dl
+	This variable contains the name of the program used to
+	download the code into the card.
+
+WLAN_DLIMAGE=/etc/wlan/apfw.hex
+	This variable contains the name of the file you wish to
+	download.
+
+3.3 USER MIB Group
+
+There is only one variable in this group, USER_MIBS.  You may add your
+own local MIB item assignments assignments to this variable.  The
+wlan-ng script will loop through the assignments found in this
+variable and configure the card with each one prior to final
+configuration and enable.
+
+3.4 WEP Group
+
+The variables in the WEP group are used to configure the 802.11 "Wired
+Equivalent Privacy" element of the MAC if it is supported.  The driver
+is queried for WEP support prior to attempting WEP configuration.  If
+the driver states that WEP is NOT supported, these variables are
+ignored.  Note that you may need to set some of these variables even if 
+you are not using the privacy service.  If shared-key authentication
+is used, the WEP keys must be present.
+
+dot11PrivacyInvoked=false
+	Set this variable to "true" to enable the WEP support.
+
+lnxreq_hostWEPEncrypt=false
+lnxreq_hostWEPDecrypt=false 
+	Set these to true if you want WEP to be handled by the driver
+	instead of the hardware.  The only downside of this is that it
+	takes a bit of CPU time and you lose the ability to handle
+	fragmentation.   However, with prism2 cards, you should see a
+	performance boost, and with prism2.5 cards, this may avoid lockups.
+
+dot11WEPDefaultKeyID=1
+	This variable identifies which of the WEP keys is the default
+	key used for all transmits from this station.  In some
+	implementations, this can be changed (or rotated) later.
+
+dot11ExcludeUnencrypted=true
+	Setting this variable to "true" and dot11PrivacyInvoked to
+	true, has the effect of making WEP completely required for this 
+	station (or AP).  If set to "true", this STA will discard any
+	received frames that are not encrypted.
+
+PRIV_GENERATOR=/sbin/nwepgen
+	Some vendors include "WEP Key Generator" programs as part of
+	their windows or AP implementations.  This is purely a
+	convenience to prevent you from having to type in 40
+	hexadecimal digits.  It does not contribute to the secrity of
+	your system at all.  In some cases, we've included small
+	programs that generate keys in a manner compatible with the
+	vendor's method.  If you wish to use this capability, include
+	the name of the generator program here.
+
+PRIV_GENSTR="12345"
+	Every generator implementation we've seen so far uses some
+	kind of 'passphrase' to generate the keys.  This variable
+	contains the passphrase.  To disable the use of a generator,
+	leave this variable empty.
+
+dot11WEPDefaultKey0
+dot11WEPDefaultKey1
+dot11WEPDefaultKey2
+dot11WEPDefaultKey3
+	If you are configuring your keys by hand, you need to assign
+	these four variables.  The format is "xx:xx:xx:xx:xx" and the
+	order of the keys in these variables IS IMPORTANT.  Note: If
+	the PRIV_GENSTR variable is not empty, these variables are
+	ignored.
+
+3.5 STA Group
+
+Currently, there is only one variable in the STA group.  This will
+change over time.
+
+dot11DesiredSSID="WLAN_PRISM2"
+	This variable contains the SSID or "network name" of the
+	wireless network you wish to associate with.
+
+3.6 AP START Group
+
+If you have access to the necessary hardware and firmware, this driver
+can be used to set up a Access Point.  To configure for an access
+point, set the IS_AP variable to 'y'.  The following is a quick
+summary of the other AP configuration variables:
+
+
+APBRIDGEDEVICE=eth0
+	Defines the ethernet device that will be the 'other' port for
+	bridging 802.11 frames.
+APSSID="WLAN_PRISM2"
+	Defines the SSID that the AP will use when creating the network.
+APBCNINT=100
+	Defines the beacon interval (in Kus) that the AP will use.
+APDTIMINT=3
+	Defines the DTIM interval (in beacon intervals).
+
+APCFPOLLABLE|APCFPOLLREQ | Description
+---------------------------
+   false    |   false    | No point coordination by this AP
+   false    |   true     | AP will point coordinate for delivery only
+   true     |   false    | AP will point coordinate for deliver and polling
+   true     |   true     | Reserved
+
+APCFPPERIOD=3
+	Defines how often the contention free period occurrs (in
+	beacons).
+
+APCFPMAXDURATION=100
+	Defines the maximum length of the contention free period (in
+	Kus).
+
+APPROBEDELAY=100
+	Not used for infrastructure networks, any value is valid.
+
+APCHANNEL=6
+	Channel that the AP will create the network on.  Range of valid
+	values depends on you regulatory domain.  In the USA and Canada 
+	the range is 1-11.  In Japan the range is 1-14.
+
+
+APBASICRATES="2 4"
+	A whitespace separated list of data rates in units of 500Kb/s.
+	The basic rate set is the set of rates that stations MUST
+	support to be allowed to join the network.
+
+APOPRATES="2 4 11 22"
+	A whitespace separated list of data rates in units of 500Kb/s.
+	The operational rate set is the set of rates that are allowed
+	in the network.  It must be a superset of the basic rates
+	above.
+
+To complete the configuration of an Access Point, you will need to
+make sure you have kernel bridging enable in your currently running
+kernel and have the brcfg utility installed.  One version of the brcfg
+utility can be found at ftp://ftp.absoval.com
+
+To start the access point running, make sure the ethernet card is in the
+system first.  Then insert the WLAN card and everything should be
+configured automatically by the /etc/pcmcia/wlan-ng script.
+
+

@@ -1,0 +1,630 @@
+<sect>Configuration de l'Authentication
+<p>
+La section suivante du fichier de configuration permet de configurer l'authentification.
+
+<sect1>Section &lsqb;Gatekeeper::Auth&rsqb;
+<label id="gkauth">
+<p>
+La section définie le méchanisme d'authentification du gatekeeper.
+
+<descrip>
+<tag/Syntax:/
+<tscreen><verb>
+authrule=actions
+
+ <authrule> := SimplePasswordAuth | AliasAuth | PrefixAuth | RadAuth | RadAliasAuth | ...
+ <actions>  := <control>[;<ras>|<q931>,<ras>|<q931>,...]
+ <control>  := optional | required | sufficient
+ <ras>      := GRQ | RRQ | URQ | ARQ | BRQ | DRQ | LRQ | IRQ
+ <q931>     := Setup | SetupUnreg
+
+</verb></tscreen>
+</descrip>
+Une règle peut retourner un de ces trois codes: ok, fail, pass.
+<itemize>
+<item><tt/ok/ - La requête est authentifié par le module.
+<item><tt/fail/ - L'authentification a echoué et doit être rejeté.
+<item><tt/next/ - La règle ne permet pas d'authentifié la requête.
+</itemize>
+Il existe aussi trois façons de contrôler une règle.
+<itemize>
+<item><tt/optional/ - Si la règle ne peut authentifié la requête, on passe à la règle suivante.
+<item><tt/required/ - Les requêtes doivent être authentifiées par ce module, ou elles seront rejetées. Une fois authentifiée par ce module, la requête passera à la règle suivante.
+<item><tt/sufficient/ - Si la règle est authentifié, elle est acceptée, sinon elle est rejetée. Aucune règle ne devrait suivre une règle 'sufficient' car elle ne servira jamais.
+</itemize>
+
+Modules actuellement supportés:
+<itemize>
+<item><tt>SimplePasswordAuth/SQLPasswordAuth/LDAPPasswordAuth</tt>
+<p>
+Ces modules vérifient les champs <bf/tokens/ or <bf/cryptoTokens/ du message RAS.
+Les champs doivent au moins contenir generalID and password.
+Le hashage simple MD5 des champs <bf/cryptoTokens/, <bf/cryptoEPPwdHash/ et le hashage HMAC-SHA1-96 (libssl doit être installé) du champ <bf/nestedcryptoToken/ sont maintenant supportés. les hashages des champs par CAT (Cisco Access Token) et en texte clair (username/password) sont aussi supportés.
+Le ID et le password sont lus depuis la section <ref id="password" name="[SimplePasswordAuth]">, une base de données SQL ou LDAP respectivement par les modules <tt/SimplePasswordAuth/, <tt/SQLPasswordAuth/ et <tt/LDAPPasswordAuth/. Le module <tt/MySQLPasswordAuth/ afin de conserver la compatibilité avec les versions précédentes.
+
+<item><tt>AliasAuth/SQLAliasAuth/LDAPAliasAuth</tt>
+<p>
+Ce module ne peut être utilisé que pour l'authentification des RegistrationRequest (RRQ).
+L'adresse IP d'un terminal et un alias donné doit vérifier une pattern donnée.
+Pour <tt/AliasAuth/, la pattern est définie dans la section <ref id="rrqauth" name="[RasSrv::RRQAuth]">.
+Pour <tt/SQLAliasAuth/, la pattern est rappatrier à partir d'une base de données SQL, définie dans la section <ref id="sqlaliasauth" name="[SQLAliasAuth]">.
+Pour <tt/LDAPAliasAuth/, l'alias (par défaut: mail attribute) et l'adresse IP (par défaut: voIPIpAddress attribute) doivent être trouvé dans une entrée LDAP.
+
+<item><tt>PrefixAuth</tt>
+<p>
+A l'origine ce module se nommait <tt/GkAuthorize/.
+L'adresse IP et l'alias de la requête et un préfix donné doivent vérifier une pattern donnée. Pour plus de détails voir la section <ref id="prefixauth" name="[PrefixAuth]">.
+Actuellement le module ne sait vérifier que les AdmissionRequest (ARQ) et les LocationRequest (LRQ).
+
+<item><tt>RadAuth</tt>
+<p>
+Ce module permet l'authentification suivant le schéma de sécurité username/password d'H.235. Il authentifie RRQ, ARQ, Q931 Setup grâce à des serveurs RADIUS distants. Il envoie aux serveurs RADIUS les usernames/passwords extrait du <bf/tokens/ CAT (Cisco Access Tokens) se trouvant dans les paquets RRQ, ARQ et Setup. Donc si votre terminal ne supporte pas les CATs ou bien you n'avez pas besoin d'un schéma d'authentification basé des usernames/password individuels - ce n'est pas le module qu'il vous faut  (vous pouvez regarder du côté du <tt/RadAliasAuth/). Pour plus de détails se référer à la section <ref id="radauth" name="[RadAuth]">.
+
+<item><tt>RadAliasAuth</tt>
+<p>
+Ce module permet d'authentifier à partir des alias de terminals et/ou des adresses IP "call signalling" avec l'aide de serveurs RADIUS. Il ne nécessite aucun <bf/tokens/ H.235 dans les messages RAS, il peut donc être uilisé avec une gamme plus large de systemes contrairement au module <tt/RadAuth/. Les messages RRQ, ARQ, et Q.931 Setup peuvent être authentifiés avec ce module. Pour plus de détails se référer à la section <ref id="radaliasauth" name="[RadAliasAuth]">.
+
+</itemize>
+
+Vous pouvez aussi configurer une règle afin de vérifier seulement une partie du message RAS. L'exemple suivant montre comment vérifier uniquement les RRQ et ARQ à partir du module <tt/SimplePasswordAuth/ avec une règle optionnelle. Si un RRQ n'est pas vérifié (ne contient pas de champs <bf/tokens/ ou <bf/cryptoTokens/), il est passé à la règle suivante <tt/AliasAuth/. La règle par défaut est d'acepter toutes les requêtes.
+
+<descrip>
+<tag/Exemple 1:/
+<tt/SimplePasswordAuth=optional;RRQ,ARQ/<newline>
+<tt/AliasAuth=sufficient;RRQ/<newline>
+</descrip>
+
+L'exemple ci-dessous authentifie tous les appels, vérifie le détils des messages de signalisation Setup avec le module RadAliasAuth.
+
+<descrip>
+<tag/Exemple 2:/
+<tt/RadAliasAuth=required;Setup/<newline>
+<tt/default=allow/
+</descrip>
+
+L'exemple suivant vérifie l'enregistrement des terminaux (RRQ) et l'admission d'appel (ARQ) soit par username/password (RadAuth) soit par alias/IP (RadAuthAlias). De plus, si l'ppel provient d'un terminal non enregistré (ET qu'aucune authentification par RRQ ou ARQ n'est été faite), le module RadAliasAuth vérifie alors le message Setup (SetupUnreg).
+
+<descrip>
+<tag/Exemple 3:/
+<tt/RadAuth=optional;RRQ,ARQ/<newline>
+<tt/RadAliasAuth=required;RRQ,ARQ,SetupUnreg/<newline>
+<tt/default=allow/
+</descrip>
+
+<sect1>Section &lsqb;SimplePasswordAuth&rsqb;
+<label id="password">
+<p>
+Cette section définie la paire userid/password utilisé par le module <tt/SimplePasswordAuth/. Tous les mots de passe sont cryptés avec le programme <tt/addpasswd/.
+
+Usage:
+<tscreen><verb>
+addpasswd config section userid password
+</verb></tscreen>
+
+Options:
+<itemize>
+<item><tt/KeyFilled=123/<newline>
+Défaut: <tt/0/
+<p>
+Valeur par défault à utiliser comme octets de remplissage pendant l'encryption/décryption du mot de passe.
+
+<item><tt/CheckID=1/<newline>
+Défautt: <tt/0/
+<p>
+Vérifie si les alias correspondent aux ID dans les marques.
+
+<item><tt/PasswordTimeout=120/<newline>
+Défaut: <tt/-1/
+<p>
+Le module <tt/SimplePasswordAuth/ et tous ses descandants mettent en cache un mot de passe authentifié. Ce champ définie le durée de vie du cache en seconde.
+<tt/0/ signifie qu'aucun cache ne sera utilisé, alors qu'une valeur négative indique que le cache n'expirera jamais.
+</itemize>
+
+<sect1>Section &lsqb;SQLPasswordAuth&rsqb;
+<label id="sqlpasswordauth">
+<p>
+Authentifie les terminaux compatibles H.235 à partir de mots de passe enregistrés dans une base de données SQL. Cette section définie les gestionnaires SQL à utiliser, les paramètres de connexion à la base de données SQL et la requête pour récupérer les mots de passe.
+
+<itemize>
+<item><tt/Driver=MySQL | PostgreSQL/<newline>
+Défaut: N/A
+<p>
+Gestionnaire de base de données SQL à utiliser. Actuellement seul <tt/MySQL/ et <tt/PostgreSQL/ sont implémentés.
+
+<item><tt/Host=DNS[:PORT] | IP[:PORT]/<newline>
+Défaut: <tt/localhost/
+<p>
+Adresse de l'hôte hébergeant la base de données SQL. Peut-être de la forme de <tt/DNS[:PORT]/ ou <tt/IP[:PORT]/.
+Par exemple <tt/sql.mycompany.com/ ou <tt/sql.mycompany.com:3306/ ou <tt/192.168.3.100/.
+
+<item><tt/Database=billing/<newline>
+Défault: <tt/billing/
+<p>
+Nom de la base de données à laquelle se connecter.
+
+<item><tt/Username=gnugk/<newline>
+<p>
+Compte utilisé pour se connecter à la base de données.
+
+<item><tt/Password=secret/<newline>
+<p>
+Mot de passe utilisé pour se connecter à la base de données.
+Si le mot de passe n'est pas indiqué, une connexion sans mot de passe sera tenter à la base de données.
+Si <tt/EncryptAllPasswords/ est actif, ou si la variable <tt/KeyFilled/ est définie dans cette section, le mot de passe sera sous une forme encrypté et doit être créé avec l'utilitaire <tt/addpasswd/.
+
+<item><tt/CacheTimeout=120/<newline>
+Défaut: <tt/0/
+<p>
+Ce champ définie combien de temps la paire (alias:mot de passe) récupérée de la base de données sera conservée en cache en local. L'unité de base est la seconde. <tt/0/ signifie que le cache n'est pas actif, une valeur négative désactive l'expiration du cache (seule la commande <tt/reload/ forcera le rafraîchissement du cache).
+
+<item><tt/MinPoolSize=5/<newline>
+Défaut: <tt/1/
+<p>
+Définie le nombre de connexions SQL actives simultannées. Cela permet des performances accrues lors de charges élevées, car plusieurs requêtes concurrentes peuvent alors être exécutées en même temps. Si <tt/MinPoolSize=1/ le précédent comportement est recréé, les requêtes à la base de données sont sérialisées.
+
+<item><tt/Query=SELECT .../<newline>
+Défaut: <tt>N/A</tt>
+<p>
+Définie la requête SQL utilisée pour récupérer le mot de passe H.235 de la base de données. La requête est personnalisable - avant chaque requête les nouvelles valeurs sont substituées aux paramètres de remplacement.
+Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... strings.
+Specify %% to embed a percent character before a digit into string (like <bf/%%1/),
+specify <bf/%{1}/ to allow expansion inside complex expressions like <bf/%{1}123/.
+For <tt/SQLPasswordAuth/ two parameters are defined:
+<itemize>
+<item><tt/%1/ - l'alias pour lequel on demande le mot de passe
+<item><tt/%2/ - l'identification de la gatekeeper
+</itemize>
+<p>
+Exemples:
+<tscreen><verb>
+SELECT h235password FROM users WHERE alias = '%1' AND active
+SELECT h235password FROM users WHERE alias = '%1' AND gk = '%2'
+</verb></tscreen>
+
+</itemize>
+
+<sect1>Section &lsqb;RasSrv::RRQAuth&rsqb;
+<label id="rrqauth">
+<p>
+Spécifie l'action lors de la réception d'un message RRQ (confirmation ou rejet) pour le module <tt/AliasAuth/.
+Le premier alias (le plus souvent un H323ID) du terminal à enregistrer est recherché dans la section. Si un paramètre est trouvé la valeur sera appliquée comme une règle. Une règle est constituée de condititions séparées par des '&'.
+Un enregistrement est accepté si toutes les conditions sont vérifiées.
+
+<descrip>
+<tag/Syntax:/
+<tscreen><verb>
+&lt;authrules&gt; :=  empty  |  &lt;authrule&gt; "&" &lt;authrules&gt;
+
+  &lt;authrule&gt;  := &lt;authtype&gt; ":" &lt;authparams&gt;
+  &lt;authtype&gt;  := "sigaddr" | "sigip"
+  &lt;autparams&gt; := [!&]*
+</verb></tscreen>
+</descrip>
+
+La notation et la signification des <tt/&lt;authparams&gt;/ dépendent de <tt/&lt;authtype&gt;/:
+
+<itemize>
+<item><tt/sigaddr/ - expresson régulière étendue qui s'applique à ``PrintOn(ostream)'', la représentation de l'adresse du signal de la requête.
+<p>
+Exemple:
+<tscreen><verb>
+sigaddr:.*ipAddress .* ip = .* c0 a8 e2 a5 .*port = 1720.*
+</verb></tscreen>
+
+<item><tt/sigip/ - forme spécialisée de `<tt/sigaddr/'.
+Ecrire l'adresse IP de la signalisation en notation décimal:
+``<tt/byteA.byteB.byteC.byteD:port/''.
+<p>
+Exemple:
+<tscreen><verb>
+sigip:192.168.242.165:1720
+</verb></tscreen>
+
+<item><tt/allow/ - toujours accepter l'alias.
+
+<item><tt/deny/ - toujours rejeter l'alias.
+
+</itemize>
+
+<sect1>Section &lsqb;SQLAliasAuth&rsqb;
+<label id="sqlaliasauth">
+<p>
+Authentifie les terminaux par des règles stockées dans base de données SQL (les règles doivent être conformes au format de la section <ref id="rrqauth" name="[RasSrv::RRQAuth]">).
+Cette section définie le gestionnaire SQL à utiliser, les paramètres de la connexion à la base de données and la requête à utiliser.
+
+<itemize>
+<item><tt/Driver=MySQL | PostgreSQL/<newline>
+Défaut: N/A
+<p>
+Gestionnaire de base de données à utiliser, les versions pour <tt/MySQL/ et <tt/PostgreSQL/ sont implémentées.
+
+<item><tt/Host=DNS[:PORT] | IP[:PORT]/<newline>
+Défaut: <tt/localhost/
+<p>
+Adresse de l'hôte hébergeant le serveur SQL. Peut être de la forme <tt/DNS[:PORT]/ ou <tt/IP[:PORT]/.
+Par exemple <tt/sql.mycompany.com/ ou <tt/sql.mycompany.com:3306/ ou <tt/192.168.3.100/.
+
+<item><tt/Database=billing/<newline>
+Défaut: <tt/billing/
+<p>
+Nom de la base de données à laquelle se connecter.
+
+<item><tt/Username=gnugk/<newline>
+<p>
+Compte utilisé pour se connecter à la base de données.
+
+<item><tt/Password=secret/<newline>
+<p>
+Mot de passe utilisé pour se connecter à la base de données.
+Si aucun mot de passe n'est spécifié, une connexion sans mot de passe sera effectuée.
+Si <tt/EncryptAllPasswords/ est selectionné, ou la variable <tt/KeyFilled/ est définie dans cette section, le mot de passe sera sous une forme encryptée et peut être généré par l'utilitaire <tt/addpasswd/.
+
+<item><tt/CacheTimeout=120/<newline>
+Défaut: <tt/0/
+<p>
+Ce champ définie combien de temps le couple (alias;authrule) récupéré depuis la base de données sera conservé dans le cache local.
+La valeur à pour unité la seconde. <tt/0/ signifie qu'aucune règle ne sera mise en cache, et une valeur négative indique que le cache n'expire jamais (seule la commande <tt/reload/ forcera le rafraîchissement du cache).
+
+<item><tt/MinPoolSize=5/<newline>
+Défaut: <tt/1/
+<p>
+Définit le nombre de connexions simultanéés à la base de données SQL. Cela permet une performance accrue sous charge élevée (pusieurs requêtes sont alors exécutées en parallèle). Si <tt/MinPoolSize=1/ simule le conportement des versions précédentes (les requêtes sont lancées en série, une requête à la fois).
+
+<item><tt/Query=SELECT .../<newline>
+Défaut: <tt>N/A</tt>
+<p>
+Définie la requête SQL utilisées pour récupérer la règle d'alias de la base de données. La requête est personnalisable - ce qui signifie que le remplacement des paramètres est fait à chaque nouvelle requête.
+Parameter placeholders are denoted by <bf/%1/, <bf/%2/, ... strings.
+Specify %% to embed a percent character before a digit into string (like <bf/%%1/),
+specify <bf/%{1}/ to allow expansion inside complex expressions like <bf/%{1}123/.
+For <tt/SQLAliasAuth/ two parameters are defined:
+<itemize>
+<item><tt/%1/ - l'alias pour lequel on recherche la règle.
+<item><tt/%2/ - l'identification de la gatekeeper.
+</itemize>
+<p>
+Exemple:
+<tscreen><verb>
+SELECT authrule FROM users WHERE alias = '%1' AND active
+SELECT 'sigip:' || host(ip) || port FROM users WHERE alias = '%1'
+</verb></tscreen>
+
+</itemize>
+
+
+<sect1>Section &lsqb;PrefixAuth&rsqb;
+<label id="prefixauth">
+<p>
+Cette section définie les règles d'authentification pour le module <tt/PrefixAuth/. Actuellement, seuls les messages ARQs et LRQs peuvent être authentifiés par ce module.
+
+On débute par le préfix le plus spécifique du champ <bf/destinationInfo/ de la reqête reçue. Ensuite la requête est eccepté ou non suivant les règles dans l'ordre spécifique décroissant. Si aucune correspondance de préfix n'est trouvée, et que l'option par <tt/default/ est spécifié, cette dernière accepte ou non la reqête. Autrement la requête continue sont parcourt dans les modules d'authification suivant les conditions du module.
+
+<descrip>
+<tag/Format:/
+<tscreen><verb>
+prefix=authrule[|authrule|...]
+</verb></tscreen>
+
+<tag/Syntax:/
+<tscreen><verb>
+&lt;authrule&gt; :=  &lt;result&gt; &lt;authrule&gt;
+
+  &lt;result&gt;    := deny | allow
+  &lt;authrule&gt;  := [!]ipv4:&lt;iprule&gt; | [!]alias:&lt;aliasrule&gt;
+</verb></tscreen>
+</descrip>
+Où <tt/&lt;iprule&gt;/ peut être noté en notation décimal ou CIDR, <tt/&lt;aliasrule&gt;/ est une expression régulière. Si `<tt/!/' précède la règle, le sens est inversé.
+
+<descrip>
+<tag/Example:/
+<tscreen><verb>
+555=deny ipv4:10.0.0.0/27|allow ipv4:0/0
+5555=allow ipv4:192.168.1.1|deny ipv4:192.168.1.0/255.255.255.0
+86=deny !ipv4:172.16.0.0/24
+09=deny alias:^188884.*
+ALL=allow ipv4:ALL
+</verb></tscreen>
+</descrip>
+
+Dans cette configuration, tous les terminaux sauf ceux du réseau <tt>10.0.0.0/27</tt> sont autorisés à appeler le préfix 555 (execpté le 5555).
+Les terminaux du réseau <tt>192.168.1.0/24</tt> sont autorisés à appeler le préfix 5555, sauf <tt/192.168.1.1/.
+Les terminaux ne provenant pas de <tt>172.16.0.0/24</tt> ne sont pas autorisés à appeler le préfix 86.
+Les terminaux ayant un alias commençant par 188884 ne sont pas autorisés à appeler le préfix 09. Toutes les autres situations sont autorisées.
+
+<sect1>Section &lsqb;RadAuth&rsqb;
+<label id="radauth">
+<p>
+Cette section définie les options qui permettent d'activer l'authentification RADIUS basé sur le H.235 CATs (Cisco Access Tokens) présent dans les requêtes RAS RRQ et ARQ et les messages Setup Q931.
+<itemize>
+<item><tt/Servers=SERVER1[:AUTH_PORT[:ACCT_PORT[:SECRET]]];SERVER2[:AUTH_PORT[:ACCT_PORT[:SECRET]]];.../<newline>
+Default: <tt>N/A</tt>
+<p>
+Définie les serveurs RADIUS utilisés pour l'authentification. Cette liste peut contenir un nombre arbitraire de serveurs. L'ordre des serveurs sera respecté par le module RADIUS lors du processus d'interrogation. Si aucun port UDP n'est indiqué, <tt/DefaultAuthPort/ sera utilisé. De même avec le secret et <tt/SharedSecret/.
+Adresses IP ou nom DNS peuvent être utilisés comme nom pour les serveurs RADIUS. 
+
+<descrip>
+<tag>Exemple <tt/Servers/:</tag>
+<tt>Servers=192.168.1.1</tt><newline>
+<tt>Servers=192.168.1.1:1645</tt><newline>
+<tt>Servers=192.168.1.1:1645:1646:secret1</tt><newline>
+<tt>Servers=radius1.mycompany.com:1812</tt><newline>
+<tt>Servers=radius1.mycompany.com;radius2.mycompany.com</tt><newline>
+<tt>Servers=radius1.mycompany.com:1812:1813:secret1;radius2.mycompany.com:1812:1813:secret2</tt><newline>
+</descrip>
+
+<item><tt/LocalInterface=IP_OR_FQDN/<newline>
+Défaut: <tt>N/A</tt>
+<p>
+Interface réseau que le client RADIUS doit utiliser pour communiquer avec les serveurs RADIUS. Ce paramètre peut être utile sur les machines "NATées". By défaut cette valeur est vide et c'est la table de routage de l'OS qui choisit l'adresse IP source. Si vous n'êtes pas certain de ce que vous faîtes, il est préférable de laisser cette option vide.
+
+<item><tt/RadiusPortRange=10000-11000/<newline>
+Défaut: <tt>N/A</tt>
+<p>
+Par défaut (si cette option n'est pas définie), le client RADIUS alloue des ports dynamiquement comme indiqué par l'OS. Si vous désirez que le client RADIUS utilise des ports d'une plage particulière seulement - configurer ce paramètre.
+
+<item><tt/DefaultAuthPort=PORT_NO/<newline>
+Défaut: <tt>1812</tt>
+<p>
+Ports UDP à utiliser pour les requêtes d'authentification RADIUS (paquets Access-Request), l'attribut <tt/Servers/ est prioritaire.
+
+<item><tt/SharedSecret=SECRET/<newline>
+Défaut: <tt>N/A (chaîne vide)</tt>
+<p>
+Secret utilisé pour authentifier ce GnuGK (client NAS) auprès d'un serveur RADIUS. Cela peut être un mot de passe à fort encryption. C'est la valeur par défaut, si aucun secret spécifique n'est indiqué dans la partie <tt/Servers/. Si <tt/EncryptAllPasswords/ est selectionné, or la variable <tt/KeyFilled/ est définie dans cette section, alors le mot de passe est sous une forme cryptée et peut être crée à partir de l'utilitaire <tt/addpasswd/.
+
+<item><tt/RequestTimeout=TIMEOUT_MS/<newline>
+Défaut: <tt/2000/ (milisecondes)
+<p>
+Délai (en millisecondes) que la réponse du serveur RADIUS à une requête envoyée par GnuGK ne peut dépasser. Si il n'y a pas de réponse dans cette période, une nouvelle requête est envoyé au serveur RADIUS suivant.
+
+<item><tt/IdCacheTimeout=TIMEOUT_MS/<newline>
+Défaut: <tt/9000/ (milisecondes)
+<p>
+Timeout (miliseconds) for RADIUS request 8-bit identifiers to be
+unique. If all 8-bit identifier range is exhausted within this period,
+new client socket (UDP socket) is allocation by RADIUS module. Let's
+take the example: we have approximatelly 60 RRQs/sec - after ca. 4 seconds
+8-bit identifiers range gets exhausted - new socket allocated - after next
+4 seconds the second 8-bit identifiers range gets exhauted - third socket
+allocated - after 9th second identifiers from the pool 1 are available again
+- ... . In general, too long timeout - too much resources consumed,
+too short timeout - RADIUS server may take incoming packets as duplicated
+and therefore drop it.
+
+<item><tt/SocketDeleteTimeout=TIMEOUT_MS/<newline>
+Défaut: <tt/60000/ (milisecondes) - 60 s
+<p>
+Délai au bout duquel les sockets RADIUS inutilisées sont fermées. Utilisé en conjonction de <tt/IdCacheTimeout/ - les sockets supplémentaires créées pendant les périodes où GnuGK est fortement chargé afin de répondre aux requêtes entrantes, sont fermées pendant les périodes d'inactivités.
+
+<item><tt/RequestRetransmissions=NUMBER/<newline>
+Défaut: <tt/2/
+<p>
+Combien de fois une même requête RADIUS est envoyée à chaque serveur RADIUS configurés (si aucune réponse n'est reçue). 1 signifie aucune retransmission, 2 - une seule, ... . la méthode exacte de retransmission est définie par l'attribut <tt/RoundRobinServers/.
+
+<item><tt/RoundRobinServers=BOOLEAN/<newline>
+Défaut: <tt/1/
+<p>
+Méthode de retransmission des requêtes RADIUS.
+<p>
+Si définie à 1, la requête RADIUS est transmise de la façon suivante (jusqu'à ce qu'une réponse soit reçue):
+<tscreen><verb>
+Serveur #1 Essai #1, Serveur #2 Essai #1, ..., Serveur #N Essai #1
+...
+Serveur #1 Essai #RequêtesRetransmises, ..., Serveur #1 Essai #RequêtesRetransmises
+</verb></tscreen>
+<p>
+Si définie à 0, la séquence suivante est déroulée:
+<tscreen><verb>
+Serveur #1 Essai #1, ..., Serveur #1 Essai #RequêtesRetransmises
+...
+Serveur #N Essai #1, ..., Serveur #N Essai #RequêtesRetransmises
+</verb></tscreen>
+
+<item><tt/AppendCiscoAttributes=BOOLEAN/<newline>
+Défaut: <tt/0/
+<p>
+Si définie, les attributs RADIUS spécifiques Cisco (en anglais: VendorSpecificAttribut) sont inclus dans les requêtes RADIUS(h323-conf-id,h323-call-origin,h323-call-type).
+
+<item><tt/IncludeTerminalAliases=BOOLEAN/<newline>
+Défaut: <tt/1/
+<p>
+Si définie, l'attribut VSA Cisco 'h323-ivr-out' est envoyé avec la liste d'alias avec laquelle le terminal s'est enregistré(RRQ.m_terminalAlias). Cet attribut est fourni afin de permettre un contrôle fin sur la liste d'alias du terminal sous lesquels il a le droit de s'enregistrer. Le formadt e cet attribut est:
+<tscreen><verb>
+	Cisco-AV-Pair = "h323-ivr-out=terminal-alias:" alias [,alias] [;]
+Exemple:
+	Cisco-AV-Pair = "h323-ivr-out=terminal-alias:helpdesk,support,77771;"
+</verb></tscreen>
+
+<item><tt/UseDialedNumber=BOOLEAN/<newline>
+Défaut: <tt/0/
+<p>
+<tt/UseDialedNumber=1/: renseigne le nombre Called-Station-Id avec le numéro originellement appelé par l'utilisateur.
+<tt/UseDialedNumber=0/: le renseigne avec le numéro réécri.
+
+</itemize>
+
+<sect1>Section &lsqb;RadAliasAuth&rsqb;
+<label id="radaliasauth">
+<p>
+Cette section permet de configurer la partie qui s'occupe d'activer les authentification RADIUS des alias de terminal ou des adresses IP présents dans les requêtes RAS RRQ, ARQ ou Setup Q.931.
+Ce schéma authentification est utile à la fois pour les terminaux enregistrés auprès de la GateKeeper (ARQ,RRQ) et aussi pour les appels provenant de terminaux non-enregistrés (Setup).
+
+<itemize>
+<item><tt/Servers=SERVER1[:AUTH_PORT[:ACCT_PORT[:SECRET]]];SERVER2[:AUTH_PORT[:ACCT_PORT[:SECRET]]];.../<newline>
+Défaut: <tt>N/A</tt>
+<p>
+Serveurs RADIUS à utiliser pour les requêtes d'authentifcation RAS.
+Cette liste peut contenir un nombre arbitraire de serveurs. L'ordre des serveurs sera suivi par celui des requêtes. Si aucun port UDP n'est spécifié, c'est la valeur <tt/DefaultAuthPort/ qui est utilisée. Si aucun secret est indiqué, la valeur de <tt/SharedSecret/ sera utilisée.
+Des adresses IP comme des noms DNS peuvent être indiqués pour les serveurs.
+
+<descrip>
+<tag/Exemple:/
+<tt/Servers=192.168.3.1:1645;192.168.3.2:1812:1813:mysecret;radius.mycompany.com/
+</descrip>
+
+<item><tt/LocalInterface=IP_OR_FQDN/<newline>
+Défaut: <tt>N/A</tt>
+<p>
+Particular local network interface that RADIUS client should
+use in order to communicate with RADIUS servers. This parameter
+can be useful on NAT machines to restrict number of network
+interfaces used for RADIUS communication. By default this value
+is empty and allows RADIUS requests to be sent on any (best suitable)
+network interface. If you are not sure what you are doing, it is
+better to leave this option unset.
+
+<item><tt/RadiusPortRange=10000-11000/<newline>
+Default: <tt>N/A</tt>
+<p>
+By default (if this option is not set) RADIUS client
+allocates ports dynamically as specified by the operating system.
+If you want to restrict RADIUS client to use ports from
+a particular range only - set this parameter.
+
+<item><tt/DefaultAuthPort=PORT_NO/<newline>
+Default: <tt>1812</tt>
+<p>
+Default port number to be used for RADIUS authentication requests
+(Access-Request packets), if not overriden by <tt/Servers/ attribute.
+
+<item><tt/SharedSecret=SECRET/<newline>
+Default: <tt>N/A (empty string)</tt>
+<p>
+Secret used to authenticate this GNU GK (NAS client) to RADIUS
+server. It should be a cryptographically strong password. This is the default
+value used, if no server-specific secret is set in the <tt/Servers/.
+If <tt/EncryptAllPasswords/ is enabled, or a <tt/KeyFilled/ variable is defined
+in this section, the password is in encrypted form and should be created using
+the <tt/addpasswd/ utility.
+
+<item><tt/RequestTimeout=TIMEOUT_MS/<newline>
+Default: <tt/2000/ (miliseconds)
+<p>
+Timeout (miliseconds) for RADIUS server response to a request
+sent by GNU GK. If no response is received within this time period,
+next RADIUS server is queried.
+
+<item><tt/IdCacheTimeout=TIMEOUT_MS/<newline>
+Default: <tt/9000/ (miliseconds)
+<p>
+Timeout (miliseconds) for RADIUS request 8-bit identifiers to be
+unique. If all 8-bit identifier range is exhausted within this period,
+new client socket (UDP socket) is allocation by RADIUS module. Let's
+take the example: we have approximatelly 60 RRQs/sec - after ca. 4 seconds
+8-bit identifiers range gets exhausted - new socket allocated - after next
+4 seconds the second 8-bit identifiers range gets exhauted - third socket
+allocated - after 9th second identifiers from the pool 1 are available again
+- ... . In general, too long timeout - too much resources consumed,
+too short timeout - RADIUS server may take incoming packets as duplicated
+and therefore drop it.
+
+<item><tt/SocketDeleteTimeout=TIMEOUT_MS/<newline>
+Default: <tt/60000/ (miliseconds) - 60 s
+<p>
+Timeout for unused RADIUS sockets to be closed. It is used
+in conjunction with <tt/IdCacheTimeout/ - additional sockets
+created during heavy GK load time periods for serving incoming
+requests are closed during idle periods.
+
+<item><tt/RequestRetransmissions=NUMBER/<newline>
+Default: <tt/2/
+<p>
+How many times a single RADIUS request is transmissed to every
+configured RADIUS server (if no response is received). 1 means
+no retransmission, 2 - single retransmission, ... . Exact retransmission
+method is defined by <tt/RoundRobinServers/ attribute.
+
+<item><tt/RoundRobinServers=BOOLEAN/<newline>
+Default: <tt/1/
+<p>
+RADIUS requests retransmission method.
+<p>
+If set to 1, RADIUS request
+is transmitted in the following way (until response is received):
+<tscreen><verb>
+Server #1 Attempt #1, Server #2 Attempt #1, ..., Server #N Attempt #1
+...
+Server #1 Attempt #RequestRetransmissions, ..., Server #1 Attempt #RequestRetransmissions
+</verb></tscreen>
+<p>
+If set to 0, the following sequence is preserved:
+<tscreen><verb>
+Server #1 Attempt #1, ..., Server #1 Attempt #RequestRetransmissions
+...
+Server #N Attempt #1, ..., Server #N Attempt #RequestRetransmissions
+</verb></tscreen>
+
+<item><tt/AppendCiscoAttributes=BOOLEAN/<newline>
+Default: <tt/1/
+<p>
+If set, Cisco Vendor Specific RADIUS attibutes are included
+in RADIUS requests (h323-conf-id,h323-call-origin,h323-call-type).
+
+<item><tt/IncludeTerminalAliases=BOOLEAN/<newline>
+Default: <tt/1/
+<p>
+If set, Cisco VSA 'h323-ivr-out' attribute is sent with a list of aliases
+the endpoint is registering (RRQ.m_terminalAlias). This attribute is provided
+in order to provide fine control over the list of aliases the endpoint
+is allowed to register with. Format of this attribute is:
+<tscreen><verb>
+	Cisco-AV-Pair = "h323-ivr-out=terminal-alias:" alias [,alias] [;]
+Example:
+	Cisco-AV-Pair = "h323-ivr-out=terminal-alias:helpdesk,support,77771;"
+</verb></tscreen>
+
+<item><tt/FixedUsername/<newline>
+Default: <tt>N/A</tt>
+<p>
+If this parameter is set, it overwrites a value of User-Name RADIUS attribute
+for outgoing RADIUS request. That means every Access-Request will be
+authenticated as for user <tt/FixedUsername/.
+
+<item><tt/FixedPassword/<newline>
+Default: <tt>N/A</tt>
+<p>
+If not set, User-Password is a copy of User-Name. For example, if User-Name
+is 'john' then User-Password will also be set to 'john'. Setting this
+parameter overrides this behavious and User-Password attribute will be
+always set to the value of <tt/FixedPassword/.
+If <tt/EncryptAllPasswords/ is enabled, or a <tt/KeyFilled/ variable is defined
+in this section, the password is in encrypted form and should be created using
+the <tt/addpasswd/ utility.
+
+<descrip>
+<tag/Example 1:/
+<tscreen><verb>
+(Neither FixedUsername nor FixedPassword set)
+</verb></tscreen>
+All endpoints will be authenticated using their alias as the username
+and the password. That means, for example, endpoint 'EP1' will be authenticated
+with the username 'EP1 and the password 'EP1'.
+</descrip>
+
+<descrip>
+<tag/Example 2:/
+<tscreen><verb>
+(FixedUsername not set)
+FixedPassword=ppp
+</verb></tscreen>
+All endpoints will be authenticated using their alias and the password 'ppp'.
+</descrip>
+
+<descrip>
+<tag/Example 3:/
+<tscreen><verb>
+FixedUsername=ppp
+FixedPassword=ppp
+</verb></tscreen>
+All endpoints will be authenticated using the username 'ppp'
+and the password 'ppp'.
+</descrip>
+
+<item><tt/UseDialedNumber=BOOLEAN/<newline>
+Default: <tt/0/
+<p>
+Select Called-Station-Id number type between the original one (as dialed
+by the user) - <tt/UseDialedNumber=1/ - and the rewritten one - <tt/UseDialedNumber=0/.
+
+</itemize>
+

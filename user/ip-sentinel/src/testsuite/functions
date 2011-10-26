@@ -1,0 +1,40 @@
+## --*- sh -*--
+
+# Copyright (C) 2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+#  
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#  
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#  
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+
+export EF_PROTECT_BELOW=1
+export EF_PROTECT_FREE=1
+export EF_FILL=42
+
+DIFF='diff -u -U 1 -b'
+
+datadir=${srcdir}/testsuite/data
+basefile=`basename $0`
+basefile=${datadir}/${basefile%%.sh}
+
+REPLACE_REGEX='s!^.*\(: (Re)reading blacklist\)!TIME\1!;
+               s!\([[:space:],[]\)\([0-9a-fA-F]:\)!\10\2!g;
+	       :a s!\([@:/!|]\)\([0-9a-fA-F][]/|,:[:blank:]]\)!\10\2!g;ta;
+	       s!:\([0-9a-fA-F]\)$!:0\1!g;
+	       s!\(de:ad:be:ef:00:\)[^],[:blank:]]*!\1XX!g'
+
+function exists()
+{
+    which "$1" >/dev/null 2>&1
+}
+
+set -e

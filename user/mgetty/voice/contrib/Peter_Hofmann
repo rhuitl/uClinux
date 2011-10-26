@@ -1,0 +1,636 @@
+From mgetty-owner-marc=poseidon.thphy.uni-duesseldorf.de@crynwr.com  Mon Jul 14 16:25:15 1997
+Received: from ns.crynwr.com (ns.crynwr.com [192.203.178.14])
+     by poseidon.thphy.uni-duesseldorf.de (8.8.5/8.8.5) with SMTP id QAA25432
+     for <marc@poseidon.thphy.uni-duesseldorf.de>; Mon, 14 Jul 1997 16:24:59 +0200
+Received: (qmail 10327 invoked by alias); 14 Jul 1997 14:01:32 -0000
+Delivered-To: mgetty@crynwr.com
+Received: (qmail 10306 invoked from network); 14 Jul 1997 14:01:25 -0000
+Received: from vogon.muc.de (root@193.174.4.4)
+  by ns.crynwr.com with SMTP; 14 Jul 1997 14:01:24 -0000
+Received: from enterprise.prz.tu-berlin.de ([130.149.226.72]) by vogon.muc.de with ESMTP id <48663-7612>; Mon, 14 Jul 1997 16:01:02 +0100
+Received: (from peterh@localhost) by enterprise.prz.tu-berlin.de (8.7.4/8.7.3) id QAA03281 for mgetty@muc.de; Mon, 14 Jul 1997 16:00:49 +0200
+From: "Peter Hofmann" <peterh@prz.tu-berlin.de>
+Message-Id: <9707141600.ZM3280@enterprise.prz.tu-berlin.de>
+Date: Mon, 14 Jul 1997 16:00:49 +0200
+X-Mailer: Z-Mail (3.2.1 24feb96 Caldera)
+To: mgetty@muc.de
+Subject: Patches for m/vgetty 1.1.6, US Robotics Sportster Vi/Voice, ZyXEL 2864I
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Status: ROr
+
+Hi,
+
+here is a comprehensive list of problems I have encountered with
+different US Robotics Sportster modems and ZyXEL 2864I TAs (with
+accompanying patches if I know a solution/hack) and some additional
+features that I have added to mgetty/vgetty 1.1.6.
+
+To keep the following text as short as possible here is an overview of
+the three types of hardware I have used:
+
+MODEM 1: US Robotics Sportster Vi US Model
+==========================================
+OK
+ati7
+Configuration Profile...
+
+Product type      US/Canada External
+Options           V32bis,V.FC,V.34+
+Fax Options       Class 1/Class 2.0
+Clock Freq        20.16Mhz
+Eprom             256k
+Ram               32k
+
+Supervisor date   02/27/96
+DSP date          02/22/96
+
+Supervisor rev    6.1.5
+DSP rev           1.2.5
+OK
+
+MODEM 2: US Robotics Sportster Voice German Model
+=================================================
+ati7
+Configuration Profile...
+
+Product type           Germany External
+Options                V32bis,V.FC,V.34+
+Fax Options            Class 1/Class 2.0
+Clock Freq             92.0Mhz
+Eprom                  256k
+Ram                    64k
+
+EPROM date             8/21/96
+DSP date               8/21/96
+
+EPROM rev              2.0
+DSP rev                2.0
+OK
+
+MODEM 2: ZyXEL 2864I ISDN TA with Modem Functions
+=================================================
+ati1
+
+Elite 2864I DSS1:  V 2.08
+Internal fax/modem:  V 1.16
+0CD6
+OK
+
+
+Now to the list of problems:
+
+PROBLEM 1:
+==========
+
+Description: MODEM 2 and MODEM 3 have to be in playback or recording
+mode to properly detect DTMF signals. Otherwise, in the IS_101_wait
+function no DTMF tones are detected (MODEM 2) or they are not
+correctly identified (MODEM 3).
+
+Cause: possibly firmware bugs
+
+Patch: The following patch removes the IS_101 implementation for US
+Robotics and ZyXEL 2864I and replaces it with two modem-specific
+versions that brings the modems into voice playback mode when waiting.
+
+Status: For further investigation. MODEM 1 recognizes DTMF codes
+using the original IS_101_wait function, so it seems to be a problem
+that depends on the ROM version. Perhaps proper setting of DLE
+responses using AT#VTD might help. What exactly does AT#VTD do?
+
+The problem might get fixed for MODEM 3 with a later flash-ROM
+version, MODEM 2 does not have a flash ROM.
+
+------------------------------------------------------------------------------
+diff -urw /tmp/mgetty-1.1.6/voice/libvoice/US_Robotics.c
+mgetty-1.1.6/voice/libvoice/US_Robotics.c
+--- /tmp/mgetty-1.1.6/voice/libvoice/US_Robotics.c     Fri Apr 11 17:07:27
+1997
++++ mgetty-1.1.6/voice/libvoice/US_Robotics.c     Wed May 21 09:40:39 1997
+@@ -39,6 +39,7 @@
+
+ static char stop_recording_char = 0x10;
+ static volatile int buffer_size = USR_BUFFER_SIZE;
++extern int stop_waiting; /* defined in IS_101.c */
+
+ /*
+  * Here we save the current mode of operation of the voice modem when
+@@ -76,11 +77,11 @@
+      else
+           lprintf(L_WARN,"can't turn on hardware flow control");
+
+-     if (voice_command("AT#VTD=3F,3F,3F", "OK") != VMA_USER_1)
++     /*     if (voice_command("AT#VTD=3F,3F,3F", "OK") != VMA_USER_1)
+           lprintf(L_WARN, "can't set DLE responses");
+      else
+           lprintf(L_WARN, "VTD setup successful");
+-
++     */
+      voice_modem_state = IDLE;
+      return(OK);
+      }
+@@ -768,6 +770,90 @@
+      return(OK);
+      }
+
++int USR_wait (int wait_timeout)
++     {
++     time_t timeout;
++     char buffer[VOICE_BUF_LEN];
++
++     reset_watchdog(0);
++     stop_waiting = FALSE;
++     voice_modem_state = WAITING;
++     voice_check_events();
++     timeout = time(NULL) + wait_timeout;
++
++     if (voice_command("ATE0#VTX", "CONNECT") != VMA_USER_1)
++          return(FAIL);
++
++     sprintf(buffer, "%c%c", DLE, ETX);
++     lprintf(L_JUNK, "%s: <DLE> <ETX>", program_name);
++
++     if (voice_write_raw(buffer, strlen(buffer)) != OK)
++       return(FAIL);
++
++     if ((voice_command("", "OK|VCON") & VMA_USER) != VMA_USER)
++          return(FAIL);
++
++     while ((!stop_waiting) && (timeout >= time(NULL)))
++          {
++          reset_watchdog(5);
++
++          sprintf(buffer, "%c", 0);
++          voice_write_raw(buffer, strlen(buffer));
++
++          while (check_for_input(voice_fd))
++               {
++               int char_read;
++               if ((char_read = voice_read_char()) == FAIL)
++                    {
++                         sprintf(buffer, "%c%c", DLE, ETX);
++                         lprintf(L_JUNK, "%s: <DLE> <ETX>", program_name);
++
++                         voice_write_raw(buffer, strlen(buffer));
++                         return(FAIL);
++                    }
++
++               if (char_read == DLE)
++                    {
++
++                    if ((char_read = voice_read_char()) == FAIL)
++                    {
++                         sprintf(buffer, "%c%c", DLE, ETX);
++                         lprintf(L_JUNK, "%s: <DLE> <ETX>", program_name);
++
++                         voice_write_raw(buffer, strlen(buffer));
++                         return(FAIL);
++                    }
++
++                    lprintf(L_JUNK, "%s: <DLE> <%c>", voice_modem_name,
++                     char_read);
++                    voice_modem->handle_dle(char_read);
++                    }
++               else
++                    lprintf(L_WARN,
++                     "%s: unexpected byte <%c> from voice modem",
++                     program_name, char_read);
++
++               };
++
++          voice_check_events();
++          delay(100);
++          };
++
++     if (voice_write_raw("ATE1\r",5) != OK)
++          return(FAIL);
++
++     if ((voice_command("", "OK|VCON") & VMA_USER) != VMA_USER)
++          return(FAIL);
++
++     if (voice_command("AT", "OK") != VMA_USER_1)
++          return(FAIL);
++
++     voice_check_events();
++     voice_modem_state = IDLE;
++
++
++     return(OK);
++     }
+
+ voice_modem_struct US_Robotics =
+      {
+@@ -791,5 +877,5 @@
+      &USR_switch_to_data_fax,
+      &USR_voice_mode_off,
+      &USR_voice_mode_on,
+-     &IS_101_wait
++     &USR_wait
+      };
+diff -urw /tmp/mgetty-1.1.6/voice/libvoice/ZyXEL_2864.c
+mgetty-1.1.6/voice/libvoice/ZyXEL_2864.c
+--- /tmp/mgetty-1.1.6/voice/libvoice/ZyXEL_2864.c Fri Apr 11 17:07:28
+1997
++++ mgetty-1.1.6/voice/libvoice/ZyXEL_2864.c Thu May 15 21:46:26 1997
+@@ -15,6 +15,8 @@
+
+ char *libvoice_ZyXEL_2864_c = "$Id: ZyXEL_2864.c,v 1.17 1997/04/11 15:07:28
+marc Exp $";
+
++extern int stop_waiting; /* defined in IS_101.c */
++
+ static int ZyXEL_2864_answer_phone (void)
+      {
+      int result;
+@@ -231,6 +233,76 @@
+      return(FAIL);
+      }
+
++int ZyXEL_2864_wait (int wait_timeout)
++     {
++     time_t timeout;
++     char buffer[VOICE_BUF_LEN];
++
++     reset_watchdog(0);
++     stop_waiting = FALSE;
++     voice_modem_state = WAITING;
++     voice_check_events();
++     timeout = time(NULL) + wait_timeout;
++
++     if (voice_command("AT+VTX", "CONNECT") != VMA_USER_1)
++          return(FAIL);
++
++     while ((!stop_waiting) && (timeout >= time(NULL)))
++          {
++          reset_watchdog(10);
++
++          while (check_for_input(voice_fd))
++               {
++               int char_read;
++
++               if ((char_read = voice_read_char()) == FAIL)
++                    {
++                         sprintf(buffer, "%c!", DLE);
++                         lprintf(L_JUNK, "%s: <DLE> <!>", program_name);
++
++                         voice_write_raw(buffer, strlen(buffer));
++                    return(FAIL);
++                    }
++
++               if (char_read == DLE)
++                    {
++
++                    if ((char_read = voice_read_char()) == FAIL)
++                    {
++                         sprintf(buffer, "%c!", DLE);
++                         lprintf(L_JUNK, "%s: <DLE> <!>", program_name);
++
++                         voice_write_raw(buffer, strlen(buffer));
++                         return(FAIL);
++                    }
++
++                    lprintf(L_JUNK, "%s: <DLE> <%c>", voice_modem_name,
++                     char_read);
++                    voice_modem->handle_dle(char_read);
++                    }
++               else
++                    lprintf(L_WARN,
++                     "%s: unexpected byte <%c> from voice modem",
++                     program_name, char_read);
++
++               };
++
++          voice_check_events();
++          delay(100);
++          };
++
++     voice_check_events();
++     voice_modem_state = IDLE;
++
++     sprintf(buffer, "%c!", DLE);
++     lprintf(L_JUNK, "%s: <DLE> <!>", program_name);
++
++     if (voice_write_raw(buffer, strlen(buffer)) != OK)
++       return(FAIL);
++
++     return(OK);
++     }
++
+ voice_modem_struct ZyXEL_2864 =
+      {
+      "ZyXEL 2864",
+@@ -253,5 +325,5 @@
+      &IS_101_switch_to_data_fax,
+      &IS_101_voice_mode_off,
+      &IS_101_voice_mode_on,
+-     &IS_101_wait
++     &ZyXEL_2864_wait
+      };
+------------------------------------------------------------------------------
+
+
+PROBLEM 2:
+==========
+
+Description: When using modem 3 I want to use the called party number
+information (ie. the MSN that was called) to deliver fax or voice
+message to different users. Therefore, this information must be passed
+to the new_fax and new_message scripts.
+
+Patch: The following patch changes cnd.c, faxrec.c, mgetty.h, answer.c
+to parse the FM:xxxx TO:yyyy lines to extract the yyyy information and
+pass it as an additional parameter ("CalleeId") to the new_fax and
+new_message scripts.
+
+Status: Should be included in the mgetty/vgetty sources. Perhaps the
+called party information should be passed as environment variables
+instead of modifying the parameter list of the new_fax and new_message
+programs to keep compatibility with older implementations.
+
+------------------------------------------------------------------------------
+diff -urw /tmp/mgetty-1.1.6/cnd.c mgetty-1.1.6/cnd.c
+--- /tmp/mgetty-1.1.6/cnd.c   Sun May  4 12:20:22 1997
++++ mgetty-1.1.6/cnd.c   Tue May 13 13:15:40 1997
+@@ -13,6 +13,7 @@
+
+ char *Connect = "";
+ char *CallerId = "none";
++char *CalleeId = "none";
+ char *CallTime = "";
+ char *CallName = "";
+ /* the next few are for Rockwell */
+@@ -119,7 +120,25 @@
+          *(cp->variable) = malloc(strlen(str) - len + 1);
+          (void) strcpy(*(cp->variable), str+len);
+         }
+-        lprintf(L_JUNK, "CND: found: %s", *(cp->variable));
++        lprintf(L_JUNK, "CND: found (caller id): %s", *(cp->variable));
++            if (strncmp(cp->string, "FM:", 3) == 0) /* it's a ZyXEL 2864 */
++            {
++                char *pp;
++                /* write callee id */
++                for (pp = str; pp < str + strlen(str) - 3; pp++)
++                    if (strncmp(pp, "TO:", 3) == 0)
++                    {
++                        char *qq;
++                        CalleeId = malloc(strlen(pp) - 2);
++                        (void) strcpy(CalleeId, pp + 3);
++                        /* clean up caller and callee id */
++                        for (qq = CalleeId; isdigit(*qq); qq++);
++                        *qq = 0;
++                        for (qq = CallerId; isdigit(*qq); qq++);
++                        *qq = 0;
++                    }
++                lprintf(L_JUNK, "CND: found (callee id): %s", CalleeId);
++            }
+         return;
+     }
+     }
+@@ -216,3 +235,9 @@
+ #endif
+     return(match);
+ }
++
++/*
++ * Local Variables: ***
++ * eval: (c-set-style "mgetty") ***
++ * End: ***
++ */
+diff -urw /tmp/mgetty-1.1.6/faxrec.c mgetty-1.1.6/faxrec.c
+--- /tmp/mgetty-1.1.6/faxrec.c     Mon Mar 31 20:28:14 1997
++++ mgetty-1.1.6/faxrec.c     Tue May 13 13:15:40 1997
+@@ -273,11 +273,13 @@
+      * note: stdout / stderr redirected to console, we don't
+      *       want the program talking to the modem
+      */
+-    sprintf( line, "%s %d '%s' %d %s >%s 2>&1 </dev/null",
++    sprintf( line, "%s %d '%s' %d %s '%s' '%s' >%s 2>&1 </dev/null",
+                          FAX_NOTIFY_PROGRAM,
+                          fax_hangup_code,
+                          fax_remote_id,
+                          pagenum,
++                                         CallerId,
++                                         CalleeId,
+                          fax_file_names,
+                          CONSOLE);
+
+diff -urw /tmp/mgetty-1.1.6/mgetty.h mgetty-1.1.6/mgetty.h
+--- /tmp/mgetty-1.1.6/mgetty.h     Sun May  4 12:51:15 1997
++++ mgetty-1.1.6/mgetty.h     Tue May 13 13:15:40 1997
+@@ -241,6 +241,7 @@
+
+ extern char *Connect;
+ extern char *CallerId;
++extern char *CalleeId;
+ extern char *CallTime;
+ extern char *CallName;
+
+diff -urw /tmp/mgetty-1.1.6/voice/vgetty/answer.c
+mgetty-1.1.6/voice/vgetty/answer.c
+--- /tmp/mgetty-1.1.6/voice/vgetty/answer.c  Fri Apr 11 17:07:34 1997
++++ mgetty-1.1.6/voice/vgetty/answer.c  Tue May 13 13:15:40 1997
+@@ -705,13 +705,14 @@
+
+      if (strlen(cvd.message_program.d.p) != 0)
+           {
+-          char *arguments[4];
++          char *arguments[5];
+           char message_program[VOICE_BUF_LEN];
+
+           arguments[0] = message;
+           arguments[1] = CallerId;
+-          arguments[2] = CallName;
+-          arguments[3] = NULL;
++          arguments[2] = CalleeId;
++          arguments[3] = CallName;
++          arguments[4] = NULL;
+           lprintf(L_NOISE, "executing message program, dev=%s, pid=%d",
+            DevID, getpid());
+           make_path(message_program, cvd.voice_dir.d.p,
+
+------------------------------------------------------------------------------
+
+
+PROBLEM 3:
+==========
+
+Description: If voice messages are to be generated on the fly during
+voice script execution (eg. text-to-speech conversion) the voice
+script must know the type of voice modem it is connected to. In my
+case I have to different brands of modem, MODEM 2 and MODEM 3.
+
+Patch: The type of voice modem is passed as an environment variable to
+dtmf shell scripts invoked by shell.c.
+
+Status: Should be included in vgetty sources.
+
+------------------------------------------------------------------------------
+diff -urw /tmp/mgetty-1.1.6/voice/libvoice/shell.c
+mgetty-1.1.6/voice/libvoice/shell.c
+--- /tmp/mgetty-1.1.6/voice/libvoice/shell.c Fri Apr 11 17:07:29 1997
++++ mgetty-1.1.6/voice/libvoice/shell.c Fri Jul  4 15:50:49 1997
+@@ -65,6 +65,7 @@
+                     char buffer2[VOICE_BUF_LEN];
+                     char buffer3[VOICE_BUF_LEN];
+                     char buffer4[VOICE_BUF_LEN];
++                    char buffer5[VOICE_BUF_LEN];
+
+ /*
+                     if (strcmp(program_name, "vgetty") == 0)
+@@ -86,6 +87,9 @@
+                     putenv(buffer3);
+                     sprintf(buffer4, "VOICE_OUTPUT=%d", pipe_out[1]);
+                     putenv(buffer4);
++                    sprintf(buffer5, "VOICE_RMD_TYPE=%s",
++                            voice_modem->rmd_name);
++                    putenv(buffer5);
+                     break;
+                     };
+                default:
+------------------------------------------------------------------------------
+
+
+PROBLEM 4:
+==========
+
+Description: When stopping the playback of voice messages from voice
+scripts the following sequence of events might occurr
+undeterministically:
+
+send: PLAY /tmp/out.rmd
+get:  PLAYING
+send: STOP
+get:  READY
+send: BEEP 1320 10
+get:  BEEPING
+
+OR
+
+send: PLAY /tmp/out.rmd
+get:  PLAYING
+send: STOP
+get:  READY
+send: BEEP 1320 10
+get:  READY           << ERROR!! BEEPING was expected
+
+This makes it very difficult do write reliable voice shell scripts.
+
+Cause: In the first case vgetty was still in mode PLAYING when the
+STOP was sent, whereas in the second case vgetty just finished playing
+and was in mode IDLE. In this case the STOP request causes mgetty to
+send an additional READY.
+
+Patch: The patch just removes the lines that send back READY when
+vgetty is in IDLE mode.
+
+Status: Should be included in vgetty.
+
+------------------------------------------------------------------------------
+diff -urw /tmp/mgetty-1.1.6/voice/libvoice/shell.c
+mgetty-1.1.6/voice/libvoice/shell.c
+--- /tmp/mgetty-1.1.6/voice/libvoice/shell.c Fri Apr 11 17:07:29 1997
++++ mgetty-1.1.6/voice/libvoice/shell.c Fri Jul  4 15:50:49 1997
+@@ -212,8 +216,8 @@
+                               lprintf(L_NOISE, "%s: STOP during IDLE",
+                                program_name);
+
+-                              if (voice_write_shell("READY") != OK)
+-                                   return(FAIL);
+
+                               break;
+                          default:
+------------------------------------------------------------------------------
+
+
+PROBLEM 5:
+==========
+
+Description: MODEMs 1 and 2 detect spurious busy (DLE b) signals
+during record or playback.
+
+Cause: possibly firmware bug
+
+Patch: The mgetty/vgetty 1.1.5 release did not have this
+problem. Trial and error led to the patch below. The AT#VTD command
+seems to make the modem overly sensitive. Removal of this command
+sequence fixed the problem.
+
+DOES ANYONE KNOW THE SPECIFICATION OF AT#VTD? Properly set, this might
+eliminate some of the other spurious DLE recognition problems with
+Sportster Vi.
+
+Status: For further investigation. This "DLE responses" setup was
+probably included in vgetty because it fixes someone else's problems
+with a different US Robotics Sportster model.
+
+------------------------------------------------------------------------------
+diff -urw /tmp/mgetty-1.1.6/voice/libvoice/US_Robotics.c
+mgetty-1.1.6/voice/libvoice/US_Robotics.c
+--- /tmp/mgetty-1.1.6/voice/libvoice/US_Robotics.c     Fri Apr 11 17:07:27
+1997
++++ mgetty-1.1.6/voice/libvoice/US_Robotics.c     Wed May 21 09:40:39 1997
+@@ -39,6 +39,7 @@
+
+ static char stop_recording_char = 0x10;
+ static volatile int buffer_size = USR_BUFFER_SIZE;
++extern int stop_waiting; /* defined in IS_101.c */
+
+ /*
+  * Here we save the current mode of operation of the voice modem when
+@@ -76,11 +77,11 @@
+      else
+           lprintf(L_WARN,"can't turn on hardware flow control");
+
+-     if (voice_command("AT#VTD=3F,3F,3F", "OK") != VMA_USER_1)
++     /*     if (voice_command("AT#VTD=3F,3F,3F", "OK") != VMA_USER_1)
+           lprintf(L_WARN, "can't set DLE responses");
+      else
+           lprintf(L_WARN, "VTD setup successful");
+-
++     */
+      voice_modem_state = IDLE;
+      return(OK);
+      }
+------------------------------------------------------------------------------
+
+
+PROBLEM 6:
+==========
+
+Description: Voice playback is extremely poor with MODEM 3 (ADPCM type
+4 compression). This is true for the playback of audio files converted
+to the ZyXEL 2864 type 4 format as well as for the playback of files
+previously recorded with the same modem. This is has also been a
+problem with Firmware version 2.07.
+
+
+PROBLEM 7:
+==========
+
+Description: MODEM 1 detects the beginning of busy tones as DLE d
+(dial tone). Only a single DLE d sequence is reported.
+
+Cause: Possibly: US Modem used in Germany
+
+PROBLEM 8:
+==========
+
+Description: MODEM 1 still occasionally detects spurious DLE
+tones. There is one greeting message that consistently causes the
+reporting of DLE 1 even though no such button was pressed on the
+telephone.
+
+------------------------------------------------------------------------------
+
+I would like to get feedback to this posting, send e-mail to
+<mailto:peterh@prz.tu-berlin.de>.
+
+Peter
+
+--
+Peter Hofmann                  e-mail: peterh@prz.tu-berlin.de
+Technical Univ. Berlin PRZ     Tel. ++49-(0)30-314-21701
+MA 073, Str. des 17. Juni 135  Fax  ++49-(0)30-314-21114
+D-10623 Berlin, Germany        PGP:  finger peterh@enterprise.prz.tu-berlin.de
+

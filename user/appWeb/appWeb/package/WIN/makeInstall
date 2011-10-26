@@ -1,0 +1,158 @@
+#!/bin/bash
+#
+#	makeInstall - Install AppWeb 
+#
+#	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+#	The latest version of this code is available at http://www.mbedthis.com
+#
+#	This software is open source; you can redistribute it and/or modify it 
+#	under the terms of the GNU General Public License as published by the 
+#	Free Software Foundation; either version 2 of the License, or (at your 
+#	option) any later version.
+#
+#	This program is distributed WITHOUT ANY WARRANTY; without even the 
+#	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#	See the GNU General Public License for more details at:
+#	http://www.mbedthis.com/downloads/gplLicense.html
+#	
+#	This General Public License does NOT permit incorporating this software 
+#	into proprietary programs. If you are unable to comply with the GPL, a 
+#	commercial license for this software and support services are available
+#	from Mbedthis Software at http://www.mbedthis.com
+#
+################################################################################
+#
+#	This script installs appWeb into the directories specified by:
+#
+#		BLD_PREFIX			Linux 						Windows
+#		BLD_DOC_PREFIX 		/usr/share/appWeb-*			prefix
+#		BLD_INC_PREFIX 		/usr/include/appWeb			prefix/include/appWeb
+#		BLD_LIB_PREFIX 		/usr/lib					prefix/bin
+#		BLD_ROOT_PREFIX		/							/
+#		BLD_SBIN_PREFIX		/usr/sbin					prefix/bin
+#		BLD_SRC_PREFIX		/usr/src/appWeb-VER			prefix/src
+#		BLD_WEB_PREFIX		/var/appWeb					prefix/web
+#
+
+PACKS=${*-"release binary dev doc samples src"}
+SKIP_PERMS=${SKIP_PERMS:-0}
+PKG_DIR=${PKG_DIR:-}
+
+DEFAULT_PERM=644
+BLD_DATE=`date '+%c'`
+BINARY_INSTALL=0
+
+. ${BLD_TOP}/config.sh
+
+if [ -x ${BLD_TOOLS_DIR}/bldout ]
+then BLDOUT=bldout
+else BLDOUT=cat
+fi
+
+################################################################################
+#
+#	Copy and set permissions. Usage: cpmod src dest perm owner.group
+#
+
+cpmod() {
+	target="${2-$DestD}"
+	perm=${3-$DEFAULT_PERM}
+	owner=${4-root.root}
+
+	dir="${target%/*}"
+	if [ ! -z ${dir} ]
+	then
+		mkdir -p "${dir}"
+		chmod 775 "${dir}"
+	fi
+
+	cp -pf "$1" "$target"
+	echo "      cp -pf $1 $target" | $BLDOUT
+	if [ $? != 0 ] 
+	then
+		echo "# Can't copy: cp -pf $1 $target"
+		exit 2
+	fi
+	if [ -d "$target" ] 
+	then
+		file=`basename "$1"`
+		chmod $perm "$target/$file"
+		chown $owner "$target/$file"
+	else
+		chmod $perm "$target"
+		chown $owner "$target"
+	fi
+}
+
+################################################################################
+#
+#	Copy packages
+#
+
+copyPackage() {
+
+	while read f
+	do
+		f=`eval echo ${f}`
+		echo "    #     Installing ${f} ..."
+		. ${f}
+	done < ${1}
+}
+
+################################################################################
+#
+#	Patch the !!BLD_XXX!! keywords. Usage: patchFile files ...
+#
+
+patchFile() {
+
+	for f in $*
+	do
+		cp $f .pbldtmp
+		sed -e < .pbldtmp "s/!!BLD_CPU!!/${BLD_CPU}/g; s/!!BLD_OSVER!!/${BLD_OSVER}/g; s/!!BLD_OS!!/${BLD_OS}/g; s/!!BLD_TYPE!!/${BLD_TYPE}/g; s/!!BLD_NUMBER!!/${BLD_NUMBER}/g; s/!!BLD_COMPANY!!/${BLD_COMPANY}/g; s/!!BLD_PRODUCT!!/${BLD_PRODUCT}/g; s/!!BLD_VERSION!!/${BLD_VERSION}/g; s/!!BLD_NAME!!/${BLD_NAME}/g; s/!!BLD_DATE!!/${BLD_DATE}/g; s^!!BLD_PREFIX!!^${BLD_PREFIX}^g; s^!!BLD_DOC_PREFIX!!^${BLD_DOC_PREFIX}^g; s^!!BLD_INC_PREFIX!!^${BLD_INC_PREFIX}^g; s^!!BLD_LIB_PREFIX!!^${BLD_LIB_PREFIX}^g; s^!!BLD_SBIN_PREFIX!!^${BLD_SBIN_PREFIX}^g; s^!!BLD_SRC_PREFIX!!^${BLD_SRC_PREFIX}^g; s^!!BLD_WEB_PREFIX!!^${BLD_WEB_PREFIX}^g; " >$f
+		chmod $DEFAULT_PERM ${f}
+	done
+	rm -f .pbldtmp
+}
+
+################################################################################
+
+echo -e "\n    #"
+echo -e "    # Installing \"${BLD_NAME} ${BLD_VERSION}-${BLD_NUMBER}\"\n    #"
+
+echo -e "    # Copy file packages ...\n    #"
+for pack in $PACKS
+do
+	f=${BLD_TOP}/${BLD_PRODUCT}/package/${pack}.pack
+	if [ ${pack} = "binary" ]
+	then
+		BINARY_INSTALL=1
+	fi
+	if [ -f ${f} ]
+	then
+		copyPackage ${f}
+	else
+		echo "Can't find pack list ${f}"
+	fi
+done
+
+if [ "${BINARY_INSTALL}" = "1" -a "$BLD_FEATURE_RUN_AS_SERVICE" = "1" ]
+then
+	echo -e "    #\n    # Starting ${BLD_PRODUCT} Service \n    #\n"
+	
+	${INS_BLD_PREFIX}/bin/winAppWeb -i -d
+	${INS_BLD_PREFIX}/bin/winAppWeb -rs
+	echo
+fi
+
+echo -e "    #\n    # Done \n    #\n"
+
+##
+##  Local variables:
+##  tab-width: 4
+##  c-basic-offset: 4
+##  End:
+##  vim:tw=78
+##  vim600: sw=4 ts=4 fdm=marker
+##  vim<600: sw=4 ts=4
+##

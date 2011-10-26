@@ -1,0 +1,137 @@
+--- orig/generator.c	2005-07-28 19:00:14
++++ generator.c	2005-04-28 16:19:24
+@@ -58,6 +58,7 @@ extern int make_backups;
+ extern int csum_length;
+ extern int ignore_times;
+ extern int size_only;
++extern OFF_T min_size;
+ extern OFF_T max_size;
+ extern int io_error;
+ extern int allowed_lull;
+@@ -834,6 +835,15 @@ static void recv_generator(char *fname, 
+ 		return;
+ 	}
+ 
++	if (min_size && file->length < min_size) {
++		if (verbose > 1) {
++			if (the_file_list->count == 1)
++				fname = f_name(file);
++			rprintf(FINFO, "%s is under min-size\n",
++				safe_fname(fname));
++		}
++		return;
++	}
+ 	if (max_size && file->length > max_size) {
+ 		if (verbose > 1) {
+ 			if (the_file_list->count == 1)
+@@ -1234,7 +1244,7 @@ void generate_files(int f_out, struct fi
+ 
+ 	phase++;
+ 	csum_length = SUM_LENGTH;
+-	only_existing = max_size = opt_ignore_existing = 0;
++	only_existing = min_size = max_size = opt_ignore_existing = 0;
+ 	update_only = always_checksum = size_only = 0;
+ 	ignore_times = 1;
+ 	make_backups = 0; /* avoid a duplicate backup for inplace processing */
+--- orig/options.c	2005-07-28 18:48:38
++++ options.c	2005-07-28 19:08:05
+@@ -98,6 +98,7 @@ int only_existing = 0;
+ int opt_ignore_existing = 0;
+ int need_messages_from_generator = 0;
+ int max_delete = 0;
++OFF_T min_size = 0;
+ OFF_T max_size = 0;
+ int ignore_errors = 0;
+ int modify_window = 0;
+@@ -166,7 +167,7 @@ static int modify_window_set;
+ static int itemize_changes = 0;
+ static int refused_delete, refused_archive_part;
+ static int refused_partial, refused_progress, refused_delete_before;
+-static char *max_size_arg;
++static char *min_size_arg, *max_size_arg;
+ static char partialdir_for_delayupdate[] = ".~tmp~";
+ 
+ /** Local address to bind.  As a character string because it's
+@@ -307,6 +308,7 @@ void usage(enum logcode F)
+   rprintf(F,"     --ignore-errors         delete even if there are I/O errors\n");
+   rprintf(F,"     --force                 force deletion of directories even if not empty\n");
+   rprintf(F,"     --max-delete=NUM        don't delete more than NUM files\n");
++  rprintf(F,"     --min-size=SIZE         don't transfer any file smaller than SIZE\n");
+   rprintf(F,"     --max-size=SIZE         don't transfer any file larger than SIZE\n");
+   rprintf(F,"     --partial               keep partially transferred files\n");
+   rprintf(F,"     --partial-dir=DIR       put a partially transferred file into DIR\n");
+@@ -362,7 +364,7 @@ void usage(enum logcode F)
+ 
+ enum {OPT_VERSION = 1000, OPT_DAEMON, OPT_SENDER, OPT_EXCLUDE, OPT_EXCLUDE_FROM,
+       OPT_FILTER, OPT_COMPARE_DEST, OPT_COPY_DEST, OPT_LINK_DEST,
+-      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW,
++      OPT_INCLUDE, OPT_INCLUDE_FROM, OPT_MODIFY_WINDOW, OPT_MIN_SIZE,
+       OPT_READ_BATCH, OPT_WRITE_BATCH, OPT_ONLY_WRITE_BATCH, OPT_MAX_SIZE,
+       OPT_REFUSED_BASE = 9000};
+ 
+@@ -426,6 +428,7 @@ static struct poptOption long_options[] 
+   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
+   {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
+   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
++  {"min-size",         0,  POPT_ARG_STRING, &min_size_arg,  OPT_MIN_SIZE, 0, 0 },
+   {"max-size",         0,  POPT_ARG_STRING, &max_size_arg,  OPT_MAX_SIZE, 0, 0 },
+   {"timeout",          0,  POPT_ARG_INT,    &io_timeout, 0, 0, 0 },
+   {"temp-dir",        'T', POPT_ARG_STRING, &tmpdir, 0, 0, 0 },
+@@ -834,6 +837,15 @@ int parse_arguments(int *argc, const cha
+ 			read_batch = 1;
+ 			break;
+ 
++		case OPT_MIN_SIZE:
++			if ((min_size = parse_size_arg(min_size_arg)) <= 0) {
++				snprintf(err_buf, sizeof err_buf,
++					"--min-size value is invalid: %s\n",
++					min_size_arg);
++				return 0;
++			}
++			break;
++
+ 		case OPT_MAX_SIZE:
+ 			if ((max_size = parse_size_arg(max_size_arg)) <= 0) {
+ 				snprintf(err_buf, sizeof err_buf,
+@@ -1348,6 +1360,11 @@ void server_options(char **args,int *arg
+ 		args[ac++] = arg;
+ 	}
+ 
++	if (min_size && am_sender) {
++		args[ac++] = "--min-size";
++		args[ac++] = min_size_arg;
++	}
++
+ 	if (max_size && am_sender) {
+ 		args[ac++] = "--max-size";
+ 		args[ac++] = max_size_arg;
+--- orig/rsync.yo	2005-07-28 19:26:48
++++ rsync.yo	2005-05-06 19:12:35
+@@ -340,6 +340,7 @@ to the detailed description below for a 
+      --ignore-errors         delete even if there are I/O errors
+      --force                 force deletion of dirs even if not empty
+      --max-delete=NUM        don't delete more than NUM files
++     --min-size=SIZE         don't transfer any file smaller than SIZE
+      --max-size=SIZE         don't transfer any file larger than SIZE
+      --partial               keep partially transferred files
+      --partial-dir=DIR       put a partially transferred file into DIR
+@@ -756,10 +757,16 @@ dit(bf(--max-delete=NUM)) This tells rsy
+ files or directories (NUM must be non-zero).
+ This is useful when mirroring very large trees to prevent disasters.
+ 
++dit(bf(--min-size=SIZE)) This tells rsync to avoid transferring any
++file that is smaller than the specified SIZE, which can help in not
++transferring small, junk files.
++
++The SIZE value can be suffixed with a letter to indicate a size multiplier
++(K, M, or G) and may be a fractional value (e.g. "bf(--min-size=2.5k)").
++
+ dit(bf(--max-size=SIZE)) This tells rsync to avoid transferring any
+-file that is larger than the specified SIZE. The SIZE value can be
+-suffixed with a letter to indicate a size multiplier (K, M, or G) and
+-may be a fractional value (e.g. "bf(--max-size=1.5m)").
++file that is larger than the specified SIZE. See the bf(--min-size)
++option for a description of SIZE.
+ 
+ dit(bf(-B, --block-size=BLOCKSIZE)) This forces the block size used in
+ the rsync algorithm to a fixed value.  It is normally selected based on

@@ -1,0 +1,78 @@
+#!/bin/sh
+#
+# /usr/local/lib/mgetty+sendfax/new_fax
+#
+# new_fax <getty-exit-code> <fax-sender-id> <number-of-pages> <page> [<page>..]
+#
+# This program is called by mgetty, when a fax is received. It sends
+# the fax as a multipart/mixed MIME mail to the faxadmin ($ADMIN),
+# where every fax page is attached as image/x-fax-g3 (the native
+# received format, which is compact and which can be viewed with the
+# viewfax command). To view and print a page from your mail reader add
+# the following to your ~/.mailcap:
+# image/x-fax-g3; viewfax -geometry +5+23 '%s'; test=test -n "$DISPLAY"
+# image/x-fax-g3;; print=printfax '%s'
+#
+# You need the program mmencode for base64 encoding of the fax data,
+# which you will find in your metamail distribution.
+#
+# (c) 1997-1998 Roland Rosenfeld <roland@spinnaker.rhein.de>
+#
+# $Id: new_fax.mime3,v 1.1 1998/06/12 17:20:08 gert Exp $
+#
+
+PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin
+
+ADMIN="faxadmin"	# mail address of fax administrator
+			# change this to your needs!
+
+CODE="$1"		# getty exit code 
+SENDER="$2"		# fax senders ID
+PAGES="$3"		# number of pages
+shift 3
+
+TMP=/tmp		# temporary directory. change this to your needs.
+
+TMPMAIL=$TMP/new_fax.$$
+trap "rm -f $TMPMAIL; exit" 0 1 2 15
+
+BOUNDARY="newfax-`date +%s`-$$"
+
+# Create mail header:
+echo "Subject: FAX from $SENDER with $PAGES pages" > $TMPMAIL
+echo "Mime-Version: 1.0" >> $TMPMAIL
+echo "Content-Type: multipart/mixed; boundary=$BOUNDARY" >> $TMPMAIL
+echo "" >> $TMPMAIL
+
+# Create first part of the mail (describing the fax):
+echo "--$BOUNDARY" >> $TMPMAIL
+echo "Content-Type: text/plain; charset=us-ascii" >> $TMPMAIL
+echo "" >> $TMPMAIL
+echo "A fax from $SENDER was received at about" >> $TMPMAIL
+echo "`date` consisting of $PAGES pages." >> $TMPMAIL
+echo "The termination code of the fax program was $CODE." >> $TMPMAIL
+echo "The pages are included below." >> $TMPMAIL
+echo "" >> $TMPMAIL
+
+# Add every page of the fax to the mail:
+for file
+do
+    echo "--$BOUNDARY" >> $TMPMAIL
+    echo "Content-Type: image/x-fax-g3" >> $TMPMAIL
+    echo "Content-Transfer-Encoding: base64" >> $TMPMAIL
+    echo "Content-Disposition: attachment; filename=\"`basename $file`\"" \
+                                                        	 >> $TMPMAIL
+    echo "" >> $TMPMAIL
+
+    # base64 encoder:
+    mmencode -b $file >> $TMPMAIL
+    
+    echo "" >> $TMPMAIL
+done
+
+echo "--$BOUNDARY--" >> $TMPMAIL
+
+# Send out the created mail:
+sendmail $ADMIN < $TMPMAIL
+
+exit 0

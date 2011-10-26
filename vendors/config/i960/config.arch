@@ -1,0 +1,141 @@
+############################################################################
+#
+#  A Generic i960 config.arch that can be included by other platforms
+#  to reduce the number of places that need to be edited when something
+#  common changes.  If you include this file you should provide:
+#
+#  CPUFLAGS            - cpu specific flags to pass to the compiler
+#  VENDOR_CFLAGS       - vendor specific flags to pass to the compiler
+#  LOPT                - library optimisation flags
+#  UOPT                - user optimisation flags
+#
+#  David McCullough <davidm@snapgear.com>
+#
+############################################################################
+#
+# Generic settings
+#
+
+ifndef CONSOLE_BAUD_RATE
+CONSOLE_BAUD_RATE = 9600
+endif
+
+############################################################################
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all build
+#
+# ARCH is for the kernel
+# TARGET_ARCH is for uClibc
+
+ENDIAN        = little
+MACHINE       = SX6
+ARCH          = i960
+# CROSS_COMPILE = i960-elf-
+CROSS_COMPILE = i960-coff-
+CROSS         = $(CROSS_COMPILE)
+CONFIGURE_HOST = i960-coff
+
+CONFIG_UCLINUX=y
+
+CC        = $(CROSS_COMPILE)gcc $(CPUFLAGS)
+AS        = $(CROSS_COMPILE)as $(CPUFLAGS)
+CXX       = $(CROSS_COMPILE)g++ $(CPUFLAGS)
+AR        = $(CROSS_COMPILE)ar
+LD        = $(CROSS_COMPILE)ld
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+ELF2FLT   = elf2flt
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+UCLINUX_BUILD_SET = 0					# have we set a special config below
+
+############################################################################
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O2) -g -fomit-frame-pointer
+  endif
+	CFLAGS  += $(CPUFLAGS)
+	CFLAGS  += -pipe
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -fno-builtin
+	CFLAGS  += -DEMBED
+	CFLAGS  += -nostdinc -I$(ROOTDIR)/nclude -I$(ROOTDIR)/include/include
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS = $(CFLAGS)
+	CFLAGS  += -Dlinux -D__linux__ -D__uClinux__ -Dunix
+	LDFLAGS  = $(CFLAGS) -Wl,-elf2flt
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+	LDPATH = -L$(ROOTDIR)/lib
+
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-O2) -g -fomit-frame-pointer
+  endif
+
+	CFLAGS  += $(CPUFLAGS)
+	CFLAGS  += -pipe
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -fno-builtin
+	CFLAGS  += -Dlinux -D__linux__ -Dunix -D__uClinux__ -DEMBED
+	CFLAGS  += -nostdinc -I$(ROOTDIR)/nclude -I$(ROOTDIR)/include/include
+	CFLAGS  += -nostartfiles
+
+	CXXFLAGS = $(CFLAGS)
+
+  ifeq ($(LIBCDIR),libc)
+	LDFLAGS  = $(CFLAGS) -Wl,-elf2flt $(ROOTDIR)/lib/libc/crt0.o
+  else
+	LDFLAGS  = $(CFLAGS) -Wl,-elf2flt $(ROOTDIR)/lib/crt0.o \
+					$(ROOTDIR)/lib/crti.o \
+					$(ROOTDIR)/lib/crtn.o
+  endif
+
+	LDFLAGS += $(LDPATH)
+
+	LDLIBS         = $(LIBC)
+	LDLIBS_static  = $(SLIBC)
+	CXXLIBS        = $(LIBIOSTREAM) $(LIBIO) $(LIBIBERTY) \
+					 $(LIBC) $(LIBGCC)
+	
+  ifndef FLTFLAGS
+	FLTFLAGS :=
+  endif
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+endif
+
+############################################################################

@@ -1,0 +1,87 @@
+##############################################################################
+
+#
+#	mkintelflash -- construct an entire NETtel/x86 intel flash image.
+#
+#	(C) Copyright 2001-2002, Greg Ungerer (gerg@snapgear.com)
+#
+
+##############################################################################
+
+#
+#	Define the files to use.
+#
+FLASH=images/flash.bin
+KERNEL=images/bzImage
+ROMFS=images/romfs.img
+JFFS=images/jffs.img
+JFFS2=images/jffs2.img
+BIOS=boot/x86/bios128k.bin
+
+FLASHSIZE=8388608
+#FLASHSIZE=16777216
+
+##############################################################################
+
+usage()
+{
+	echo "usage: mkintelflash"
+	exit 1
+}
+
+##############################################################################
+
+#
+#	Check for any args...
+#
+if [ $# -gt 0 ]
+then
+	usage
+fi
+
+#
+#	Figure out what filesystem type to use...
+#
+if [ -f "$JFFS2" ]
+then
+	FSTYPE="JFFS2:"
+	FS=$JFFS2
+elif [ -f "$JFFS" ]
+then
+	FSTYPE="JFFS: "
+	FS=$JFFS
+elif [ -f "$ROMFS" ]
+then
+	FSTYPE="ROMFS:"
+	FS=$ROMFS
+else
+	echo "ERROR: no filesystem image found??"
+	exit 1
+fi
+
+#
+#	Kernel first (896k in size)
+#
+cat $KERNEL > $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 1048576 - $SIZE`
+echo "KERNEL: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	Filesystem image.
+#
+cat $FS >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr $FLASHSIZE - 131072 - $SIZE`
+echo "$FSTYPE  flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD 2> /dev/null | tr \\000 \\377 >> $FLASH
+
+#
+#	BIOS (128k in size)
+#
+cat $BIOS >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+echo "BIOS:   flash size=$SIZE"
+
+exit 0

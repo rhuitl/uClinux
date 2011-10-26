@@ -1,0 +1,48 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+COMMON_DIR := $(top_srcdir)libc/sysdeps/linux/common
+COMMON_OUT := $(top_builddir)libc/sysdeps/linux/common
+
+CSRC := $(notdir $(wildcard $(COMMON_DIR)/*.c))
+
+ifeq ($(EXCLUDE_BRK),y)
+CSRC := $(filter-out sbrk.c,$(CSRC))
+endif
+
+ifneq ($(UCLIBC_HAS_LFS),y)
+CSRC_LFS := $(notdir $(wildcard $(COMMON_DIR)/*64.c))
+CSRC := $(filter-out llseek.c $(CSRC_LFS),$(CSRC))
+endif
+
+CSRC := $(filter-out ssp-local.c,$(CSRC))
+ifneq ($(UCLIBC_HAS_SSP),y)
+CSRC := $(filter-out ssp.c,$(CSRC))
+endif
+
+# fails for some reason
+ifneq ($(strip $(ARCH_OBJS)),)
+CSRC := $(filter-out $(notdir $(ARCH_OBJS:.o=.c)),$(CSRC))
+endif
+
+CFLAGS-ssp.c := $(SSP_DISABLE_FLAGS)
+CFLAGS-ssp-local.c := $(SSP_DISABLE_FLAGS)
+
+COMMON_SRC := $(patsubst %.c,$(COMMON_DIR)/%.c,$(CSRC))
+COMMON_OBJ := $(patsubst %.c,$(COMMON_OUT)/%.o,$(CSRC))
+
+libc-y += $(COMMON_OBJ)
+libc-static-$(UCLIBC_HAS_SSP) += $(COMMON_OUT)/ssp-local.o
+libc-nonshared-$(UCLIBC_HAS_SSP) += $(COMMON_OUT)/ssp-local.os
+
+libc-nomulti-y += $(COMMON_OUT)/__syscall_rt_sigaction.o $(COMMON_OUT)/__syscall_sigaction.o
+libc-nomulti-$(UCLIBC_HAS_SSP) += $(COMMON_OUT)/ssp.o
+
+objclean-y += common_objclean
+
+common_objclean:
+	$(RM) $(COMMON_OUT)/*.{o,os,oS}

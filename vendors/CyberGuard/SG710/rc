@@ -1,0 +1,55 @@
+echo "/etc/rc processing ..."
+echo "Starting watchdog ..."
+watchdog /dev/watchdog
+hostname SG710
+echo "Mounting Filesystems ..."
+mount -t proc proc /proc
+echo 2 > /proc/cpu/alignment
+mount -t devpts devpts /dev/pts
+mount -t tmpfs -o size=33m tmpfs /var
+if ! mount -t ext3 /dev/flash/config /etc/config
+then
+	mke2fs -j /dev/flash/config
+	if ! mount -t ext3 /dev/flash/config /etc/config
+	then
+		mount -t tmpfs -o size=2m tmpfs /etc/config
+	fi
+fi
+[ -d /etc/config/persistent ] || mkdir /etc/config/persistent
+mkdir -m 1777 /var/tmp
+mkdir -m 755 /var/log
+mkdir -m 755 /var/run
+mkdir -m 1777 /var/lock
+mkdir -m 755 /var/empty
+mkdir -m 755 /var/mnt
+echo "Processing Config Filesystem ..."
+flatfsd -r -n
+echo "Setting system clock ..."
+hwclock --hctosys --utc
+logd boot
+echo "Loading network drivers."
+modprobe crc32
+modprobe mii
+modprobe 8139cp
+ip link set eth0 name tmp
+ip link set eth1 name eth0
+ip link set tmp name eth1
+modprobe ixp400
+modprobe ixp425_npe
+rmmod ixp425_npe
+cat /etc/IxNpeMicrocode.dat > /dev/ixNpe
+modprobe ixp425_eth
+modprobe ixp400_eth
+modprobe e1000
+setmac -n 4
+#modprobe ipsec
+echo "Loading crypto drivers."
+modprobe safenet
+modprobe safenet_sg
+modprobe authd
+modprobe ocf
+modprobe ixp4xx
+modprobe cryptodev
+initconf -v
+ifconfig lo 127.0.0.1
+echo "/etc/rc complete."

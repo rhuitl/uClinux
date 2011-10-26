@@ -1,0 +1,131 @@
+#!/usr/bin/perl -w
+
+# $Id: new_fax.th,v 1.1 1998/08/31 20:25:38 gert Exp $
+# Program which is called for newly received faxes
+#
+# take all fax data, pack together (tar archive + gzip), and send as
+# MIME mail.  Use together with "faxview.th" for decoding those e-mails.
+# 
+# Torsten Hilbrich <Torsten.Hilbrich@gmx.net>
+#
+
+# Some functions for dealing with files
+use File::Basename;
+
+# The user to receive the fax and the get the fax viewer on its display
+my $user = 'torsten';
+
+my $faxviewer = '/usr/local/bin/faxview';
+
+my $sendmail = '/usr/sbin/sendmail';
+my $tar = '/bin/tar';
+my $gzip = '/bin/gzip';
+my $su = '/bin/su';
+my $mmencode = '/usr/local/bin/mmencode';
+
+# Information received from mgetty
+my $hangup_code = shift;
+my $sender_id = shift;
+my $number_pages = shift;
+
+my $subject_line = 
+  "Subject: incoming FAX from $sender_id with $number_pages page";
+if($number_pages != 1) {
+  $subject_line = "${subject_line}s";
+}
+
+# Check the hangup code
+if($hangup_code != 0) {
+  my $args = "";
+  my $file;
+  foreach $file (@ARGV) {
+    $args = "$args\n$file";
+  }
+  open MAIL, "|$sendmail $user"
+    or die "Unable to send mail using $sendmail to $user";
+  print MAIL <<EOF
+$subject_line
+
+The fax was not completly received.  No data are appended here, you
+may want to check the files:$args
+.
+EOF
+  ;
+  close MAIL;
+  exit 0;
+}
+
+# First call the faxviewer in the background
+my $args = "";
+my $file;
+foreach $file (@ARGV) {
+  $args = "$args \\\"$file\\\"";
+}
+
+system("$su $user -c \"$faxviewer $args -display :0 &\"");
+
+my $tmp = "/tmp/new_fax-$$";
+mkdir $tmp, 0755
+  or die "Unable to create dir $tmp";
+
+my $archive_tmp = "$tmp/$sender_id.new";
+my $archive = "$tmp/$sender_id.faxes";
+
+my $mail = "$tmp/mail";
+
+foreach $file (@ARGV) {
+  # Ignore non-existing files
+  -f $file && -r $file or next;
+
+  chdir dirname($file)
+    or die "Unable to chdir to directory of $file";
+
+  system($tar, "rf", $archive_tmp, basename $file) == 0
+    or die "Tar failed for adding $file to archive $archive_tmp";
+}
+
+system("$gzip -c9 \"$archive_tmp\" > \"$archive\"") == 0
+  or die "Gzip failed for compressing $archive_tmp to $archive";
+
+# Now build a file for sending mail
+$args = basename $archive;
+
+open MAIL, ">$mail"
+  or die "Unable to compose mail in $mail";
+print MAIL <<EOF
+$subject_line
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="attachment"
+
+--attachment
+Content-Type: application/x-faxarchive; name="$args"
+Content-Transfer-Encoding: base64
+
+EOF
+  ;
+close MAIL;
+
+# Encode the file and add it to the mail
+system("$mmencode -b \"$archive\" >> \"$mail\"") == 0
+  or die "Error while encoding $archive into $mail";
+
+open MAIL, ">>$mail"
+  or die "Unable to append to mail in $mail";
+print MAIL <<EOF
+
+--attachment--
+EOF
+  ;
+close MAIL;
+
+# Now call sendmail
+system("$sendmail $user < \"$mail\"") == 0
+  or die "Error while sending the mail";
+
+END {
+  defined $tmp and
+    system("rm -rf $tmp");
+}
+
+
+

@@ -1,0 +1,15 @@
+#
+#	mkrd - make a ram disk image
+#
+
+SIZE=64
+BYTESPERINODE=2048
+
+dd if=/dev/zero of=/dev/ram0 bs=1k count=${SIZE}
+mke2fs -vm0 -O none -i ${BYTESPERINODE} /dev/ram0 ${SIZE}
+tune2fs -i 0 /dev/ram0
+mount /dev/ram0 /mnt
+rmdir /mnt/lost+found
+umount /mnt
+dd if=/dev/ram0 of=ramfs${SIZE} bs=1k count=${SIZE}
+holes ramfs${SIZE} > ramfs${SIZE}.img

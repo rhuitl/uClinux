@@ -1,0 +1,25 @@
+echo "/etc/rc processing ..."
+hostname SE5100
+echo "Making Filesystems ..."
+# /dev/ram0 is the root filesystem for recovery images, so skip it.
+/bin/expand /etc/ramfs.img /dev/ram1
+echo "Mounting Filesystems ..."
+mount -t proc proc /proc
+mount -t ext2 /dev/ram1 /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+echo "Remount / write enabled ..."
+mount -o rw,remount /dev/nftla1 /
+echo "Processing Config Filesystem ..."
+/bin/flatfsd -r
+cp /etc/config/resolv.user /etc/config/resolv.conf
+echo "Loading ethernet drivers."
+insmod ixp400
+insmod ixp425_eth
+setmac -o 0x37000
+insmod ipsec
+echo "/etc/rc complete."
+exit 0

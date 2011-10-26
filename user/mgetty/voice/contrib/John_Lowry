@@ -1,0 +1,35 @@
+From: John Lowry <jlowry@netcom.com>
+Newsgroups: alphanet.ml.mgetty
+Subject: Re: Too fast NO_DIAL_TONE error
+Date: 31 Aug 1999 19:27:52 +0200
+Message-ID: <Pine.3.89.9908311056.A23517-0100000@netcom11>
+
+On Mon, 30 Aug 1999, Guy Cohen wrote:
+
+> 
+> then rings, buy vm is too fast and im getting NO_DIAL_TONE after
+> the modem beeps 3 times. I tried looking in the source to change that,
+> but with no results. 
+> 
+
+If I have understood your question correctly, you want to tell the modem 
+to ignore the initial beeps. Here is what I used to make my USR modem 
+wait 4 seconds before the dial tone starts (to overcome the stutter voice 
+mail message I get):
+
+I added the following to US_Robotics.c::USR_init, to deal with my
+PacBell voice mail system:
+
+     /*
+      * Fix put in by jlowry to ignore stutter dial tone
+      * Can either set S6=4 to make modem wait 4 secs for dial tone
+      * or enable blind dial (usually X0 or X1)
+      */
+     if (voice_command("ATS6=4", "OK") != VMA_USER_1)
+          lprintf(L_WARN, "can't ignore stutter dial tone");
+
+
+Hope this helps.
+
+John Lowry
+

@@ -1,0 +1,859 @@
+Host AP driver for Intersil Prism2/2.5/3
+========================================
+
+Copyright (c) 2001-2002, SSH Communications Security Corp and Jouni Malinen
+Copyright (c) 2002-2004, Jouni Malinen
+Author: Jouni Malinen <jkmaline@cc.hut.fi>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 2 as
+published by the Free Software Foundation. See COPYING for more
+details.
+
+
+Introduction
+============
+
+This is a Linux driver for wireless LAN cards based on Intersil's
+Prism2/2.5/3 chipset. The driver supports a so called Host AP mode, i.e.,
+it takes care of IEEE 802.11 management functions in the host computer
+and acts as an access point. This does not require any special
+firmware for the wireless LAN card. In addition to this, normal station
+operations in BSS (infrastructure) and in IBSS (ad hoc). Current version
+of the Host AP driver and tools supports WPA in AP (Authenticator) and
+client (Supplicant) modes.
+
+Intersil's station firmware for Prism2/2.5/3 chipset supports a so called
+Host AP mode in which the firmware takes care of time critical tasks
+like beacon sending and frame acknowledging, but leaves other
+management tasks to host computer driver. This driver implements basic
+functionality needed to initialize and configure Prism2/2.5/3-based cards,
+to send and receive frames, and to gather statistics. In addition, it
+includes an implementation of following IEEE 802.11 functions:
+authentication (and deauthentication), association (reassociation, and
+disassociation), data transmission between two wireless stations,
+power saving (PS) mode signaling and frame buffering for PS
+stations. The driver has also various features for development
+debugging and for researching IEEE 802.11 environments like access to
+hardware configuration records, I/O registers, and frames with 802.11
+headers.
+
+
+Distribution
+============
+
+Before version v0.1.0, Host AP driver used to be distributed as one
+tarball. This has now been separated into four components:
+
+hostap-driver:
+	Linux driver for Intersil Prism2/2.5/3
+	Host AP mode support, IEEE 802.11 management (AP)
+
+hostapd:
+	User space daemon for extended IEEE 802.11 management
+	IEEE 802.1X Authenticator
+	WPA/WPA2 Authenticator
+	RADIUS Authentication client
+	RADIUS Accounting client
+
+hostap-utils:
+	Utility programs for hostap-driver
+
+wpa_supplicant:
+	Additional program needed for WPA and WPA2 client operations. The
+	Supplicant is used in WPA/WPA2 key handshakes to authenticate
+	with the AP and to generate dynamic encryption keys (TKIP or
+	CCMP).
+
+See README files in each of these packages for information about the
+different components of the full Host AP software package.
+
+
+Feedback/Questions
+==================
+
+Any comments, reports on success/failure, ideas for further
+improvement, feature requests, etc. are welcome at jkmaline@cc.hut.fi.
+Please note, that I may not always have time for replying emails
+quickly, but I'll try to go through my mail whenever time permits.
+There is also a mailing list for Host AP related messages. Since this
+list has a broader audience, you might even get an answer.. Anyway,
+this list is recommended for general questions about Host AP driver
+and its development. In addition, I will send release notes to it
+whenever a new version is available.
+
+The mailing list information and web archive is at
+http://lists.shmoo.com/mailman/listinfo/hostap. Messages to
+hostap@shmoo.com will be delivered to the subscribers. Please note, that
+due to large number of spam and virus messages sent to the list address,
+the list is configured to automatically accept messages only from
+subscribed addresses.
+
+
+Supported environment
+=====================
+
+Hardware
+--------
+
+The driver supports IEEE 802.11 wireless LAN PC Cards that are based
+on Intersil's Prism2, 2.5, or 3 chipsets (especially, MAC processors
+HFA3841 or HFA3842 for Prism2 and ISL3874 for Prism2.5). Native PCI
+cards using Prism2.5/3 are also supported, but USB cards based on
+Prism2.5/3 chipset are not supported in this version.
+
+This version has been successfully tested with number of different
+models, e.g., Compaq WL100 and WL200, D-Link DWL-650, and Linksys
+WPC11, but there may still be issues with some models.
+
+Some of the new Prism3-based cards use a smaller flash chip that does
+not include full firmware for the card. For example, D-Link DWL-650
+rev. P1 and D-Link DWL-520 rev. E1 are such cards. These cards require
+that the firmware is downloaded to the card during initialization. See
+utils/hostap_fw_load for example commands on doing this.
+
+If you happen to have a wireless LAN card that is based on Prism2, but
+does not seem to work with this driver, please let me know the model
+and I can try to come up with a solution for any problems. This will
+be easier if I have access to the non-functioning card model, but I
+might also be able to solve some cases based on debug logs and other
+easily collectible information.
+
+In addition to Intersil's Prism2/2.5/3 chipsets, this driver may partly
+support other chipsets. As far as I know, other chipsets do not have
+Host AP mode, so this is not supported, but managed mode (i.e., being
+a station in a BSS) seems to work with Prism1 (e.g., Intel, 3Com, and
+Symbol cards) and Lucent WaveLAN. I would like to add support for AP
+functionality also with these cards, but I'm not sure whether it can
+be done without special firmware. Please let me know, if you have
+further information about this.
+
+The driver should be portable to different host CPUs. I have tested it
+on ix86 and PowerPC platforms. In addition, I have received reports of
+it working on Alpha and Arm.
+
+Software
+--------
+
+This driver is developed in Linux 2.4.x and 2.6.x environment and may
+require the latest available kernel version. These are the only
+"officially supported" versions in the development branch of the Host
+AP driver. Older "stable branch" v0.1.x versions may be used with
+Linux 2.2.x and older 2.4.x and 2.6.x versions.
+
+PCI (hostap_pci.o) and PLX9052 (hostap_plx.o) versions require at
+least Linux kernel version 2.4.x for their PCI initialization
+routines.
+
+
+Driver installation
+===================
+
+PC Cards (not in PLX9052 adapter)	hostap_cs.o
+---------------------------------
+
+Systems using kernel tree PCMCIA modules:
+
+'Makefile' includes commands for compiling and installing Host AP
+driver for systems using kernel tree PCMCIA support (i.e., kernel
+modules are not compiled with external pcmcia-cs package). Edit
+KERNEL_PATH in Makefile to match your system. Run 'make' (this
+compiles the sources; this step can be run as non-root user). After
+the compilation has finished, you can install hostap_cs.o by running
+'make install' (as root). You will then need to restart cardmgr
+to load new configuration from /etc/pcmcia/hostap_cs.conf.
+
+
+Systems using external pcmcia-cs modules:
+
+There are two options for building and installing:
+
+1) just like the steps for kernel tree, but also configure PCMCIA_PATH in
+   Makefile (i.e., compile and install pcmcia-cs separately)
+
+2)
+Copy everything except driver/modules/Makefile from 'driver' subdirectory on
+top of root pcmcia-cs directory, i.e., so that driver/modules/hostap.c ends up
+in pcmcia-cs's 'modules' directory, like so:
+
+	# make sure that Makefile does not overwrite old Makefile in pcmcia-cs
+	mv driver/modules/Makefile driver/modules/Makefile-not-used
+	cp -a driver/* /usr/src/pcmcia-cs-3.1.31
+
+After this you should be able to build and install pcmcia-cs with this
+driver (hostap_cs.o) using normal commands ('make config', 'make all',
+and 'make install').
+
+PC Cards in PLX9052 adapter	hostap_plx.o
+---------------------------
+
+'Makefile' includes commands for compiling and installing Host AP
+driver for systems using PLX9052-based PCI adapters for PC Cards.
+These cards do not use pcmcia-cs package and hostap_plx.o is used to
+also initialize the PCI parts of such setup. Edit KERNEL_PATH in
+Makefile to match your system. Run 'make' (this compiles the
+sources; this step can be run as non-root user). After the compilation
+has finished, you can install hostap_plx.o by running 'make
+install' (as root). You can probe PCI bus for PLX9052 adapters and
+initialize the devices by loading the module ('modprobe hostap_plx').
+
+PCI cards based on Prism2.5/3	hostap_pci.o
+-----------------------------
+
+'Makefile' includes commands for compiling and installing Host AP
+driver for systems using Prism2.5/3-based PCI cards. These cards do not
+use pcmcia-cs package. Edit KERNEL_PATH in Makefile to match your
+system. Run 'make' (this compiles the sources; this step can be
+run as non-root user). After the compilation has finished, you can
+install hostap_pci.o by running 'make install' (as root). You can
+probe PCI bus for Prism2.5/3 PCI cards and initialize the devices by loading
+the module ('modprobe hostap_pci').
+
+Note!
+If you have a PC Card adapter in your PCI card, this card does _not_
+use hostap_pci.o module, but hostap_plx.o or hostap_cs.o (with
+pcmcia-cs).
+
+
+Installation and configuration
+==============================
+
+See README file for driver compilation and installation instructions
+(PC Card systems using kernel tree PCMCIA modules or external pcmcia-cs
+package, PC Cards in PLX9052-based adapters, and Prism2.5/3 PCI cards).
+
+If you are using hostap_cs.o version, pcmcia-cs needs to know which
+driver to use for each PC Card. This driver has its own file
+(/etc/pcmcia/hostap_cs.conf) that lists few PC Cards that are
+supported. It does not include every Prism2/2.5/3-based card, so you may
+need to add your model to hostap_cs.conf in order to get the driver
+started. If you add new model information to the configuration file
+and the card works with this driver, please send me the output of
+'cardctl ident' and the lines you added so that I can include them
+in the next release.
+
+If you are using hostap_plx.o version, prism2_plx_known_manfids table
+in driver/modules/hostap_plx.c needs to have an entry for the PC Card
+you are using. Module parametered 'ignore_cis' can used to skip manfid
+verifications for testing any card (please note, that this will try to
+initialize any PC Card in PLX adapter as Prism2). If you have a card
+that works with the driver after adding its manfid to the table,
+please let me know the card manufacturer, model, and the manfid
+numbers so that I can include them in the next release of the driver.
+
+Unlike most Linux network drivers, Host AP driver creates multiple
+network devices. wifi0 (or wifi# if you have multiple cards) is the
+"master interface" for the radio device. It uses IEEE 802.11 headers
+and is used internally by the driver to process frames to and from
+other interfaces. wlan0 is the default data interface. It is the
+interface that is used in most configurations, e.g., it is configured
+with an IP address and iwconfig commands can be used with it. When
+using WDS, each link will create a new virtual device (wlan0wds0).
+
+Please note that the current driver version enables the Prism2/2.5/3
+card only when at least one of the interfaces is set up (e.g., with
+'ifconfig wlan0 up'). The device is disabled when all interfaces are
+set down. This means that the card will not associate (in client mode)
+with an AP before at least one of the interfaces is set up.
+
+The driver supports Linux Wireless Extensions and certain configuration
+items can be viewed and changed with iwconfig(8) and iwpriv(8) from
+wireless utilities, e.g., mode (AP/station; iwconfig's 'mode'),
+channel (iwconfig's 'freq' or 'channel'), WEP (encryption; iwconfig's
+'key').
+
+TODO: list example iwconfig commands and explain what they do
+
+Current driver supports following iwpriv commands:
+
+iwpriv wlan0 monitor <val>		[DEPRECATED]
+	see 'IEEE 802.11 monitoring' below
+
+iwpriv wlan0 prism2_param <param> <val>
+	see list below for different parameters
+	see prism2_param wrapper in hostap-utils package if using
+	old version of iwpriv.
+
+iwpriv wlan0 readmif <2*CR>
+iwpriv wlan0 writemif <2*CR> <val>
+	testing commands that allow low-level access to baseband processor
+	configuration registers; do *NOT* use these, unless you are sure what
+	you are doing; these do not have error checking and it may be
+	possible to cause physical damage to your equipment by setting invalid
+	values
+
+iwpriv wlan0 reset <val>
+	0: perform soft reset of the card
+	1: perform COR sreset (almost hardreset ;-)
+	2: perform port reset (disable and enable port 0)
+	3: disable port 0
+	4: enable port 0
+
+iwpriv wlan0 inquire <val>
+	use inquire command; debugging only
+
+iwpriv wlan0 wds_add <mac addr>
+iwpriv wlan0 wds_del <mac addr>
+	add/remove WDS links (see WDS below)
+
+iwpriv wlan0 set_rid_word <rid> <value>
+	debug command for setting RIDs that are two bytes long; you may need
+	to specify RID and value in decimal format (i.e. 64512, not 0xFC00)
+
+iwpriv wlan0 maccmd <val>
+	0: open policy for ACL (default)
+	1: allow policy for ACL
+	2: deny policy for ACL
+	3: flush MAC access control list
+	4: kick all authenticated stations
+
+iwpriv wlan0 addmac <mac addr>
+	add mac addr into access control list
+
+iwpriv wlan0 delmac <mac addr>
+	remove mac addr from access control list
+
+iwpriv wlan0 kickmac <mac addr>
+	kick authenticated station from AP
+
+prism2_param
+------------
+
+prism2_param is an extentsion to private ioctls; it uses ioctl
+sub-type to provide number of configuration items for the
+driver. iwpriv from the latest version of Linux wireless tools and
+receive Linux wireless extensions support these sub-ioctls
+directly. Older versions can use prism2_param wrapper from the
+hostap-utils package for setting these parameters.
+
+Following parameters are currently supported. These can be set using
+'iwpriv wlan# <param_name> <value>' or 'prism2_param wlan#
+<param_name> <value>'. Most values can be read with 'iwpriv wlan#
+get<param_name>' or 'prism2_param wlan# <param_name>'.
+
+txratectrl:
+	0 = use host driver based TX rate control (default),
+	1 = use f/w based TX rate control
+beacon_int: beacon interval (1 = 1024 usec)
+dtim_period: DTIM period, i.e., number of beacon intervals between
+	successive delivery traffic identification maps (DTIMs),
+	used for power saving and multicast/broadcast delivery
+pseudo_ibss:
+	0 = use IEEE 802.11 IBSS mode (default),
+	1 = use pseudo adhoc mode (no management frames)
+other_ap_policy:
+	0 = skip all beacons
+	1 = accept beacons with our SSID
+	2 = accept beacons from all APs
+	3 = accept all beacons (even from IBSS)
+dump: set RX/TX/TXEXC debug dump header bitfield
+	0 = do not dump frame headers
+	1 = dump RX frame headers
+	2 = dump TX frame headers
+	4 = dump TX error frame headers
+	(these values can be bitwise ORed; e.g. 3 = both RX and TX)
+ap_max_inactivity: Time (in seconds) after which inactive stations
+	can be removed from AP's station list
+ap_bridge_packets:
+	0 = do not bridge packets between associated stations, i.e.,
+		just pass them to upper layers for handling
+	1 = bridge packets directly between associated stations, i.e.,
+		upper layers do not even see these packets
+ap_nullfunc_ack:
+	0 = let station firmware take care of data::nullfunc ACKs
+	1 = send "extra" ACKs for data::nullfunc frames to workaround
+		problems with stations using PS mode
+	(default 1 if STA f/w version is 0.8.0, otherwise 0)
+max_wds: maximum number of allowed WDS connections (default 16)
+autom_ap_wds:
+	0 = add WDS connections manually
+	1 = add WDS connections automatically to all recorded APs
+		(based on other_ap_policy)
+ap_auth_algs: allowed authentication algorithms
+	0 = none (no authentication will succeed)
+	1 = only open
+	2 = only shared key
+	3 = open or shared key (default)
+monitor_allow_fcserr:
+	0 = drop frames with FCS errors in monitor mode
+	1 = pass also frames with FCS errors
+host_encrypt:
+	0 = do not use host encryption unless in Host AP mode
+	1 = use host encryption in all modes
+host_decrypt:
+	0 = use WLAN card firmware to decrypt frames
+	1 = use host driver to decrypt frames
+bus_master_threshold_rx:
+	packet length threshold for using PCI bus master on RX
+	(only used with hostap_pci.o and if PRISM2_BUS_MASTER is set)
+bus_master_threshold_tx:
+	packet length threshold for using PCI bus master on TX
+	(only used with hostap_pci.o and if PRISM2_BUS_MASTER is set)
+host_roaming:
+	0 = use station firmware for roaming decision (default)
+	1 = use host driver roaming decision (automatic scan)
+	2 = manual scan and roaming
+bcrx_sta_key:
+	0 = use station specific key (WEP key mapping) to override
+	    default keys only for RX frames sent to unicast address
+	    ("individual RA") (default)
+	1 = use station specific key also with broadcast RX frames
+	    (this is against IEEE 802.11, but makes it easier to use
+	    different keys with stations that do not support WEP key
+	    mapping)
+ieee_802_1x:
+	0 = do not use IEEE 802.1X specific functionality (default)
+	1 = use IEEE 802.1X: require 802.1X auth, filter EAPOL packets
+antsel_tx:
+	0 = do not touch TX AntSel, i.e., use card default (default)
+	1 = use antenna diversity
+	2 = force TX AntSel pin low
+	3 = force TX AntSel pin high
+antsel_rx:
+	0 = do not touch RX AntSel, i.e., use card default (default)
+	1 = use antenna diversity
+	2 = force RX AntSel pin low
+	3 = force RX AntSel pin high
+monitor_type:
+	0 = IEEE 802.11 headers (ARPHRD_IEEE80211)
+	1 = Prism2 + IEEE 802.11 headers (ARPHRD_IEEE80211_PRISM)
+	2 = AVS monitor header + IEEE 802.11 headers
+	    (ARPHRD_IEEE80211_PRISM)
+wds_type: WDS type bitfield
+	0 = options disabled (default)
+	1 = use broadcast RA (WDS frame destination) for broadcast and
+		multicast frames
+	2 = use AP client mode in 'Managed mode'
+	4 = use standard compliant WDS (4 addr) frame also in Host AP
+	    mode (Note! This requires STA f/w ver 1.5.x or newer)
+hostscan: perform non-destructive AP scanning (i.e., maintain current
+	  association state); this requires STA f/w ver 1.3.1 or newer
+	1 = send Probe Request at 1 Mbps
+	2 = send Probe Request at 2 Mbps
+	3 = send Probe Request at 5.5 Mbps
+	4 = send Probe Request at 11 Mbps
+ap_scan: interval (in seconds) between passive AP scans on different
+	channels, 0 = disabled (default)
+enh_sec: "enhanced security" bitfield
+	0 = options disabled (default)
+	1 = hide SSID in beacon frames
+	2 = ignore clients configured with "ANY" (broadcast) SSID
+	(3 = both options)
+	Note! This requires STA f/w ver 1.6.3 or newer
+basic_rates: basic transmit rate bitmap
+	bit 0: 1 M, bit 1: 2 M, bit 2: 5.5 M, bit 3: 11 M
+	(default 3: 1 and 2 Mbps)
+oper_rates: operational transmit rate bitmap
+	bit 0: 1 M, bit 1: 2 M, bit 2: 5.5 M, bit 3: 11 M
+	(default 15: 1, 2, 5.5, and 11 Mbps)
+	Note! This changes the same value as iwconfig rate command, but
+	as a bitfield.
+hostapd: hostapd mode configuration
+	0 = use kernel driver for IEEE 802.11 management
+	1 = use user space daemon, hostapd, for IEEE 802.11 management
+hostapd_sta: hostapd mode configuration
+	0 = no extra STA interface
+	1 = use hostapd to control extra STA interface (wlan#sta)
+
+
+Following parameters are for debug use only;
+do not use unless you are sure what you are doing!
+
+alc: 0=disabled ALC, 1=enable ALC (automatic level control)
+
+
+Bridging between wireless and wired networks
+============================================
+
+Prism2/2.5/3 AP driver controls a wireless device (wlan#), but does not
+take care of bridging between wireless and wired networks. If this AP
+feature is required, it has to be implemented using an external
+software.
+
+Linux kernels support Ethernet bridging (code already present in 2.4.x
+kernels and also as a separate patch for 2.2.x kernels). This can be
+used to easily build an AP between the wired and wireless
+networks. Below is an example of a simple setup in which the AP has
+one Ethernet interface and one wireless interface. If needed, see
+http://bridge.sourceforge.net/ for more information on Linux kernel's
+Ethernet bridging.
+
+Example:
+
+(after loading Prism2/2.5/3 AP driver)
+
+brctl addbr br0
+brctl addif br0 eth0
+brctl addif br0 wlan0
+ifconfig eth0 0.0.0.0
+ifconfig wlan0 0.0.0.0
+ifconfig br0 192.168.100.200 up
+
+(the AP bridges packets between Ethernet and wireless LAN and can be
+reached with IP address 192.168.100.200 from either network; stations
+associated to this AP can then communicate with other wireless LAN
+stations and with the hosts in the wired network)
+
+
+Wireless distribution system (WDS)
+==================================
+
+IEEE 802.11 specifies a method for using wireless connection as a
+distribution system. A special data frame with four addresses is
+defined for this. This allows layer 2 bridging of packets (two
+addresses, the immediate sender and receiver, are required for 802.11
+frame acknowledgement; the other two addresses are the original
+sending and receiver of the frame).
+
+There is a bug in station firmware code used in Prism2/2.5/3 cards that
+prevents standard-compliant 4-address frames being sent in Host AP
+mode. To overcome this problem, the current version of the driver uses
+a non-standard frame format, in which the 802.11 header has first
+three addresses and the fourth address (which is usually also in the
+header) is sent after the frame payload.
+
+Due to this non-standard frame format, the driver with a card using
+station firmware older than v1.5.0 does not interoperate with
+standard-compliant AP devices as far as WDS connections are concerned.
+The non-standard frame format should be identical to the one used in
+OpenAP project (http://opensource.instant802.com/), so APs using their
+code should interoperate.
+
+Note!
+-----
+
+The latest firmware versions (STA firmware version 1.5.0 or newer)
+have fixed this bug. The driver can use standard-compliant 4-address
+frames with these firmware versions. Please upgrade your card firmware
+if you want to use IEEE 802.11 compliant WDS frames with the
+driver. Current driver code selects automatically which format to use
+based on the firmware version on the card.
+
+
+Example WDS configuration:
+
+- bridging between two wired network using a wireless link
+- additional wireless net included in the bridge setup
+
+Note! It should be needless to say, but this kind of bridging of wired
+networks introduces serious security problems due to open nature of
+the wireless network. This is just a simple example of what could be
+done with bridging code and WDS links. Connections should be encrypted
+in real networks, e.g., with IPSec, to prevent packets from being
+captured of injected into the network.
+
+
+Network 192.168.1.0/24  (same address space in each network)
+
+<wired net A>--eth0 : AP-A : wlan0 -- <wireless net A>
+                               |
+                              WDS
+                               |
+                             wlan0 : AP-B : eth0--<wired net B>
+
+Each AP has eth0 as the wired network device and Host AP driver loaded
+and wlan0 as the wireless device.
+
+AP-A: wireless LAN card with hwaddr 00:11:11:11:11:11, IP addr 192.168.1.1
+AP-B: wireless LAN card with hwaddr 00:22:22:22:22:22, IP addr 192.168.1.2
+
+
+AP-A configuration:
+
+iwpriv wlan0 wds_add 00:22:22:22:22:22
+brctl addbr br0
+brctl addif br0 eth0
+brctl addif br0 wlan0
+brctl addif br0 wlan0wds0
+ifconfig eth0 0.0.0.0
+ifconfig wlan0 0.0.0.0
+ifconfig wlan0wds0 0.0.0.0
+ifconfig br0 192.168.1.1 up
+
+AP-B configuration:
+
+iwpriv wlan0 wds_add 00:11:11:11:11:11
+brctl addbr br0
+brctl addif br0 eth0
+brctl addif br0 wlan0wds0
+ifconfig eth0 0.0.0.0
+ifconfig wlan0wds0 0.0.0.0
+ifconfig br0 192.168.1.2 up
+
+(AP-B's wlan0 interface is not used in this example; all wireless
+traffic goes through WDS link to AP-A using wlan0wds0)
+
+
+'brctl show' should show br0 bridge with the added interfaces and STP
+enabled.
+
+'brctl showstp br0' should show more statistics about each bridge
+port. 'state' should first be few seconds 'learning' and then change
+to 'forwarding'.
+
+'brctl showmacs br0' can be used to check behind which bridge port
+each known mac addr is currently.
+
+With this example configuration, the users of the network can be in
+any of the three listed network. They can even move their computer to
+another network and the bridging code will eventually (it seemed to
+take about 30 seconds in my test; this can probably be adjusted with
+bridge parameters) learn about the move. The bridging is performed on
+layer 2, so other hosts in the 192.168.1.0/24 network look like they
+were in the same physical network, no matter in which part of the
+bridged network (wired net A, wired net B, wireless net A) they are.
+
+
+Monitoring other APs
+====================
+
+Host AP driver can be instructed to monitor beacon frames from other
+APs (other_ap_policy parameter). In addition, WDS code can be setup to
+automatically add new WDS links to all detected APs to ease bridge
+setup with STP.
+
+prism2_param wlan0 autom_ap_wds 1
+prism2_param wlan0 other_ap_policy 1
+
+WDS connections can be added with 'iwpriv wlan# wds_add <other end
+hwaddr>' and removed with similar wds_del command. hwaddr
+00:00:00:00:00:00 can be used as a special address to pre-allocate
+netdevices. These entries are used when adding the real WDS link,
+e.g., when a new AP is detected. Pre-allocated devices can be included
+in a bridging configuration and set into UP state before knowing the
+real AP address.
+
+In other words, you would need to run 'iwpriv wlan0 wds_add
+00:00:00:00:00:00' N times after loading the driver and then add
+interfaces wlan0wds0 to wlan0wds<N-1> into bridge configuration. When
+new APs are detected after this, they will be assigned a pre-allocated
+interface that is already part of the bridge setup.
+
+Another option would be to make an external program for monitoring new
+WDS links (e.g., from /proc/net/hostap/wlan#/wds) and automatically
+add them to the bridge setup with brctl.
+
+
+Driver status and debug information
+===================================
+
+/proc/net/hostap/wlan#
+	##:##:##:##:##:## for each authenticated station
+		STA/AP information, TX/RX statistics, etc.
+
+	ap_control
+		Access control list for station authentication
+
+	ap_debug
+		AP debugging information (wireless bridging statistics)
+
+	debug
+		driver debugging information (TX queue)
+
+	registers
+		Prism2/2.5/3 MAC register contents (for development use)
+
+	stats
+		TX/RX statistics
+
+	wds
+		List of configured WDS links (netdevice, remote hwaddr)
+
+
+kernel messages (dmesg/syslog)
+	The driver send debugging information to kernel log. The last
+	entries from the kernel ring buffer can be viewed with
+	dmesg(8) and the log entries can also be recorded with
+	syslogd(8).
+
+
+IEEE 802.11 monitoring
+======================
+
+Prism2/2.5/3 cards have a test mode that can be used for monitoring wireless
+networks. In this mode the driver receives all raw IEEE 802.11 frames
+(including management frames).
+
+Monitor mode is enabled with 'iwconfig wlan0 mode monitor'. Monitor
+mode was added to wireless tools version 25. With later versions, you
+cannot use iwconfig, so please either upgrade wireless tools or use
+old iwpriv monitor method described below.
+
+'prism2_param wlan0 monitor_type <val>' can be used to select which
+headers are included in the monitored frames (0: IEEE 802.11,
+1: Prism2 + IEEE 802.11).
+
+Previously, monitoring mode was started using iwpriv(8). This is now
+deprecated and it is currently implemented as a backward compatibility
+wrapper for iwconfig mode command. It may be removed in the future
+versions of the driver.
+
+iwpriv wlan0 monitor 2
+	start monitor mode and send received frames (including 802.11 header)
+	to user space using normal netdevice. This changes the device type
+	to ARPHRD_IEEE80211 so that user space programs know how to handle
+	different header type.
+iwpriv wlan0 monitor 3
+	start monitor mode and send received frames (including Prism2 RX data
+	and 802.11 header) to user space using normal netdevice. This changes
+	the device type to ARPHRD_IEEE80211_PRISM so that user space programs
+	know how to handle different header type.
+
+iwpriv wlan0 monitor 0
+	disable monitor mode and return to Host AP mode
+
+
+Example program in 'sniff', wlansniff.c, is a simple 802.11 frame
+parser that shows both the Prism2/2.5/3-specific data from the RX frame
+and parsed contents of the 802.11 frame.
+
+Latest versions of libpcap and Ethereal support ARPHRD_IEEE80211 and
+ARPHRD_IEEE80211_PRISM, so monitor modes 2 and 3 can be used with them
+for real time IEEE 802.11 network monitoring.
+
+
+Access control list (ACL) for stations
+======================================
+
+Default configuration of the AP allows any station to authenticate and
+associate (open policy). This behavior can be changed with ACL
+configuration.
+
+ACL is based on MAC address of the station. New addresses can be added with
+'addmac' command (iwpriv) and policy can be changed with 'maccmd'.
+
+Examples:
+
+# allow policy
+iwpriv wlan0 maccmd 1
+iwpriv wlan0 addmac 00:11:22:33:44:55
+iwpriv wlan0 addmac 00:12:34:56:78:9a
+
+Allow only stations 00:11:22:33:44:55 and 00:12:34:56:78:9a to
+authenticate with the AP.
+
+
+# deny policy
+iwpriv wlan0 maccmd 2
+iwpriv wlan0 addmac 00:11:22:33:44:55
+iwpriv wlan0 addmac 00:12:34:56:78:9a
+
+Deny authentication from stations 00:11:22:33:44:55 and
+00:12:34:56:78:9a, but allow every other station to authenticate.
+
+
+# open policy
+iwpriv wlan0 maccmd 0
+
+Allow any station to authenticate (regardless of ACL contents).
+
+
+Encryption
+==========
+
+Host AP driver supports both firmware and host driver based
+encryption. Firmware based encryption has some limitations--STA
+firmware versions before 1.4.x have a bug in Host AP mode that breaks
+TX frames when using WEP, it does not support other encryption
+algorithms than WEP, most versions do not support WEP key mappings
+with individual keys for different stations. These limitations can be
+overcome by using host based encryption.
+
+Host AP driver uses modularized encryption implementation that allows
+the encryption code be shared by different hardware versions of the
+driver (hostap_{cs,plx,pci}.o). In addition, this design allows one to
+load new algorithms dynamically if needed. WEP implementation
+(driver/modules/hostap_crypt_wep.c) can be used as an example
+implementation when adding support for other algorithms.
+
+WEP implementation, hostap_crypt_wep.o, is not loaded
+automatically during initialization, but driver tries to load it with
+kmod when WEP is configured. If this does not work, the module needs
+to be loaded either with modprobe/insmod after having loaded driver
+module or by configuring /etc/modules.conf or pcmcia-cs configuration
+to load it when using Host AP driver.
+
+When using WEP, default encryption keys can be set using 'key' command
+of iwconfig(8) from Wireless Tools. All other setups (key mapping with
+individual keys or other algorithms) must use separate tool,
+utils/hostap_crypt_conf. See hostap-utils package for more instructions
+on how to use that tool.
+
+TKIP (WEP with per packet keys and Michael MIC, hostap_crypt_tkip.o)
+and CCMP (AES-CCM, hostap_crypt_ccmp.o) are used with WPA. These
+algorithms require host-based encryption and decryption because the
+Prism2/2.5/3 firmware does not support them. hostapd and wpa_supplicant
+can be used to negotiate encryption keys for TKIP/CCMP when operating in
+station mode. In addition, these algorithms can be used on WDS
+links. Static TKIP/CCMP keys can be set with hostap_crypt_conf.
+
+
+IEEE 802.1X
+===========
+
+See separate hostapd package for IEEE 802.1X and WPA/WPA2
+support. hostapd can be used with Host AP driver to implement IEEE
+802.1X Authenticator with support for dynamic WEP keying and IEEE
+802.11i (WPA/WPA2) with TKIP/CCMP encryption.
+
+
+Roaming in station mode
+=======================
+
+Host AP driver supports three different modes for roaming in station
+modes (Managed/Ad-hoc). These are configured with prism2_param
+host_roaming.
+
+Firmware-based roaming (mode 0; default)
+----------------------
+
+Station firmware decides when to scan channels for APs and which AP to
+use. Host AP driver only configured SSID and possible WEP keys, but
+does not control AP selection in any other ways.
+
+Host-based roaming (mode 1)
+------------------
+
+Station firmware decides when to scan channels for APs and informs
+Host AP driver about scan results. Host AP driver will then select
+which AP to use. Current version of the selection code is quite
+simple, the driver just selects the first entry in the list of APs
+(which should be sorted by signal quality). In addition, this mode
+allows user to specify preferred AP with 'iwconfig wlan0 ap
+<bssid>'. This preferred AP will be used if it is in the list of scan
+results. User will also need to set SSID.
+
+Manual scan and roaming (mode 2)
+-----------------------
+
+Both scanning and AP selection are left to user; neither firmware nor
+Host AP driver initialize scanning automatically. User space programs
+can use Linux wireless extensions to initialize scanning and joining
+an AP. Active IEEE 802.11 scanning is not required; any other external
+mean can be used to get knowledge about the AP configuration.
+
+Example commands:
+
+# enable manual scan and roaming in managed (infra/BSS) mode
+iwpriv wlan0 host_roaming 2
+iwconfig wlan0 mode managed
+
+# scan channels; set broadcast SSID ('Any') to accept all SSIDs in scan
+# results. Optionally, could also set WEP keys, if needed.
+iwconfig wlan0 essid any
+iwlist wlan0 scan
+
+# Select AP with SSID foobar and BSSID 00:11:22:33:44:55
+iwconfig wlan0 essid foobar
+iwconfig wlan0 ap 00:11:22:33:44:55
+
+Note: both SSID and BSSID must be set in order to make association
+work. Setting BSSID with 'ap' command must be done after SSID is set
+since this commands triggers join request for Prism2 firmware.
+
+Note: scanning is limited to current SSID. If information about other
+APs is required, SSID must be set to 'Any'. However, this will remove
+current association. Alternatively, host scan command, 'iwpriv wlan0
+hostscan 1', can be used without breaking the connection. This command
+requires STA f/w version 1.3.1 or newer. In addition, current version
+of the driver shows hostscan results only in the kernel log ('dmesg').

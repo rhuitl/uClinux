@@ -1,0 +1,39 @@
+    As times passes since the initial release of Tripwire, memories
+fade, and things that I used to assume as obvious are no longer quite
+so clear.  These are some notes I made to help me remember internal
+Tripwire implementation details.  Surely other people besides myself
+might benefit from this.
+
+Adding new signature routines:
+==============================
+
+    Add the files under the ./sigs directory.  Use the md4 directory
+as a template -- it needs to know what endian your machine is, which
+we glean at compile time in the Tripwire build.  Use md4wrapper.c as a
+template for "wrapping" the signature routine to interface with
+Tripwire.
+
+    Remember, if you use pltob64(), the signature string will already
+be null-terminated.  However, when generating your hex signature, you'll
+have to manually affix a null.
+
+    Look next at ./include/config.h.  You'll need to change a couple
+of defines, namely the SIGxFUNC and SIGxNAME defines that tell
+Tripwire what function to call and what to name the routine.
+
+    Next, edit ./src/Makefile and change the SIGxDIR, OSIGx, and CSIGx
+variables at the top of the Makefile.
+
+    Lastly, add a line in the ./include/tripwire.h to include the
+signature prototype file.
+
+    Don't forget to change the file ./tests/tw.conf.test to exclude 
+those new object files from the Tripwire test suite.
+
+    At the time of this writing, nine of the ten slots are taken.  So
+maybe people won't have to (or be able to) add new signature routines
+in the future.  :-)
+
+Gene Kim
+10 July 1994
+

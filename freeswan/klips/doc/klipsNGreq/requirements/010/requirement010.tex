@@ -1,0 +1,70 @@
+\subsection{010: routing above tunnel layer}
+
+%  3.1   Multiple Tunnels to Same Subnet
+%   
+%   Suppose  West is a FreeS/WAN box that is connected to two different wild-side ISPs. It has
+%   two  different  wild-side  addresses.  It  would be very nice to set up two connections to
+%   Sunrise-net.  This  would  allow load-sharing, and it would also improve reliability if we
+%   could arrange failover from one connection to the other.
+%   Unfortunately,  if  you  try  to  set  up multiple connections to the same subnet (Sunrise
+%   subnet)  using  FreeS/WAN  version  1,  the result is fratricide. The second connection is
+%   treated as a replacement for the first.
+%   You  can  work  around this by not making subnet connections. Instead, as suggested by Joe
+%   Patteson,   make   host-to-host   connections   between   East  and  West,  and  then  run
+%   GRE-encapsulated  traffic  over  these  connections,  as discussed in section 2.2. You can
+%   perform load-balancing and failover with respect to the GRE virtual devices.
+%   If East has N ISPs and West has M ISPs, you could conceivably want M×N IPsec connections.
+%   Note the following imperfect parallelism:
+%     * IPsec  tunnel  mode  is  sometimes  described (imperfectly) as follows: Set up an IPIP
+%       tunnel, and then apply transport-mode encryption to the encapsulated traffic.
+%     * In  this  case,  we encapsulate using GRE, and then apply transport-mode encryption to
+%       the encapsulated traffic.
+% 
+%    On  the  other  hand,  it is not 100% correct to view tunnel mode as IPIP plus encryption,
+%  because  real  tunnel  mode  allows allows the system to verify that the correct subnet is
+%   being  carried  over  the  tunnel; that is, the inner headers can be checked. In contrast,
+%   using  IPIP+encryption  or GRE+encryption, the inner headers are just data in some obscure
+%   format that cannot be checked by the IPsec system per se.
+%   On  the  third  hand,  since  FreeS/WAN relies on you, the user, to implement the security
+%   policy  anyway,  using the firewalling system, you can perfectly well check the packets as
+%   they enter the GRE device. So all the necessary functionality can be achieved.
+%   Also  note that the GRE links, as the name implies, were designed with routers in mind, so
+%   their up/down state is meaningful, and their metric is meaningful to routing daemons.
+%   It  sure  would  be nice if the next-generation IPsec system could do this itself, without
+%   requiring  us  to  resort  to  GRE.  We  need  multiple  tunnels  to the same subnet, with
+%   meaningful  up/down  state  and  meaningful  metrics. And we need the ipsec device to play
+%   nicely with routing daemons.
+   
+  
+
+\subsubsection{010: Definition of requirement }
+
+%   http://www.quintillion.com/fdis/moat/ipsec+routing/
+%especially section 3 therein, i.e.
+%   http://www.quintillion.com/fdis/moat/ipsec+routing/#sec-routing-above
+%
+%That was written over a year ago.  The big ideas haven't changed, but a few 
+%details need polishing.
+%  *) In particular, there are several places where it speaks of a "device" 
+%going down whereas is should say "link" going down.
+%
+%  *) Also the rationale is given in terms of failover and load-sharing, and 
+%we now know that mobility is a third important motivator for doing this.
+%
+%  *) Also the terminology
+%         a) routing above the tunnel
+%         b) routing below the tunnel
+%has been deemed unnecessarily confusing to Muggles.  It would be better to 
+%speak of
+%         a) routing the inner headers (plain text)
+%         b routing the outer headers (crypto text)
+%but the intended meanings are unchanged.
+%
+%===========
+%
+%Tangentially relevant remark: Routing above the tunnel is one of the big 
+%motivations for having a virtual device.  A detailed look at how this might 
+%work, as worked out at OLS, was posted to the list at 02:15 PM 7/30/01 -0400.
+
+see JSD documents.
+

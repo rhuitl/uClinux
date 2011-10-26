@@ -1,0 +1,880 @@
+<!doctype linuxdoc system>
+
+<article>
+
+<!-- Title information -->
+
+<title>Frox FAQ</title>
+<author>
+ <name>James Hollingshead <tt/&lt;frox at hollo.org/&gt;
+</author>
+<date>2004-11-03</date>
+
+<abstract>
+</abstract>
+
+<!-- Table of contents -->
+<toc>
+
+<!-- Begin the document -->
+
+    <sect>
+      <heading>General</heading>
+      <sect1>
+	<heading>What is frox?</heading>
+
+	<p>Frox is a transparent ftp proxy for linux written under
+	the GPL.</p>
+      </sect1>
+
+      <sect1>
+	<heading>What can it do for me?</heading> 
+
+        <p>It will transparently proxy your ftp clients (duh). This
+        means that any clients you have that are behind the proxy will
+        believe that they are connecting to an ftp server as normal,
+        but will actually be connecting to frox. Frox will do the
+        onward connection to the remote server.</p>
+
+	<p>It can also be set up to do non-transparent proxying. In
+	this case the ftp client can connect directly to frox, but
+	instead of logging in with ``username'' should log in with
+	``username@ftp.wherever.org''.</p>
+
+	<p>On either of these sorts of connections it can do caching
+	of files you download, or converting of data connections from
+	active--&gt;passive which can make firewalling rules a lot
+	easier/safer. There is also basic support for running a virus
+	scanner on downloaded files. Frox can also encrypt connections
+	that it makes to ftp servers which support it.</p>
+
+	<p>These extra options can all be enabled/disabled at compile
+	time so if you don't want them you can still have a small
+	binary - the default one is around 30K.</p>
+      </sect1>
+
+      <sect1>
+	<heading>What can't it do for me?</heading>
+
+	<p>It does not implement ftp proxy over HTTP. This means if
+	you configure a web browser (eg. Netscape/Mozilla/IE) to use
+	frox as their ftp proxy it won't work. If you leave them with
+	ftp-proxy unconfigured then they should be transparently
+	proxied like anything else.</p>
+
+	<p>It cannot do transparent proxying on 2.4.x linux kernels
+	which are using ipchains compatability. I have not been able
+	to find out how to do this.</p>
+
+	<p>IPv6 is completely unimplemented</p>
+      </sect1>
+
+      <sect1>
+        <heading>Why doesn't it run on ... OS</heading>
+
+        <p>Transparent proxy system calls vary a lot from system to
+        system. I only have success reports for linux and FreeBSD, but
+        you may well have success on any UNIX like OS which uses
+        ipfilter. See the section on <ref id="otheros" 
+        name="systems other than linux"> for details and let me know if
+        you have success or failure</p>
+      </sect1>
+
+      <sect1>
+	<heading>Where can I get it?</heading>
+
+	<p>Latest versions should be downloadable from the homepage
+	at: <url url="http://frox.sourceforge.net/"> or at; <url
+	url="http://www.hollo.org/frox/">.</p>
+      </sect1>
+    </sect>
+
+    <sect>
+      <heading>Compiling and installing</heading>
+
+      <p>Compile frox with:
+      <tscreen><verb>
+        ./configure
+        make
+        make install (as root)
+      </verb></tscreen>
+
+      <sect1>
+        <heading>./configure options</heading>
+
+        <p>
+          <itemize>
+            <item> <tt>--enable-http-cache</tt> and
+            <tt>--enable-local-cache</tt> compile in caching support. 
+            You can give both these options if you wish.</item>
+
+            <item> <tt>--enable-virus-scan</tt> compiles in support
+            for virus scanning downloaded files.</item>
+
+            <item> <tt>--enable-configfile=...</tt> allows you to set
+            the default config file to something else eg. 
+            /etc/frox.conf. Otherwise it defaults to
+            /usr/local/etc/frox.conf</item>
+
+            <item> <tt>--enable-transparent-data</tt> compiles in
+            support for transparently proxying the data connections. 
+            Note you probably don't need this. Transparent proxying
+            works without, and it entails security risks. If you wish
+            to run on a 2.4.x kernel you will also need
+            <tt>--enable-libiptc</tt></item>
+
+          </itemize>
+        </p>
+      </sect1>
+      <sect1>
+        <heading>Systems other than linux<label id="otheros"></heading>
+
+        <p>Frox was originally written for linux, but thanks to some
+        work by Sergey Matveychuk it should now run on BSD and
+        possibly some other UNIX like OSes. The configure script
+        should do things automatically for bsd systems, but there are
+        still one or two things you should be aware of.</p>
+
+        <p>The BSD transparent proxying code can use ipfilter or ipfw. 
+        ipfw is the default, but you can use the ipfilter code by
+        compiling with --enable-ipfilter. Other OSes which run ipfilter
+        may also work in this way. If you try it could you drop me an
+        email and let me know the result.</p>
+
+	<p>You need to have <tt>Listen</tt> defined to a local IP address
+	in your config file if you are doing transparent proxying. This
+	means that you can't listen on more than one interface.</p>
+
+        <p>You should also note that the TransparentData config file
+        option and the --enable-transparent-data compile time option
+        only works under linux. You probably don't need this
+        functionality anyway, but if you really do then feel free to
+        send me a patch. :)</p>
+      </sect1>
+    </sect>
+
+    <sect>
+      <heading>Configuration</heading>
+
+      <sect1>
+	<heading>Configuring frox</heading>
+
+	<p>By default frox uses
+	<tt>/usr/local/etc/frox.conf</tt> as a configuration file, but
+	this can be changed either by giving
+	<tt>--enable-configfile=/etc/whatever/you/want</tt> to the
+	<tt>./configure</tt> script, or by the <tt/-f/ command line
+	option.</p>
+
+	<p>The sample config file is well commented and the best
+	documentation for configuration. Note you will need to edit
+	some of these options for it to work at all. You will also need
+	to create a working directory for frox - see below.</p>
+
+	<p>For the transparent proxying to work your kernel will need
+	to be compiled with transparent proxy support and you will need
+	to enable forwarding with ``<tt>echo 1 &gt;&gt;
+	/proc/sys/net/ipv4/ip_forward</tt>''. You then need to
+	redirect ftp requests passing through the box to frox. For
+	kernel 2.2 this will be something like ``<tt>ipchains -A input
+	-p tcp -s LOCALNET -d 0/0 21 -j REDIRECT 2121</tt>'', and for
+	kernel 2.4, ``<tt>iptables -t nat -A PREROUTING -p tcp -s
+	LOCALNET --dport 21 -j REDIRECT --to 2121</tt>''.</p>
+
+        <p>You can configure frox to run from inetd with the FromInetd
+        option. This will not work well with either the local caching
+        or with TransparentData, but otherwise should be ok.</p>
+
+      </sect1>
+
+      <sect1>
+        <heading>The Working Directory</heading>
+
+          <p>Frox needs a working directory, specified in the config
+          file. This is used for temporary files and sockets, for
+          creating cache files in, and is also the directory frox will
+          chroot to. This directory should be owned by root,
+          permissions 0755, and frox will create the directory
+          structure it needs in here. If you are doing virus scanning
+          or using the command control program then these binaries,
+          with any libraries they need, must also be added to this
+          directory.</p>
+
+          <p>You may also have problems with resolving host names. 
+          Frox needs to resolve host names if you are using non
+          transparent proxying, or if you are doing caching with
+          CacheOnFQDN set to yes. There are two ways to fix this:</p>
+
+          <p>The quick and easy way is to define
+          <tt>ResolvLoadHack</tt> in the config file to an address
+          which is not defined in <tt>/etc/hosts</tt>. Frox will try
+          and resolve this on startup and this will load the relevant
+          resolver libraries. It doesn't matter if this address fails
+          to resolve.</p>
+
+          <p>The other solution is to copy the resolver libraries into
+          the chroot jail. For me it works with <tt>host.conf</tt> and
+          <tt>resolv.conf</tt> in <tt><em>WorkingDir</em>/etc/</tt>,
+          and <tt>libnss_dns.so.2</tt> and <tt>libresolv.so.2</tt> in
+          <tt><em>WorkingDir</em>/lib/</tt> </p>
+      </sect1>
+      <sect1>
+	<heading>How should I configure my ftp clients?<label
+	id="client-ref"></heading>
+
+	<p>Normally you don't have to. Certainly don't set the ftp
+	proxy variable in your browser or set your ftp_proxy
+	environment variable to http://anything.</p>
+
+	<p>If you are using non-transparent ftp proxying (set
+	``DoNTP'' to ``yes'' in the config file) and you have a ftp
+	client which supports this (such as ncftp, or debian's apt-get
+	ftp method) then you need to set it up to login with
+	``username@host[:port]''. eg. ``anonymous@ftp.gnu.org'' or
+	``anonymous@ftp.gnu.org:21''. You can of course do this
+	manually by typing this in when prompted for the username.</p>
+
+        <p>You may have a mixture of clients being transparently
+        proxied and clients being non transparently proxied. In this
+        case if you set the NTPAddress to the address/port you have
+        told your non transparently proxied clients to contact the
+        proxy on then only they will see frox's login banner. Clients
+        which are transparently redirected to frox will see the login
+        banner of the remote host they are contacting and will not be
+        offered the chance to login with username@host:port.</p>
+
+      </sect1>
+    </sect>
+
+    <sect>
+      <heading>Caching</heading>
+
+      <sect1>
+        <heading>HTTP caching vs local caching</heading>
+
+        <p>With HTTP caching frox rewrites ftp retrieve requests in
+        HTTP and sends them to a proxy server like squid which
+        actually retrieves the file and does the caching. With local
+        caching frox maintains its own cache of recently downloaded
+        files on the hard disk.</p>
+
+        <p>The main advantage of the HTTP method is that the cache can
+        be shared with any web browsers which use the same proxy
+        directly for their ftp requests. Local caching is much faster
+        (especially for small files) and lighter on network
+        resources.</p>
+
+        <p>Caching needs to be compiled in by running
+        <tt>./configure</tt> with <tt/--enable-http-cache/ or
+        <tt/--enable-local-cache/. You can have both compiled in if
+        you want - the cache method actually used (if any) is chosen
+	in the config file.</p>
+
+        <p>For HTTP caching your config file needs to say:
+        <tscreen><verb>
+        CacheModule HTTP
+        HTTPProxy 192.168.2.1:3128 # proxy address
+        # and optionally...
+        MinCacheSize 64000 # in bytes
+        </verb></tscreen></p>
+
+        <p>Files smaller than MinCacheSize will not be cached. Latency
+        on small files can be really bad with this method since the
+        HTTP proxy has to make a separate connection to the ftp server
+        - setting MinCacheSize fairly high will help with this.</p>
+
+        <p>For Local caching your config file should say:<tscreen><verb>
+        CacheModule Local
+        # and optionally...
+        CacheSize 100 # in MB
+        </verb></tscreen></p>
+
+        <p>The cached copies will be created within frox's working directory
+	as specified in the config file. If CacheSize is unspecified the
+	cache will grow indefinitely.</p>
+
+	<p>Finally you can turn off caching with the line <tt>CacheModule
+	None</tt>. This is necessary if you wish a config file subsection to
+	not do caching when the parent section has it turned on.</p>
+      </sect1>
+
+      <sect1>
+	<heading>StrictCaching</heading>
+
+	<p>With strict caching off frox works out the URI for the file
+	it is retrieving by sending a PWD to ask the server what
+	the current working directory is. On a small minority of
+	servers this may be broken, and a server may return the same
+	answer to PWD for more than one directory. If additionally two
+	such directories contain files with the same names, sizes, and
+	times of modification then frox could cache the wrong file by
+	mistake.</p>
+
+	<p>StrictCaching tries to get around this by keeping track of
+	all directory changes and making up its own path instead of
+	asking the server for it. This has the disadvantage that ``cd
+	pub; get readme'' will not cache to the same file as ``get
+	pub/readme'' or ``get /pub/readme'' or ``cd /pub; get
+	readme''. As a result your cache hit rate will probably drop
+	considerably, but you will have the extra security. Note that
+	you can set this on a per server basis if there is a
+	particular server about which you are worried.</p>
+
+	<p>Thanks to Henrik Nordstrom for pointing this problem out
+	and suggesting a solution.</p>
+      </sect1>
+
+      <sect1>
+        <heading>CacheOnFQDN</heading>
+
+        <p>This option involves using FQDNs instead of IP addresses
+        for the cache requests (either to squid or the local cache),
+	and allowing squid to guess whether to
+        use binary or ascii file transfer rather than using the value
+        supplied by the ftp client. For transparently proxied
+        connections this requires a reverse DNS lookup to get the
+        FQDN, and may cause problems with un-synced mirrored ftp hosts
+        all running off the same FQDN, although most of the time there
+        will be no problems. The advantage is that you should increase
+        the hit rate, in particular with squid based caching for files
+        which have been previously downloaded through squid with a web
+        browser.</p>
+
+        <p>If all your clients are being non transparently proxied
+        then this option should cause no problems. Otherwise use with some care,
+        although it may be worth the extra hit rate.</p>
+      </sect1>
+
+      <sect1>
+	<heading>I get an ``Unable to initialise cache'' error.</heading>
+
+	<p>Check that frox was compiled with support for the cache
+	module you are attempting to use, and that you have given the
+	correct Cache options for that module. If doing http caching check
+	that the http proxy name resolves.</p>
+      </sect1>
+
+      <sect1>
+	<heading>I retrieved a file I had retrieved before and it doesn't 
+seem to have been cached?</heading>
+
+	<p>Files are not cached if the ftp server doesn't support the
+	MDTM and SIZE extensions. Non-Anonymous ftp sessions are only
+	cached if you have set the <tt>CacheAll</tt> config file
+	option. Additionally if the host's DNS name resolves to more
+	than one IP address then the file will be cached, but frox has
+	no way of knowing that the different IP addresses refer to the
+	same host - unless your ftp client happens to pick the same IP
+	both times you will not get the cached file back. Using
+	CacheOnFQDN may impove this behaviour.</p>
+      </sect1>
+    </sect>
+
+    <sect>
+      <heading>Virus scanning</heading>
+
+      <p>You can configure frox to run a virus scanner on downloaded
+      files between downloading them to the proxy and them being
+      forwarded to the client. You need to <tt>./configure</tt> with
+      <tt>--enable-virus-scan</tt>, and set the config file variable
+      VirusScanner to something like <tt>
+      '&quot;/usr/local/bin/yourviruscanner&quot;
+      &quot;--options&quot; &quot;&percnt;s&quot;'</tt>. You no
+      longer need to be doing local caching for this to work - it
+      will work with caching through squid or with no caching at
+      all.</p>
+
+      <p>Note that the whole variable is enclosed in single quotes
+      ('), while the individual arguments within are enclosed with
+      double quotes (&quot;). The <tt>&quot;&percnt;s&quot;</tt>
+      will be replaced by the name of the file to scan. NB. unlike
+      all the other paths in the config file, any pathnames or
+      filenames in VirusScanner will <em>not</em> be stripped in the
+      case that you are running in a chroot jail. If your virus
+      scanner exits with a value other than 0 when a file is scanned
+      and is virus free you will need to set VSOK to that value.</p>
+
+      <p>There are currently some problems with this:
+      <itemize>
+	<item>Only file downloads are scanned.</item>
+
+	<item>If the file contains a virus then the file will
+	not be sent to the user, even if your virus scanner is
+	able to clean the virus from the file.</item>
+
+	<item>The user will see a delay before the file starts
+	to download as the whole thing must be downloaded to
+	the proxy and be scanned before any of it can be
+	passed to the client.</item>
+
+      </itemize></p>
+
+      <p>If the <tt>VSProgressMsgs</tt> option is set to something
+      other than <tt>0</tt> then every time that number of seconds
+      passes during the delay a progress message will be sent to the
+      client. On the plus side these may be displayed to users of
+      command line ftp clients, and will probably prevent clients
+      from giving up and timing out. On the down side the progress
+      messages could confuse some ftp clients (I think they do with
+      some Mozilla builds).</p>
+
+      <sect1>
+        <heading>Can I redirect requests to a virus scanning http proxy?</heading>
+
+	<p>Probably not. Most of these proxies send various http progress
+	messages back to the client. Frox is unable to parse these without
+	giving it a more extensive http implementation, and so it will
+	probably fail. Also there will be a delay before the client starts
+	to get the file, and it may well time out during this period. There
+	is interest in being able to do this though, so if anyone wants to
+	try coding it then they are welcome.</p>
+    </sect>
+
+    <sect>
+      <heading>Security</heading>
+      <sect1>
+        <heading>User, Group and Chroot</heading>
+
+        <p>Unless compiled with --enable-run-as-root you must specify
+        a non root user and group for frox to run as. It is strongly
+        recommended that you do this rather than recompiling.</p>
+
+        <p>You must specify WorkingDir for frox in the config file. By
+        default it will also chroot to this directory. If you do not
+        wish to run chrooted you must explicitly set DontChroot to "yes"
+	in the config file.</p>
+      </sect1>
+      <sect1>
+        <heading>Access control lists</heading>
+
+        <p>Access to frox is controlled by the access control lists in
+        the config file. These take the format	
+        <verb>
+        ACL ACTION CLIENT - [USER@]SERVER [PORTS]
+        </verb>
+        <tt>ACTION</tt> can be one of <tt>Deny</tt> or <tt>Allow</tt>. 
+        <tt>CLIENT</tt> and <tt>SERVER</tt> are either a domain name,
+        a <tt>*</tt>, an ip address, or an address/netmask in either
+        <tt>x.x.x.x/y</tt> or <tt>x.x.x.x/y.y.y.y</tt> form. 
+        <tt>PORTS</tt> is optional. If present it should contain one
+        or more port numbers or ranges of port numbers, separated by
+        &dquot;,&dquot;. There should be no whitespace within the
+        <tt>PORTS</tt> string. If no ports are specified then ports
+        are not taken into account in matching that rule.<tt>USER</tt>
+	is also optional. If present then note that it should be
+	<tt>ftp</tt> to match any anonymous connections.</p>
+
+        <p>Acls are checked after the client has connected to frox,
+        but before frox connects to the server. If non-transparent
+        proxying is enabled then the client will enter the username
+        before the acl is checked. The acls are checked in the order
+        they appear in the config file until one matches. If no acls
+        match the connection is denied.</p>
+      </sect1>
+      <sect1>
+        <heading>Command Control Program</heading>
+
+        <p>Frox has optional support for a ftp-proxy like command
+        control program (ccp). Just to confuse things there are two
+        different ways that this can work. The default is still the
+        old version based on ftp-proxy, while the new version is a bit
+        more like the squid redirector interface.</p>
+
+        <p>To use either method you should compile with
+        <tt>--enable-ccp</tt>, and set <tt>CCProgram</tt> to the
+        program you wish use. This must be within the chroot jail with
+        any libraries and/or shells it needs to run. To use the new
+        version you should also explicitly set <tt>UseOldCCP</tt> to
+        <tt>no</tt> in the config file.</p>
+
+        <sect2>
+          <heading>The Old Version</heading>
+
+          <p>The ccp will then be called for every command that the
+          client sends. It will not be called for any commands that
+          frox decides to send itself (eg. as part of determining
+          whether a file is suitable for caching). It can make use of
+          the following environment variables:
+          <verb>
+          FROX_CLIENT, FROX_SERVER: Ip addresses of client and server.
+          FROX_SERVERNAME:          Server's domain name if known.
+          FROX_SESSION:             Unique string for this session.
+          FROX_COMMAND:             FTP command just given.
+          FROX_PARAMATER:           Argument to that command.
+          </verb>
+	  With a new connection the ccp will be called with the
+	  special <tt>FROX_COMMAND</tt> of <tt>+NEW</tt>. The server
+	  variables may subsequently change if a user name is given
+	  which contains a different server to contact.</p>
+
+          <p>If the ccp exits with a value of 0 then the command is
+          dealt with as normal. If it exits with 1 then the command is
+          discarded. If it exits with 2 then the session is closed. If
+          the ccp writes a line to stderr then it will be sent to the
+          client over the control connection. If it writes a line to
+          stdout it will be logged by frox. If the ccp returns a value
+          other than 0 it is its responsibility to write a well formed
+          ftp message to the client which tells it what is happening
+          (eg. from a shell script by echo -ne "533 Permission
+          denied\r\n" &gt;&amp;2) . Failure to do this will result in
+          the client and proxy getting out of sync.</p>
+        </sect2>
+        <sect2>
+          <heading>The New Version</heading>
+
+          <p>One copy of the ccp will be executed each time a client
+          connects. It should read commands and messages from
+          <tt>stdin</tt> and write its replies back to
+          <tt>stdout</tt>. Each call is a '\n' terminated string which
+          starts with a single char, followed optionally by a space
+          and a string.</p>
+
+          <p>If the initial char is "I" then it is followed by
+          <tt>&dquot;client_ip server_ip server_name&dquot;</tt>,
+          although if the server_name is not known it will be replaced
+          by an "X". If the char is a "C" then it is followed by a
+          command from the client, and if it is a "S" it is followed
+          by a message from the server.</p>
+
+          <p>The ccp should reply with a similar string. "C" should be
+          followed by a message to go the client, while S is followed
+          by a command for the server. In response to an "I" a "R" can
+          be sent where the argument is the IP address of a server to
+          contact in place of the currently selected one. A single "X"
+          tells frox to continue as before, while a "Q" tells frox to
+          drop the connection. Finally the string after an "L" will be
+          logged by frox. It should also be followed by another line
+          giving an action to take.</p>
+
+          <p>Written like that is is pretty confusing, so there are
+          two example ccp scripts in the doc/ directory. One is a
+          simple bash script to disallow downloading of files greater
+          than a certain size. The other is a more complicated C
+          program which attempts to redirect users to mirrors of ftp
+          sites. I am sure there are other applications.</p>
+        </sect2>
+      </sect1>
+      <sect1>
+	<heading>TLS/SSL Support</heading>
+
+	<p>There is very experimental (currently only tested with
+	vsftpd) support for having frox use encryption when connecting
+	to the ftp server. You need to give <tt>--enable-ssl</tt> to
+	<tt>./configure</tt>, and define <tt>UseSSL yes</tt> in the
+	config file. By default data connections will also be
+	encrypted, but you can turn this off by setting <tt>DataSSL
+	no</tt>. Note you will need to create <tt>/dev/urandom</tt>
+	and <tt>/dev/random</tt> at least in the chroot jail, and
+	possibly some other stuff, for the openssl libraries to work. 
+	If you are having difficulties try defining <tt>DontChroot
+	yes</tt> temporarily to see if it fixes things.</p>
+
+        <p>Note SSL support currently only covers the connection
+        between frox and the ftp server. Frox does not support clients
+        connecting to it with SSL at the moment.</p>
+
+	<p>It is suggested to have a config file subsection which turns
+	off SSL for anonymous connections. There is little point in having
+	the overhead of encryption for this, and ftp servers may deny an
+	anonymous connection once SSL has been negotiated (this is the
+	default configuration of vsftpd). At this stage frox is not able to
+	undo the ssl negotiation.</p>
+	
+	<p>This is not yet rfc compliant. It should be at some point...</p>
+    </sect1>
+    </sect>
+    <sect>
+      <heading>Troubleshooting</heading>
+      <sect1>
+	<heading>I can't connect to an ftp site through frox?</heading>
+
+	<p>Look at the log file that frox produces and see if it gives
+	you any clues. It should say ``Connect from A to B''. If it
+	doesn't say anything then you aren't getting through to frox
+	at all - check the config file to see frox is listening on the
+	right address/interface. Have you remembered to do the
+	ipchains/iptables command that is in the INSTALL file?</p>
+
+	<p>If the log file suggests frox is connecting back to itself
+	then you are probably contacting it directly and
+	non-transparent proxying is switched off. Either switch
+	non-transparent proxying on in the config file, or make sure
+	that your ftp client is not trying to connect directly to frox
+	- either from you specifying the frox machine as the ftp host
+	on the command line, or from the client trying to use it
+	explicitly as a proxy.</p>
+
+	<p>If you have a complicated network setup then check the<ref
+	id="networking" name="Network Problems"> section. </p>
+
+	<p>Read the <ref id="client-ref" name="client configuration">
+	section again</p>
+      </sect1>
+      <sect1>
+        <heading>Frox says "unable to determine destination address"</heading>
+
+	<p>There are two likely causes for this. One is that you are
+	trying to do non-transparent proxying, but the config file is
+	not setup correctly. Ensure that <tt>DoNTP</tt> is set to
+	<tt>yes</tt> in the config file, and comment out
+	<tt>NTPAddress</tt> - it is never necessary and only serves
+	a purpose if you are doing a mixture of transparent and
+	non-transparent proxying.</p>
+
+        <p>The other possiblity is that your connection is
+        transparently redirected to frox, but frox is unable to
+        determine the orriginal destination. The most likely cause is
+        if you are using Linux kernel 2.4.x with ipchains
+        compatability. I do not know of a way around this short of
+        changing from ipchains to iptables (or changing back to a
+        2.2.x kernel!).</p>
+      </sect1>
+      <sect1>
+	<heading>Non transparent proxying won't work</heading>
+	
+	<p>Check whether you have NTPAddress set. If this is set then
+	it must be set to the address and port that the ftp clients
+	are using to contact the proxy, otherwise clients will not be
+	offered non transparent proxying. If you unset it then all
+	clients will be offered non transparent proxying.</p>
+      </sect1>
+      <sect1>
+	<heading>Frox ignores the Squid proxy I am using</heading>
+	
+	<p>If you have HTTP caching set up then frox should conduct
+	all anonymous downloads through your proxy. But, frox also
+	needs to make an ftp connection to the remote ftp server for
+	retrieving directory listings etc. Therefore if you do netstat
+	or equivalent you will not see a connection from frox to squid
+	unless a file download is actually in progress.</p>
+
+        <p>This also means that you cannot use frox + squid and then
+        firewall off ftp access to the outside world altogether. Your
+        best bet is to keep frox (with or without squid), and set
+        <tt>ApConv</tt> to <tt>yes</tt> in the config file. You will
+        still need to allow frox to make outbound tcp connections on
+        port 21, and any ports in the PasvPorts range, but you should
+        not have any of the usual problems associated with firewalling
+        ftp.</p>
+      </sect1>
+      <sect1>
+        <heading>HTTP caching doesn't work for a particular host</heading>
+
+	<p>With HTTP caching frox makes a connection to the ftp server
+	initially, and then the http proxy/cache makes its own connection
+	when you initiate a download. If the http proxy and frox are both
+	at the same IP address then there will be problems with any ftp
+	server (and there are a few) which only allow one connection per
+	host.</p>
+
+	<p>The workaround is not to use http caching! You can either do
+	this globally, or put in a specific config file subsection to
+	turn off caching for any hosts that you have this problem with.
+	A better workaround should appear in a future version.</p>
+      </sect1>
+      <sect1>
+        <heading>Non transparent proxy when usernames contain @</heading>
+
+        <p>As of version 0.7.8 frox scans the username from right to
+        left when looking for the dividing @. If your username on the
+        remote server is abc@def.org and you are logging in to
+        ftp.gnu.org you can simply give "abc@def.org@ftp.gnu.org" to
+        frox as your username.</p>
+
+        <p>If you are using both transparent and non-transparent
+        proxying then you will need to use the <tt>NTPAddress</tt>
+        option so that when your direct connection to ftp.gnu.org is
+        intercepted by frox it won't interpret your username
+        "abc@def.org" as a login to def.org with username abc.</p>
+      </sect1>
+      <sect1>
+	<heading>Audiogalaxy</heading>
+	
+	<p>Audiogalaxy is a music sharing program. Although
+	audiogalaxy works through port 21 it does not use the ftp
+	protocol, and therefore frox does not allow its connections
+	through. If you are using frox as a transparent proxy and you
+	wish to use audiogalaxy then you need to change your
+	iptables/netfilter rules so that packets addressed to the
+	audiogalaxy servers do not pass through frox. Fortunately
+	audiogalaxy does not use port 21 to contact other machines
+	using the audiogalaxy client so these do not also need to be
+	added.</p>
+      </sect1>
+      <sect1>
+	<heading>I still can't get it to work</heading>
+
+	<p>There is a mailing list at <tt/frox-user at lists.sourceforge.net/.
+	Please say what version of frox you are running, what
+	version of the linux kernel, whether you gave any options to
+	<tt>./configure</tt> at compile time, and what point exactly
+	it fails at. The log file should give you some info, especially if
+	you set LogLevel to 25.</p>
+      </sect1>
+    </sect>
+    <sect>
+      <heading>Network problems<label id="networking"></heading>
+
+      <sect1>
+        <heading>General</heading>
+
+        <p>If you are running frox on a machine on your default route,
+        and with little or no firewalling between it and either the
+        outside world or your internal network you should not have
+        network problems. Because of the nature of the ftp protocol
+        though, if your setup is more complicated than this then you
+        may run into difficulties.</p>
+
+        <p>The easiest way of checking that your network setup isn't
+        what is causing the problems is to (temporarily if you wish)
+        run an ftp server on the machine which runs frox. If you can't
+        ftp from your clients to this server and retrieve files O.K. 
+        then your clients won't be able to ftp to frox either. Also
+        try running an ftp client on the frox machine and connecting
+        to a server in the outside world. If this doesn't work then
+        frox obviously won't be able to do this either.</p>
+      </sect1>
+
+      <sect1>
+        <heading>Control connection problems</heading>
+
+	<p>With a control connection problem your clients will not be
+	able to connect to ftp servers through frox at all. If
+	transparently proxying then check that
+	outgoing tcp traffic is being redirected to frox without
+	changing the destination address (ie. you must route it there,
+	not use DNAT), and that the machine running frox can make a
+	tcp connection to the outside world successfully</p>
+      </sect1>
+      <sect1>
+        <heading>Data connection problems</heading>
+
+        <p>If the problem is with the data connection then your
+        clients will be able to connect to the ftp server, login, and
+        do things like print the current working directory. File
+        retrievals and directory listings will fail, though you may
+        find that passive mode ftp works and active doesn't, or visa
+        versa.</p>
+
+        <p>If you are having these problems I strongly reccomend that
+        you set <tt>TransparentData</tt> to <tt>no</tt>, and
+        <tt>ApConv</tt> to <tt>yes</tt> in the config file. The frox
+        machine must be able to make tcp connections on any port to
+        the outside world. It should also be possible to establish tcp
+        connections in either direction between the frox machine and
+        the client machines, and with no NAT being performed on these
+        connections. With this setup you shouldn't have any
+        problems.</p>
+
+        <p>The above suggestions aren't strictly necessary, but things
+        get more complicated without them.
+        <itemize>
+          <item><tt>ApConv</tt> = <tt>no</tt>: Either incoming tcp
+          connections must be allowed from the outside world to the
+          machine running frox, or they must be prevented only by a
+          NATed (IP masquerading) firewall which is configured to
+          allow ftp connections (eg. linux + ipt_nat_ftp.o
+          module)</item>
+
+          <item>If frox cannot make tcp connections to the client then
+          clients are limited to passive mode ftp.</item>
+
+          <item>If clients cannot make arbitrary tcp connections to
+          frox then they are limited to active mode ftp.</item>
+
+          <item>NAT between client and frox: If DNAT occurs when the
+          client connects to frox (ie. the client makes the connection
+          to a different IP to that which the packets frox eventually
+          receives are addressed to then you should set
+          <tt>PASVAddress</tt> to the IP which the clients should use. 
+          NB. This option doesn't actually exist yet, but let me know
+          if you need it and I'll consider adding it.</item>
+
+          <item><tt>TransparentData</tt> = <tt>yes</tt>: This can make
+          things really unpleasant. Are you <em>sure</em> you need
+          it? These are the problems which spring to mind...
+          <itemize>
+            <item>Frox should be in your default route for outgoing
+            tcp traffic. If you are using policy based routing to
+            route only port 21 tcp traffic to frox then
+            TransparentData will not work.</item>
+
+            <item>Beware that frox will make connections to your
+            clients that purport to be from arbitrary hosts outside
+            your network. If there is a firewall/router between your
+            frox and your clients with IP spoofing protection it must
+            let these packets through.</item>
+
+            <item>Have another read of SECURITY to remind yourself of
+            the extra risks you are taking.</item>
+          </itemize>
+          </item>
+
+        </itemize></p>
+      </sect1>
+    </sect>
+    <sect>
+      <heading>Miscellaneous (Infrequently Asked Questions)</heading>
+	<sect1>
+	  <heading>Tunneling FTP using frox</heading>
+
+	  <p>The following is a description from Travis Richardson on
+	  how to use frox to tunnel all your ftp connections through
+	  an ssh link:</p>
+
+	  <p>Object:<p>	
+
+	  <p>Tunnel ftp connections from my laptop to my server, and
+	  from there out into the world (I'm assuming here (for my own
+	  reasons) that my server's connection / routing is more
+	  secure than my laptop's). I want to tunnel both control AND
+	  data connections, so I can't just use a single tunnel with
+	  Frox.</p>
+
+	  <p>Solution:</p>
+
+	  <p><itemize>
+	    <item> Install Zebedee (an open source tunnel - see
+	    http://www.winton.org.uk/zebedee/) on your server and
+	    client</item>
+
+	    <item> Configure the zebedee server to allow tunnels to
+	    127.0.0.1:3121 (Frox's default port) and for your data
+	    connections (eg: 127.0.0.1:41000-41049)</item>
+
+	    <item> Configure your local zebedee client to forward the
+	    local versions of these ports to 127.0.0.1 on your server
+	    (eg: 3121:127.0.0.1:3121 and
+	    41000-41049:127.0.0.1:41000:41049). You must use 127.0.0.1
+	    instead of my.server.com because Frox will be listening
+	    for a data connection on 127.0.0.1 (what you will set
+	    PASVAddress to) and won't accept connections on other IPs. 
+	    It looks weird, but it works.</item>
+
+            <item> Configure Frox to listen on 127.0.0.1:3121 </item>
+
+            <item> Configure Frox with PASVAddress to 127.0.0.1 (which
+            will cause your FTP client to connect to localhost, which
+            will be forwarded / tunneled by zebedee to the localhost
+            on your server) and PassivePorts to your port range above
+            (eg: 41000-41049)</item>
+	  </itemize></p>
+
+	  <p>Done! Restart / start your zebedee server / client and
+	  Frox and set your FTP client to use the new proxy at
+	  127.0.0.1:3121. Should work like a charm.</p>
+	</sect1>
+
+        <sect1>
+	  <heading>grsecurity kernel patch</heading>
+
+	  <p>If you are using the grsecurity kernel patch and also
+	  local caching in frox then note that frox does a chown
+	  within a chroot jail. If you have disabled this then you
+	  will need to manually change the ownership of the frox-cache
+	  socket file in the working dir the first time you run
+	  frox.</p>
+	</sect1>
+
+      </sect>
+</article>

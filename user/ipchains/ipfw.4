@@ -1,0 +1,687 @@
+.\"
+.\" Modified by Paul Russell and Michael Neuling July 1997.
+.\"
+.\" Based on the original man page by Jos Vos <jos@xos.nl> (see README).
+.\"
+.\"	This program is free software; you can redistribute it and/or modify
+.\"	it under the terms of the GNU General Public License as published by
+.\"	the Free Software Foundation; either version 2 of the License, or
+.\"	(at your option) any later version.
+.\"
+.\"	This program is distributed in the hope that it will be useful,
+.\"	but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"	GNU General Public License for more details.
+.\"
+.\"	You should have received a copy of the GNU General Public License
+.\"	along with this program; if not, write to the Free Software
+.\"	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\"
+.TH IPFW 4 "February 9, 1999" "" ""
+.SH NAME
+ipfw \- IP firewall
+.SH SYNOPSIS
+.BR "#include <sys/types.h>"
+.br
+.BR "#include <sys/socket.h>"
+.br
+.BR "#include <netinet/in.h>"
+.br
+.BR "#include <linux/ip.h>"
+.br
+.BR "#include <linux/tcp.h>"
+.br
+.BR "#include <linux/udp.h>"
+.br
+.BR "#include <linux/icmp.h>"
+.br
+.BR "#include <linux/if.h>"
+.br
+.BR "#include <linux/ip_fwchains.h>"
+.sp 0.75
+.BI "int setsockopt (int " socket ", IPPROTO_IP, int " command ", void *" data ", int " length ")"
+.SH DESCRIPTION
+The IP firewall facilities in the Linux kernel provide mechanisms for
+accounting IP packets, for building firewalls based on packet-level
+filtering, for building firewalls using transparent proxy servers (by
+redirecting packets to local sockets), and for masquerading forwarded
+packets.  The administration of these functions is maintained in the
+kernel as a series of separated table (hereafter referred to as
+chains) each containing zero or more rules.  There are three builtin
+chains which are called input, forward and output which always exist.
+All other chains are user defined.  A chain is a sequence of rules;
+each rule contains specific information about source and destination
+addresses, protocols, port numbers, and some other characteristics.
+Information about what to do if a packet matches the rule is also
+contained.  A packet will match with a rule when the characteristics
+of the rule match those of the IP packet.
+.PP
+A packet always traverses a chain starting at rule number 1.  Each
+rule specifies what to do when a packet matches.  If a packet does not
+match a rule, the next rule in that chain is tried.  If the end of a
+builtin chain is reached the a default policy for that chain is
+returned.  If the end of a user defined chain is reached then the rule
+after the rule which branched to that chain is tried.  The purpose of
+the three builtin chains are
+.TP
+Input firewall 
+These rules regulate the acceptance of incoming IP packets.  All
+packets coming in via one of the local network interfaces are checked
+against the input firewall rules (locally-generate packets are
+considered to come from the loopback interface).  A rule which matches
+a packet will cause the rule's packet and byte counters to be
+incremented appropriately.
+.TP
+Forwarding firewall
+These rules define the permissions for forwarding IP packets.  All
+packets sent by a remote host having another remote host as
+destination are checked against the forwarding firewall rules.  A rule
+which matches will cause the rule's packet and byte counters to be
+incremented appropriately.
+.TP
+Output firewall
+These rules define the permissions for sending IP packets.  All
+packets that are ready to be be sent via one of the local network
+interfaces are checked against the output firewall rules.  A rule
+which matches will cause the rule's packet and byte counters to be
+incremented appropriately.
+.PP
+Each of the firewall rules contains either a branch name or a policy,
+which specifies what action has to be taken when a packet matches with
+the rule.  There are 5 different policies possible:
+.I ACCEPT
+(let the packet pass the firewall),
+.I REJECT
+(do not accept the packet and send an ICMP host unreachable message
+back to the sender as notification),
+.I DENY 
+(sometimes referred to as block) (ignore the packet without sending
+any notification),
+.I REDIRECT
+(redirected to a local socket - input rules only)
+and
+.I MASQ
+(pass the packet, but perform IP masquerading - forwarding rules only)
+.PP
+The last two are special; for 
+.IR REDIRECT , 
+the packet will be received by a local process, even if it was sent to
+another host and/or another port number.  This function only applies
+to TCP or UDP packets.
+.PP
+For 
+.IR MASQ , 
+the sender address in the IP packets is replaced by the address of the
+local host and the source port in the TCP or UDP header is replaced by
+a locally generated (temporary) port number before being forwarded.
+Because this administration is kept in the kernel, reverse packets
+(sent to the temporary port number on the local host) are recognized
+automatically.  The destination address and port number of these
+packets will be replaced by the original address and port number that
+was saved when the first packet was masqueraded.  This function only
+applies to TCP or UDP packets.
+.PP
+There is also a special target 
+.I RETURN
+which is equivalent to falling off the end of the chain.
+.PP
+This paragraph describes the way a packet goes through the firewall.
+Packets received via one of the local network interface will pass the
+following chains:
+.RS
+.I input firewall
+(incoming device)
+Here, the device (network interface) that is used when trying to
+match a rule with an IP packet is listed between brackets.
+After this step, a packet will optionally be redirected to a local socket.
+When a packet has to be forwarded to a remote host, it will also pass
+the next set of rules:
+.I forwarding firewall
+(outgoing device)
+After this step, a packet will optionally be masqueraded.
+Responses to masqueraded packets will never pass the forwarding firewall
+(but they will pass both the input and output firewalls).
+All packets sent via one of the local network interfaces, either
+locally generated or being forwarded, will pass the following sets
+of rules:
+.I output firewall
+(outgoing device)
+.PP
+.RE
+When a packet enters one of the three above chains rules are traversed
+from the first rule in order.  When analysing a rule one of three
+things may occur.
+.PP
+Rule unmatched:
+.RS
+If a rules is unmatched then the next rule in that chain is analysed.
+If there are no more rules for that chain the default policy for that
+chain is returned (or traversal continues back at the calling chain,
+in the case of a user-defined chain).
+.RE
+.PP
+Rule matched (with branch to chain):
+.RS
+When a rule is matched by a packet and the rule contains a branch
+field then a jump/branch to that chain is made.  Jumps can only be
+made to user defined chains.  As described above, when the end of a
+builtin chain is reached then a default policy is returned.  If the
+end of a used defined chain is reached then we return to the rule from
+whence we came.
+.PP 
+There is a reference counter at the head of each chain which
+determines the number of references to that chain.  The reference
+count of a chain must be zero before it can be deleted to ensure that
+no branches are effected.  To ensure the builtin chains are never
+deleted their reference count is initialised to one.  Also since no
+branches to builtin chains can be made, their reference counts are
+always one.  The reference count on user defined chains are
+initialised to zero and are changed accordingly when rules are
+inserted, deleted etc.
+.PP
+Multiple jumps to different chains are possible which unfortunately
+make loops possible.  Loop detection is therefore provided.  Loops are
+detected when a packet tries to re-enter a chain it is already
+traversing.  An example of a simple loop that could be created is if
+we set up two user defined chains called "test1" and "test2".  We
+firstly insert a rule in the "input" chain which jumps to "test1".  We
+then create a rule in the "test1" chain which points to "test2" and a
+rule in "test2" which points to "test1".  Here we have obviously
+created a loop.  When a packet then enters the input chain it will
+branch to the "test1" chain and then to the "test2" chain.  From here
+it will try to branch back to the "test1" chain.  A message in the
+syslog will be recorded along with the path which the packet
+traversed, to assist in debugging firewall rules.
+.RE
+.PP
+Rule matched (special branch):
+.RS
+The special labels 
+.IR ACCEPT , 
+.IR DENY , 
+.IR REJECT ,
+.IR REDIRECT , 
+.I MASQ
+or
+.I RETURN
+can be given which specify the immediate fate of the packet as
+discussed above.  If no of labels is specified then the next
+rule in the chain is analysed.
+.PP
+Using this last option (no label) an accounting chain can be created.
+If each of the rules in this accounting chain have no branch or label
+then the packet will always fall through to the end of the chain and
+then return to the calling chain.  Each rule that matches in the
+accounting chain will have its byte and packet counters incremented as
+expected.  This accounting chain can be branched to from any other
+chain (eg input, forward or output chain).  This is a very neat way of
+performing packet accounting.
+.RE
+.br
+The firewall administration can be changed via calls to
+.IR setsockopt (2).
+The existing rules can be inspected by looking at 2 files in
+the
+.I /proc/net
+directory:
+.IR ip_fwchains ,
+.IR ip_fwnames .
+These two files are readable only by root.
+The current administration related to masqueraded sessions can
+be found in the file
+.I ip_masquerade
+in the same directory
+.SH COMMANDS
+Command for changing and setting up chains and rules is
+.IR ipchains (8)
+.
+Most commands require some additional data to be passed.
+A pointer to this data and the length of the data are passed
+as option value and option length arguments to
+.IR setsockopt .
+The following commands are available:
+.PP
+.B IP_FW_INSERT
+.br
+.RS
+This command allows a rule to be inserted in a chain at a given
+position (where 1 is considered the start of the chain).  If there is
+already a rule in that position, it is moved one slot, as are any
+preceding rules in that chain.  The reference count of any chains
+referenced by this inserted rule are incremented appropriately.  The
+data passed with this command is an
+.I ip_fwnew
+structure, defining the position, chain and contents of the new rule.
+.RE
+.PP
+.B IP_FW_DELETE
+.br
+.RS
+Remove the first rule matching the specification from the given chain.
+The data passed with this command is an
+.I ip_fwchange
+structure, defining the rule to be deleted and its chain.  The
+reference count of any chains referenced by this deleted rule are
+decremented appropriately.
+Note that the fw_mark field is currently ignored in rule comparisons
+(see the
+.B BUGS
+section).
+.RE
+.PP
+.B IP_FW_DELETE_NUM
+.br
+.RS
+Remove a rule from one of the chains at a given rule number (where 1
+means the first rule).  The data passed with this command is an
+.I ip_fwdelnum
+structure, defining the rule number of the rule to be deleted and its
+chain.  The reference count of any chains referenced by this deleted
+rule are decremented appropriately.
+.RE
+.PP
+.B IP_FW_ZERO
+.br
+.RS
+Reset the packet and byte counters in all rules of a chain.  The data
+passed with this command is an
+.I ip_chainlabel
+which defines the chain which is to be operated on. See also the
+description of the
+.I /proc/net
+files for a way to atomically list and reset the counters.
+.RE
+.PP
+.B IP_FW_FLUSH
+.br
+.RS
+Remove all rules from a chain.  The data passed with this command is a
+.I ip_chainlabel
+which defines the chain to be operated on.
+.RE
+.PP
+.B IP_FW_REPLACE
+.br
+.RS
+Replace a rule in a chain.  The new rule overwrites the rule in the
+given position.  Any chains referenced by the new rule are incremented
+and chains referenced by the overwritten rule are decremented.  The
+data passed with this command is an
+.I ip_fwnew
+structure, defining the contents of the new rule, the the chain name
+and the position of the rule in that chain.
+.RE
+.PP
+.B IP_FW_APPEND
+.br
+.RS
+Insert a rule at the end of one of the chains.  The data passed with
+this command is an
+.I ip_fwchange
+structure, defining the contents of the new rule and the chain to
+which it is to be appended.  Any chains referenced by this new rule
+have their refcount incremented.
+.RE
+.PP
+.B IP_FW_MASQ_TIMEOUTS
+.RS
+Set the timeout values used for masquerading.
+The data passed with this command is a structure containing 3 fields of type
+.IR int ,
+representing the timeout values (in jiffies, 1/HZ second) for TCP sessions,
+TCP sessions after receiving a FIN packet, and UDP packets,
+respectively.
+A timeout value 0 means that the current timeout value of the
+corresponding entry is preserved.
+.RE
+.PP
+.B IP_FW_CHECK
+.br
+.RS
+Check whether a packet would be accepted, denied, rejected, redirected
+or masqueraded by a chain.  The data passed with this command is an
+.I ip_fwtest
+structure, defining the packet to be tested and the chain which it is
+to be test on.  Both builtin and user defined chains can be tested.
+.RE
+.PP
+.B IP_FW_CREATECHAIN
+.br
+.RS
+Create a chain.  The data passed with this command is an
+.I ip_chainlabel
+defining the name of the chain to be created.  Two chains can not have
+the same name.
+.RE
+.PP
+.B IP_FW_DELETECHAIN
+.br
+.RS
+Delete a chain.  The data passed with this command is an
+.I ip_chainlabel
+defining the name of the chain to be deleted.  The chain must not be
+referenced by any rule (ie. refcount must be zero).  The chain must
+also be empty which can be achieved using IP_FW_FLUSH.
+.RE
+.PP
+.B IP_FW_POLICY
+.br
+.RS
+Changes the default policy on a builtin rule.  The data passed with
+this command is an
+.I ip_fwpolicy
+structure, defining the chain whose policy is to be changed and the
+new policy.  The chain must be a builtin chain as user-defined chains
+don't have default policies.
+.RE
+.SH STRUCTURES
+The
+.I ip_fw
+structure contains the following relevant fields to be filled
+in for adding or replacing a rule:
+.TP
+struct in_addr fw_src, fw_dst
+Source and destination IP addresses.
+.TP
+struct in_addr fw_smsk, fw_dmsk
+Masks for the source and destination IP addresses.
+Note that a mask of 0.0.0.0 will result in a match for all hosts.
+.TP
+char fw_vianame[IFNAMSIZ]
+Name of the interface via which a packet is received by the system or is
+going to be sent by the system.
+If the option
+.B IP_FW_F_WILDIF
+is specified, then the fw_vianame need only match the packet interface
+up to the first NUL character in fw_vianame.  This allows
+wildcard-like effects.  The empty string has a special meaning: it
+will match with all device names.
+.TP 
+__u16 fw_flg
+Flags for this rule.
+The flags for the different options can be bitwise or'ed with each other.
+.sp 0.75
+The options are:
+.B IP_FW_F_TCPSYN
+(only matches with TCP packets when the SYN bit is set and both the
+ACK and RST bits are cleared in the TCP header, invalid with other
+protocols), The option
+.B IP_FW_F_MARKABS
+is described under the fw_mark entry.
+The option
+.B IP_FW_F_PRN
+can be used to list some information about a matching packet via
+.IR printk ().
+The option
+.B IP_FW_F_FRAG
+can be used to specify a rule which applies only to second and
+succeeding fragments (initial fragments can be treated like normal
+packets for the sake of firewalling).  Non-fragmented packets and
+initial fragments will never match such a rule.  Fragments do not
+contain the complete information assumed for most firewall rules,
+notably ICMP type and code, UDP/TCP port numbers, or TCP SYN or ACK
+bits.  Rules which try to match packets by these criteria will never
+match a (non-first) fragment.
+The option
+.B IP_FW_F_NETLINK
+can be specified if the kernel has been compiled with
+CONFIG_IP_FIREWALL_NETLINK enabled.  This means that all matching
+packets will be sent out the firewall netlink device (character
+device, major number 36, minor number 3).  The output of this device
+is four bytes indicating the total length, four bytes indicating the
+mark value of the packet (as describe under fw_mark above), a string
+of IFNAMSIZ characters containing the interface name for the packet,
+and then the packet itself.  The packet is truncated to
+.B fw_outputsize 
+bytes if it is longer.
+.TP
+__u16 fw_invflg
+This field is a set of flags used to negate the meaning of other
+fields, eg. to specify that a packet must NOT be on an interface.  The
+valid flags are
+.B IP_FW_INV_SRCIP
+(invert the meaning of the fw_src field)
+.B IP_FW_INV_DSTIP
+(invert the meaning of fw_dst)
+.B IP_FW_INV_PROTO
+(invert the meaning of fw_proto)
+.B IP_FW_INV_SRCPT 
+(invert the meaning of fw_spts)
+.B IP_FW_INV_DSTPT
+(invert the meaning of fw_dpts)
+.B IP_FW_INV_VIA
+(invert the meaning of fw_vianame)
+.B IP_FW_INV_SYN
+(invert the meaning of fw_flg & IP_FW_F_TCPSYN)
+.B IP_FW_INV_FRAG
+(invert the meaning of fw_flg & IP_FW_F_FRAG).  It is illegal (and
+useless) to specify a rule that can never be matched, by inverting an
+all-inclusive set.  Note also, that a fragment will never pass any
+test on ports or SYN, even an inverted one.
+.TP
+__u16 fw_proto
+The protocol that this rule applies to.  The protocol number 0 is used
+to mean `any protocol'.
+.TP
+__u16 fw_spts[2], fw_dpts[2]
+
+These fields specify the range of source ports, and the range of
+destination ports respectively.  The first array element is the
+inclusive minimum, and the second is the inclusive maximum.  Unless
+the rule specifies a protocol of TCP, UDP or ICMP, the port range must
+be 0 to 65535.  For ICMP, the 
+.I fw_spts 
+field is used to check the ICMP type, and the
+.I fw_dpts
+field is used to check the ICMP code.
+.TP
+__u16 fw_redirpt
+This field must be zero unless the target of the rule is "REDIRECT".
+Otherwise, if this redirection port is 0, the destination port of a
+packet will be used as the redirection port.
+.TP
+__u32 fw_mark
+This field indicates a value to mark the skbuff with (which contains
+the administration data for the matching packet).  This is currently
+unused, but could be used to control how individual packets are
+treated.  If the
+.B IP_FW_F_MARKABS
+flag is set then the value in
+.I fw_mark
+simply replaces the current mark in the skbuff, rather than being
+added to the current mark value which is normally done.  To subtract a
+value, simply use a large number for
+.I fw_mark
+and 32-bit wrap-around will occur.
+.TP
+__u8 fw_tosand, fw_tosxor
+These 8-bit masks define how the TOS field in the IP header should be
+changed when a packet is accepted by the firewall rule.
+The TOS field is first bitwise and'ed with
+.I fw_tosand
+and the result of this will be bitwise xor'ed with
+.IR fw_tosxor .
+Obviously, only packets which match the rule have their TOS effected.
+It is the responsibility of the user that packets with invalid TOS
+bits are not created using this option.
+.PP 
+The
+.I ip_fwuser
+structure, used when calling some of the above commands contains the following fields:
+.TP
+struct ip_fw ipfw
+.I See above
+.PP
+ip_chainlabel label
+This is the label of the chain which is to be operated on.  
+.PP
+The
+.I ip_fwpkt
+structure, used when checking a packet,
+contains the following fields:
+.TP
+struct iphdr fwp_iph
+The IP header. See
+.I <linux/ip.h>
+for a detailed description of the
+.I iphdr
+structure.
+.PP
+struct tcphdr fwp_protoh.fwp_tcph
+.br
+struct udphdr fwp_protoh.fwp_udph
+.br
+struct icmphdr fwp_protoh.fwp_icmph
+.RS
+The TCP, UDP, or ICMP header, combined in a union named
+.IR fwp_protoh .
+See
+.IR <linux/tcp.h> ,
+.IR <linux/udp.h> ,
+or
+.I <linux/icmp.h>
+for a detailed description of the respective structures.
+.RE
+.TP
+struct in_addr fwp_via
+The interface address via which the packet is pretended to be
+received or sent.
+.SH "CHANGES"
+The ability to add in extra chains other than just the standard input,
+output and forward chains is very powerful.  The ability to branch to
+any chain makes the replication of rules unnecessary.  Accounting
+becomes automatic as a single chain can be referenced by all builtin
+chains to do the accounting.
+.PP
+Fragments must now be handled explicitly; previously second and
+succeeding fragments were passed automatically.
+.PP
+The lowest TOS bit (MBZ) could not be effected previously; the kernel
+used to silently mask out any attempted manipulation of the lowest
+TOS bit.  (``So now you know how to do it - DON'T.'').
+.PP
+The packet and byte counters are now 64-bit on 32-bit machines
+(actually presented as 2 32-bit values).
+.PP
+The ability to specify an interface by an IP address was obsoleted by
+the ability to specify it by name; the combination of the two was
+error-prone and so only an interface name can now be used.
+.PP
+The old 
+.B IP_FW_F_TCPACK
+flag was made obsolete by the ability to invert
+the 
+.B IP_FW_F_TCPSYN 
+flag.
+.PP
+The old 
+.B IP_FW_F_BIDIR
+flag made the kernel code complex and is no longer supported.
+.PP
+The ability to specify several ports in one rule was messy and didn't
+win much, so has been removed.
+.SH "RETURN VALUE"
+On success (or a straightforward packet accept for the CHECK options), zero is returned.
+On error, -1 is returned and
+.I errno
+is set appropriately.
+See
+.IR setsockopt (2)
+for a list of possible error values.  
+.B ENOENT
+indicates that given chain name doesn't exist.
+When the check packet command is used, zero is returned
+when the packet would be accepted without redirection or masquerading.
+Otherwise, -1 is returned and
+.I errno
+is set to
+.B ECONNABORTED
+(packet would be accepted using redirection),
+.B ECONNRESET
+(packet would be accepted using masquerading),
+.B ETIMEDOUT
+(packet would be denied),
+.B ECONNREFUSED
+(packet would be rejected),
+.B ELOOP
+(packet got into a loop),
+.B ENFILE	
+(packet fell off end of chain (only occurs for used defined chains)).
+.SH "LISTING RULES"
+In the directory
+.I /proc/net
+there are 2 entries to list the currently defined rules and chains:
+.I ip_fwnames
+(for IP firewall chain names) One line per chain.  Contains the chain
+name, policy, the number of references to that chain and the packet
+and byte counters which have matched the policy (represented as two
+pairs of 32-bit numbers; most significant 32-bits first).
+.I ip_fwchains
+(for IP firewall chains)
+One line per rule; rules are listed one chain at a time (from
+first to last as they appear in
+.IR /proc/net/ip_fwnames )
+and in order from first to last down each chain.
+.PP
+The fields are: the chain name for that rule, source address and mask,
+destination address and mask, interface name (or "-"), the fw_flg
+field, the fw_invflg field, protocol number, packet and byte counters,
+the source and destination port ranges, the TOS and-mask, the TOS
+xor-mask, the fw_redirpt field, the fw_mark field, the fw_outputsize
+field, and the target (label).  The IP addresses and masks are listed
+as 8 hexadecimal digits, the TOS masks are listed as 2 hexadecimal
+digits preceded by the letters A and X, respectively, the fw_mark,
+fw_flg and fw_invflg fields are listed in hex, and the other values
+are represented in decimal format.  The packet and bytes counters are
+represented as two space-separated 32-bit numbers, representing the
+most and least significant words respectively.  Individual fields are
+separated by white space, by a "/" (the address and the corresponding
+mask), by "->" (the source and destination address/mask pairs), or "-"
+(the ranges for source and destination ports).
+.PP
+The files may also be opened in read/write mode.  In that case, the
+packet and byte counters in all the rules of that category will be
+reset to zero after listing their current values.
+.PP
+The file
+.I /proc/net/ip_masquerade
+contains the kernel administration related to masquerading.
+After a header line, each masqueraded session is described on a
+separate line with the following entries, separated by white space or by ':'
+(the address/port number pairs):
+protocol name ("TCP" or "UDP"), source IP address and port number,
+destination IP address and port number,
+the new port number, the initial sequence number
+for adding a delta value, the delta value, the previous delta value,
+and the expire time in jiffies (1/HZ second).
+All addresses and numeric values are in hexadecimal format, except the last
+3 entries, being represented in decimal format.
+.SH FILES
+.I /proc/net/ip_fwchains
+.br
+.I /proc/net/ip_fwnames
+.br
+.I /proc/net/ip_masquerade
+.SH "BUGS"
+The 
+.IR setsockopt (2)
+interface is a crock.  This should be put under /proc/sys/net/ipv4 and
+the world would be a better place.
+.PP
+There is no way to read and reset a single chain; stop packets
+traversing the chain and then list, reset and restore traffic.
+.PP
+The packet and byte counters should be presented in /proc as a single
+64-bit value, not two 32-bit values.
+.PP
+The "fw_mark" field isn't used for deletions of matching rules.  This
+is to facilitate the ipfwadm compatibility script.  Similarly, the 
+.B IP_FW_F_MARKABS
+flag is ignored in comparisons.
+.SH SEE ALSO
+setsockopt(2), socket(2), ipchains(8)
+.\" .SH AUTHOR
+.\" Michael Neuling
+.\" .br
+.\" Rustcorp IT Consulting, Adelaide, Australia

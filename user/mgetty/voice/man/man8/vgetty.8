@@ -1,0 +1,197 @@
+.TH vgetty 8 "$Date: 2001/12/22 18:43:22 $" "version 0.60" "vgetty manual"
+.IX vgetty
+
+.SH NAME
+vgetty \- voice extension to the mgetty+sendfax program
+
+.SH SYNOPSIS
+.B vgetty
+.RB [ options ]
+.RI ttydevice
+
+.B vgetty
+is not meant to be run from the command line. It should be
+run from the /etc/inittab file so it can respawn after each
+call. Here is a typical inittab entry:
+
+S0:345:respawn:/usr/local/sbin/vgetty ttyS0
+
+If you already have a line in your inittab file which invokes
+.B mgetty,
+replace it with
+.B vgetty,
+since it replaces/extends its functionality.
+.SH DESCRIPTION
+.B vgetty
+is an extension to the mgetty+sendfax program which provides
+an interface to voice-capable modems. Use it to operate your
+modem as a simple answering machine or build your own
+sophisticated voice messaging system.
+.B vgetty
+handles all the voice-modem specific protocols, giving
+application programs a uniform, modem-independent voice
+library. Supported modems include many common serial modems
+from 3com/USRobotics, Elsa, Multitech, ZyXEL, and others.
+Caller ID and Distinctive Ring are supported provided you
+have subscribed to these services from your phone company.
+Software-based modems (winmodems) are not supported.
+
+.B vgetty
+comes with tools to convert au/wav/voc sound files to/from
+the format used by most supported modems. Basic editing and
+filtering of sound files is included as well. See
+.B pvf(1)
+for more information.
+.SH OPTIONS
+.B vgetty
+accepts the same options as
+.B mgetty.
+The one's relevant to voice mode are given here.
+See
+.B mgetty(8)
+for other options related to data and fax modes.
+.TP
+.B -a
+Use autobauding (change port speed to modem CONNECT speed).
+There is no voice modem that needs this, the option is just
+documented for completeness.
+.TP
+.B "-m 'expect send ...'"
+Set the chat sequence that is used to initialize the modem.
+For an empty expect part, use empty double quotes ("").
+Since the sequence contains spaces, you will have to enclose
+all of it in single quotes (''). Example:
+
+vgetty -m '"" ATH0 OK'
+.TP
+.B "-n <rings>"
+Set the number of rings after which
+.B vgetty
+will answer the phone
+.TP
+.B "-s <speed>"
+Set the serial port speed to use, e.g. "-s 38400". This is
+the speed of communication between the computer and modem in
+bits/sec (baud).
+.TP
+.B "-x <log level>"
+Set the log verbosity level. Zero (0) means no logging, six
+(6) is really noisy. Use level six (6) when sending problem
+reports to the maintainer. The log file is
+.I /var/log/vgetty.ttyXX.
+.SH ENVIRONMENT
+.B vgetty
+sets the following environment variables when calling
+external programs:
+.TP
+.B CALLER_ID
+The caller's telephone number.
+.TP
+.B CALLED_ID
+The number the caller has dialed. Useful for ISDN with
+multiple incoming phone numbers on the same physical line.
+.TP
+.B CONNECT
+The connect string as reported by the modem (e.g.
+"38400/V.32bis/V.42bis ... ", etc.).
+.TP
+.B DEVICE
+The tty device being used (e.g. "ttyS0"). Useful for
+handling multiple devices ("messages on this line are for
+work, messages on the other line are personal").
+.SH RESOURCES
+.B vgetty
+is included in the
+.B mgetty+sendfax
+distribution. For the latest release, go to:
+
+ftp://alpha.greenie.net/mgetty/source
+
+The
+.B vgetty
+maintainer's home page is at:
+
+http://www-internal.alphanet.ch/~schaefer/vgetty.html
+
+Send problem reports to:
+
+vgetty-maintainer@alphanet.ch
+
+For information on
+.B mgetty,
+go to:
+
+http://alpha.greenie.net/mgetty
+
+The
+.B mgetty
+mailing list is at mgetty@muc.de. The mailing list is mirrored
+to the de.alt.comm.mgetty newsgroup.
+.SH FILES
+.TP
+.I /etc/mgetty+sendfax/voice.conf
+Main configuration file for
+.B vgetty.
+Many options here override the equivalents found in
+.I /etc/mgetty+sendfax/mgetty.config
+.TP
+.I /etc/nologin.ttyXX
+If this file exists,
+.B vgetty
+will not answer calls on device ttyXX.
+.TP
+.I /var/log/vgetty.ttyXX
+Debug log file for
+.B vgetty.
+.TP
+.I /var/spool/voice/messages/Index
+List of greeting messages to use.
+.TP
+.I /var/spool/voice/.code
+Access code for remote playback of messages using the
+dtmf.sh script
+.TP
+.I /var/spool/voice/.flag
+.B vgetty
+touches this file when a new message is received
+.TP
+.I /var/spool/voice/.timestamp
+Used by the dtmf.sh script to record last time of message
+playback
+
+.SH DIAGNOSTICS
+If
+.B vgetty
+doesn't work they way you think it should, check the log file.
+By default, it is located in
+.I /var/log/vgetty.ttyXX
+(for the vgetty process handling device ttyXX, e.g. ttyS0).
+.SH BUGS
+.B vgetty
+supports most standard voice modems, but many modems are not
+fully compliant with relevant standards or contain firmware
+bugs. If you have problems, try upgrading your modem to the
+latest firmware revision. If you discover a bug with how
+.B vgetty
+reacts to your modem, please email the maintainer
+(vgetty-maintainer@alphanet.ch) describing your problem.
+Include relevant excerpts from the log file (set log level
+to six first), and details about your modem (including
+firmware revision) and operating system.
+.SH SEE ALSO
+.B mgetty(8), pvf(1)
+.SH COPYRIGHT
+.B vgetty
+is Copyright (c) 1997-2001 Marc Schaefer (schaefer@alphanet.ch)
+and many others, before and after.
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of
+the License, or (at your option) any later version.
+
+This man page was written by Barry Stewart <bstewart@smyrnacable.net>,
+and has CVS version: $Id: vgetty.8,v 1.1 2001/12/22 18:43:22 marcs Exp $
+
+
+

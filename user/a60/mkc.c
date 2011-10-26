@@ -1,0 +1,1281 @@
+/*
+ * Copyright (C) 1991,1992 Erik Schoenfelder (schoenfr@ibr.cs.tu-bs.de)
+ *
+ * This file is part of NASE A60.
+ * 
+ * NASE A60 is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * NASE A60 is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with NASE A60; see the file COPYING.  If not, write to the Free
+ * Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ * mkc.c:					oct '90
+ *
+ * Erik Schoenfelder (schoenfr@ibr.cs.tu-bs.de)
+ *
+ * The main part of C-code creation. This is at all a simple
+ * mechanism; so ``switches'' are not implemented, the ``own'' concept
+ * isn't full implemented at all, mixed call-by-name and call-by-value
+ * parameters are handled in C-macros (no local labels; no recursion).
+ * Untyped parameters are the hell at all.
+ *
+ * But for simple programs, this work.
+ *
+ * The options -c and -C are used for C-code generation. With -C the
+ * C-compiler defined in config.h is used.
+ */
+#ifndef EMBED
+#include "comm.h"
+#include "a60.h"
+#include "tree.h"
+#include "util.h"
+#include "version.h"
+#include "config.h"
+
+
+/* maximum number of array dimensions : */
+#define MAX_ADIM	16
+
+/* name of the include header */
+#define A60INC_FILE	"a60-mkc.inc"
+
+
+/*
+ * path list to the ``a60-mkc.inc'' header:
+ */
+
+static char *
+inc_paths[] = {
+#ifdef unix
+	".",		"..",
+#ifdef LIBDIRPATH
+	/*
+	 * if LIBDIRPATH is included via Makefile, then add here:
+	 */
+	LIBDIRPATH ,
+#endif
+	"/usr/lib",	"/usr/lib/a60",	"/usr/local/lib",
+	"/usr/local/lib/a60",		"/usr/include",
+	"/usr/include/a60",		"/usr/local/include",
+	"/usr/local/include/a60",
+#endif
+#ifdef AMIGA
+	"",		"s:",		"s:a60",
+	"lib:",		"lib:a60",	"include:",
+	"include:a60",
+#endif
+#ifdef MSDOS
+	".",		"..",
+	"\\lib",	"c:\\lib",	"\\a60",
+	"c:\\a60",
+#endif
+#ifdef ATARI
+	".",		"..",
+	"\\lib",	"c:\\lib",	"\\a60",
+	"c:\\a60",
+#endif
+	(char *) 0
+};
+
+
+/*
+ * directory delimiter:
+ */
+
+#ifdef unix
+#define DIRDELIM	"/"
+#endif /* unix */
+#ifdef AMIGA
+#define DIRDELIM	"/"
+#endif /* AMIGA */
+#ifdef MSDOS
+#define DIRDELIM	"\\"
+#endif /* MSDOS */
+#ifdef ATARI
+#define DIRDELIM	"\\"
+#endif /* ATARI */
+
+
+/*
+ * simple name mapping for a60-type to c-type (used for int and real).
+ */
+
+static char *
+ctype_tag_name[] = {
+	"unknown",			/* ty_unknown	 */
+	"procedure",			/* ty_proc	 */
+	"switch",			/* ty_switch	 */
+	"label",			/* ty_label	 */
+	"char *",			/* ty_string	 */
+	"long",				/* ty_integer	 */
+	"arrdesc *",			/* ty_int_array	 */
+	"long procedure",		/* ty_int_proc	 */
+	"double",			/* ty_real	 */
+	"arrdesc *",			/* ty_real_array */
+	"double procedure",		/* ty_real_proc	 */
+	"int",				/* ty_bool	 */
+	"double array",			/* ty_bool_array */
+	"int procedure",		/* ty_bool_proc	 */
+	"last_ctype_tag_name"		/* TY_LAST_TYPE_TAG */
+};
+
+
+/* output file for c code: */
+static FILE *cout;
+
+/* newline string; */
+static char *nl = "\n";
+
+/* recursion detection in macro defines: */
+static SYMTAB *dont_call = 0;
+
+/* mark the first pass to be run: */
+static int first_pass;
+
+
+/* forward: */
+static void mkc_fcall ();
+static void mkc_expr ();
+static void mkc_doit ();
+static void mkc_def_valproc ();
+static void mkc_def_bnproc ();
+static void mkc_lparm ();
+static int is_val_pf ();
+
+
+/*
+ * find the header file, open and return the handle.
+ */
+
+static FILE *
+open_hdr ()
+{
+	extern char *getenv();
+	char *s = A60INC_FILE;
+	char tmp[1024];
+	int i, j;
+	char *p;
+	FILE *in;
+
+	if(! (p = getenv ("A60LIB")) &&
+	   ! (p = getenv ("a60lib"))) {
+
+		for (i = 0; inc_paths[i]; i++) {
+			if (! *inc_paths[i])
+				sprintf (tmp, "%s", s);
+			else 
+				sprintf (tmp, "%s%s%s", inc_paths[i],
+					 DIRDELIM, s);
+			in = fopen (tmp, "r");
+			if (in) {
+				if (verbose)
+					fprintf (stderr, 
+						 "including `%s' ...\n", tmp);
+				fprintf (cout,
+			"/* including header from `%s' */\n", tmp);
+				return in;
+			}
+		}
+	}
+	else {
+		i = 0;
+		while (p[i]) {
+			for (j = 0; p[i] && p[i] != ';' && p[i] != ',';
+			    j++, i++)
+				tmp[j] = p[i];
+			tmp[j] = '\0';
+			strcat (tmp, DIRDELIM);
+			strcat (tmp, s);
+			
+			in = fopen (tmp, "r");
+			if (in) {
+				if (verbose)
+					fprintf (stderr, 
+						 "including `%s' ...\n", tmp);
+				fprintf (cout,
+			"/* including header from `%s' */\n", tmp);
+				return in;
+			}
+		}
+		if (p[i])
+			i++;
+	}
+	return (FILE *) 0;
+}
+
+
+/*
+ * create the output header:
+ */
+
+static void
+mkc_hdr ()
+{
+	FILE *in;
+
+	fprintf (cout, "/*\n * c-output from input file `%s'.\n", infname);
+	fprintf (cout, " * generated by: %s\n */\n\n", VERSION);
+
+	/*
+	 * now copy the ``a60-mkc.inc'' header in:
+	 */
+
+	if (! (in = open_hdr ())) {
+		/* include as include: */
+		fprintf (cout, "#include <a60-mkc.inc>\n");
+	}
+	else {
+		/* copy literal: */
+		int c;
+
+		while ((c = fgetc (in)) != EOF)
+			fputc (c, cout);
+		fclose (in);
+	}
+}
+
+
+/*
+ * list of all the symbols, to be def'd later:
+ */
+
+typedef struct _mlist {
+	struct _symtab *sym;
+	struct _mlist *next;
+} MLIST;
+
+static MLIST *mroot = (MLIST *) 0;
+
+
+static void
+mark_fp_def (sym)
+SYMTAB *sym;
+{
+	MLIST *new = TALLOC (MLIST);
+	MLIST *ptr;
+
+	new->sym = sym;
+	new->next = (MLIST *) 0;
+
+	if (mroot) {
+		for (ptr = mroot; ptr->next; ptr = ptr->next)
+			continue;
+		ptr->next = new;
+	}
+	else {
+		mroot = new;
+	}
+}
+
+
+static int
+no_ext_ref (sym)
+SYMTAB *sym;
+{
+	return (sym->u.pproc->block->ext_ref == 0);
+}
+
+
+static void
+mkc_make_marked ()
+{
+	while (mroot) {
+
+		if (is_val_pf (mroot->sym) && no_ext_ref (mroot->sym))
+			mkc_def_valproc (mroot->sym);
+		else
+			mkc_def_bnproc (mroot->sym);
+		mroot = mroot->next;
+	}
+}
+
+
+/*
+ * handle the vprint (...) as a special case:
+ */
+
+static void
+mkc_vprint (t)
+TREE *t;
+{
+	FUNCALL *fcall = t->u.funcall;
+	EXPR *ex;
+	char format [256];
+	ENUM type_tag type;
+
+	fprintf (cout, " B_VPRINT (");
+
+	format [0] = 0;
+	for (ex=fcall->parm; ex; ex=ex->next) {
+		type = ex->type;
+		if (type == ty_unknown && ex->tag == e_symbol)
+			type = ex->u.lhelm->sym->type;
+
+		if (type == ty_integer)
+			strcat (format, "  %15ld ");
+		else if (type == ty_real)
+			strcat (format, "  %15.7e ");
+		else if (type == ty_string)
+			strcat (format, "%s");
+		else if (type == ty_bool)
+			strcat (format, " %s ");
+		else {
+			if (verbose)
+				a60_error (t->source, t->lineno,
+			   "warning: mkc: unknown type `%s' in `vprint'\n",
+					   type_tag_name[type]);
+			strcat (format, " (??? 0x%lx) ");
+		}
+	}
+	fprintf (cout, "\"%s\\n\", ", format);
+
+	for (ex=fcall->parm; ex; ex=ex->next) {
+
+		type = ex->type;
+		if (type == ty_unknown && ex->tag == e_symbol
+		    && ex->u.lhelm->sym->type == ty_bool) {
+			fprintf (cout, "((");
+			mkc_expr (ex);
+			fprintf (cout, ") ? \"T\" : \"F\")");
+		}
+		else
+			mkc_expr (ex);
+		
+		if (ex->next)
+			fprintf (cout, ", ");
+	}
+	fprintf (cout, " ); fflush (stdout);%s", nl);
+}
+
+
+/* 
+ * indentation is not necessary, but makes it somewhat easier to
+ * examine the output (better pipe through cb, or indent, if
+ * wanted ?).
+ */
+
+static void
+mkc_indent (n)
+int n;
+{
+	while (n > 8) {
+		fprintf (cout, "\t");
+		n -= 8;
+	}
+	while (n > 0) {
+		fprintf (cout, " ");
+		n--;
+	}
+}
+
+
+/*
+ * make a string; handle only '\n' and '\\' with care...
+ * (to be exanded if necessary)
+ */
+
+static void
+mkc_string (s)
+char *s;
+{
+	fprintf (cout, "\"");
+	while (s && *s) {
+		if (*s == '\n')
+			fprintf (cout, "\\n");
+		else if (*s == '\\')
+			fprintf (cout, "\\\\");
+		else
+			fprintf (cout, "%c", *s);
+		s++;
+	}
+	fprintf (cout, "\"");
+}
+
+
+/*
+ * create a unique c-name for the symbols name. toplevel symbols (the
+ * builtins) are handeled seperately.
+ * using the name and the (runtime-) address should be enough.
+ */
+
+static void
+mkc_sname (sym)
+SYMTAB *sym;
+{
+	char *name = sym->name;
+
+	if (! sym->block->up) {
+		if (! strcmp (name, "sin"))
+			fprintf (cout, "sin");
+		else if (! strcmp (name, "cos"))
+			fprintf (cout, "cos");
+		else if (! strcmp (name, "arctan"))
+			fprintf (cout, "atan");
+		else if (! strcmp (name, "exp"))
+			fprintf (cout, "exp");
+		else if (! strcmp (name, "ln"))
+			fprintf (cout, "log");
+		else if (! strcmp (name, "sqrt"))
+			fprintf (cout, "sqrt");
+		else if (! strcmp (name, "entier"))
+			fprintf (cout, "B_ENTIER");
+		else if (! strcmp (name, "sign"))
+			fprintf (cout, "B_SIGN");
+		else if (! strcmp (name, "abs"))
+			fprintf (cout, "B_ABS");
+		else if (! strcmp (name, "PI"))
+			fprintf (cout, "B_PI");
+		else if (! strcmp (name, "rand"))
+			fprintf (cout, "B_RAND");
+		else if (! strcmp (name, "length"))
+			fprintf (cout, "B_LENGTH");
+		else if (! strcmp (name, "outstring"))
+			fprintf (cout, "B_OUTSTR");
+		else if (! strcmp (name, "outreal"))
+			fprintf (cout, "B_OUTREAL");
+		else if (! strcmp (name, "outinteger"))
+			fprintf (cout, "B_OUTINT");
+		else if (! strcmp (name, "outsymbol"))
+			fprintf (cout, "B_OUTSYMB");
+		else if (! strcmp (name, "insymbol"))
+			fprintf (cout, "B_INSYMB");
+		else if (! strcmp (name, "inreal"))
+			fprintf (cout, "B_INREAL");
+		else if (! strcmp (name, "print"))
+			fprintf (cout, "B_PRINT");
+		else if (! strcmp (name, "vprint"))
+			fprintf (cout, "B_VPRINT");
+		else
+			fprintf (cout, "%s_%lx", sym->name, (long) sym);
+	}
+	else
+		fprintf (cout, "%s_%lx", sym->name, (long) sym);
+}
+
+
+static void mkc_idx (sym, idx)
+SYMTAB *sym;
+MINDEX *idx;
+{
+	fprintf (cout, "->data.%s [ gidx (",
+		 (sym->type == ty_real_array) ? "d" : "l");
+	mkc_sname (sym);
+	fprintf (cout, ", ");
+	while (idx) {
+		fprintf (cout, "(long) (");
+		mkc_expr (idx->expr);
+		fprintf (cout, ")");
+		if (idx->next)
+			fprintf (cout, ", ");
+		idx = idx->next;
+	}
+	fprintf (cout, ")] ");
+}
+
+
+/*
+ * the main hang-up makig expressions.
+ */
+
+static void
+mkc_expr (e)
+EXPR *e;
+{
+	char *op = "";
+
+	if (! e)
+		return;
+
+	if (e->tag == e_symbol) {
+		mkc_sname (e->u.lhelm->sym);
+
+		if (e->u.lhelm->mindex) {
+			mkc_idx (e->u.lhelm->sym, e->u.lhelm->mindex);
+		}
+		return;
+	}
+
+	if (e->tag == e_label) {
+		mkc_sname (e->u.label);
+		return;
+	}
+
+	if (e->tag == e_switch) {
+		a60_error (e->source, e->lineno,
+			   "mkc: cannot handle switch construct.\n");
+		xabort ("compile error");
+	}
+	
+	if (e->tag == e_fcall) {
+		mkc_fcall (e->u.lhelm->u.fcall);
+		return;
+	}
+
+	if (e->tag == e_condexpr) {
+		fprintf (cout, "(");
+		mkc_expr (e->u.expr[0]);
+		fprintf (cout, ") ? ");
+		mkc_expr (e->u.expr[1]);
+		fprintf (cout, ":");
+		mkc_expr (e->u.expr[2]);
+		return;
+	}
+
+	if (e->type != ty_unknown)
+		fprintf (cout, "(%s) ", ctype_tag_name[e->type]);
+	else
+		if (rwarn)
+			a60_error (e->source, e->lineno,
+				   "warning: mkc: unknown type ignored\n");
+
+	switch (e->tag) {
+	case e_ival:		fprintf (cout, "%ld", e->u.ival);  break;
+	case e_rval: 		fprintf (cout, "%.10e", e->u.rval);  break;
+	case e_bool: 		fprintf (cout, "%d", (int) e->u.bool);  break;
+	case e_string:		mkc_string (e->u.string);  break;
+	case e_op_neg: 		op = "#-";  break;
+	case e_op_plus:		op = "+";  break;
+	case e_op_minus:	op = "-";  break;
+	case e_op_times: 	op = "*";  break;
+	case e_op_rdiv: 	op = "/ (double)";  break;
+	case e_op_idiv: 	op = "/ (long)";  break;
+	case e_op_pow:		op = "pow"; break;
+	case e_op_not: 		op = "#!";  break;
+	case e_op_and: 		op = "&&";  break;
+	case e_op_or: 		op = "||";  break;
+	case e_op_equiv: 	op = "==";  break;
+	case e_op_impl: 	op = "IMPL"; break;
+	case e_op_less: 	op = "<";  break;
+	case e_op_notgreater: 	op = "<=";  break;
+	case e_op_equal: 	op = "==";   break;
+	case e_op_notless: 	op = ">=";  break;
+	case e_op_greater: 	op = ">";  break;
+	case e_op_notequal: 	op = "!=";  break;
+	default:
+		fprintf (cout, " ??? ");
+	}
+	
+	if (*op) {
+		if (*op == '#') {
+			fprintf (cout, "( %s (", op+1);
+			mkc_expr (e->u.expr[0]); 
+			fprintf (cout, "))");
+		}
+		else {
+			fprintf (cout, "(");
+			mkc_expr (e->u.expr[0]);
+			fprintf (cout, " %s ", op);
+			mkc_expr (e->u.expr[1]);
+			fprintf (cout, ")");
+		}
+	}
+}
+
+
+/*
+ * make the parameter for a procedure/function call.
+ */
+
+static void
+mkc_pf_call (fcall)
+FUNCALL *fcall;
+{
+	EXPR *ex = fcall->parm;
+
+	SYMTAB *parm = (SYMTAB *) 0; 
+
+	if (fcall->sym->tag == s_defined)
+		parm = fcall->sym->u.pproc->block->symtab;
+	
+	fprintf (cout, " (");
+	
+	for ( ; ex; ex=ex->next) {
+		if (parm && parm->tag == s_byname && ex->tag == e_fcall)
+			mkc_sname (ex->u.lhelm->sym);
+		else
+			mkc_expr (ex);
+		/*** array ??? */
+		if (ex->next)
+			fprintf (cout, ", ");
+		if (parm)
+			parm = parm->next;
+	}
+	fprintf (cout, " )");
+}
+
+
+static void
+mkc_proc (t)
+TREE *t;
+{
+	char *name = t->u.funcall->sym->name;
+
+	if (! t->u.funcall->sym->block->up && ! strcmp (name, "vprint")) {
+		mkc_vprint (t);
+		return;
+	}
+	mkc_sname (t->u.funcall->sym);
+
+	mkc_pf_call (t->u.funcall);
+
+	fprintf (cout, ";%s", nl);
+}
+
+
+/*
+ * has the given func/proc only call-by-value parameters ?
+ */
+
+static int
+is_val_pf (sym)
+SYMTAB *sym;
+{
+	SYMTAB *parm;
+	int flag = 1;
+
+	for (parm=sym->u.pproc->block->symtab; parm && flag; parm=parm->next)
+		flag = flag && parm->tag == s_byvalue;
+
+	return flag;
+}
+
+
+/*
+ * make a call-by-value only proc: the is a simple c-function.
+ */
+
+static void
+mkc_def_valproc (s)
+SYMTAB *s;
+{
+	SYMTAB *parm;
+	int is_void_func = ! TIS_FUNC(s->type);
+
+	fprintf (cout, "\n/*\n * function/proc `%s':\n */\n", s->name);
+
+	if (! is_void_func)
+		fprintf (cout, "%s ", ctype_tag_name[TPROC_BASE(s->type)]);
+	
+	mkc_sname (s);
+	fprintf (cout, " (");
+
+	for (parm=s->u.pproc->block->symtab; parm; parm=parm->next) {
+		mkc_sname (parm);
+		if (parm->next)
+			fprintf (cout, ", ");
+	}
+
+	fprintf (cout, ")%s", nl);
+
+	for (parm=s->u.pproc->block->symtab; parm; parm=parm->next) {
+		fprintf (cout, "%s ", ctype_tag_name[parm->type]);
+		mkc_sname (parm);
+		fprintf (cout, ";%s", nl);
+	}
+
+	fprintf (cout, "{%s", nl);
+
+	/*
+	 * create a local variable name ``xxxx_rval'' for use
+	 * as return value;
+	 */
+	if (! is_void_func) {
+		fprintf (cout, "    %s ",
+			 ctype_tag_name[TPROC_BASE(s->type)]);
+		mkc_sname (s);
+		fprintf (cout, "_rval;%s", nl);
+	}
+
+	/*
+	 * copy all the call-by-value array's by hand...
+	 */
+	for (parm=s->u.pproc->block->symtab; parm; parm=parm->next) {
+		if (TIS_ARR(parm->type)) {
+			fprintf (cout, "    DUP_DATA (");
+			mkc_sname (parm);
+			fprintf (cout, "->data.%s, ",
+				 (parm->type == ty_real_array) ? "d" : "l");
+			mkc_sname (parm);
+			fprintf (cout, "->siz, %s);%s", 
+				 ctype_tag_name[TAR_BASE(parm->type)], nl);
+		}
+	}
+		
+	if(s->u.pproc->block->stmt) {
+		mkc_doit (s->u.pproc->block->stmt, 0, 4);
+	}
+
+	if (! is_void_func) {
+		fprintf (cout, "    return ");
+		mkc_sname (s);
+		fprintf (cout, "_rval;%s", nl);
+	}
+
+	fprintf (cout, "}%s", nl);
+}
+
+
+/*
+ * make a call-by-name function/proc. if the parameters are mixed with
+ * call-by-value parameters, create local copies of these variables.
+ * (this can only used with the GNU CC)
+ */
+
+static void
+mkc_def_bnproc (s)
+SYMTAB *s;
+{
+	SYMTAB *parm;
+	int by_val = 0;
+
+	fprintf (cout, "\n#define ");
+	mkc_sname (s);
+	fprintf (cout, "(");
+	for (parm=s->u.pproc->block->symtab; parm; parm=parm->next) {
+		/*
+		 * functions with mixed parameters:
+		 * GNUC can handle ``a = ({ int i = 3; i });
+		 * test it ? use it ? ignore it ?
+		 */
+#ifndef MKC_GNUC_TARGET
+		if (parm->tag == s_byvalue && TIS_FUNC(s->type)) {
+			fprintf (stderr,
+"mkc: cannot handle functions with mixed by-name/by-value parameters (`%s')\n",
+				 s->name);
+			xabort ("compile error");
+		}
+#endif
+		mkc_sname (parm);
+		if (parm->tag == s_byvalue) {
+			fprintf (cout, "val");
+			by_val++;
+		}
+			
+		if (parm->next)
+			fprintf (cout, ", ");
+	}
+
+	/* escape the newline: still in a macro. */
+	nl = " \\\n";
+	fprintf (cout, ")%s", nl);
+
+
+	/*
+	 * marcro replacement for a function; enclose in '(' and ')':
+	 */
+	if (TIS_FUNC(s->type))
+		fprintf (cout, "( ");
+
+	/*
+	 * lets give us a chance; copy by-value parms to a local value;
+	 * (only for use with GNU CC)
+	 */
+	if (by_val || TIS_FUNC(s->type)) {
+		fprintf (cout, "{ ");
+		if (TIS_FUNC(s->type)) {
+			fprintf (cout, "  %s ",
+				 ctype_tag_name[TPROC_BASE(s->type)]);
+			mkc_sname (s);
+			fprintf (cout, "_rval;%s", nl);
+		}
+		mkc_lparm (s->u.pproc->block->symtab);
+	}
+
+	dont_call = s;
+
+	if(s->u.pproc->block->stmt) {
+		mkc_doit (s->u.pproc->block->stmt, 0, 4);
+	}
+
+	if (by_val || TIS_FUNC(s->type)) {
+		if (TIS_FUNC(s->type)) {
+			fprintf (cout, "    ; ");
+			mkc_sname (s);
+			fprintf (cout, "_rval;");
+		}
+		fprintf (cout, " }");
+	}
+	if (TIS_FUNC(s->type))
+		fprintf (cout, " ) ");
+
+	nl = "\n";
+	fprintf (cout, "%s", nl);
+
+	dont_call = (SYMTAB *) 0;
+}
+
+
+static void
+mkc_lparm (parm)
+SYMTAB *parm;
+{
+	if (! parm)
+		return;
+
+	if (parm->tag == s_byvalue) {
+
+		fprintf (cout, "%s ", ctype_tag_name[parm->type]);
+		mkc_sname (parm);
+		fprintf (cout, " = ");
+		mkc_sname (parm);
+		fprintf (cout, "val; ");
+		fprintf (cout, "%s", nl);
+		if (TIS_ARR(parm->type)) {
+			/* finish local vals: */
+			mkc_lparm (parm->next);
+			/* add data duplication: */
+			fprintf (cout, " DUP_DATA (");
+			mkc_sname (parm);
+			fprintf (cout, "->data.%s, ",
+				 (parm->type == ty_real_array) ? "d" : "l");
+			mkc_sname (parm);
+			fprintf (cout, "->siz, %s);%s", 
+				 ctype_tag_name[TAR_BASE(parm->type)], nl);
+			/* return: */
+			return;
+		}
+	}
+	
+	mkc_lparm (parm->next);
+}
+
+
+static void
+mkc_bounds (s, n)
+SYMTAB *s;
+int n;
+{
+	BOUND *b = s->u.arr->bound;
+	int i;
+
+	mkc_indent (n);
+	mkc_sname (s);
+	fprintf (cout, "->siz = 1;%s", nl);
+	mkc_indent (n);
+	mkc_sname (s);
+	fprintf (cout, "->dim = %ld;%s", (long) (s->u.arr->dim), nl);
+
+	for (i=0; i < MAX_ADIM && b; i++, b=b->next) {
+		/* low_bound : */
+		mkc_indent (n);
+		mkc_sname (s);
+		fprintf (cout, "->bnd [%d][0] = ", i);
+		mkc_expr (b->low);
+		fprintf (cout, ";%s", nl);
+		/* high_bound : */
+		mkc_indent (n);
+		mkc_sname (s);
+		fprintf (cout, "->bnd [%d][1] = ", i);
+		mkc_expr (b->high);
+		fprintf (cout, ";%s", nl);
+		/* mpl = siz : */
+		mkc_indent (n);
+		mkc_sname (s);
+		fprintf (cout, "->bnd [%d][2] = ", i);
+		mkc_sname (s);
+		fprintf (cout, "->siz;%s", nl);
+		/* size *= high - low + 1 : */
+		mkc_indent (n);
+		mkc_sname (s);
+		fprintf (cout, "->siz *= ");
+		mkc_sname (s);
+		fprintf (cout, "->bnd [%d][1] - ", i);
+		mkc_sname (s);
+		fprintf (cout, "->bnd [%d][0] + 1;%s", i, nl);
+	}
+	/* now the access to the array: */
+}
+
+
+static void
+mkc_symtab (s, n)
+SYMTAB *s;
+int n;
+{
+	if (! s) {
+		fprintf (cout, "%s", nl);
+		return;
+	}
+
+	if (s->type == ty_label) {
+		mkc_symtab (s->next, n);
+		return;
+	}
+
+	mkc_indent (n);
+
+	if (TIS_ARR(s->type)) {
+		/*
+		 * make an  'array' foo [x:y, ...]  to something like:
+		 *  ARRDESC *foo_zzz, with ARRDESC = {
+		 *    long bnd [MAXBOUND][3];
+		 *    long size, dim;
+		 *    union { double *d; long *l; } data;
+		 */
+		if (first_pass && s->own) {
+			fprintf (cout, "static arrdesc * ");
+			mkc_sname (s);
+			fprintf (cout, " = (arrdesc *) 0;%s", nl);
+		}
+		if (! first_pass) {
+			if (! s->own) {
+				fprintf (cout, "arrdesc * ");
+				mkc_sname (s);
+				fprintf (cout, " = (arrdesc *) 0;%s", nl);
+			}
+			/* complete definitions: */
+			mkc_symtab (s->next, n);
+			/* append dynamic/static initialisation: */
+			if (s->own) {
+				mkc_indent (n);
+				fprintf (cout, "if (");
+				mkc_sname (s);
+				fprintf (cout, ") {%s", nl);
+				n += 2;
+			}
+			mkc_indent (n);
+			mkc_sname (s);
+			fprintf (cout, " = (arrdesc *) malloc ((unsigned) ");
+			fprintf (cout, " sizeof (arrdesc));%s", nl);
+			mkc_bounds (s, n);
+			mkc_indent (n);
+			mkc_sname (s);
+			if (BASE_TYPE(s->type) == ty_integer)
+				fprintf (cout, "->data.l = NTALLOC(long, ");
+			else
+				fprintf (cout, "->data.d = NTALLOC(double, ");
+			mkc_sname (s);
+			fprintf (cout, "->siz);%s", nl);
+			if (s->own) {
+				n -= 2;
+				mkc_indent (n);
+				fprintf (cout, "}%s", nl);
+			}
+			return;
+		}
+	}
+	else if (s->tag != s_byname && TIS_PROC(s->type)) {
+		if (first_pass) {
+			mark_fp_def (s);
+			mkc_doit (s->u.pproc->block->stmt, 0, 0);
+		}
+	}
+	else {
+		/* not an array / proc type: */
+
+		if (first_pass && s->own) {
+			fprintf (cout, "static %s ",
+				 ctype_tag_name[BASE_TYPE(s->type)]);
+			mkc_sname (s);
+			fprintf (cout, " = 0;%s", nl);
+		}
+		if (! first_pass && ! s->own) {
+			fprintf (cout, "%s ",
+				 ctype_tag_name[BASE_TYPE(s->type)]);
+			mkc_sname (s);
+			fprintf (cout, " = 0;%s", nl);
+		}
+	}
+	
+	mkc_symtab (s->next, n);
+}
+
+
+static void
+mkc_fcall (fcall)
+FUNCALL *fcall;
+{
+	mkc_sname (fcall->sym);
+
+	if (dont_call == fcall->sym) {
+		fprintf (stderr,
+	"mkc: cannot handle recursion for symbol `%s'.\n", 
+			 dont_call->name);
+		xabort ("compile error");
+	}
+
+	mkc_pf_call (fcall);
+}
+
+
+static void
+mkc_assign (t)
+TREE *t;
+{
+	LHELM *l = t->u.ass->lhelm;
+
+	while (l) {
+		mkc_sname (l->sym);
+
+		/* if lefthand is a function name append `rval': */
+		if (TIS_FUNC(l->sym->type))
+			fprintf (cout, "_rval");
+		else if (l->mindex)
+			mkc_idx (l->sym, l->mindex);
+		else if (l->u.fcall)
+			/* mkc_fcall (l->u.fcall); */
+			xabort ("mkc_assign: oops ?");
+
+		fprintf (cout, " = ");
+		l = l->next;
+	}
+	
+	mkc_expr (t->u.ass->expr);
+
+	fprintf (cout, "; %s", nl);
+}
+
+
+static void
+mkc_ifstmt (t, n)
+TREE *t;
+int n;
+{
+	fprintf (cout, "if ( ");
+	mkc_expr (t->u.ifstmt->cond);
+	fprintf (cout, " ) {%s", nl);
+	mkc_doit (t->u.ifstmt->tthen, 1, n+4);
+	mkc_indent (n);
+	fprintf (cout, "}%s", nl);
+	if (t->u.ifstmt->telse) {
+		mkc_indent (n);
+		fprintf (cout, "else {%s", nl);
+		mkc_doit (t->u.ifstmt->telse, 1, n+4);
+		mkc_indent (n);
+		fprintf (cout, "}%s", nl);
+	}
+}
+
+
+static void
+mkc_forstmt (t, n)
+TREE *t;
+int n;
+{
+	FORSTMT *fs = t->u.forstmt;
+	FORELM *fe;
+
+	if (first_pass) {
+		mkc_doit (fs->stmt, 0, n);
+		return;
+	}
+
+	for (fe=fs->forelm; fe; fe=fe->next) {
+
+		if (fe->tag == fe_expr) {
+
+			fprintf (cout, "%s", nl);
+			mkc_indent (n);
+			mkc_sname (fs->lvar->sym);
+			fprintf (cout, " = ");
+			mkc_expr (fe->expr[0]);
+			fprintf (cout, ";%s", nl);
+			
+			mkc_doit (fs->stmt, 0, n);
+		}
+		else if (fe->tag == fe_until) {
+
+			fprintf (cout, "for (");
+			mkc_sname (fs->lvar->sym);
+			fprintf (cout, " = ");
+			mkc_expr (fe->expr[0]);
+			fprintf (cout, "; (");
+			mkc_sname (fs->lvar->sym);
+			fprintf (cout, " - ");
+			mkc_expr (fe->expr[2]);
+			fprintf (cout, ") * sign(");
+			mkc_expr (fe->expr[1]);
+			fprintf (cout, ") <= 0 ; ");
+			mkc_sname (fs->lvar->sym);
+			fprintf (cout, " += ");
+			mkc_expr (fe->expr[1]);
+			fprintf (cout, " )%s", nl);
+	
+			mkc_doit (fs->stmt, 0, n);
+		}
+		else { /* fe_while */
+		
+			mkc_indent (n);
+			mkc_sname (fs->lvar->sym);
+			fprintf (cout, " = ");
+			mkc_expr (fe->expr[0]);
+			fprintf (cout, ";%s", nl);
+			
+			mkc_indent (n);
+			fprintf (cout, "while (");
+			mkc_expr (fe->expr[1]);
+			fprintf (cout, ") {%s", nl);
+
+			mkc_doit (fs->stmt, 0, n+2);
+
+			mkc_indent (n+2);
+			mkc_sname (fs->lvar->sym);
+			fprintf (cout, " = ");
+			mkc_expr (fe->expr[0]);
+			fprintf (cout, ";%s", nl);
+
+			mkc_indent (n);
+			fprintf (cout, "}%s", nl);
+		}
+	}
+}
+
+
+static void
+mkc_doit (t, ret_if_cont, n)
+TREE *t;
+int ret_if_cont, n;
+{
+	if (! t) {
+		return;
+	}
+
+	if (! first_pass)
+		mkc_indent (n);
+
+	switch (t->tag) {
+	case t_block:
+		if (! first_pass)
+			fprintf (cout, "{%s", nl);
+		if (t->u.block->symtab) {
+			/* skip builtin symbols ... */
+			if (t->u.block->up)
+				mkc_symtab (t->u.block->symtab, n+2);
+		}
+		if (! first_pass)
+			fprintf (cout, "%s", nl);
+		mkc_doit (t->u.block->stmt, 0, n+2);
+		if (! first_pass) {
+			if (! t->u.block->up) {
+				/* toplevel scope : */
+				fprintf (cout, "  return 0;%s", nl);
+			}
+			mkc_indent (n);
+			fprintf (cout, "}%s", nl);
+		}
+		break;
+	case t_dummy_stmt:
+		if (first_pass)
+			break;
+		fprintf (cout, ";   /* dummy stmt */%s", nl);
+		break;
+	case t_goto_stmt:
+		if (first_pass)
+			break;
+		fprintf (cout, "goto ");
+		mkc_expr (t->u.dexpr);
+		fprintf (cout, ";%s", nl);
+		break;
+	case t_assign_stmt:
+		if (first_pass)
+			break;
+		mkc_assign (t);
+		break;
+	case t_if_stmt:
+		if (first_pass)
+			break;
+		mkc_ifstmt (t, n);
+		break;
+	case t_label:
+		if (first_pass)
+			break;
+		mkc_sname (t->u.symbol);
+		fprintf (cout, ":");
+		fprintf (cout, "  /* (%s: %s; sym 0x%lx; next 0x%lx) */%s",
+			t->u.symbol->name,
+			sym_tag_name[t->u.symbol->tag],
+			(long) t->u.symbol,
+			(long) t->next, nl);
+		break;
+	case t_proc_stmt:
+		if (first_pass)
+			break;
+		mkc_proc (t);
+		break;
+	case t_for_stmt:
+		mkc_forstmt (t, n);
+		break;
+	default:
+		xabort ("INTERNAL: mkc: unknown tag.");
+	}			
+	
+	if (ret_if_cont && t->is_cont)
+		return;
+	else
+		mkc_doit (t->next, 0, n);
+}
+
+
+/*
+ * create c-output of the parse-tree:
+ */
+
+void
+make_c ()
+{
+	char *oname;
+	int rc;
+
+	if (verbose)
+		fprintf (stderr, "creating C output ...\n");
+
+	if (make_bin)
+		oname = tmp_name ();
+	else 
+		oname = outfname;
+
+	if (! oname) {
+		cout = stdout;
+	}
+	else {
+		cout = fopen (oname, "w");
+		if (! cout) {
+			fprintf (stderr,
+				 "cannot open file `%s' for writing\n",
+				 oname);
+			exit (-1);
+		}
+		else {
+			if (verbose)
+				fprintf (stderr, 
+					 "writing output to `%s' ...\n",
+					 oname);
+		}
+	}
+
+	mkc_hdr ();
+
+	first_pass = 1;
+	mkc_doit (rtree, 0, 0);
+
+	first_pass = 0;
+	mkc_make_marked ();
+
+	fprintf (cout, "\nint\nmain ()\n");
+	mkc_doit (rtree, 0, 0);
+
+	fclose (cout);
+
+	if (make_bin) {
+		rc = do_compile (oname, outfname);
+		if (! rc) {
+			/* release tmp-file */
+			rm_tmp (oname);
+			if (verbose)
+				fprintf (stderr, "compilation done.\n");
+		}
+		else {
+			fprintf (stderr, "compilation failed.\n");
+		}
+	}
+}
+#endif
+/* end of mkc.c */

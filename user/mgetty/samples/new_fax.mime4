@@ -1,0 +1,171 @@
+#!/bin/sh
+
+# This new_fax script is based on Martin Spott's new_fax.mime2.
+# I have tightened the error checking, replaced the invocation
+# of pnmscale (which used copious amounts of memory) with the
+# correct stretch option for g32pbm, added support for other
+# image types, and included an informative message body.
+#                   Ed Doolittle <dolittle@math.toronto.edu>
+#
+# CVS: $Id: new_fax.mime4,v 1.1 1999/04/17 10:38:50 gert Exp $
+
+# Martin's original comments:
+
+# A script to send mgetty's incoming faxes via MIME encoded EMail;
+# by Martin Spott (martin.spott@uni-duisburg.de), I borrowed one or two
+# lines from other's ....
+#
+# I wrote this one because I wanted a program using as little specialized
+# MIME tools as possible.
+#
+# This 'new_fax' only needs ' g32pbm', 'pnmscale' and 'pnmtotiff' from the
+# 'pbmplus' package, 'mmencode' from the 'multimail' packages, and the rest
+# is standard Unix tools.
+# It was tested with thsmail under Linux and PMMail under OS/2 as frontends.
+
+# This script is called when a message was recorded. 
+# It gets the following arguments:
+#      $1 : the hangup code
+#      $2 : the remote id
+#      $3 : the number of pages
+#      $4... : the file names
+
+# Place the correct EMail-adresses here !!!
+USER="postmaster"
+
+# Where to locate the binaries listed below
+PATH=/usr/sbin:/usr/local/bin:/usr/bin:/bin:$PATH
+
+# Select image type by uncommenting one of the following lines:
+#PBMTOX=pnmtopng 	; MIME_TYPE="image/png"               ; FILE_EXTN=png
+PBMTOX=ppmtogif 	; MIME_TYPE="image/gif"               ; FILE_EXTN=gif
+#PBMTOX=pnmtotiff 	; MIME_TYPE="image/tiff"              ; FILE_EXTN=tif
+# PBM files may be huge
+#PBMTOX=cat       	; MIME_TYPE="image/x-portable-bitmap" ; FILE_EXTN=pbm
+# compressed PBM files
+#PBMTOX=gzip       	; MIME_TYPE="application/octet-stream"; FILE_EXTN=pbm.gz
+
+# The binaries we need; please check carefully !!!
+BASENAME=basename
+CAT=cat
+ECHO=echo
+G3TOPBM=g32pbm
+#MMENCODE=mmencode
+MMENCODE=mimencode
+RM=rm
+SED=sed
+SENDMAIL=sendmail
+
+# How mgetty calls us.
+HANGUP_CODE="$1"
+SENDER_ID="$2"
+NUMBER_PAGES="$3"
+
+# Some miscellaneous data and filenames.
+TMP=/tmp
+MAIL_MESS=$TMP/MESS_$$
+ERRO_MESS=$TMP/ERRO_$$
+IMAG_FILE=$TMP/TIFF_$$
+MIME_MESS=$TMP/MAIL_$$
+umask 077
+
+# Clean up from previous invocations and trap errors
+$RM -f $MAIL_MESS $ERRO_MESS $IMAG_FILE $MIME_MESS
+trap "$RM -f $MAIL_MESS $ERRO_MESS $IMAG_FILE $MIME_MESS; exit" 0 1 2 15
+
+# Essential lines to put into the header of a MIME mail.
+HEADERLINE_1="MIME-Version: 1.0"
+HEADERLINE_2="Content-Type: multipart/mixed; boundary="attachment""
+
+# Lines to put into the header of each MIME attachment.
+ATTACHMENT_HEADERLINE_1="--attachment"
+ATTACHMENT_HEADERLINE_2="Content-Type: $MIME_TYPE"
+ATTACHMENT_HEADERLINE_3="Content-Transfer-Encoding: base64"
+
+# Line to close the attachment section of a MIME mail.
+ATTACHMENT_ENDLINE="--attachment--"
+
+# Now we build our MIME mailheader using commandline arguments.
+$ECHO "Subject: incoming FAX from $2 with $3 pages" >  $MAIL_MESS
+$ECHO "$HEADERLINE_1"                               >> $MAIL_MESS
+$ECHO "$HEADERLINE_2"                               >> $MAIL_MESS
+$ECHO ""                                            >> $MAIL_MESS
+$ECHO "This is a MIME encoded email."               >> $MAIL_MESS
+$ECHO "$ATTACHMENT_HEADERLINE_1"                    >> $MAIL_MESS
+$ECHO ""                                            >> $MAIL_MESS
+$ECHO "Incoming FAX from $2 with $3 pages"          >> $MAIL_MESS
+$ECHO "Hangup code was $1"                          >> $MAIL_MESS
+$ECHO ""                                            >> $MAIL_MESS
+
+# To handle each attachment we skip the first three arguments (those we
+# already used for the header).
+shift 3
+
+# Handling of each fax page, whose names are given via commandline arguments.
+# We have to cut off the absolute path via 'basename' and remove the dot
+# which separates the page number. Also we add a filename extension and fit
+# the result as filename into our attachment header - some mail frontends
+# need this.
+#
+for i in $@
+do
+	# We use the second character in the filename to identify the
+	# resolution of our incoming fax, so we can easily scale the fax for
+	# display on a screen.
+	RESOLUTION=`$BASENAME $i | $SED 's/.\(.\).*/\1/'`
+	if [ "$RESOLUTION" = "n" ]
+	then
+		STRETCH=-s
+	else
+		STRETCH=
+	fi
+#
+	# The fax is converted from G3 to PBM, it is scaled and then
+	# converted to TIFF.
+	# We write it into a temporary file, because my 'mmencode' doesn't
+	# handle standard input correctly.
+	$CAT $i                                        2>> $ERRO_MESS \
+	| $G3TOPBM $STRETCH                            2>> $ERRO_MESS \
+	| $PBMTOX                        >> $IMAG_FILE 2>> $ERRO_MESS
+#
+	# Now we put the header for each attachment into our MIME mail.
+	$ECHO "$ATTACHMENT_HEADERLINE_1" >> $MIME_MESS
+	$ECHO "$ATTACHMENT_HEADERLINE_2; name=\"`$BASENAME $i|cut -f1 -d\.``$BASENAME $i|cut -f2 -d \.`.$FILE_EXTN\""    >> $MIME_MESS
+	$ECHO "$ATTACHMENT_HEADERLINE_3" >> $MIME_MESS
+	$ECHO ""                         >> $MIME_MESS
+#
+	# Here we do base64 encoding of out TIFF data and add the result
+	# into our MIME mail as attachment.
+	$MMENCODE -b $IMAG_FILE          >> $MIME_MESS 2>> $ERRO_MESS
+#
+	# To clean up temporary TIFF data.
+	$RM -f $IMAG_FILE
+#
+	# Each attachment has to end with a blank line (I believe).
+	$ECHO ""                         >> $MIME_MESS
+done
+
+# To close the attachment section of our mail.
+$ECHO "$ATTACHMENT_ENDLINE"              >> $MIME_MESS
+
+# Assemble the message
+if [ -s $ERRO_MESS ]; then
+	$ECHO "Errors, warnings, and chatter encountered during processing:" \
+                                         >> $MAIL_MESS
+	$CAT $ERRO_MESS                  >> $MAIL_MESS
+	$ECHO ""                         >> $MAIL_MESS
+fi
+$CAT $MIME_MESS                          >> $MAIL_MESS
+
+# Sending the mail.
+$SENDMAIL < $MAIL_MESS $USER
+
+# Cleaning up mail data.
+$RM -f $MAIL_MESS $ERRO_MESS $IMAG_FILE $MIME_MESS
+trap "" 0 1 2 15
+
+# Cheerio !
+exit 0
+
+
+

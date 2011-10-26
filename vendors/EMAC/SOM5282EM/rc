@@ -1,0 +1,19 @@
+hostname uClinux
+/bin/expand /etc/ramfs.img /dev/ram1
+mount -t ext2 /dev/ram1 /var
+mkdir /var/tmp
+mkdir /var/log
+touch /var/log/utmp
+touch /var/mtab
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+/etc/etcremount.sh
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+dhcpcd -p -a eth0 &
+insmod mcf_qspi
+insmod DS1305RTC
+hwclock --hctosys

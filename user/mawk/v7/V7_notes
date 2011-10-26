@@ -1,0 +1,65 @@
+				MAWK ON V7 UNIX
+
+
+09/08/91  Carl Mascott
+
+
+1.  Prerequisites
+
+hash8 :	from comp.sources.unix volume 15
+	used by V7 Makefiles
+	When you build hash8 you should add all long ( > 7 char)
+	runtime library function names to the reserved word table
+
+memcmp(), memcpy(), memset()
+	included in stringlib, comp.sources.unix volume 6
+	simple to write if necessary
+
+2.  Procedure
+
+	a.  In ~/mawk:
+		Rename Makefile.v7 Makefile
+		Rename *.c *.cl
+		Rename *.xc *.xcl
+		Rename *.h *.hl
+		Check CFLAGS and LDFLAGS in Makefile
+
+	    Repeat the applicable portions of the above
+	    in ~/mawk/rexp and in ~/mawk/config
+
+	b.  From ~/mawk:
+		make config/V7.h
+		make config/Idefault.h
+		ln config/V7.h config.h
+
+	c.  Do a make in ~/mawk/rexp
+
+	d.  Do a make in ~/mawk
+
+3.  Notes
+
+	a.  V7 sh scripts
+
+The original mawk_test and fpe_test wouldn't run on V7.  V7 sh doesn't
+have a comment character ('#').  Since ':' is actually a statement its
+arguments need to be quoted if they contain any special characters.
+
+	b.  SW_FP_CHECK
+
+SW_FP_CHECK has been added.  The particular implementation is
+for XENIX-68K 2.3A.  There are no checks preceding calls to
+fmod() because the check is built into mawk's fmod().  This
+would be a problem on a system that needs SW_FP_CHECK but
+already has fmod() in the RTL.  The work-around is to always
+use mawk's fmod() if using SW_FP_CHECK.
+
+SW_FP_CHECK is activated only if XNX23A is defined.  The
+standard V7 Makefile doesn't define XNX23A, so you needn't
+concern yourself with SW_FP_CHECK.
+
+	c.  3-argument open()
+
+Mawk always calls open() with the 3rd argument set to 0.  V7
+open() really takes only 2 arguments.  With most UNIX C compilers
+extra arguments in function calls are harmless, so the open()
+calls have not been altered for V7.

@@ -1,0 +1,38 @@
+#
+# Makefile 1.39 2000/02/14 22:16:30 (David Hinds)
+#
+
+ifeq (config.mk, $(wildcard config.mk))
+include config.mk
+endif
+
+ALL  = modules clients wireless cardmgr flash debug-tools man etc
+#DIRS = cardmgr flash debug-tools man etc
+DIRS = cardmgr flash debug-tools etc
+
+#
+# we can't build modules from here yet
+#
+ifndef CONFIG_PCMCIA
+DIRS := modules clients wireless $(DIRS)
+endif
+
+all:
+	@set -e ; for d in $(DIRS) ; do $(MAKE) -C $$d ; done
+	@for f in *.mk ; do \
+	    if [ $$f != config.mk -a $$f != rules.mk ] ; then \
+	    $(MAKE) -f $$f all ; \
+	fi ; done
+
+clean:
+	@touch config.mk
+	@set -e ; for d in $(ALL) ; do $(MAKE) -C $$d clean ; done
+
+romfs install:
+	@set -e ; for d in $(DIRS) ; do $(MAKE) -C $$d install ; done
+	@for f in *.mk ; do \
+	    if [ $$f != config.mk -a $$f != rules.mk ] ; then \
+	    $(MAKE) -f $$f install ; \
+	fi ; done
+
+

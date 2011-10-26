@@ -1,0 +1,1102 @@
+.\" manual page [] for diald 0.15
+.\" SH section heading
+.\" SS subsection heading
+.\" LP paragraph
+.\" IP indented paragraph
+.\" TP hanging label
+.TH DIALD-EXAMPLES 5 "DIALD 0.16 - 1997.01.28"
+.SH NAME
+diald-examples \- examples of how to configure diald
+.SH SYNOPSIS
+/etc/diald.conf
+
+.SH DESCRIPTION
+.LP
+\."WRITE ME! (REWRITE!!!!)
+\."Do, slip and dynamic slip. Do PPP and dynamic PPP.
+\."Talk about multiple diald's. Talk about IP address concerns.
+
+This manual page walks through several example configurations of diald.
+Diald is configured by writing a configuration file. Diald always
+reads the configuration file /etc/diald.conf on startup, and further
+configuration files can be specified on the command line.
+In the examples considered here, we assume that the configuration
+is done only through the file /etc/diald.conf.
+
+Configuring diald consists of three major tasks:
+.TP
+1)
+Constructing a "connect script", which is a small program
+that dials your phone for you and starts up PPP or SLIP on
+the remote side of the link,
+.TP
+2)
+Basic configuration of diald to use the correct devices and modes, and
+.TP
+3)
+Configuring the rules that diald uses to decide if the link should be up.
+
+.LP
+
+The remainder of this manual divides discussion into three parts,
+corresponding to these three tasks. First, the construction of connect
+scripts is briefly discussed. Second, some example configurations are given
+using the default filter rules. Lastly, the construction of alternate
+filter rules is discussed.
+
+.SH CONNECT SCRIPTS
+
+Once diald decides that it wants to bring up the link, it must
+dial the phone and log into the remote system. Diald relies on
+the user to provide a program, called the connect script, to do this.
+Clearly, writing a connect script is critical. This can be a
+daunting task for a non-programmer.
+
+If you already have a working pppd connection, then you will already have
+a connect script, and this can be used for diald as well.
+For example, suppose that you start pppd with a command something like:
+
+.IP
+pppd /dev/ttyS1 ... connect "chat -f /etc/ppp/chatscript" ...
+
+.LP
+then you can simply use
+
+.IP
+connect "/usr/sbin/chat -f /etc/ppp/chatscript"
+
+.LP
+as your connect option for diald. Note that you
+must specify the full path for the chat program, since diald will
+run with an empty PATH environment.
+
+If you do not already have a working connect script, then you will
+have to construct one. An example script, called "connect", is
+located in the directory /usr/lib/diald. This script can be customized
+to match your needs by changing the configuration parameters at the
+start of the script. Most dialing and login sequences can be dealt with
+by this script. The comments in the example script explain what
+the settings are for. 
+
+If the connect script in /usr/lib/diald cannot be configured to
+meet your needs, then you will have to write your own script.
+If you need to do this, then you should read the manual page for
+.B chat.
+You may also want to consider using the
+.B expect
+program to write connect scripts with more complex behaviors.
+You should also be aware of the environment that the connect script
+runs in. In particular, the standard input and output and error
+streams are all connected to the serial device (i.e. the modem).
+In addition, the environment variable MODEM will contain
+the name of the device, and if diald is using a control FIFO,
+then the environment variable FIFO will contain the name of the
+command fifo used by diald. These environment variables may be
+of use for particularly complex interactions between diald and
+the connect script.
+
+.SH BASIC CONFIGURATIONS
+
+The configuration of diald is controlled by the file /etc/diald.conf.
+This section covers several different configuration scenarios,
+starting with some very simple ones, and then covering a few more
+complex cases. Throughout this section, it is assumed that the
+connect script is /usr/diald/connect. Each of the examples
+cases provides an /etc/diald.conf file that can be used as
+an example to construct your own /etc/diald.conf file.
+You should probably read all the examples before you try to
+write your own /etc/diald.conf file. In particular, most
+of the examples are stripped to the bare minimum number of
+options needed to make diald run. There are several options that
+are only discussed in the last example that you probably want to use.
+
+.SS A Leaf Node with a static IP address using PPP.
+
+The simplest connection case occurs when you have a fixed IP address
+assigned to your local machine, and that machine is not connected
+to a local network. Generally PPP is simpler to setup correctly than SLIP.
+Suppose for this example that your machine is to be connected by PPP,
+that your machine has been assigned the IP address 137.130.1.14,
+and that the machine you are connecting to has the address 137.130.2.44.
+Also, suppose your modem is on the serial line /dev/ttyS1, and
+that you want to set the modem speed to 115200, since you have a fast modem.
+Then the following /etc/diald.conf file is a minimal configuration for
+this case:
+
+.IP
+mode ppp
+.br
+connect /etc/diald/connect
+.br
+device /dev/ttyS1
+.br
+speed 115200
+.br
+modem
+.br
+lock
+.br
+crtscts
+.br
+local 137.130.1.14
+.br
+remote 137.130.2.44
+.br
+defaultroute
+.br
+include /usr/lib/diald/standard.filter
+
+.LP
+The
+.B mode
+option tells diald that it should use the PPP protocol.
+The
+.B connect
+option tells diald where to find the connect script.
+The
+.B device
+option tells diald that the modem is on the /dev/ttyS1 device, and
+the
+.B speed
+option tells diald that it should connect to the modem at a speed of
+115000 bps.
+The
+.B modem
+option tells diald that there is a modem on the serial line.
+Without this option diald will assume that it is connected directly
+to the remote system by a serial cable. Unless this is really the case,
+you will want the modem option.
+The
+.B lock
+option tells diald that it should perform locking to prevent other
+programs from using the modem while it is doing so.
+The
+.B crtscts
+option tells diald that it should use the hardware flow control lines
+for the serial device. This is almost certainly necessary for any
+high speed serial connections.
+
+The
+.B local
+option specifies the IP address for your machine.
+Similarly, the 
+.B remote
+option specifies the IP address for the machine at the remote end
+of your link.
+The
+.B defaultroute
+option tells diald to install a default route in the routing table
+that goes through the link it is controlling. If the link that diald
+is controlling is your link to the rest of the Internet, then you
+will want this option.
+
+Finally, the last line tells diald to load the options in the file
+"/usr/lib/diald/standard.filter".
+These options specify a set of rules for diald to use to determine
+when to bring the link up or down. Modifications to these rules are
+discussed in the third part of this manual page.
+
+.SS A Leaf Node with Static IP Addresses using SLIP
+.LP
+Suppose that you needed to connect using the SLIP protocol rather
+than the PPP protocol?
+In this case the line that says "mode ppp" needs to be changed
+to read "mode slip" (if you are using compressed SLIP this should
+read "mode cslip" instead).
+Assuming that your connect script does the right thing to start
+SLIP on the remote machine this might be enough.
+However, it is usually necessary to also set the Maximum Transmission Unit
+(MTU) on a SLIP link, since this setting must be identical on both
+ends of a SLIP link, and the default value of 1500 may be incorrect.
+Supposing that your MTU setting should be 576, then the following
+modification of the above example is a minimal /etc/diald.conf
+file for this situation:
+.IP
+mode slip
+.br
+connect /etc/diald/connect
+.br
+device /dev/ttyS1
+.br
+speed 115200
+.br
+modem
+.br
+lock
+.br
+crtscts
+.br
+local 137.130.1.14
+.br
+remote 137.130.2.44
+.br
+mtu 576
+.br
+defaultroute
+.br
+include /usr/lib/diald/standard.filter
+
+.SS A Leaf Node with Dynamic Remote Address using PPP
+
+Assume now that when you dial your remote site you might
+be connected to any one of a number of terminal servers,
+each of which has a different remote address. What should
+you pick for the remote address to tell diald?
+Curiously enough, it doesn't matter. The remote address assigned
+to an interface is really only a local label that the route
+program uses to find the right interface. Once the routes
+have been established the number is never used again.
+Therefore, faced with the above situation you can choose the
+address of any one of the terminal servers that you can
+be connected to as the remote address. 
+
+.SS A Leaf Node with Dynamic Local Address using PPP
+
+Let us again complicate matters for ourselves. Assume now
+that not only do you not know the remote address you will
+get connected to, but that the remote site might assign you
+a different local address each time you connect.
+In this situation we must use the \fBdynamic\fR option.
+Note that you must still supply an initial local address,
+otherwise diald won't be able to fake the existence of a connection when
+none has yet been made. This initial local address should be
+picked from one of the unroutable subnets that have been
+set aside for use as private IP numbers. It is usually also
+convenient to choose a fake number for the remote IP address
+in this case. If you do not have a local IP network that
+is using one of these private addresses, then you can just
+use the IP addresses 192.168.0.1 and 192.16.0.2.
+If you are already using these addresses in your local network,
+then you should pick IP addresses that you have not assigned to
+a machine on your local network.
+The following is a minimal /etc/diald.conf file for this case:
+.IP
+mode ppp
+.br
+connect /etc/diald/connect
+.br
+device /dev/ttyS1
+.br
+speed 115200
+.br
+modem
+.br
+lock
+.br
+crtscts
+.br
+local 192.168.0.1
+.br
+remote 192.168.0.2
+.br
+dynamic
+.br
+defaultroute
+.br
+include /usr/lib/diald/standard.filter
+
+.SS A Leaf Node with Dynamic Local Address using SLIP
+
+If you are using SLIP with dynamic IP addresses, then things are
+slightly more complicated.
+This is because the SLIP protocol does not specify a way
+for the two machines to negotiate the addresses assigned
+to the endpoints. The standard way to get around this problem
+is to have the remote SLIP server output a string stating
+the addresses that have been assigned before it actually
+goes into SLIP mode. The local machine can then read these
+strings from the modem before it enters SLIP mode.
+.B Diald
+is capable of reading and interpreting these strings, but
+it needs a little help. In particular, diald can't know in
+advance which order the local and remote addresses will be
+output, or for that matter if both will even appear.
+The \fBdslip-mode\fR command allows you to specify what
+address should be expected to appear and what
+order they will appear in.
+For example, if your remote site prints out the
+remote address followed by the local address
+(possibly with some intervening text between the addresses),
+the you might use the following minimal /etc/diald.conf file:
+
+.IP
+mode slip
+.br
+connect /etc/diald/connect
+.br
+device /dev/ttyS1
+.br
+speed 115200
+.br
+modem
+.br
+lock
+.br
+crtscts
+.br
+local 192.168.0.1
+.br
+remote 192.168.0.2
+.br
+dynamic
+.br
+dslip-mode remote-local
+.br
+mtu 576
+.br
+defaultroute
+.br
+include /usr/lib/diald/standard.filter
+
+.SS A More Complex Example
+
+We now consider a more complex example. This example illustrates
+several more advanced options that you might need to be aware of.
+
+Suppose that you have a small network that has been assigned the IP
+addresses in the network 137.130.1.0/255.255.255.0 that must be connected
+to corporate headquarters via a PPP server that has the 
+IP address 137.130.2.44.
+Also, suppose that your main connection to the Internet is via some other
+connection, and that you only want to route addresses on the
+network 137.130.2.0/255.255.255.0 through the link maintained by diald.
+
+Let us further suppose that the server at headquarters
+depends on you to specify the address of your local machine
+in the PPP negotiation phase, since you may need to change it in
+the event of a breakdown, and headquarters doesn't want to be
+bothered with reconfiguring their server when this happens.
+In this case, pppd must be passed an address parameter of the
+form "137.130.1.14:".
+
+Finally, suppose that there is a pool of modems on the devices
+/dev/ttyS1 through /dev/ttyS5, and that outgoing calls should use
+any of these modems that is not busy already.
+
+The following /etc/diald.conf file can be used in this case.
+The options that have not been used in previous examples are
+discussed below.
+
+.IP
+# General options
+.br
+mode ppp
+.br
+accounting-log /var/log/diald.log
+.br
+fifo /etc/diald/diald.ctl
+.br
+pppd-options 137.130.1.14:
+
+# Device configuration
+.br
+connect /etc/diald/connect
+.br
+device /dev/ttyS1
+.br
+device /dev/ttyS2
+.br
+device /dev/ttyS3
+.br
+device /dev/ttyS4
+.br
+device /dev/ttyS5
+.br
+rotate-devices
+.br
+speed 115200
+.br
+modem
+.br
+lock
+.br
+crtscts
+
+# Network configuration
+.br
+local 137.130.1.14
+.br
+remote 137.130.2.44
+.br
+netmask 255.255.255.0
+.br
+mtu 576
+.br
+mru 576
+.br
+window 2048
+.br
+addroute /etc/diald/addroute
+.br
+ip-up /etc/diald/shipmail
+.br
+
+# Timeouts
+.br
+redial-backoff-start 4
+.br
+redial-backoff-limit 300
+.br
+dial-fail-limit 15
+ 
+# Get the standard filter policy
+.br
+include /usr/lib/diald/standard.filter
+
+.LP
+The
+.B accounting-log
+option specifies a file in which diald should record
+a log of the phone calls it makes. If you don't need this log,
+then you can just omit this option.
+
+The
+.B fifo
+option tells diald to make a control fifo named /etc/diald/diald.ctl
+that can be used to control diald once it is running. The programs
+.B dcntl
+and
+.B diald-top
+make use of this control fifo, and it is
+easy to write new programs that also make use of it.
+Note that although the fifo need not exist when
+diald is started, the directory that it is located in
+(/etc/diald in the example) must exist.
+
+The
+.B pppd-options
+option specifies a list of one or more options that should be
+passed to pppd when diald starts it. In this case the option
+"137.130.1.14:" is passed so that pppd can negotiate the correct
+local IP address.
+
+Note that there is more than one
+.B device
+option. Each specifies one of the possible modem devices.
+The
+.B rotate-devices
+option tells diald to start with a different device every time
+it tries to make a call. This ensures that if one of the modems
+gets broken diald won't get stuck trying to use the same broken
+modem every time.
+
+The
+.B netmask
+option sets the network mask for the local side of the PPP interface.
+In this case we want the mask to be 255.255.255.0.
+Often the correct netmask can be deduced by diald knowing the IP address,
+but if this is not the case you can specify it with this option.
+
+Unlike previous examples using the PPP mode, this example includes
+an MTU setting. The default setting for the MTU in PPP mode is 1500.
+To get better interactive response you might want to negotiate a smaller
+value. In this example we are trying to get both sides of the link
+to set their MTU to 576.
+The
+.B mtu
+option sets the MTU on this side of the link.
+The
+.B mru
+option forces diald to ask the other side of the link to set its MTU to 576.
+
+The
+.B window
+option is also present for performance tuning reasons. In particular,
+the TCP protocol can normally send quite large amounts of data (30-40k)
+at a time. This much data can take quite a while to pass through a modem.
+This option tells diald to set the window size in its entries in the
+routing table. This restricts the amount of data that TCP will send
+in a single burst. This can improve interactive performance quite a bit.
+See the diald manual page for a discussion of appropriate window settings.
+
+The
+.B addroute
+option asks diald to run a script named /etc/diald/addroute when it is
+ready to add entries to the routing table. We do this so that we can
+add the routes to the network 137.130.2.0/255.255.255.0 as we discussed
+in the description leading up to this example. An appropriate
+/etc/diald/addroute script for this purpose would be:
+.IP
+#!/bin/sh
+.br
+/sbin/route add -net 137.130.2.0 \\
+.br
+  netmask 255.255.255.0 gw $4 \\
+.br
+  window 2048 metric $5 dev $1
+.br
+
+.LP
+The
+.B ip-up
+option asks diald to run a script named /etc/diald/shipmail whenever
+the IP layer is brought up. In this case we might suppose that this
+script sends out any mail that is destine for addresses at headquarters.
+You can use an ip-up script to do any processing that you need to
+do every time the link comes up.
+
+The
+.B redial-backoff-start,
+.B rediald-backoff-limit,
+and
+.B dial-fail-limit
+options all help limit how often diald will attempt to
+make consecutive failing calls. The
+.B rediald-backoff-start
+option tells diald to start doubling the time between
+successive calls after 4 consecutive failures.
+The
+.B rediald-backoff-limit
+option tells diald not to wait more than 300 seconds
+after a failed call.
+Finally, the
+.B dial-fail-limit
+option tells diald not to make more than 15 consecutive failed calls.
+If diald should make 15 consecutive calls that failed, then it would
+stop attempting to dial out, issue a report of the error condition
+to the system logs, and wait for an operator to issue it an instruction
+to restart dialing. The manual page for diald describes these options in
+more detail.
+
+.SH FILTER RULES
+.LP
+.B Diald
+maintains a virtual link to the remote site
+at all times. This link is in one of two modes.
+Either the corresponding physical link is expected to be up,
+or it is expected to be down.
+When the physical link is expected to be up
+.B diald
+will attempt to maintain
+the physical link, dialing and re-dialing if necessary.
+It will also monitor any packets passing over the virtual
+link to determine if the physical link should be brought down.
+When the physical link is expected to be down
+.B diald
+will monitor packets that are sent to the virtual link to determine
+if the physical link should be brought up.
+The general approach used by
+.B diald
+to determine when to change between these two modes is to
+keep a \fIconnection set\fR of \fIconnection identities\fR,
+each with an associated timeout.
+When a timeout associated with a connection identity
+expires, it is removed from the set.
+When the connection set is empty
+.B diald
+expects the physical link to be down,
+otherwise
+.B diald
+expects the physical link to be up.
+This section discusses how the rules that
+.B diald
+follows to construct the connection set are written.
+
+.SS Filter Rule Basics
+
+Accept, bringup, keepup and ignore rules control the addition of new connection
+identities to the connection set. Each accept, bringup or keepup rule specifies
+a set of conditions that a packet must match, a method
+to generate a connection identity from a packet, and a timeout.
+Ignore rules specify only a set of conditions that a packet must match.
+When a packet arrives that matches a given accept rule, then
+a connection identity, say \fI<id>\fR, is generated from the packet,
+and \fI<id>\fR is added to the connection set with the
+timeout specified by the filter rule. If \fI<id>\fR was already
+in the set, then the new timeout will replace the old timeout.
+Note that the new timeout may be less than the old timeout.
+
+Each accept, bringup, keepup or ignore statement must specify the name of a
+protocol rule.
+Protocol rules specify how to build connection identifiers.
+The distributed /usr/lib/diald/diald.defs file contains the following
+four definitions:
+.LP
+prule tcp tcp 9:12:13:14:15:16:17:18:19:+0:+1:+2:+3:9:9:9
+.br
+prule udp udp 9:12:13:14:15:16:17:18:19:+0:+1:+2:+3:9:9:9
+.br
+prule icmp icmp 9:12:13:14:15:16:17:18:19:9:9:9:9:9:9:9
+.br
+prule any any 9:12:13:14:15:16:17:18:19:9:9:9:9:9:9:9
+.LP
+The tcp and udp rules respectively match tcp and udp packets,
+and build connection identifiers consisting of the packet protocol,
+the source and destination IP addresses, and the source
+and destination port numbers.
+The icmp and any rules construct identifiers consisting only
+of the packet protocol and source and destination IP addresses.
+It is important to note that diald does not build connection
+identifiers directly from the matched packet. Before generating
+the connection identifier
+.B diald
+may swap the source and destination addresses, so that the
+numerically smaller address is always in the source field
+before generating the connection identifier. This is done
+so that the same connection identifier is generated regardless
+of the direction the packet is going across the interface.
+.LP
+As well, each accept, bringup, keepup or ignore statement must specify some
+set of conditions on the contents of the packet. Variable
+definitions allow access to the contents of the packet in
+accept and reject statements.
+The distributed /usr/lib/diald/diald.defs file defines
+variables for all the fields in the ip packet header
+and for all the fields in the tcp, udp and icmp packet headers.
+The names match those used in the 
+include files found in /usr/include/linux.
+.LP
+The IP packet header variables are:
+    ip.ihl			header length
+.br
+    ip.version			format version
+.br
+    ip.tos			type of service
+.br
+    ip.tot_len			length of ip packet in words
+.br
+    ip.id				packet id
+.br
+    ip.frag_off		fragment offset
+.br
+    ip.ttl			time to live
+.br
+    ip.protocol		ip protocol
+.br
+    ip.check			ip header checksum
+.br
+    ip.saddr			ip source address
+.br
+    ip.daddr 			ip destination address
+.LP
+The TCP packet header variables are:
+    tcp.source			tcp source port
+.br
+    tcp.dest			tcp destination port
+.br
+    tcp.seq			tcp sequence number
+.br
+    tcp.ack_seq		tcp ack sequence number
+.br
+    tcp.doff			tcp data offset in words
+.br
+    tcp.fin			tcp finish flag
+.br
+    tcp.syn			tcp synchronize flag
+.br
+    tcp.rst			tcp reset flag
+.br
+    tcp.psh			tcp push flag
+.br
+    tcp.ack			tcp acknowledge flag
+.br
+    tcp.urg			tcp urgent flag
+.br
+    tcp.live			tcp connection state
+.LP
+The final variable (tcp.live) is a pseudo variable provided by
+diald. It is true if and only if the TCP connection has not
+been shut down.
+.LP
+The UDP packet header variables are:
+    udp.source			udp source port
+.br
+    udp.dest			udp destination port
+.br
+    udp.len			udp header length
+.br
+    udp.check			udp packet checksum
+.LP
+The ICMP packet header variables are:
+    icmp.type			icmp packet type
+.br
+    icmp.code			icmp packet code
+.br
+    icmp.checksum		icmp packet checksum
+.br
+    icmp.echo.id		icmp echo id
+.br
+    icmp.echo.sequence	icmp echo sequence
+.br
+    icmp.gateway		icmp gateway
+
+.SS Simple Examples
+
+.LP
+It may help to consider some examples.
+The rule
+.IP
+accept tcp 10 any
+.LP
+says to match any tcp packet and assign the generated
+connection identity a timeout of 10 seconds.
+The method used to generate a connection identity is specific
+to tcp packets. The identity of a tcp packet consists of
+the protocol, the source and destination ip address, and
+the source and destination port associated with the tcp packet.
+.LP
+Similarly, the rule
+.IP
+accept any 10 any
+.LP
+says to match any packet and assign the generated connection
+identity a timeout of 10 seconds.
+.LP
+The more complex rule
+.IP
+accept tcp 60 tcp.dest=tcp.www,ip.daddr&255.255.0.0=149.100.0.0
+.LP
+matches any tcp packet with a destination matching the tcp www
+port number specified in /etc/services, and an ip destination
+address on the 149.100.0.0 subnet.
+
+.SS The Standard Filter Rules
+
+We now describe the construction of much of the rule set found in the
+file "/usr/lib/diald/standard.filter". Rather than listing
+the contents of this file in one piece, we will discuss small
+groups of rules in the order they appear in the file.
+Be warned that some knowledge of the internal workings of the
+Internet protocols may be required to completely understand
+some of these examples. Also be warned that the description
+here is intended to help understand how to write filter rules.
+Some rules that occur in the actual file at the time of this writing
+have been left out, and the distributed file may have evolved since
+this was written. This should not affect the usefulness of the
+discussion.
+
+Note that the order in which filter rules occur is critical.
+Each time a packet arrives diald will apply the first filter rule
+that matches the packet.
+
+The rules in the standard filter file are divided into three
+sections: TCP rules, UDP rules, and a general
+catch all set of rules.
+
+.LP
+.B TCP Rules
+.LP
+
+Before proceeding to describe the rules, it will be helpful to make
+some general remarks about the reasoning behind these rules.
+
+In general, we would like to treat only data on a TCP link as significant
+for timeouts. Therefore, we try to ignore packets with no data.
+Since the shortest possible set of headers in a TCP/IP packet is 40 bytes.
+Any packet with length 40 must have no data riding in it.
+We may miss some empty packets this way (optional routing information
+and other extras may be present in the IP header), but we should get
+most of them. Note that we don't want to filter out packets with
+tcp.live clear, since we use them later to speedup disconnects
+on some TCP links.
+
+We also want to make sure WWW packets live even if the TCP socket
+is shut down. We do this because WWW doesn't keep connections open
+once the data has been transfered, and it would be annoying to have the link
+keep bouncing up and down every time you get a document.
+
+Outside of WWW the most common use of TCP is for long lived connections,
+that once they are gone mean we no longer need the network connection.
+We don't necessarily want to wait 10 minutes for the connection
+to go down when we don't have any telnet's or rlogin's running,
+so we want to speed up the timeout on TCP connections that have
+shutdown. We do this by catching packets that do not have the live flag set.
+
+The first rule is designed to give the link 15 seconds up time
+when we are initiating a TCP connection.
+The idea here is to deal with possibility that the network on the opposite
+end of the connection is unreachable. In this case you don't really
+want to give the link 10 minutes up time. With the rule below
+we only give the link 15 seconds initially. If the network is reachable
+then we will normally get a response that actually contains some
+data within 15 seconds. If this causes problems because you have a slow
+response time at some site you want to regularly access, you can either
+increase the timeout or remove this rule.
+.IP
+accept tcp 15 tcp.syn
+
+.LP
+If you are running named, then it will send data across the link
+periodically to synchronize against other domain name servers.
+Since this can happen at any time, it is undesirable to keep the
+link up for it. Therefore, we ignore any traffic from or
+to a domain name server.
+.IP
+ignore tcp tcp.dest=tcp.domain
+.br
+ignore tcp tcp.source=tcp.domain
+
+.LP
+Normally the packet that starts a connection is longer that 40 bytes,
+since it normally contains TCP options to specify the MSS.
+However, some TCP implementations don't include these options.
+Therefore, we must be careful not to ignore SYN packets that are
+only 40 bytes long.
+.IP
+accept tcp 5 ip.tot_len=40,tcp.syn
+
+.LP
+Otherwise, we want to ignore any TCP packet that is only 40 bytes long,
+since it is not carrying any data. However, we don't want to ignore
+40 byte packets that mark the closing of a connection, since we use
+those to cut short the timeout on connections that have died.
+Therefore we must test the tcp.live flag here. If it is not set we
+might want to see this packet later on in the rules.
+.IP
+ignore tcp ip.tot_len=40,tcp.live
+
+.LP
+Make sure http transfers hold the link for 2 minutes, even after they end.
+This prevents web browsers from bouncing the connection too much.
+You may find the 2 minutes is a bit short for your taste.
+.IP
+accept tcp 120 tcp.dest=tcp.www
+.br
+accept tcp 120 tcp.source=tcp.www
+
+.LP
+Once the link is no longer live, we try to shut down the connection
+quickly. Note that if the link is already down, the closing of the
+a connection (which will generate traffic) will not bring it back up.
+.IP
+keepup tcp 5 !tcp.live
+.br
+ignore tcp !tcp.live
+
+.LP
+An ftp-data or ftp connection can be expected to show reasonably frequent
+traffic, so we can use a short timeout for this kind of traffic.
+.IP
+accept tcp 120 tcp.dest=tcp.ftp
+.br
+accept tcp 120 tcp.source=tcp.ftp
+
+.LP
+Finally, if we don't match the TCP packet somewhere above,
+then we give the link 10 minutes up time. Most TCP packets
+match this rule.
+.IP
+accept tcp 600 any
+
+.LP
+.B UDP Rules
+
+.LP
+Not many programs communicate via UDP packets, and many of those
+that do are programs that we don't want to hold the link up, since
+they broadcast UDP packets every few minutes. However, the normal
+sequence of events when the link is down is for the user to initiate
+a network program that needs to perform a domain name query before
+it can make a TCP connection. Therefore, we want to bring up the
+link when we see a domain name packet cross the link.
+We explicitly ignore may other kinds of UDP packets.
+
+.LP
+Don't bring the link up for rwho.
+.IP
+ignore udp udp.dest=udp.who
+.br
+ignore udp udp.source=udp.who
+
+.LP
+Don't bring the link up for routing packets.
+.IP
+ignore udp udp.dest=udp.route
+.br
+ignore udp udp.source=udp.route
+
+.LP
+Don't bring the link up for NTP or timed.
+.IP
+ignore udp udp.dest=udp.ntp
+.br
+ignore udp udp.source=udp.ntp
+.br
+ignore udp udp.dest=udp.timed
+.br
+ignore udp udp.source=udp.timed
+
+.LP
+Don't bring up on domain name requests between two running
+copies of named.
+.IP
+ignore udp udp.dest=udp.domain,udp.source=udp.domain
+
+.LP
+Bring up the network whenever we make a domain request from someplace
+other than named.
+We time out domain requests quite quickly. We just want them to bring
+the link up, not keep it around for very long.
+This is because the network will usually come up on a call
+from the resolver library, but once it is up we will get a response
+and make TCP connection. If that fails we don't want the link to
+stay up because of the prior domain name query.
+Note that you should not make the timeout shorter than the time you
+might expect your DNS server to take to respond. Otherwise
+when the initial link gets established there might be a delay
+greater than this between the time the initial series of packets
+goes across the link and the time that any response packets
+cross the link, in which case you will loose the link.
+.IP
+accept udp 30 udp.dest=udp.domain 
+.br
+accept udp 30 udp.source=udp.domain
+
+.LP
+We treat netbios-ns broadcasts the same as domain name queries.
+.IP
+ignore udp udp.source=udp.netbios-ns,udp.dest=udp.netbios-ns
+.br
+accept udp 30 udp.dest=udp.netbios-ns
+.br
+accept udp 30 udp.source=udp.netbios-ns
+
+.LP
+Any other UDP packets keep the link up for 2 minutes.
+If you are having trouble because various UDP protocols
+are keeping your link up when you don't want them to,
+you might try changing this rule to ignore any UDP packets
+that were not caught above. Of course this may break something else.
+.IP
+accept udp 120 any
+
+.LP
+.B Catch All Rules
+.LP
+Catch any packets that we didn't catch above and give the connection
+30 seconds of live time. Most often this just catches ICMP ping packets.
+.IP
+accept any 30 any
+
+.SH Time Restrictions and Impulses
+
+.SS Simple Time Restrictions
+
+Often it will be the case that you do not want to use the same set
+of filter rules at all times. This can be accomplished by the use
+of the
+.B restrict
+and
+.B or-restrict
+statements.
+For example, suppose that you wanted diald to keep the line up at
+all times from 08:00 to 18:00 Monday to Friday, and from 08:00 to 14:00
+on Saturday, but you wanted the line to stay down at all other times.
+This could be accomplished by the following filter rules:
+.IP
+restrict 08:00:00 18:00:00 1-5 * *
+.br
+or-restrict 08:00:00 14:00:00 6 * *
+.br
+up
+.br
+restrict * * * * *
+.br
+down
+.LP
+Note that the statement "restrict * * * * *" means that the "down"
+rule is applicable at all times. The reason this set of rules works
+as intended is that diald looks for the first rule that is applicable
+to each packet. During the hours that the "up" rule is applicable,
+the down rule will never be examined. Outside of those hours the
+down rule will be the only matching rule.
+
+As a slightly more complicated example, suppose that we wanted
+the line to be up "on demand" outside of normal working hours,
+rather than forced down. In addition suppose that we must
+force the line down 15 minutes after the end of normal business
+hours for 15 minutes to clear the modem to accept an incoming
+call from a branch site that will update the sales database.
+This can be accomplished by the following filter rules:
+
+.IP
+restrict 08:00:00 18:00:00 1-5 * *
+.br
+or-restrict 08:00:00 14:00:00 6 * *
+.br
+up
+.br
+restrict 18:15:00 18:30:00 1-5 * *
+.br
+restrict 14:15:00 14:30:00 6 * *
+.br
+down
+.br
+restrict * * * * *
+.br
+include /usr/lib/diald/standard.filter
+
+.SS Impulses
+
+In many countries phone calls are charged in fixed size quanta,
+called impulses. Once an impulse has started, you are charged
+for the entire impulse. This means that there is no money to be
+saved by hanging up the phone just after the start of an impulse.
+Diald has a facility that allows you to specify the impulse charging
+mechanism in use, and arrange to try and hang up near the end of impulses.
+
+As an example, suppose that on Monday to Friday, from 08:00 to 15:00
+phone calls are charged in impulses of 3 minutes, but outside of these
+hours they are charged in impulses of 9 minutes. In addition suppose
+that the first impulse of any phone call is always 3 minutes, regardless
+of when the call is made.
+
+The following rules, placed before your filtering rules in /etc/diald.conf,
+will tell diald about this impulse system.
+
+.IP
+restrict 08:00:00 15:00:00 1-5 * *
+.br
+impulse 150,510,30
+.br
+restrict * * * * *
+.br
+impulse 150,30
+
+The diald man page should be consulted for the precise semantics
+of the
+.B impulse
+command.
+
+.SS Restrictions Don't Do Everything
+
+There are some problems that you might be tempted to solve using
+time restrictions, that are better solved in a different way.
+
+For example, suppose you wanted to bring the phone line up every 30 minutes
+for 5 minutes to check your mail. You might be tempted have the mail
+collection started in your ip-up script, and to write a long
+series of rules like:
+
+.IP
+restrict 00:00:00 00:05:00 * * *
+.br
+or-restrict 00:30:00 00:35:00 * * *
+.br
+ .
+.br
+ .
+.br
+ .
+.br
+up
+
+.LP
+This will work, but requires writing a rather long series of rules.
+Furthermore, the problem can better be solved by having cron
+run a job every 30 minutes that issues diald an "up" command via
+the fifo control, or sends it a SIGUSR1, which has the same effect.
+This would cause diald to make a single attempt to dial out,
+and if it succeeds in making the connection the ip-up script
+will be run, collecting your mail.
+
+.SH SEE ALSO
+.LP
+diald(8), dctrl(1), diald-monitor(5), diald-control(5)
+
+.SH AUTHOR
+.LP
+Eric Schenk (Eric.Schenk@dna.lth.se)
+
+
+

@@ -1,0 +1,196 @@
+.TH mgetty 8 "27 Oct 93 - 21 Jul 98" "greenie" "mgetty+sendfax manual"
+.IX mgetty
+.SH NAME
+mgetty \- smart modem getty
+.SH SYNOPSIS
+.B mgetty
+.RB [ options ]
+.RI ttydevice
+.RI [ gettydefs ]
+.SH DESCRIPTION
+Mgetty is a ``smart'' getty replacement, designed to be used with hayes
+compatible data and data/fax modems.
+Mgetty knows about modem initialization, manual modem answering (so your
+modem doesn't answer if the machine isn't ready), UUCP locking (so you can
+use the same device for dial-in and dial-out).
+Mgetty provides very extensive logging facilities.
+
+This manpage doesn't try to detail mgetty setup in detail, it just lists
+the most important options. For detailed instructions, see the info file
+mgetty.info (mgetty.texi).
+
+.SH OPTIONS
+.TP
+.B -k <space>
+Tells
+.I mgetty
+to leave <space> kbytes free on disk when receiving a fax.
+.TP
+.B -x <debug level>
+Use the given level of verbosity for logging - 0 means no logging, 9 is
+really noisy. The log file is usually /tmp/log_mg.<device>
+.TP
+.B -s <speed>
+Set the port speed to use, e.g. "-s 19200".
+.TP
+.B -r
+Tells
+.I mgetty
+that it is running on a direct line. UUCP locking is done, but no modem
+initialization whatsoever.
+.TP
+.B -p <login prompt>
+Use the given string to prompt users for their login names. Various
+tokens are allowed in this string. These tokens are: @ for the system
+name, \\n, \\r, \\g, \\b, \\v, \\f, \\t for newline, carriage return, bell,
+backspace, vertical tab, form feed, and tab, respectively.
+\\P and \\L will expand to the tty name ("ttyS0"). \\Y will give the Caller
+ID, \\I the "CONNECT foobar" string returned
+by the modem, and \\S will output the port speed.
+\\s, \\m, \\V, \\R represent the operating system, the hardware name,
+the OS version, the OS release.
+\\N and \\U give the number of users currently logged in.
+\\C will be changed into the result of ctime(), and \\D and \\T will
+output the date and time, respectively. Finally, \\<digit> will use digit
+as octal/decimal/hexadecimal representation of the character to follow.
+
+The default prompt is specified at compile time.
+.TP
+.B -n #
+Tells
+.I mgetty
+to pick up the phone after the #th RING. Default is 1.
+.TP
+.B -R <t>
+Tells
+.I mgetty
+to go into "ringback" (aka "ring-twice") mode. That means: the first call
+is never answered, instead the caller has to hang up after the phone
+RINGs, wait 30 seconds, and then call again in the next <t> seconds for
+mgetty to pick up. If no call comes, mgetty will exit.
+
+I do not really recommend using this, better get a second phone line for
+the modem.
+.TP
+.B -i <issue file>
+Output <issue file> instead of /etc/issue before prompting for the user
+name. The same token substitutions as for the the login prompt are done
+in this file.
+.TP
+.B -D
+Tells
+.I mgetty
+that the modem is to be treated as a DATA modem, no fax initalization is
+attempted.
+.TP
+.B -F
+Tells
+.I mgetty
+that DATA calls are not allowed and the modem should be set to Fax-Only.
+.TP
+.B -C <class>
+Tells
+.I mgetty
+how to treat the modem. Possible values for <class> are "auto" (default,
+try to find out whether the modem supports fax), "cls2" (use the class 2
+fax command set, even if the modem supports class 2.0), "c2.0" (use the
+class 2.0 fax command set), "data" (data only, exactly as the -D switch).
+.TP
+.B -S <g3 file>
+If a call comes in and requests fax polling,
+.I mgetty
+will send the named file. Note: not all fax modems support poll
+sending.
+.TP
+.B -I <fax id>
+Use the given fax station ID for fax identification. Not used for data
+modems.
+.TP
+.B -b
+Open the port in blocking mode. Best used in combination with "-r". This
+is the default if
+.I mgetty
+is called as
+.I getty.
+You may want to use this if you want to make use of the two-device /
+kernel-locking scheme of the Linux and SunOS operating systems
+(/dev/ttyS.. and /dev/cua..). I do not recommend it, it's just include for
+completeness, and to be able to use mgetty as a full-featured getty
+replacement.
+.TP
+.B -a
+Use autobauding. That is, after a connection is made,
+.I mgetty
+parses the "CONNECT foo" response code of the modem and sets the port
+speed to the first integer found after the "CONNECT" string, "foo" in this
+example. You need this if your modem insist on changing its DTE speed to
+match the line speed. I recommend against using it, better leave the port
+speed locked at a fixed value. The feature is included because there
+exist old modems that cannot use a fixed (locked) port speed.
+.TP
+.B -m 'expect send ...'
+Set the "chat sequence" that is used to initialize the modem. For an empty
+expect part, use empty double quotes (""). Since the sequence contains
+spaces, you have to enclose all of it in single quotes(''). Example:
+
+mgetty -m '"" ATH0 OK'
+
+.SH FILES
+.TP
+.B @CONFDIR@/mgetty.config
+Main configuration file.
+.TP
+.B @CONFDIR@/login.config
+controls whether (and when)
+.I mgetty
+should call some other program for user login instead of @LOGIN@. How this
+is done is explained in this file.
+.TP
+.B @CONFDIR@/dialin.config
+controls acceptance/denial of incoming calls based on the caller's number.
+Available only if you have "caller ID" and your modem supports it.
+.TP
+.B @NOLOGIN@
+controls whether mgetty should pick up the phone upon incoming calls. If
+the file exists, calls are completely ignored. You can use this, for
+example, to stop mgetty during day time, and let it pick up at night only,
+by creating and removing @NOLOGIN@ via the 
+.I cron
+program at the appropriate time.
+.TP
+.B /etc/issue
+will be printed after a connection is established, and before the
+'login:' prompt.  Usually contains a 'Welcome' message. Can be changed 
+with the '-i' option.
+.TP
+.B @LOG_PATH@
+Debug log file, see below.
+
+.SH DIAGNOSTICS
+If
+.I mgetty
+doesn't work the way it should, the main source of diagnostic data is the
+.I log file.
+It can be found in "@LOG_PATH@" (for the mgetty process handling 
+"ttyxx").  If it doesn't contain enough details, enhance the log level with
+the '-x' option to mgetty, e.g. "-x 5".
+
+Many of the common problems and solutions are discussed in the mgetty
+manual and the FAQ.  Please see the WWW page at 
+http://alpha.greenie.net/mgetty/ for both.
+
+
+.SH BUGS
+Not all of
+.I mgetty
+configuration can be done at run-time yet. Things like flow control and
+file paths (log file / lock file) have to be configured by changing the
+source and recompiling.
+
+Users never read manuals...
+
+.SH "SEE ALSO"
+g32pbm(1), sendfax(8), getty(8), mgettydefs(4), mgetty.info
+.SH AUTHOR
+.I mgetty
+is Copyright (C) 1993 by Gert Doering, <gert@greenie.muc.de>.

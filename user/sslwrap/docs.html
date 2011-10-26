@@ -1,0 +1,386 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="description"
+content="An inetd service that sits over POP3, IMAP, SMTP, etc. and encrypts data using SSL">
+<meta name="keywords" content="SSL, TLS, IMAP, POP3, SMTP, wrapper, ssleay, inetd, Unix">
+<meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+<title>SSLWrap</title>
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<h1>sslwrap</h1>
+
+<p>sslwrap is a simple Unix service that sits over any simple TCP service such as POP3,
+IMAP, SMTP, and encrypts all of the data on the connection using TLS/SSL. It uses <a
+href="http://www.psy.uq.edu.au:8080/~ftp/Crypto">ssleay</a> to support SSL version 2 and
+3. It can run out of inetd. It can also encrypt data for services located on another
+computer.</p>
+
+<p>It works with the servers you already have, and does not require any modifications to
+your existing servers.</p>
+
+<p>In this document: 
+
+<ul>
+  <li><a href="index205.html#Installation">Installation</a></li>
+  <li><a href="index205.html#Release">Release Notes</a></li>
+  <li><p align="left"><a href="index205.html#Legal">Legal</a></p>
+  </li>
+</ul>
+
+<h2><a name="Installation">Installation</a></h2>
+
+<p>Just follow these steps to build sslwrap.&nbsp; </p>
+
+<h3>Make ssleay</h3>
+
+<p>You will need to get and build OpenSSL or ssleay. OpenSSL is available from <a
+href="http://www.openssl.org">www.openssl.org</a>. The <a
+href="http://www.psy.uq.edu.au:8080/~ftp/Crypto/#Where to get {{SSLeay}} - FTP site list">ssleay
+FAQ</a> lists the current mirror locations for ssleay. Just follow the instructions to
+build it. sslwrap assumes that the libraries will be in /usr/local/ssl/lib and the
+includes in /usr/local/ssl/include. These are the default locations for the Makefiles
+included with ssleay.</p>
+
+<p>Note that in the U.S. it appears that you must link with RSAREF from <a
+href="http://www.rsa.com">RSA Data Security, Inc</a>. instead of using the ssleay public
+key algorithms. This is described in the ssleay documentation. There may be additional use
+restrictions imposed by the RSAREF license.</p>
+
+<p>sslwrap was tested with ssleay 0.8.1 and 0.9.0b and OpenSSL 0.9.3b, and OpenSSL 0.9.4.</p>
+
+<h3>Make sslwrap</h3>
+
+<p>You can get sslwrap source as a tar/gzip file via HTTP here:</p>
+
+<p><a href="http://www.rickk.com/sslwrap/sslwrap.tar.gz">http://www.rickk.com/sslwrap/sslwrap.tar.gz</a></p>
+
+<p>The file is approximately 20K. </p>
+
+<p>Then unzip and untar the files:</p>
+
+<pre>gunzip sslwrap.tar.gz
+tar xf sslwrap.tar</pre>
+
+<p>Just do a &quot;make&quot; and (hopefully) the file &quot;sslwrap&quot; will be
+created. The Makefile assumes gcc; you will need to edit it for other compilers and
+options. There isn't much in there, though.</p>
+
+<p>If you are using ssleay instead of OpenSSL comment out the first OPENSSL= line and
+uncomment out the second one in Makefile.</p>
+
+<p>If you are using Solaris you will probably need to remove the &quot;#&quot; from the
+beginning of the line that reads &quot;EXTLIBS = -lxnet&quot; in the Makefile.</p>
+
+<p>I copied the built version of sslwrap to /usr/local/sbin, but you may prefer a
+different location. It doesn't matter where is is, as long as your inetd.conf file points
+to the location you put the file.</p>
+
+<h3>Get a certificate</h3>
+
+<p>You need a certificate for your server. You can make a self-signed certificate with no
+encryption by using these commands from the ssleay FAQ:</p>
+
+<pre>cd /usr/local/ssl/certs
+/usr/local/ssl/bin/req -new -x509 -nodes -out server.pem -keyout server.pem -days 365
+ln -s server.pem `/usr/local/ssl/bin/x509 -noout -hash &lt; server.pem`.0</pre>
+
+<p>There is information on getting a real server certificate from a Certificate Authority
+(CA) in the ssleay FAQ. Note that <a href="http://www.verisign.com">Verisign</a>
+previously would not issue a certificate for a server using ssleay; though this may have
+changed.</p>
+
+<p>There is a security problem with sslwrap: it requires an unencrypted private key. Since
+sslwrap runs out of inetd it is not particularly convenient to prompt the server operator
+for the private key password. I'm only using sslwrap for the link encryption (not server
+identity verification), so I'm using a self-signed certificate, and I'm not as concerned
+about the private key being stolen. </p>
+
+<p>You can use self-signed certificates using Netscape Navigator 2.0 or later, or
+Microsoft Internet Explorer 3.02 or later. The client will need to go through several
+dialogs to add the certificate, either for the session or until expiration.</p>
+
+<p>You will want to chmod 600 your certificate file so that normal users won't be able to
+read your unencrypted private key.</p>
+
+<p>Also, when req prompts for you &quot;Common Name (eg, YOUR name) []&quot; enter your
+host name, not your name, for a server certificate. Netscape 3.0.2 and later allow
+wildcards (i.e. &quot;*.acme.com&quot;) but Microsoft Internet Explorer 4.0 does not. The
+hostname can be an IP CNAME, but must match whatever you specified to connect to (in the
+https URL, mail configuration, etc.) or you will get a warning dialog in the client.</p>
+
+<p>You can also use sslwrap without a certificate; to do this use the -nocert option in
+the command line for either inetd or daemon mode.</p>
+
+<h3>Add to /etc/services</h3>
+
+<p>According to <a href="http://www.iana.org/numbers.html">IANA</a>, the following port
+numbers have been assigned for SSL:</p>
+
+<pre>https 443/tcp     # http protocol over TLS/SSL
+smtps 465/tcp     # smtp protocol over TLS/SSL
+nntps 563/tcp     # nttp protocol over TLS/SSL
+telnets 992/tcp   # telnet protocol over TLS/SSL
+imaps 993/tcp     # imap4 protocol over TLS/SSL
+ircs 994/tcp      # irc protocol over TLS/SSL
+pop3s 995/tcp     # POP3 protocol over TLS/SSL
+ftps-data 989/tcp # ftp protocol, data, over TLS/SSL
+ftps 990/tcp      # ftp protocol, control, over TLS/SSL</pre>
+
+<p>If you do not have the entries above in /etc/services, you will probably want to add
+them.</p>
+
+<p>Note that you cannot front-end ftp data connections with sslwrap nor can you front-end
+UDP services. While you can front-end telnet using sslwrap, only the &quot;sslonly&quot;
+variant of telnet is supported. Other SSL telnet implementations such as <a
+href="ftp://ftp.uni-mainz.de/pub/internet/security/ssl/SSL-MZapps">SSL-MZtelnet</a> also
+support SSL via telnet option negotiation to the standard telnet port (23) instead of
+using the special port (992). </p>
+
+<p>While you can front-end your HTTP server with sslwrap, you're better off using <a
+href="http://www.apache-ssl.org">apache-ssl</a>. It is more efficient and won't adversely
+affect your logs. If you use sslwrap, all connections appear to come from
+&quot;localhost&quot;. The <a href="http://stronghold.ukweb.com/">Stronghold</a> version
+of Apache also comes with a <a href="http://www.thawte.com/">Thawte</a> certificate. Using
+a self-signed certificate for electronic commerce is probably not a good idea. </p>
+
+<p>You cannot front-end SMTP service with Netscape Communicator 4.5 and later clients. Due
+to a change in port assignments by IANA, there is no longer a smtps service port (465),
+and there won't ever be one assigned. Instead, smtps can only be negotiated on the
+standard SMTP port (25), and therefore cannot easily be wrapped.</p>
+
+<h3>Running out of inetd</h3>
+
+<p>If you want to run sslwrap out of inetd, you will need to edit inetd.conf to add all of
+the services you want to front-end:</p>
+
+<pre>https stream tcp nowait sslwrap /usr/sbin/tcpd /usr/local/sbin/sslwrap
+-cert /usr/local/ssl/certs/server.pem -port 80
+
+imaps stream tcp nowait sslwrap /usr/sbin/tcpd /usr/local/sbin/sslwrap
+-cert /usr/local/ssl/certs/server.pem -port 143
+
+telnets stream tcp nowait sslwrap /usr/sbin/tcpd /usr/local/sbin/sslwrap
+-cert /usr/local/ssl/certs/server.pem -port 23
+
+pop3s stream tcp nowait sslwrap /usr/sbin/tcpd /usr/local/sbin/sslwrap
+-cert /usr/local/ssl/certs/server.pem -port 110 </pre>
+
+<p>This example is from Linux; your inetd.conf file may vary. </p>
+
+<p>The service (https, imaps, telnets, pop3s, etc.) is the service identifier you added to
+/etc/services.</p>
+
+<p>I created a user which has no login privileges and is pretty much like
+&quot;nobody&quot; called &quot;sslwrap&quot; to run sslwrap. Note that sslwrap has not
+been analyzed extensively and it is not recommended that you run it setuid root, nor does
+it need to be. But you do need to make sure it can read the private certificate file. </p>
+
+<p>The -cert parameter specifies the certificate file which may be the self-signed
+certificate you created above, or a real certificate. The certificate file's private key
+must not be encrypted.</p>
+
+<p>The -port parameter specifies the port to connect to. When a connection comes in via
+SSL, a connection is made to localhost and this port. This is the port that the actual
+service is listening on.</p>
+
+<p>The -addr parameter specifies the address to connect to. In the absence of the -addr
+parameter a connection is made to localhost. The parameter must be an IP address in dotted
+decimal notation, such as 123.45.67.89. </p>
+
+<p>You will need to restart inetd, typically by using kill -HUP <em>&lt;pid of inetd&gt;</em>.</p>
+
+<h3>Running as a daemon</h3>
+
+<p>You can also run sslwrap as a daemon instead of running out of inetd. </p>
+
+<pre>/usr/local/sbin/sslwrap -cert /usr/local/ssl/certs/server.pem \
+-port 80 -accept 443 &amp;
+
+/usr/local/sbin/sslwrap -cert /usr/local/ssl/certs/server.pem \
+-port 143 -accept 993 &amp;
+
+/usr/local/sbin/sslwrap -cert /usr/local/ssl/certs/server.pem \
+-port 23 -accept 992 &amp;
+
+/usr/local/sbin/sslwrap -cert /usr/local/ssl/certs/server.pem \
+-port 110 -accept 995 &amp;</pre>
+
+<p>You might type in commands like this, or perhaps add it to one of the startup files,
+like rc.inet2.</p>
+
+<p>I created a user which has no login privileges and is pretty much like
+&quot;nobody&quot; called &quot;sslwrap&quot; to run sslwrap for inetd. This works fine
+for inetd, but the problem is that you must be root to bind to a 'reserved port' (less
+than 1024) under Unix. This would require running sslwrap setuid root. Since sslwrap has
+not been analyzed to be sure it's safe to run setuid root, I really have to warn against
+doing this. You really should use inetd instead of daemon mode. </p>
+
+<p>The -cert parameter specifies the certificate file which may be the self-signed
+certificate you created above, or a real certificate. The certificate file's private key
+must not be encrypted.</p>
+
+<p>The -port parameter specifies the port to connect to. When a connection comes in via
+SSL, a connection is made to localhost and this port. This is the port that the actual
+service is listening on.</p>
+
+<p>The -addr parameter specifies the address to connect to. In the absence of the -addr
+parameter a connection is made to localhost. The parameter must be an IP address in dotted
+decimal notation, such as 123.45.67.89. </p>
+
+<p>The -accept parameter specifies the port to listen on (that is, accept connection on).
+This is the SSL port number.</p>
+
+<h3>Connecting To Another Machine</h3>
+
+<p>You can &quot;ssl-ize&quot; a service running on a computer other than the one you're
+running sslwrap on. Of course anyone between you and the server your connecting on can
+still look at your clear text data, but if you'll be connecting to the SSL server from an
+even more distant or insecure area, you may still have benefits from doing this.</p>
+
+<p>Remote connection can be done from inetd or as a daemon; add a &quot;-addr&quot;
+parameter to the command line:</p>
+
+<pre>imaps stream tcp nowait sslwrap /usr/sbin/tcpd /usr/local/sbin/sslwrap
+-cert /usr/local/ssl/certs/server.pem -port 143 -addr 123.45.67.89</pre>
+
+<p>The address must be specified in dotted decimal notation and be an IP address, not a
+hostname.</p>
+
+<h3>Testing</h3>
+
+<p>sslwrap has only been lightly tested by me. It works for what I wanted it for (SSL IMAP
+with Microsoft Outlook 98, though previously I used Netscape Communicator), and I do not
+guarantee it will work for you. It has been tested in the following environment:</p>
+
+<p>My server is running RedHat Linux 6.0 on the x86 platform. I have front-ended <a
+href="http://www.imap.org">IMAP</a> (University of Washington server), POP3 (Qualcomm <a
+href="http://www.eudora.com/freeware/servers.html">qpopper</a>), <a
+href="http://www.apache.org">Apache</a> HTTP server, telnet (MIT ktelnetd), and SMTP
+(sendmail) successfully.</p>
+
+<p>I have tested the server using <a href="http://www.netscape.com">Netscape</a>
+Communicator 4.01a for both HTTP and IMAP under Windows 95 and Windows NT; it works quite
+well. Note, however, that Netscape Communicator 4.5 cannot use SSL SMTP. This is because
+Netscape removed all of the functionality for SMTP on port 465 in versions 4.5 and later.</p>
+
+<p>I have tested it with https using <a href="http://www.microsoft.com">Microsoft</a>
+Internet Explorer 4.0.1 under Windows 95. <a href="http://www.microsoft.com/outlook/">Microsoft
+Outlook</a> 98 Beta 2 under Windows NT also was able to use SSL POP3 successfully, as
+well. Note that you must use a version of Internet Explorer later than 3.02 when you're
+using a self-signed certificate because older versions do not allow certificates made by
+certificate authority that is not on the list of approved CAs. Unfortunately, you cannot
+remember an unknown CA like you can with Netscape, so you are frequently prompted to allow
+the unknown CA. A real server certificate would probably work fine, but this is not
+necessarily recommended because of the requirement for an unencrypted private key. </p>
+
+<p>A later test, done March 19, 1998, on a different computer, yielded somewhat different
+results with Microsoft Outlook 98 Beta 2 under Windows NT 4.0 (Service Pack 3). In this
+case, I was able to use my self-signed server certificate for both IMAP and SMTP without
+warning. I cannot explain why this would be the case, but I am both happy (that I don't
+get a dialog every time I connect) and sad (that I wasn't warned about an unknown CA)!</p>
+
+<p>I have since switched to using Microsoft Outlook 98 and it seems to work quite well for
+SSL IMAP and SSL SMTP. In fact, it works a little better than Netscape Communication
+because it breaks the connection less often. If your sslwrap server is not really fast,
+generating the temporary keys at the beginning of each connection can take several
+seconds. </p>
+
+<p>Aside from not being recommended for security reasons, running sslwrap in daemon mode
+has not been tested very much. I really suggest using inetd mode instead of daemon mode.</p>
+
+<hr>
+
+<h2><a name="Release">Release</a> Notes</h2>
+
+<h3>Version 2.0.5</h3>
+
+<p>September 28, 1999 
+
+<ul>
+  <li>Compatibility fixes for OpenSSL 0.9.4</li>
+</ul>
+
+<h3>Version 2.0.4</h3>
+
+<p>September 26, 1999 
+
+<ul>
+  <li>Compatibility fixes for OpenSSL 0.9.3b</li>
+</ul>
+
+<h3>Version 2.0.3</h3>
+
+<p>March 10, 1999 (From User Contribution) 
+
+<ul>
+  <li>Fixed a buffer size overflow that could cause problems during large read operations,
+    such as downloading large messages with POP3s.</li>
+</ul>
+
+<h3>Version 2.0.2</h3>
+
+<p>November 19, 1998 (From User Contributions) 
+
+<ul>
+  <li>Corrected missing &quot;)&quot; in call to RSA_generate_key for SSLeay &lt; 0.9</li>
+  <li>Additions to Makefile for more Solaris friendliness</li>
+</ul>
+
+<h3>Version 2.0.1</h3>
+
+<p>November 11, 1998 (From User Contributions) 
+
+<ul>
+  <li>Added &quot;-exec&quot; option to directly run a program instead of having to connect to
+    localhost</li>
+  <li>Corrected a typo in the usage info for -accept</li>
+  <li>Corrected a segmentation fault when -nocafile is used</li>
+</ul>
+
+<h3>Version 2.0: </h3>
+
+<p>September 21, 1998 
+
+<ul>
+  <li>Daemon support. You can still run sslwrap out of inetd, but if you prefer you can run it
+    a a daemon (probably out of rc.d). See important caveats below, however. It is not really
+    recommended.</li>
+  <li>Remote server support. You can now wrap services on computers other than the one you're
+    running sslwrap on. This of course means anyone on the LAN can still peek at your data,
+    but if you're connecting from a remote location you can gain the benefits of sslwrap. </li>
+</ul>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="Legal">Legal</a></h2>
+
+<p>sslwrap is written by Rick Kaseguma<br>
+Copyright 1997-1999 Rick Kaseguma<br>
+All Rights Reserved</p>
+
+<p>This code is based on ssleay, Copyright 1995-1997 Eric Young</p>
+
+<p>The latest version of this document is available here: <a
+href="http://www.rickk.com/sslwrap/">http://www.rickk.com/sslwrap/</a></p>
+
+<p>You can use sslwrap for any purpose you like, subject to underlying conditions imposed
+by the SSLeay library that is is based on. There are no additional commercial use,
+redistribution, or other restrictions imposed by me. There is no warranty. I make no
+guarantees that this will actually work or it will be secure. Use with caution.</p>
+
+<p>Since sslwrap itself contains no encryption code, I don't believe there should be any
+restrictions on export. </p>
+
+<p>If you have comments, suggestions, bug fixes, or if you are successfully using sslwrap,
+send a note to <a href="mailto:sslwrap@rickk.com">sslwrap@rickk.com</a>. Thanks! </p>
+
+<p><a href="../index.html"><img src="../images/home.gif" border="0" width="55" height="35"></a>
+Back to <a href="../index.html">Rick's Home Page</a></p>
+</body>
+</html>

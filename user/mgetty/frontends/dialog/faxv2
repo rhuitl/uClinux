@@ -1,0 +1,106 @@
+#!/bin/sh
+# Auswahl aller eingegangenen Faxe.
+# Menuegefuehrte Dialogbox, zum viewen, loeschen, drucken und archivieren.
+# Joerg Pareigis 04.10.1998   pareigis@t-online.de
+
+#---------------------------------------Einstellungen
+dir=/var/spool/fax/incoming
+archdir=/var/spool/fax/save
+viewcomand=/usr/local/bin/viewfax
+printcomand="/usr/local/bin/g32pbm -l"
+printer=hplaser
+#---------------------------------------Ende
+
+if [ "$DISPLAY" = "" ]
+then
+  echo "DISPLAY-variable not set!"
+  exit 1
+fi
+
+einlesen () {
+if [ "$dir" = "$archdir" ]
+then
+  bxtext="Verzeichniswechsel-Archiv-> Incoming"
+else
+  bxtext="Verzeichniswechsel-Incoming-> Archiv"
+fi
+anzahl=$(ls $dir|wc -l|cut -c6-)
+for datei in $(ls -1rt $dir)
+do
+  datum=$(ls -l $dir/$datei |cut -c 43-54 | tr " " "-")
+  bxtext="$bxtext $datei $datum "
+done
+}
+
+abbruch () {
+if [ "$?" != "0" ]
+then
+  echo "Abbruch!"
+  rm ~/tmp.$$
+  exit 1
+fi
+}
+
+faxauswahl () {
+dialog --menu "Hier eins von $anzahl Faxen auswaehlen" 15 55 10 $bxtext 2>~/tmp.$$
+abbruch
+fax=$(cat ~/tmp.$$)
+rm ~/tmp.$$
+if [ "$(echo $fax|cut -d- -f1)" = "Verzeichniswechsel" ]
+then
+  if [ "$dir" = "$archdir" ]
+  then
+    dir=$olddir
+  else
+    olddir=$dir
+    dir=$archdir
+  fi
+  einlesen
+  faxauswahl
+fi
+}
+
+einlesen
+faxauswahl
+
+while :
+do
+  if [ "$dir" = "$archdir" ]
+  then
+    options="1 Anschauen 2 Drucken 3 Loeschen 5 Umbenennen 9 Faxauswahlmenue"
+  else
+    options="1 Anschauen 2 Drucken 3 Loeschen 4 Archivieren 5 Umbenennen 9 Faxauswahlmenue"
+  fi
+  dialog --menu "Fax $fax" 15 55 10 $options 2>~/tmp.$$
+  abbruch
+  aktion=$(cat ~/tmp.$$)
+  rm ~/tmp.$$
+
+  #Ausfuehren der verschiedenen Aktionen
+  case $aktion in
+    1) $viewcomand $dir/$fax ;;
+    2) $printcomand $dir/$fax | lpr -P$printer ;;
+    3) dialog --yesno "$fax loeschen?" 5 55
+       if [ "$?" = "0" ]
+       then
+         rm $dir/$fax
+         einlesen
+         faxauswahl
+       fi ;;
+    4) mv -i $dir/$fax $archdir/$fax
+       einlesen
+       faxauswahl ;;
+    5) dialog --inputbox "Neuer Name fuer $fax:" 10 55 $fax 2>~/tmp.$$
+       if [ "$?" = "0" ]
+       then
+         newname=$(cat ~/tmp.$$)
+         rm ~/tmp.$$
+         mv -i $dir/$fax $dir/$newname
+         einlesen
+         faxauswahl
+       fi ;;
+    9) faxauswahl ;;
+    *) dialog --msgbox "Funktion nicht implementiert!" 5 55 ;;
+  esac
+done
+exit

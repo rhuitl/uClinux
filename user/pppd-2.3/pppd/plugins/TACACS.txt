@@ -1,0 +1,67 @@
+TACACS+ plugin for pppdTACACS+ plugin for pppd
+This plugin add to pppd authentication, authorization and accounting provided by 
+a TACACS+ server. 
+
+Generated file
+==============
+Sample of accounting file : 
+Fri Mar 24 09:48:56 2000  194.149.85.30  nbodeux  ttyS1  194.149.85.8  start  start_time=953887736  task_id=27249  phone_#=43435592  service=ppp  protocol=ip
+Fri Mar 24 09:49:20 2000  194.149.85.30  nbodeux  ttyS1  194.149.85.8  stop   stop_time=953887759  task_id=27249  bytes_out=5122  bytes_in=3982  elapsed_time=27
+
+Config files
+============
+
+Part of /usr/local/etc/tac_plus.conf 
+# /usr/local/etc/tac_plus.conf
+
+default authentication = file /etc/passwd
+
+user = DEFAULT
+        {
+        member   = pppuser
+        service  = ppp
+        protocol = ip
+                {
+                addr=194.149.85.8/29
+                }
+        }
+
+Caution : currently only the first address argument is used. 
+
+Sample of /etc/mgetty+sendfax/login.config mgetty file : 
+# /usr/local/etc/mgetty+fax/login.conf
+#
+/AutoPPP/       -       autoppp /usr/sbin/pppd file /etc/ppp/incoming.tacacs
+
+Sample of /etc/ppp/incoming.tacacs file : 
+plugin /usr/sbin/tacacs.so
++pap
+-chap
+debug
+tacacs
+tacacs-server 194.149.85.3
+tacacs-secret "secret"
+tacacs-authorization
+tacacs-accounting
+-detach
+
+Sample of /etc/ppp/options : 
+ms-dns 194.149.85.30
+netmask 255.255.255.0
+crtscts
+modem
+-detach
+
+Sample of /etc/ppp/options.ttyS0 (one per serial line) : 
+rout-dom.stben.be:puser1.stben.be
+
+
+This file contains executable (tacacs.so) source (tacacs.c) and Makefile. If you 
+want to compile it you should get tac library from web site of Pavel Krawczyk.
+The code for a TACACS+ server is disponible from cisco ftp server or from our 
+server. 
+
+User guide for Cisco server. 
+Send all bug report at Jean-Louis Noël (jln@stben.be). 
+ 
+http://www.stben.be/tacacs/

@@ -1,0 +1,151 @@
+.TH faxrunq 1 "23 Nov 02" "greenie" "mgetty+sendfax manual"
+.IX faxrunq
+.SH NAME
+faxrunq \- send fax jobs queued by faxspool(1)
+.SH SYNOPSIS
+.B faxrunq
+.SH DESCRIPTION
+Run the fax queue set up by faxspool(1), try to send all faxes, record
+result, remove job and send notify mails.
+
+.I faxrunq 
+looks for all the jobs queued by faxspool(1) to
+@FAX_SPOOL_OUT@/*. For each job in the queue, faxrunq tries to
+send it, using sendfax(8).
+
+If the send succeeds, the job is removed from the queue, and a "success"
+mail is sent to the originator of the spooled job.
+
+If the send fails, it's logged, and faxrunq proceeds to the next job. If
+the job fails five times "fatally", that is, not with a locked or engaged
+line, but with "NO CARRIER" (no fax machine, or line noise), the job is
+suspended, and the requestor gets a mail, telling him so.
+
+.I faxrunq
+can be run from the command line (but make sure the user doing this
+has write access to the modem device and to the fax queue, that is,
+usually this should be done by "@FAX_OUT_USER" or "root").  In a 
+production environment, it's more useful to start 
+.I faxrunq
+from
+.I cron(8)
+in regular intervals, like "run it every 5 minutes".  See the
+.I cron(8)
+and/or
+.I crontab(1)
+man pages for this (which man page exists depends on your system).
+
+.SH OPTIONS
+.TP
+.B -q
+Tells
+.I faxrunq
+to be quiet, that is, suppress all status messages.  Error messages will
+still be printed.
+
+.SH FILES
+.TP
+.B @FAX_SPOOL_OUT@/stop
+if this file exists, 
+.I faxrunq 
+(and faxrunqd) will do nothing.  You can use this to stop queue processing
+while testing something, or if you know that the modem(s) are unavailable
+and do not want to run into oany error messages, etc.
+
+.TP
+.B @FAX_SPOOL_OUT@/faxqueue_done
+Every time
+.I faxrunq
+(or faxrunqd) run the fax queue, a time stamp is written into that file.
+It is used by
+.I faxspool
+to display a warning if the queue hasn't been run recently (so faxes may
+get stuck).
+
+.SH CONFIGURATION FILE
+
+Some aspects of the behaviour of 
+.I faxrunq
+can be controlled by a configuration file, @CONFDIR@/faxrunq.config.  In
+this file, you can use the following options:
+.TP
+.B success-send-mail [y/n]
+A boolean parameter that controls whether a mail will be sent after
+successful completition of the fax job.
+
+.TP
+.B failure-send-mail [y/n]
+A boolean parameter that controls whether a mail will be sent after
+the fax job has failed more than the maximum number of times.
+
+.TP
+.B success-call-program <name>
+Here, you can specify a program that will be run when the fax has been
+successfully sent. It will be passed two command line parameters. The
+first is the full path to the fax JOB file (see faxq(5)), the second
+is the last exit code from
+.I sendfax
+(for success-call-program, this is always "0").
+
+.TP
+.B failure-call-program <name>
+Similar to the "success-call-program", this program will be run when the
+fax has been failed too often and 
+.I faxrunq
+gives up. This script could, for example, print out the fax on a printer
+so that it can be sent manually on a paper fax machine.  
+
+.TP
+.B maxfail-costly <n>
+This specifies the number of times that a fax may fail "fatally", that
+is, causing telephone costs (explained above). The default value is 5.
+
+.TP
+.B maxfail-total <m>
+This is the absolute maximum number of times that 
+.I faxrunq
+will try to send any given fax. The default value is 10. (Right now, 
+it's not yet implemented).
+
+.TP
+.B delete-sent-jobs [y/n]
+Determines whether
+.I faxrunq
+should delete jobs after sending, or leave them in the fax queue (while
+moving the "JOB" file to "JOB.done") so that they can be seen at by
+"faxq -o". The default value is "do not delete sent faxes".
+
+.TP
+.B acct-log <path>
+Specifies where
+.I faxrunq
+should protocol success and failure of each try to send a fax job.
+The default location is @FAX_SPOOL_OUT@/acct.log.
+
+There are some other options that are allowed, but ignored.  These are:
+.I max-modems,
+and
+.I faxrunqd-log.
+
+They are used by faxrunqd(8) (which reads the same config file, but has
+more options).
+
+.IX fax
+.SH BUGS
+.I faxrunq
+doesn't handle proper time scheduling yet
+
+Don't use
+.I faxrunq
+if you have malevolent users with access to the fax spool.  It doesn't
+handle all cases of file movement tricks correctly.  Use
+.I faxrunqd(8)
+instead, which does it correctly  (this point is mostly moot if the fax
+queue is set up correctly - that is, owned by '@FAX_OUT_USER@', mode 755,
+and faxrunq(1) is also run as user '@FAX_OUT_USER@').
+
+.SH "SEE ALSO"
+faxspool(1), sendfax(8), faxq(1), faxqueue(5), faxrunqd(8)
+.SH AUTHOR
+.I faxrunq
+is Copyright (C) 1993-2002 by Gert Doering, <gert@greenie.muc.de>.

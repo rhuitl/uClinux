@@ -1,0 +1,501 @@
+version 0.9.5 (2007/07/29)
+------------------------------
+
+= conntrackd =
+o conntrack-tools requires libnetfilter_conntrack >= 0.0.81 
+o add len field to nethdr
+o implement buffered send/recv to batch messages
+o use buffer of MTU size
+o stop using netlink format for network messages: use similar TLV-based format
+o reduce synchronization messages size up to 60%
+o introduce periodic alive messages for sync-nack protocol
+o timeslice alarm implementation: remove alarm pthread, remove locking
+o simplify debugging functions: use nfct_snprintf instead
+o remove major use of libnfnetlink functions: use libnetfilter_conntrack API
+o deprecate conntrackd -F, use conntrack -F instead
+o major rework of the network infrastructure: much simple, less messy
+o simplify cache_flush function: use cache_del()
+o remove current script_fault.sh when we reach fault state
+o conntrackd requires the connection tracking event API: insist more in INSTALL
+
+= conntrack =
+o better protocol argument checkings
+o fix per-protocol filtering, eg. conntrack -L -p tcp 
+o show per-protocol help, ie. conntrack -h -p tcp
+o add alias --src for --orig-src and alias --dst for --orig-dst
+o include protocol filters in the manpage
+
+version 0.9.4 (2007/07/02)
+------------------------------
+
+o fix error message in configure.in (Eric Leblond)
+o add library dependency checking to configure.in
+
+= conntrackd =
+o simplify checksum code: use UDP/multicast checksum facilities
+o fix silly bug in build_network_message: out of bound memset
+o remove useless backlog parameter in multicast sockets
+o remove reminiscents of delay destroy message and relax transitions
+o remove confusing StripNAT parameter: NAT support enabled by default
+o relax event tracking: *_update callbacks use cache_update_force
+o use wraparound-aware functions after/before/between
+o commit phase: if conntrack exists, update it
+o local requests return EXIT_FAILURE if it can't connect to the daemon
+o remove several debug statements
+o fork when internal/external dump and commit requests are received
+o lots of cleanups
+
+= conntrack =
+o fix segfault with conntrack --output (Krzysztof Oledzky)
+o use NFCT_SOPT_SETUP_* facilities: nfct_setobjopt
+o remove bogus option to get a conntrack in test.sh example file
+o add aliases --sport and --dport to make it more iptables-like
+o add support for `-L --src-nat' and `-L --dst-nat' to show natted connections
+o update conntrack(8) manpage
+o remove dlopen infrastructure
+
+version 0.9.3 (2007/05/22)
+------------------------------
+
+= conntrackd =
+o fix commit of confirmed expectations (reported by Nishit Shah)
+o fix double increment of counters in cache_update_force() (Niko Tyni)
+o nl_dump_handler must return NFCT_CB_CONTINUE (Niko Tyni)
+o initialize buffer in nl_event_handler() and nl_dump_handler() (Niko Tyni) 
+o CacheCommit value can be set via conntrackd.conf for the NACK approach
+o fix leaks in the hashtable/cache flush path (Niko Tyni)
+o fix leak if a connection already exists in the cache (Niko Tyni)
+o introduce a new header that encapsulates netlink messages
+o remove all '_entry' tail from all functions in cache.c
+o split cache.c: move cache iterators to file cache_iterators.c
+o fix inconsistencies in the cache API related to counters
+o cleanup 'usage' message
+o fix typo in examples/sync/nack/node1/conntrackd.conf
+o introduce message checksumming as described in RFC1071 (enabled by default)
+o major cleanups in the synchronization code
+o just warn once that the maximum netlink socket buffer has been reached
+o fix ignore conntrack entries by IP and introduce ignore pool abstraction layer
+o introduce netlink socket buffer overrun handler
+o constification of hash, compare and hashtable_test functions in hash.c
+o introduce ACKnowledgement mechanisms to reduce the size of the resend queue
+o remove OK messages at startup since provide useless data
+o fix compilation warning in mcast.c: recvfrom takes socklen_t not size_t
+o add a lock per buffer: makes buffer code thread safe
+o introduce 'Replicate' clause to explicitely set states to be replicated
+o kill cache feature abuse: introduce nicer cache hooks for sync algorithms
+o fix oversized buffer allocated in the stack in the cache functions
+o add support to dump internal/external cache in XML format '-x'
+o add script for keepalived fault state (eg. unplugged cable/link down)
+
+= conntrack =
+o port conntrack to the new libnetfilter_conntrack API
+o introduce '--output xml,extended,timestamp' option for '-L', '-G' and '-E'
+o deprecated '--id'
+o replace '-a' by '--src-nat' and '--dst-nat'
+o use positive logic in error handling
+o remove sctp support until is fully supported in the kernel side
+o update conntrack manpage
+o update test.sh file in examples/cli/
+o several fixes for the output of usage messages
+
+version 0.9.2 (2007/01/17)
+--------------------------
+o remove spamming packet lost messages
+o generalize network netlink sequence tracking 
+o fix bogus error message on resync `-R'
+o fix endianess issues in the network netlink message
+o introduce generic netlink multicast primitives to send and receive
+o fix bogus replayed multicast message due to sequence numbering wraparound
+o introduce counter for malformed netlink messages received
+o introduce a new syntax for the `Sync' section  in the configuration file
+o several cleanups and remove unused variables
+o add autostuff to include examples in the tarball (reported by Victor Lozano)
+o use the new API available in libnetfilter_conntrack-0.0.50
+o implement a NACK based protocol for replication
+
+version 0.9.1 (2006/11/06)
+--------------------------
+o conntrackd requires kernel >= 2.6.18
+o remove bogus TIMERS_MODE constant
+o implement bulk mode '-B': first works to address the preemption issue
+o fix minor reduction conflicts in the configfile grammar
+o check for CAP_NET_ADMIN instead of requiring root privileges
+o check that linux/capability.h exists
+o fix formatting at dump statistics '-s'
+o move dump traffic stats before multicast traffic stats
+o move event and dump handler to a generic infrastructure: kill events.c file
+o kill unused function inc_ct_stats
+o kill file resync.h
+o cleanup broadcast_sync: renamed to mcast_send_sync
+o sed 's/perror/debug/g' local.c
+o fix bogus increment of update_fail stats at dump stage
+o display descriptive error if we can't connect to conntrackd via UNIX socket
+o remove debugging message from alarm.c
+o move dump_mcast_stats to mcast.c where it really belongs
+o rename stats.c to traffic_stats.c
+o check for replayed/lost multicast message: simple seq tracking w/o recovery
+o reissue nfnl_catch on ENOENT error: a message for other subsystem
+o remove test/ directory in tree
+o improve cache commit stats
+o kill last_commit and last_flush from cache statistics: use the logfile
+o recover cache naming for dump stats `-s'
+o display multicast sequence tracking statistics: packets lost and replayed
+o zero ct_sync_state and ct_stats_state structures after allocation
+o improve keepalived scripts:
+   - resync with conntrack table on transition to master
+   - send bulk on transition to backup
+o implement alarm cascade of ten levels
+o implement timer cache flavour: limited life of entries in the external cache
+o implement a global lock that protects operation with conntrack entries
+o remove debug checking in cache_del_entry
+o set a reduced timeout for committed entries: 180 seconds by default
+o update comments on the sync-mode code
+o introduce delay destroy messages facility
+o increase timer for external states from 60 to 180 seconds
+o remove unused replicate/dont_replicated constants
+o fix cache entry clashing issue (reported by Maik Hentsche)
+o fix bogus increment of error stats in the external cache
+o remove pollution generated by `[REQ] cache dump' message from logfile
+
+version 0.9.0 (2006/09/17)
+--------------------------
+o implement initial for IPv6 (untested)
+o implement generic extensible cache: kill the internal and external caches
+o implement persistence cache feature
+o implement lifetime cache feature
+o modify UNIX facilities identification numbers:
+  separate master conntrack facilities and internal plugin facilities
+o break backward compatibility of configuration file:
+  remove IgnoreLoopback, use IgnoreTrafficFor instead
+  remove IgnoreMulticastTraffic, use IgnoreTrafficFor instead
+o merge event/event_subsys and sync/sync_subsys initialization to run.c
+o improve control of the iteration process in the hashtables
+o fix wrong locking in the alarm thread
+o supersede AcceptNAT by StripNAT clause
+o replace ignore traffic array by a hashtable
+o move lockfile checking before daemonization
+o on initialization error give a descriptive error
+o introduce netlink socket size grown limitator
+o introduce force resync with master conntrack table facility '-R'
+o ignore SIGPIPE signal
+o kill post_step since it is not used anymore
+
+version 0.8.3 (2006/09/03)
+--------------------------
+Author: Maik Hentsche <maik mm-double net>
+
+o Fix typo in conntrackd -h
+o Disable debugging messages by default
+o No signals while signals handlings
+o Add extra checkings at forking
+o Check maximum size for file passed via -C
+
+Author: Pablo Neira Ayuso <pablo netfilter org>
+
+o retry select() if EINTR is returned (Reported by Maik Hentsche)
+o Fix bug in slist_for_each_entry (Reported by Maik Hetsche)
+o Signal handler registration done after intialization
+o Implement alarm thread (based on Maik Hentsche's patch)
+o Fix segfault on conntrackd -k (Reported by Maik Hentsche)
+o Fix bug on alarm removal (Reported by Maik Hentsche)
+o configure stops if bison, flex or yacc are not installed
+
+version 0.8.2 (2006/07/05)
+--------------------------
+o RelaxTransitions clause introduced in Sync mode
+o multicast messages sequence tracking
+o SocketBufferSize clause to set up the netlink socket buffer
+o use new libnfnetlink API to solve limitations of nfnl_listen
+o extra sanity checkings for netlink multicast messages
+o improve statistics
+o tons of cleanups 8)
+
+version 0.8.1 (2006/06/13)
+--------------------------
+o -f now just flushes the internal and external caches
+o -F flushes the master conntrack table
+o fix segfault under heavy load and signal received
+o added -S mode for statistics: still needs more thinking
+
+version 0.8.0 (2006/06/11)
+--------------------------
+o more work to generalize the daemon: now it's ready to implement
+modular support for adaptive timers and conntrack statistics, time
+to implement them ;). This is *still* a work in progress.
+
+version 0.7.2 (2006/06/05)
+--------------------------
+o stupid bug in normal and alarm caches initialization: flush unset
+o fix racy signal handling
+
+version 0.7.1 (2006/06/05)
+--------------------------
+o Bugfix for multicast sockets communication
+
+version 0.7 (2006/06/01)
+------------------------
+o Major code re-structuration: internal and external cache abstraction
+o sequence tracking for event messages
+o expect more changes, I still dislike some stuff in its current status ;)
+
+version 0.6 (2006/05/31)
+------------------------
+o Lock file support
+o use new API nfct_conntrack_event_raw
+o major code clean ups
+
+version 0.5 (2006/05/30)
+-------------------------
+o Fix multicast server binds to wrong interface
+o Include clause `IgnoreProtocol', deprecates IgnoreUDP and IgnoreICMP
+
+version 0.4 (2006/05/29)
+------------------------
+o Initial release
+
+conntrack changelog
+===================
+
+2006-03-20
+<hidden@sch.bme.hu>
+	o fix ICMP protocol extension parse callback
+
+2006-01-15
+<pablo@netfilter.org>
+	o Added missing parameters to set the ports of an expectation tuple
+	o Add support to filter dumped entries. 
+	  ie: conntrack -L -p tcp --orig-port-dst 993
+	  display all the connections to IMAPS servers
+	      conntrack -L -m 2
+	  display all the connection marked with 2
+	o Bumped version to 1.00beta2
+
+2005-12-26
+<pablo@netfilter.org>
+	o add IPv6 support: main change
+	o removed dead code: iptables_insmod and get_modprobe
+	o compact the commands vs. options table
+	o move working vars from the stack to the BSS section
+	o update manpage
+	o Bumped version to 1.0beta1
+<yasuyuki.kozakai@toshiba.co.jp>
+	o check address family mismatch
+	o fix incomplete copying IPv6 addresses
+
+2005-12-19
+<pablo@netfilter.org>
+	o We only support ipv4 at the moment: set l3protonum to AF_INET
+	o Minor changes to prepare upcoming ipv6 support
+
+2005-12-03
+<pablo@netfilter.org>
+	o Add support to filter events. ie: -p tcp --orig-port-dst 80 in
+	conjuction with -E to get all the requests to HTTP servers
+	o Update manpage
+	o Missing static function declaration in the protocol handlers
+	o Use protocol flags defined in libnetfilter_conntrack
+	o Bumped version to 0.991
+
+2005-11-22
+<marcus@ingate.com>
+	o Fix oversized number of options
+
+2005-11-11
+<laforge@netfilter.org>
+	o don't check for kernel header path in configure, since we don't use
+	  kernel headers
+	o don't check for libnfnetlink, we don't use it directly
+	o move plugins into pkglibdir
+	o remove 'lib' prefix of plugins, they're not really libraries
+	o remove version information from plugin filenames
+	o Bumped version to 0.99
+2005-11-09
+<pablo@netfilter.org>
+	o set status to zero, libnetfilter_conntrack now activate
+	IPS_CONFIRMED since all conntrack in hash must be confirmed.
+	o Bumped version to 0.98
+
+2005-11-08
+<olenf@ans.pl>
+	o Fix warnings generated by gcc -Wall
+	o Fix conntrack exit value at error
+	o Replace obsolete inet_addr by inet_aton
+
+2005-11-05
+<olenf@ans.pl>
+	o Improved conntrack -h output
+	o add htons for icmp id.
+<pablo@eurodev.net>
+	o -t and -u are optional at update.
+	o Fixed versioning :(
+	o Bumped version to 0.97
+
+2005-11-03
+<laforge@netfilter.org>
+	o Use extra 'data' argument of nfct_register_callback() function that
+	  I've introduced in libetfilter_conntrack.
+<olenf@ans.pl>
+	o moves conntrack tool from bin to sbin directory since this
+	application is an administration utility and it requires uid==0 or
+	CAP_NET_ADMIN
+<pablo@eurodev.net>
+	o check if --state missing when -p is passed
+	o command type is passed to final_check: checkings based on the
+	command can be done now.
+	o kill duplicated definition of IPS_* bits: Already present in 
+	libnetfilter_conntrack.
+	o Move action and command enum to conntrack.h
+	o kill NIPQUAD macro
+	o make conntrack handler cth static.
+	o Bumped version to 0.96
+
+2005-11-01
+<pablo@eurodev.net>
+	o Fix error message describing illegal option -E -i
+	o -D -i ID requires tuple information: Display an error message
+	o Use NFCT_ALL_CT_GROUPS flag instead of NFCT_ALL_GROUPS
+	o Event mask doesn't make sense for expectations, kill dead code
+	o Bumped version to 0.95
+<olenf@ans.pl>
+	o Fix wrong formating in conntrack -h
+
+2005-10-30
+<pablo@eurodev.net>
+	Special thanks to Deti Fiegl from the Leibniz Supercomputing Centre in
+	Munich, Germany for providing the "fast" hardware to reproduce
+	spurious bugs ;)
+
+	o Replace misleading message "Not enough memory" by "Can't open handler"
+	o New option -i for expectation dumping: conntrack -L expect [-i]
+	o sed 's/VERSION/CONNTRACK_VERSION/g'
+	o Fix nfct_open flags, now uses NFCT_ALL_GROUPS when needed
+	o Bumped version to 0.94
+
+2005-10-28
+<pablo@eurodev.net>
+	o New option -i for dumping: conntrack -L [-i]
+	o Fixed warning in findproto due to a stupid wrong type definition
+	o sed 's/nfct_set_callback/nfct_register_callback/g'
+	o killed the 'retry' logic, *sigh* it is broken in some cases
+	o killed broken and unneeded protocol handler destructors (fini)
+	o killed unregister_proto
+	o Fixed code indentation in the command selector
+	o Bumped version to 0.93
+
+2005-10-27
+<pablo@eurodev.net>
+	o Use conntrack VERSION instead of the old LIBCT_VERSION
+	o proto_list and lib_dir are now static
+	o kill dead code: function dump_tuple
+	o Bumped version to 0.92
+
+2005-10-25
+<eleblond@inl.fr>
+	o Add missing autogen.sh file
+
+2005-10-24
+<pablo@eurodev.net>
+	o use NFCT_ANY_GROUP flag in nfct_open()
+
+2005-10-21
+<pablo@eurodev.net>
+	o Bumped version to 0.90
+	o Add support for id and marks
+
+2005-10-20
+<pablo@eurodev.net>
+	o Kill some more files that generated by the autocrap
+	o Resync with the lastest libnetfilter_conntrack API changes
+
+2005-10-16
+<pablo@netfilter.org>
+	o Rename libct_proto.h to conntrack.h
+	o Remove config.h.in from svn, it's autogenerated by the autocrap :)
+	o Remove dead functions in the SCTP protocol helper
+
+2005-10-14
+<pablo@netfilter.org>
+	o Kill config.h.in, it's generated by the autocrap
+	o The conntrack tool now uses libnetfilter_conntrack :)
+	o libct.c has been killed, now it's in libnetfilter_conntrack
+	o Check if you're root or CAP_NET_ADMIN
+	o Bumped version number to 0.86
+
+2005-10-07
+<chentschel@iplan.com.ar>
+	o Fixed ICMP options
+<pablo@netfilter.org>
+	o Multiple fixes for the ICMP protocol handler
+	o Fix ICMP output: wrong output. type and code were set to zero.
+
+2005-10-05
+<pablo@netfilter.org>
+	o Fix up counters
+	o Fix up compilation (IPS_* stuff missing), still need a proper fix
+	o Bumped version number to 0.82
+
+2005-09-24
+<laforge@netfilter.org>
+	o Get rid of C++ style comments
+	o Remove remaining bits of "-A --action", group-mask and dump-mask
+	o Clean up #include's
+	o Fix double-free when exiting via signal handler (Ctrl+C)
+	o Add "version" member to plugins
+	o Fix some Endianness issues when printing CTA_STATUS
+
+2005-08-31
+<pablo@netfilter.org>
+	o Fix packet and bytes counters (use __be64_to_cpu)
+	o Fix ip_conntrack_netlink load-on-demand
+
+2005-07-12
+<pablo@eurodev.net>
+	o Use conntrack netlink attributes: Major change
+	o Kill action setting: Mask based dumping
+	o Fix ChangeLog
+
+2005-05-23
+<laforge@netfilter.org>
+	o Fixed syntax error (tab/space issue) in help message
+	o Fixed getopt handling on big endian machines
+	o Fixed possible future read-over-end-of-array in TCP extension
+	o Add manpage
+	o Add missing space at output of libct_proto_icmp.c
+	o Add status bits that were introduced in 2.6.11
+	o Add SCTP extension
+	o Add support for expect creation
+	o Bump version number to 0.63
+
+2005-05-17
+<pablo@eurodev.net>
+	o Added descriptive error messages.
+	o Fix wrong flags check in [tcp|udp] proto helpers.
+
+2005-05-16
+<pablo@eurodev.net>
+	o Implemented ICMP proto helper
+	o Added help() and final_check() functions for proto helpers.
+
+2005-05-01
+<pablo@eurodev.net>
+	o Created changelog file
+	o Deleted libctnetlink.h and libnfnetlink.h from the include/ dir.
+	o Added support for version (-V) and help (-h)
+	o Added event mask based support
+	o Added GPLv2 headers
+	o Use fprintf instead of printf
+	o Defined print_tuple and print_proto output interfaces
+	o ctnl_[get|del]_conntrack handles return value from kernel via msgerr
+	o Added support for conntrack table flushing
+	o Added test case file (test.sh)
+	o Improve dump output
+
+<azez@ufomechanic.net>
+	o Autoconf stuff for conntrack + some pablo's modifications.
+	o Fixed packet counters formatting (use %llu instead of %lu)
+
+2005-04-25
+<pablo@eurodev.net>
+	o Added support for mask based event dumping
+	o Added support for mask based event notification
+	o On-demand autoload of ip_conntrack_netlink

@@ -1,0 +1,41 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Poptop MSCHAP2 ADS Howto</title>
+</head>
+
+<body>
+<p><strong><a name="mppe"></a>6. Install MPPE Kernel Module </strong></p>
+<p>Kernel version 2.6.15 or above has MPPE built-in which is required for MSCHAPv2. Fedora Core 5 and 6 kernel version on the CD are 2.6.15 and 2.6.18 respectively. That means you do not need to install the MPPE module as you have to for Fedora Core 4. Information for FC4 and MPPE is in <a href="poptop_ads_howto_a1.htm">Appendix A1 and A1.1</a>.</p>
+<p>To test if your kernel supports MPPE:</p>
+<blockquote>
+  <pre>[root@pptp ~]# modprobe ppp-compress-18 &amp;&amp; echo ok</pre>
+</blockquote>
+<p>It should resturn an &quot;ok&quot;.</p>
+<p><strong>Note:</strong> The latest kernel for Fedora Core 5/6 at the time of writing is 2.6.18.</p>
+<hr>
+<strong><a name="pppd_pptpd" id="pppd_pptpd"></a>7. pppd and  pptpd</strong>
+<p><a name="pppd"><strong>7.1 pppd </strong></a></p>
+<p>FC5 comes with ppp-2.4.3-6.2.1 and FC6 has ppp-2.4.4-1. MPPE support is already enabled.  If ppp is not installed, use<em> yum</em> to install it.</p>
+<blockquote>
+  <pre>[root@pptp ~]# yum install ppp</pre>
+</blockquote>
+<p><strong>Note</strong>: Information on how to update ppp module on FC4 is in <a href="poptop_ads_howto_a1.htm#pppd">Appendix A2</a>.</p>
+<hr>
+<a name="pptpd"></a><strong>7.2 Install pptpd</strong>
+<p>From <a href="http://sourceforge.net/project/showfiles.php?group_id=44827">here</a> download the pptpd rpm, pptpd-1.3.3-1.fc5.i386.rpm or pptpd-1.3.3-1.fc6.i386.rpm according to your Fedora version, and install it.</p>
+<blockquote>
+  <pre>[root@pptp ~]# rpm -ivh pptpd-1.3.3-1.*.i386.rpm</pre></blockquote>
+<p><strong>Note:</strong><br>
+The pptpd FC6 package is built against ppp-2.4.3 but FC6 has ppp-2.4.4. It prevents the tunnel to be established  and gives the following error message is in /var/log/message.</p>
+<blockquote>
+  <p>Plugin /usr/lib/pptpd/pptpd-logwtmp.so is for pppd version 2.4.3, this is 2.4.4 </p>
+</blockquote>
+<p>The workaround is to disable the logwtmp option in /etc/pptpd.conf.</p>
+<p>I have produced a patched RPM to address the problem. You may find a copy from <a href="http://rapidshare.com/files/11740134/pptpd-1.3.3-2.fc6.i386.rpm">here</a>.</p>
+<hr>
+<a href="poptop_ads_howto_5.htm">Next</a> &nbsp;&nbsp;<a href="poptop_ads_howto_3.htm">Previous</a>&nbsp;&nbsp;<a href="poptop_ads_howto_1.htm#toc">Content</a>
+</body>
+</html>

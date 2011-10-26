@@ -1,0 +1,75 @@
+
+Daytime Protocol (RFC-867)
+This protocol is widely used by small computers running MS-DOS and similar
+operating systems. The server listens on port 13,
+and responds to requests in either tcp/ip or udp/ip formats. The standard
+does not specify an exact format for the Daytime
+Protocol, but requires that the time is sent using standard ASCII
+characters. NIST chose a time code format similar to the one
+used by its dial-up Automated Computer Time Service (ACTS), as shown below:
+
+                      JJJJJ YR-MO-DA HH:MM:SS TT L H msADV UTC(NIST) OTM
+
+where:
+
+     JJJJJ is the Modified Julian Date (MJD). The MJD is the last five
+digits of the Julian Date, which is simply a count of the
+     number of days since January 1, 4713 B.C. To get the Julian Date, add
+2.4 million to the MJD.
+
+     YR-MO-DA is the date. It shows the last two digits of the year, the
+month, and the current day of month.
+
+     HH:MM:SS is the time in hours, minutes, and seconds. The time is
+always sent as Coordinated Universal Time (UTC). An
+     offset needs to be applied to UTC to obtain local time. For example,
+Mountain Time in the U. S. is 7 hours behind UTC
+     during Standard Time, and 6 hours behind UTC during Daylight Saving Time.
+
+     TT is a two digit code (00 to 99) that indicates whether the United
+States is on Standard Time (ST) or Daylight Saving
+     Time (DST). It also indicates when ST or DST is approaching. This code
+is set to 00 when ST is in effect, or to 50 when
+     DST is in effect. During the month in which the time change actually
+occurs, this number will decrement every day until the
+     change occurs. For example, during the month of October, the U.S.
+changes from DST to ST. On October 1, the number
+     will change from 50 to the actual number of days until the time
+change. It will decrement by 1 every day until the change
+     occurs at 2 a.m. local time when the value is 1. Likewise, the spring
+change is at 2 a.m. local time when the value reaches
+     51.
+
+     L is a one-digit code that indicates whether a leap second will be
+added or subtracted at midnight on the last day of the
+     current month. If the code is 0, no leap second will occur this month.
+If the code is 1, a positive leap second will be added at
+     the end of the month. This means that the last minute of the month
+will contain 61 seconds instead of 60. If the code is 2, a
+     second will be deleted on the last day of the month. Leap seconds
+occur at a rate of about one per year. They are used to
+     correct for irregularity in the earth's rotation. The correction is
+made just before midnight UTC (not local time).
+
+     H is a health digit that indicates the health of the server. If H=0,
+the server is healthly. If H=1, then the server is operating
+     properly but its time may be in error by up to 5 seconds. This state
+should change to fully healthy within 10 minutes. If H=2,
+     then the server is operating properly but its time is known to be
+wrong by more than 5 seconds. If H=3, then a hardware or
+     software failure has occurred and the amount of the time error is
+unknown. 
+
+     msADV displays the number of milliseconds that NIST advances the time
+code to partially compensate for network delays.
+     The advance is currently set to 50.0 milliseconds.
+
+     The label UTC(NIST) is contained in every time code. It indicates that
+you are receiving Coordinated Universal Time
+     (UTC) from the National Institute of Standards and Technology (NIST).
+
+     OTM (on-time marker) is an asterisk (*). The time values sent by the
+time code refer to the arrival time of the OTM. In
+     other words, if the time code says it is 12:45:45, this means it is
+12:45:45 when the OTM arrives.
+

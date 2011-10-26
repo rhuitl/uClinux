@@ -1,0 +1,118 @@
+SNAPGEAR ESS710 Disk-On-Chip
+----------------------------
+
+These instructions document how to use the OCdemon debugger (with
+ARM 20pin JTAG header) to program the Disk-On-Chip of the ESS710
+boards.
+
+
+0. SETTING UP DEBUGGER
+
+   Using OCdemon package, setup with appropriate .gdbinit script.
+   (Use new-wave/tools/misc/ess710.gdb).
+
+   Firstly make sure you have the lp drivers loaded, and then load
+   the ocdemon driver:
+
+      insmod parport
+      insmod parport_pc
+      insmod lp
+      insmod -f ocdemompp
+
+   (Ignore the ocdemonpp load warnings).
+
+   Now startup the process demon, and start gdb:
+
+      OcdLibRemote -c XSCALE-IXP &
+      xscale-elf-gdb
+
+   This should bring you up to the gdb prompt with no errors.
+   (I had to use the xscale-elf-gdb binary from the Macraigor tool chain
+   for this to really work properly. Not sure how there is better of
+   different, but some things just don't work right if you use arm-elf-gdb).
+
+
+1. FLASHING IPL (Initial Program Loader)
+
+   Inside gdb run the following command:
+
+      doc-programipl
+
+   It will initialize ram and load the modified boot loader programmer
+   into RAM, and then program the IPL (~/boot/ixp425/boot.elf) into the
+   special IPL sector of the DoC.
+
+   It issues progress ouput on the serial console at 11500 baud, so if
+   you have that attached you will know when it is done.
+
+   Note: this steps erases some of the normal boot loader sectors to
+   calculate its internal CRC, so you should always do this step first.
+
+
+2. FLASHING BOOT LOADER
+
+   Inside gdb run the following command:
+
+      doc-programboot
+
+   It will initialize ram and load the modified boot loader programmer
+   into RAM, and then program the SnapGear Boot Loader.
+
+   It issues progress ouput on the serial console at 11500 baud, so if
+   you have that attached you will know when it is done.
+
+   The boot loader is now installed.
+
+
+3. BOOTING FIRST LINUX
+
+   From now on we use Linux to do the rest of the hard work.
+
+   Power reset the ESS710 (you must power reset at this point) and get to
+   the SnapGear boot loader recovery prompt. Choose to do a network load.
+   This will start up the Redboot debugger. Be patient it is slow to start,
+   takes about 30 seconds to get to the command prompt.
+
+   Issue the following commands, loading a ESS710-Recover image:
+
+       load -r -v -b 0x01600000 zImage
+       load -r -v -b 0x00800000 ramdisk.gz
+       go  -n 0x01600000
+
+   Linux will boot after this (running completely from RAM).
+
+
+4. FLASHING THE IMAGE
+
+   If this is an un-formated DoC then you need to NFTL format it first.
+
+   Use:
+
+      nftl_format -b /dev/mtd0 229376
+
+   (We start 229376 bytes, 224k, offset into the device to skip over the
+   reserved factory blocks [3] and leave 128k for our boot loader).
+
+   You will need to reboot after doing this. The Linux NFTL drivers only
+   parse the DoC contents at first init.
+
+   Now use netflash to program in the image:
+
+      netflash -i -r /dev/nftla <TFTP-SERVER> image.bin
+
+   When done it should reboot, and run completely from flash.
+
+
+5. REFLASHING THE BOOT LOADER
+
+   Once you have a working system, you can reprogram the boot loader
+   without using the OCdemon debugger.  'make romfs' places the boot
+   loader in the /boot directory, so to flash the boot loader:
+
+      cd /boot
+      doc_loadbios /dev/mtd0 biosplus.bin 98304
+      doc_loadipl -e 98304 /dev/mtd0 bootplus.bin
+
+   Note: biosplus.bin also contains bootplus.bin, and doc_loadipl
+   relies on this to calculate the ECC for bootplus.bin.  This means
+   you must always run doc_loadbios before running doc_loadipl.

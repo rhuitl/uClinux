@@ -1,0 +1,50 @@
+#!/bin/sh
+# mini_httpd startup script
+# Nelson Minar <nelson@monkey.org> Thu Dec 30 13:54:31 PST 1999
+# the following two lines added 2000-01-31 by Bennett Todd <bet@rahul.net>
+# chkconfig: 2345 99 01
+# description: control script for mini_httpd
+
+
+# configuration options:
+
+DOCROOT=/home/httpd/html
+LOGFILE=/var/log/httpd/mini_httpd
+PIDFILE=/var/run/mini_httpd.pid
+HTTPD=/usr/bin/mini_httpd
+
+. /etc/rc.d/init.d/functions
+
+case "$1" in
+    start)
+        if [ ! -d $DOCROOT ]; then
+            echo "mini_httpd: $DOCROOT does not exist."
+            exit 1;
+        fi
+        cd $DOCROOT
+	action "Starting mini_httpd" $HTTPD -l $LOGFILE -i $PIDFILE;
+        touch /var/lock/subsys/httpd
+        ;;
+
+    stop)
+        echo -n "Stopping mini_httpd " 
+        killproc mini_httpd
+        echo
+        rm -f /var/lock/subsys/httpd $PIDFILE
+        ;;
+
+    status)
+        status mini_httpd
+        ;;
+
+    restart|reload)
+        $0 stop
+        $0 start
+	;;
+
+    *)
+	echo "Usage: mini_httpd {start|stop|status|restart|reload}"
+	;;
+esac
+
+exit 0

@@ -1,0 +1,469 @@
+HttpInspect
+-----------
+Daniel Roelker <droelker@sourcefire.com>
+
+-- Overview --
+HttpInspect is a generic HTTP decoder for user applications.  Given a data 
+buffer, HttpInspect will decode the buffer, find HTTP fields, and normalize 
+the fields.  HttpInspect works on both client requests and server responses.
+
+This initial version of HttpInspect only handles stateless processing.  This
+means that HttpInspect looks for HTTP fields on a packet by packet basis, and 
+will be fooled if packets are not reassembled.  This works fine when there is 
+another module handling the reassembly, but there are limitations in analyzing 
+the protocol.  That's why future versions will have a stateful processing mode 
+which will hook into various reassembly modules.
+
+-- Configuration --
+HttpInspect has a very "rich" user configuration.  Users can configure 
+individual HTTP servers with a variety of options, which should allow the 
+user to emulate any type of web server.
+
+It is VERY IMPORTANT to learn the configuration semantics, so you know what to 
+expect from the normalization routines.  So read this section over.
+
+** Global Configuration **
+The global configuration deals with configuration options that determine the 
+global functioning of HttpInspect.  The following example gives the generic
+global configuration format:
+
+preprocessor http_inspect: global [followed by the configuration options]
+
+You can only have a single global configuration, you'll get an error if 
+you try otherwise.
+
+The global configuration options are described below:
+
+* iis_unicode_map [filename (located in the config dir)] [codemap (integer)] *
+This is the global iis_unicode_map file.  THIS ALWAYS NEEDS TO BE SPECIFIED IN 
+THE GLOBAL CONFIGURATION, otherwise you get an error.  The Microsoft US
+unicode codepoint map is located in the snort /etc directory as a default.
+It is called unicode.map and should be used if no other is available.  You
+can generate your own unicode maps by using the program
+ms_unicode_generator.c located in the HttpInspect utils directory.
+Remember that this configuration is for the global IIS unicode map.  
+Individual servers can reference their own IIS unicode map.
+
+* detect_anomalous_servers *
+This global configuration option enables generic HTTP server traffic inspection
+on non-HTTP configured ports, and alerts if HTTP traffic is seen.  DON'T turn
+this on if you don't have a default server configuration that encompasses all
+of the HTTP server ports that your users might go to.  In the future we
+want to limit this to particular networks so it's more useful, but for right
+now this inspects all network traffic.
+
+* proxy_alert *
+This enables global alerting on HTTP server proxy usage.  By configuring
+HttpInspect servers and enabling allow_proxy_use, you will only receive proxy
+use alerts for web users that aren't using the configured proxies or are using
+a rogue proxy server.
+
+Please note that if users aren't required to configure web proxy use, then
+you may get a lot of proxy alerts.  So, please only use this feature with
+traditional proxy environments. Blind firewall proxies don't count.
+
+** Server Configuration **
+This is where the fun stuff begins.  There are two types of server 
+configurations: default and [IP].  The default configuration:
+  - preprocessor http_inspect_server: server default [server options]
+  
+This configuration supplies the default server configuration for any server 
+that is not individually configured.  Most of your web servers will most 
+likely end up using this default configuration.  Most of the time I would 
+suggest setting your default server to:
+  - preprocessor http_inspect_server: server default profile all ports { [whatever ports you want] }
+
+In the case of individual IPs the configuration is very similar:
+  - preprocessor http_inspect_server: server [IP] [server options]
+
+Now we'll talk about the server options.  Some configuration options have
+an argument of 'yes' or 'no'.  This argument specifies whether the user wants
+the configuration option to generate an alert or not.  
+
+IMPORTANT: 
+The 'yes/no' argument does not specify whether the configuration option 
+itself is on or off, only the alerting functionality.
+
+* profile [all/apache/iis/iis4/iis5_0] *
+Users can configure HttpInspect by using pre-defined HTTP server
+profiles.  Profiles must be specified as the first server option and
+cannot be combined with any other options except:
+  - ports
+  - iis_unicode_map
+  - allow_proxy_use
+  - flow_depth 
+  - no_alerts
+  - inspect_uri_only
+  - oversize_dir_length
+These options must be specified after the 'profile' option.
+
+Example:
+
+preprocessor http_inspect_server: server 1.1.1.1 profile all ports { 80 3128 }
+ 
+There are five profiles available:
+  - all: The "all" profile is meant to normalize the URI using most of the
+  	     common tricks available.  We alert on the more serious forms of 
+	     evasions.  This is a great profile for detecting all the types of	
+	     attacks regardless of the HTTP server.
+
+  - apache: The "apache" profile is used for apache web servers.  This differs
+	     from the 'iis' profile by only accepting utf-8 standard
+	     unicode encoding and not accepting backslashes as
+	     legitimate slashes, like IIS does.  Apache also accepts 
+	     tabs as whitespace 
+
+  - iis: The "iis" profile mimics IIS servers.  So that means we use IIS
+  	     unicode codemaps for each server, %u encoding, bare-byte encoding, 
+         backslashes, etc.
+
+  - iis4, iis5.0: In IIS 4.0 and 5.0, there was a double decoding 
+        vulnerability.  These two profiles are identical to IIS, except
+        they will alert by default if a URL has a double encoding.  Double
+        decode is not supported in IIS 5.1 and beyond, so it's disabled in 
+        Snort.
+
+Profiles are not required by http_inspect.
+ 
+* ports { [port] [port] . . . } *
+This is how the user configures what ports to decode on the HTTP server. 
+Encrypted traffic (SSL) cannot be decoded, so adding ports 443 will only 
+yield encoding false positives.
+
+* iis_unicode_map [file (located in config dir(] [codemap (integer)] *
+The IIS Unicode Map is generated by the program ms_unicode_generator.c.  This
+program is located in src/preprocessors/HttpInspect/util.  Executing this
+program generates a unicode map for the system that it was run on.  So to get
+the specific unicode mappings for an IIS web server, you run this program on
+that server and use that unicode map in this configuration.
+
+When using this option, the user needs to specify the file that contains the
+IIS unicode map and also specify the unicode map to use.  For US servers, this
+is usually 1252.  But the ms_unicode_generator program tells you which codemap
+to use for you server, it's the ANSI codepage.  You can select the correct
+code page by looking at the available code pages that the ms_unicode_generator
+outputs.
+
+* flow_depth [integer] *
+This specifies the amount of server response payload to inspect.  This option
+significantly increases IDS performance because we are ignoring a large part of
+the network traffic (HTTP server response payloads).  A small percentage of
+snort rules are targeted at this traffic and a small flow_depth value may
+cause false negatives in some of these rules.  Most of these rules target
+either the HTTP header, or the content that is likely to be in the first
+hundred or so bytes of non-header data.  Headers are usually under 300 bytes
+long, but your mileage may vary.
+
+This value can be set from -1 to 1460. A value of -1 causes Snort 
+to ignore all server side traffic for ports defined in "ports."
+Inversely, a value of 0 causes Snort to inspect all HTTP server
+payloads defined in "ports" (note that this will likely slow down IDS
+performance).  Values above 0 tell Snort the number of bytes to
+inspect in the first packet of the server response.
+
+* ascii [yes/no] *
+The ASCII decode option tells us whether to decode encoded ASCII chars, a.k.a
+%2f = /, %2e = ., etc.  I suggest you don't log alerts for ASCII since it is 
+very common to see normal ASCII encoding usage in URLs.
+
+* utf_8 [yes/no] *
+The UTF-8 decode option tells us to decode standard UTF-8 unicode sequences that
+are in the URI.  This abides by the unicode standard and only uses % encoding.
+Apache uses this standard, so for any apache servers, make sure you have this
+option turned on.  As for alerting, you may be interested in knowing when you
+have an utf-8 encoded URI, but this will be prone to false positives as
+legitimate web clients use this type of encoding.  When utf_8 is enabled,
+ascii decoding is also enabled to enforce correct functioning.
+
+* u_encode [yes/no] *
+This option emulates the IIS %u encoding scheme.  How the %u encoding scheme
+works is as follows:  The encoding scheme is started by a %u followed by 4
+chars, like %uXXXX.  The XXXX is a hex encoded value that correlates to an
+IIS unicode codepoint.  This value can most definitely be ASCII.  An ASCII
+char is encoded like, %u002f = /, %u002e = ., etc.  If no iis_unicode_map is
+specified before or after this option, the default codemap is used.
+
+You should alert on %u encodings, because I'm not aware of any legitimate 
+clients that use this encoding.  So it is most likely someone trying to be
+covert.
+
+* bare_byte [yes/no] *
+Bare byte encoding is an IIS trick that uses non-ASCII chars as valid values in
+decoding UTF-8 values.  This is NOT in the HTTP standard, as all non-ASCII
+values have to be encoded with a %.  Bare byte encoding allows the user to 
+emulate an IIS server and interpret non-standard encodings correctly.
+
+The alert on this decoding should be enabled, because there are no legitimate
+clients that encoded UTF-8 this way, since it is non-standard.
+
+* base36 [yes/no] *
+This is an option to decode base36 encoded chars.  I didn't have access to 
+a server with this option, since it appears that this is related to certain
+Asian versions of windows.  I'm going off of info from:
+http://www.yk.rim.or.jp/~shikap/patch/spp_http_decode.patch
+So I hope that works for any of you with this option.  Please note that if you
+have enabled %u encoding, this option will not work.  You have to use the
+base36 option with the utf_8 option.  Don't use the %u option, because base36
+won't work.  When base36 is enabled, so is ascii encoding to enforce correct
+behavior.
+
+* iis_unicode [yes/no] *
+The iis_unicode option turns on the unicode codepoint mapping.  If there is no
+iis_unicode_map option specified with the server config, iis_unicode uses the
+default codemap.  The iis_unicode option handles the mapping of non-ascii
+codepoints that the IIS server accepts and decodes normal UTF-8 request.
+
+Users should alert on the iis_unicode option, because it is seen mainly in 
+attacks and evasion attempts.  When iis_unicode is enabled, so is ascii and
+utf-8 decoding to enforce correct decoding.  To alert on utf-8 decoding, the
+user must enable also enable 'utf_8 yes'. 
+
+* double_decode [yes/no] *
+The double_decode option is specific to IIS 4.0 and 5.0. The versions of IIS 
+do two passes through the request URI, doing decodes in each one.  In the 
+first pass, it seems that all types of  IIS encoding is done: UTF-8 unicode,
+ASCII, bare byte, and %u.  In the second pass the following encodings are 
+done:  ASCII, bare byte, and %u.  We leave out UTF-8 because I think how 
+this works is that the % encoded UTF-8 is decoded to the unicode byte in the 
+first pass, and then UTF-8 decoded in the second stage. Anyway, this is really
+complex and adds tons of different encodings for one char.  When double_decode
+is enabled, so is ascii to enforce correct decoding.
+
+* non_rfc_char { [byte] [0x00] . . . } *
+This option lets users receive an alert if certain non-RFC chars are used in
+a request URI.  For instance, a user may not want to see NULL bytes in the
+request-URI and we can give an alert on that.  Please use this option with
+care, because you could configure it to say, alert on all '/' or something
+like that.  It's flexible, so be careful.
+
+* multi_slash [yes/no] *
+This option normalizes multiple slashes in a row, so something like:
+"foo/////////bar" get normalized to "foo/bar".
+
+If you want an alert when multiple slashes are seen, then configure with a yes,
+otherwise a no.
+
+* iis_backslash [yes/no] *
+Normalize backslashes to slashes.  This is again an IIS emulation.  So a
+request-URI of "/foo\bar" gets normalized to "/foo/bar".
+
+* directory [yes/no] *
+This option normalizes directory traversals and self-referential directories.
+So, "/foo/this_is_not_a_real_dir/../bar" get normalized to "/foo/bar".  Also,
+"/foo/./bar" gets normalized to "/foo/bar".  If a user wants to configure an
+alert, then specify "yes", otherwise "no".  This alert may give false positives
+since some web sites refer to files using directory traversals.
+
+* apache_whitespace [yes/no] *
+This option deals with non-RFC standard of tab or carriage return for a space
+delimiter, as well as any characters defined with the "whitespace_chars" option.
+Apache accepts these characters as whitespace, so if the emulated web server is
+Apache you need to enable this option.  Alerts on this option may be interesting,
+but may also be false positive prone.
+
+* whitespace_chars { [byte] [0x00 . . . } *
+This option lets users define characters that will be accepted as whitespace
+before and after a URI (e.g. GET<whitespace>/index.html<whitespace>HTTP/1.0).
+The default values are 0x09, 0x0B, 0x0C and 0x0D.  The characters defined with
+this option are in addition to the default values.  As an example, if a user
+wants to add the backspace char 0x08, this option should look like:
+whitespace_chars { 0x08 }.
+
+* iis_delimiter [yes/no] *
+I originally started out with \n being IIS specific, but Apache takes this
+non-standard delimiter was well.  Since this is common, we always take this 
+as standard since the most popular web servers accept it.  But you can still
+get an alert on this option.
+
+* chunk_length [non-zero positive integer] *
+This option is an anomaly detector for abnormally large chunk sizes.  This picks
+up the apache chunk encoding exploits, and may also alert on HTTP tunneling that
+uses chunk encoding.
+
+* no_pipeline_req *
+This option turns HTTP pipeline decoding off, and is a performance enhancement
+if needed.  By default pipeline requests are inspected for attacks, but when
+this option is enabled, pipeline requests are not decoded and analyzed per HTTP
+protocol field.  It is only inspected with the generic pattern matching.
+
+* non_strict *
+This option turns on non-strict URI parsing for the broken way in which
+Apache servers will decode a URI.  Only use this option on servers that will
+accept URIs like this "GET /index.html alsjdfk alsj lj aj  la jsj s\n".  The
+non_strict option assumes the URI is between the first and second space
+even if there is no valid HTTP identifier after the second space.
+
+* allow_proxy_use *
+By specifying this keyword, the user is allowing proxy use on this server.
+This means that no alert will be generated if the proxy_alert global keyword
+has been used.  If the proxy_alert keyword is not enabled, then this option
+does nothing.  The allow_proxy_use keyword is just a way to suppress 
+unauthorized proxy use for an authorized server.  
+
+* no_alerts *
+This option turns off all alerts that are generated by the HttpInspect
+preprocessor module.  This has no effect on http rules in the ruleset.
+No argument is specified.
+
+* oversize_dir_length [non-zero positive integer] *
+This option takes a non-zero positive integer as an argument.  The
+argument specifies the max char directory length for URL directory.  If a 
+URL directory is larger than this argument size, an alert is generated.  
+A good argument value is 300 chars.  This should limit the alerts
+to IDS evasion type attacks, like whisker -I 4.
+
+* inspect_uri_only *
+This is a performance optimization.  When enabled, only the URI portion of HTTP
+requests will be inspected for attacks.  As this field usually contains 90-95%
+of the web attacks, you'll catch most of the attacks.  So if you need extra
+performance, then enable this optimization.  It's important to note that
+if this option is used without any uricontent rules, then no inspection will
+take place.  This is obvious since the uri is only inspected with uricontent
+rules, and if there are none available then there is nothing to inspect.
+
+For example, if we have the following rule set:
+
+alert tcp any any -> any 80 ( msg:"content"; content: "foo"; )
+
+and the we inspect the following URI:
+
+GET /foo.htm HTTP/1.0\r\n\r\n
+
+No alert will be generated when 'inspect_uri_only' is enabled.  The 
+'inspect_uri_only' configuration turns off all forms of detection except 
+uricontent inspection.
+
+* webroot *
+This option generates an alert when a directory traversal traverses past
+the web server root directory.  This generates much less false positives than 
+the directory option, because it doesn't alert on directory traversals that 
+stay within the web server directory structure.  It only alerts when the 
+directory traversals go past the web server root directory, which
+is associated with certain web attacks.
+
+* tab_uri_delimiter *
+Both Apache and newer versions of IIS accept tabs as delimiters. However, 
+this option is deprecated and has been replaced by, and is enabled by default
+with, the whitespace_chars option.  For more details on its use, see the 
+whitespace_chars section above. 
+
+-- Profile Breakout --
+There are three profiles that users can select.  Only the configuration 
+that are listed under the profiles are turned on.  If there is no mention 
+of alert on or off, then that means there is no alert associated with the 
+configuration.
+
+* Apache *
+
+flow_depth 300
+non_strict URL parsing is set
+chunk encoding (alert on chunks larger than 500000 bytes)
+ascii decoding is on (alert off)
+multiple slash (alert off)
+directory normalization (alert off)
+webroot (alert on)
+apache whitespace (alert off)
+utf_8 encoding (alert off)
+
+* IIS *
+
+flow_depth 300
+non_strict URL parsing is set
+chunk encoding (alert on chunks larger than 500000 bytes)
+iis_unicode_map is set to the codepoint map in the global configuration
+ascii decoding (alert off)
+multiple slash (alert off)
+directory normalization (alert off)
+webroot (alert on)
+%u decoding (alert on)
+bare byte decoding (alert on)
+iis unicode codepoints (alert on)
+iis backslash (alert off)
+iis delimiter (alert off)
+apache whitespace (alert off)
+
+* IIS4 and IIS5_0 *
+
+flow_depth 300
+non_strict URL parsing is set
+chunk encoding (alert on chunks larger than 500000 bytes)
+iis_unicode_map is set to the codepoint map in the global configuration
+ascii decoding (alert off)
+multiple slash (alert off)
+directory normalization (alert off)
+webroot (alert on)
+double decoding (alert on)
+%u decoding (alert on)
+bare byte decoding (alert on)
+iis unicode codepoints (alert on)
+iis backslash (alert off)
+iis delimiter (alert off)
+apache whitespace (alert off)
+
+* All * 
+
+flow_depth 300
+non_strict URL parsing is set
+chunk encoding (alert on chunks larger than 500000 bytes)
+iis_unicode_map is set to the codepoint map in the global configuration
+ascii decoding is on (alert off)
+multiple slash (alert off)
+directory normalization (alert off)
+apache whitespace (alert off)
+double decoding (alert on)
+%u decoding (alert on)
+bare byte decoding (alert on)
+iis unicode codepoints (alert on)
+iis backslash (alert off)
+iis delimiter (alert off)
+webroot (alert on)
+
+The following lists the defaults:
+
+Port 80
+flow_depth 300
+non_strict URL parsing is set
+chunk encoding (alert on chunks larger than 500000 bytes)
+ascii decoding is on (alert off)
+utf_8 encoding (alert off)
+multiple slash (alert off)
+directory normalization (alert off)
+webroot (alert on)
+apache whitespace (alert off)
+iis delimiter (alert off)
+
+-- Writing uricontent rules --
+The uricontent parameter in the snort rule language searches the NORMALIZED
+request URI field.  This means that if you are writing rules that include
+things that are normalized, such as %2f or directory traversals, these
+rules will not alert.  The reason is that the things you are looking for
+are normalized out of the URI buffer.  For example, the URI:
+
+/scripts/..%c0%af../winnt/system32/cmd.exe?/c+ver
+
+will get normalized into:
+
+/winnt/system32/cmd.exe?/c+ver
+
+Another example,
+
+/cgi-bin/aaaaaaaaaaaaaaaaaaaaaaaaaa/..%252fp%68f?
+
+into:
+
+/cgi-bin/phf?
+
+So when you are writing a uricontent rule, you should write the content that
+you want to find in the context that the URI will be normalized.  Don't include
+directory traversals (if you normalize directories) and don't look for encode
+characters.  You can accomplish this type of detection by using the 'content'
+rule parameter, since this rule inspects the unnormalized buffer.
+
+-- Conclusion --
+So you got to the end?  Good for you.  I'm sure you know more about HTTP
+encodings and evasions then you ever wanted to.  My suggestions are to stick
+with the "profile" options, since they are much easier to read and have been
+researched.
+
+If you feel like giving us profiles for other web servers, please do.
+We'll incorporate them into the default server profiles for HttpInspect.

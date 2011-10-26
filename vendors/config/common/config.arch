@@ -1,0 +1,228 @@
+# Common definitions for all architectures
+############################################################################
+
+UCLINUX_DIST = 1
+export UCLINUX_DIST
+
+# ROOTDIR must be set by the initial makefile
+export ROOTDIR
+
+DEVICE_CONFIG = $(ROOTDIR)/.config
+export DEVICE_CONFIG
+-include $(DEVICE_CONFIG)
+
+LINUXDIR   = $(CONFIG_LINUXDIR)
+LIBCDIR    = $(CONFIG_LIBCDIR)
+PRODUCTDIR = $(ROOTDIR)/vendors/$(CONFIG_VENDOR)/$(CONFIG_PRODUCT)
+export LINUXDIR LIBCDIR PRODUCTDIR
+
+VERSIONPKG ?= $(CONFIG_DISTVERSION)
+VERSIONSTR ?= $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+BUILD_START_STRING ?= $(shell date "+%a, %d %b %Y %T %z")
+export VERSIONPKG VERSIONSTR BUILD_START_STRING
+
+PATH	 := $(PATH):$(ROOTDIR)/tools
+ROMFSINST = romfs-inst.sh
+LIBTOOL   = jlibtool
+export PATH ROMFSINST LIBTOOL
+
+IMAGEDIR   = $(ROOTDIR)/images
+RELDIR     = $(ROOTDIR)/release
+ROMFSDIR   = $(ROOTDIR)/romfs
+SCRIPTSDIR = $(ROOTDIR)/config/kconfig
+STAGEDIR   = $(ROOTDIR)/staging
+TFTPDIR    = /tftpboot
+export IMAGEDIR RELDIR ROMFSDIR SCRIPTSDIR STAGEDIR TFTPDIR
+
+ifndef NON_SMP_BUILD
+HOST_NCPU ?= $(shell if [ -f /proc/cpuinfo ]; then n=`grep -c processor /proc/cpuinfo`; if [ $$n -gt 1 ];then expr $$n \* 2; else echo $$n; fi; else echo 1; fi)
+# currently a lot of packages cannot be "parallel" built. Uncomment the
+# following line to enable parallel subdir builds (ie., user/* and lib/*).
+SUBDIR_SMP_BUILD := -j1
+else
+HOST_NCPU := 1
+SUBDIR_SMP_BUILD := -j1
+endif
+export HOST_NCPU SUBDIR_SMP_BUILD
+
+CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
+	  else if [ -x /bin/bash ]; then echo /bin/bash; \
+	  else echo sh; fi ; fi)
+export CONFIG_SHELL
+
+############################################################################
+#
+# everthing should be in tree,  especially if you are using ucfront,
+# instruct ucfront to remap known out-of-tree offenders
+# NOTE: make sure the /'s are the same for the match and the replacement
+#       as ucfront will just replace the left side with the right side.
+
+UCFRONT_MAPDIRS  = /lib/=$(STAGEDIR)/lib/
+UCFRONT_MAPDIRS += /usr/lib=$(STAGEDIR)/usr/lib
+UCFRONT_MAPDIRS += /include/=$(STAGEDIR)/include/
+UCFRONT_MAPDIRS += /usr/include=$(STAGEDIR)/usr/include
+export UCFRONT_MAPDIRS
+
+############################################################################
+# If either HOSTBUILD is set, or the file $ROOTDIR/hostbuild exists
+# set the hostbuild settings
+ifdef HOSTBUILD_CROSS
+	HOSTBUILD=1
+endif
+ifndef HOSTBUILD
+	ifeq ($(ROOTDIR)/hostbuild, $(wildcard $(ROOTDIR)/hostbuild))
+		HOSTBUILD=1
+	endif
+endif
+export HOSTBUILD
+
+############################################################################
+
+LINUX_CONFIG   = $(ROOTDIR)/$(LINUXDIR)/.config
+CONFIG_CONFIG  = $(ROOTDIR)/config/.config
+MODULES_CONFIG = $(ROOTDIR)/modules/.config
+ARCH_CONFIG    = $(ROOTDIR)/config.arch
+export LINUX_CONFIG CONFIG_CONFIG MODULES_CONFIG ARCH_CONFIG
+
+-include $(LINUX_CONFIG)
+-include $(CONFIG_CONFIG)
+-include $(MODULES_CONFIG)
+
+HOSTCC ?= cc
+export HOSTCC
+
+ifndef HOSTBUILD
+-include $(ARCH_CONFIG)
+endif
+
+ifdef HOSTBUILD
+RANLIB ?= ranlib
+HOSTCC += -g -DHOSTBUILD=1
+CFLAGS := -g -O -DHOSTBUILD=1 -D_FORTIFY_SOURCE=0 -DEMBED -I$(STAGEDIR)/include
+
+-include $(ROOTDIR)/vendors/$(CONFIG_VENDOR)/config.version
+
+# A black list of configs that are not supported for a host build.
+CONFIG_BLACKLIST=\
+	CONFIG_USER_FLASH_FLASH CONFIG_LEDMAN \
+	CONFIG_LIB_LIBNL_NETFILTER_CT \
+	CONFIG_PROP_AUTHD_PROXY_USES_SPLICE
+CONFIG_BLACKLIST_GREP="$(shell echo '$(CONFIG_BLACKLIST)' | sed 's/ /\\|/g')"
+$(foreach opt,$(CONFIG_BLACKLIST),$(eval $(opt) :=))
+endif
+
+############################################################################
+UCLINUX_COMMON_LIB = 0
+
+ifdef UCLINUX_BUILD_LIB
+	UCLINUX_COMMON_LIB = 1
+endif
+
+ifdef UCLINUX_BUILD_USER
+	UCLINUX_COMMON_LIB = 1
+endif
+
+ifeq ($(UCLINUX_COMMON_LIB),1)
+	# Static versions of libraries
+	SLIBFLEX	=	-lfl
+	SLIBC		=	-lc
+	SLIBM		=	-lm
+	SLIBNETOLD		=	-lnetold
+	SLIBPCAP	=	-lpcap
+	ifdef DISABLE_SHARED_SSL
+		SLIBSSL		=	-Wl,-Bstatic -lssl -Wl,-Bdynamic
+		SLIBCRYPTO	=	-Wl,-Bstatic -lcrypto -Wl,-Bdynamic
+	else
+		SLIBSSL		=	-lssl
+		SLIBCRYPTO	=	-lcrypto
+	endif
+	SLIBATM		=	-latm
+	ifdef CONFIG_LIB_LIBCRYPT_OLD
+		SLIBCRYPT	=	-Wl,-Bstatic -lcrypt_old -Wl,-Bstatic -lcrypt
+	else
+		SLIBCRYPT	=	-Wl,-Bstatic -Wl,-Bstatic -lcrypt
+	endif
+	SLIBEXPAT	=	-lexpat
+	SLIBIXML	=	-lixml
+	SLIBJPEG	=	-ljpeg
+	SLIBPNG		=	-lpng
+	ifdef CONFIG_LIB_STLPORT
+		ifdef CONFIG_LIB_STLPORT_SHARED
+			SLIBSTDCPP	=	-lstlport
+		else
+			SLIBSTDCPP	=	-Wl,-Bstatic -lstlport -Wl,-Bdynamic
+		endif
+	else
+		SLIBSTDCPP	=	-lstdc++
+	endif
+	SLIBTHREADUTIL	=	-lthreadutil
+	SLIBPTHREAD	=	-lpthread
+	SLIBUPNP	=	-lupnp
+	SLIBZ		=	-lz
+
+	# Dynamic versions
+	LIBFLEX		=	$(SLIBFLEX)
+	LIBC		=	$(SLIBC)
+	LIBM		=	$(SLIBM)
+	LIBNETOLD		=	$(SLIBNETOLD)
+	LIBPCAP		=	$(SLIBPCAP)
+	LIBSSL		=	$(SLIBSSL)
+	LIBCRYPTO	=	$(SLIBCRYPTO)
+	LIBATM		=	$(SLIBATM)
+	ifdef CONFIG_LIB_LIBCRYPT_OLD
+		LIBCRYPT	=	-lcrypt_old	-lcrypt
+	else
+		LIBCRYPT	=	-lcrypt
+	endif
+	LIBDL		=	-ldl
+	LIBEXPAT	=	-lexpat
+	LIBGCC		=	-lgcc
+	LIBIBERTY	?=	-liberty
+	LIBIO		=	-lio
+	LIBIOSTREAM	=	-liostream
+	LIBIXML		=	$(SLIBIXML)
+	LIBJPEG		=	$(SLIBJPEG)
+	LIBPNG		=	$(SLIBPNG)
+	LIBSTDCPP	=	$(SLIBSTDCPP)
+	LIBTCL		=	-ltcl
+	LIBTHREADUTIL	=	$(SLIBTHREADUTIL)
+	LIBPTHREAD	=	$(SLIBPTHREAD)
+	LIBUPNP		=	$(SLIBUPNP)
+	LIBZ		=	$(SLIBZ)
+	ifeq ($(findstring glibc,$(LIBCDIR)),glibc)
+		LIBRESOLV	=	-lresolv
+	endif
+	ifneq ($(LIBCDIR),libc)
+		LIBUTIL		=	-lutil
+	endif
+
+	# STLPort
+	# Note that STL_INCDIR is not included by default since
+	# it can cause conflicts
+	STL_INCDIR=$(STAGEDIR)/include/stlport
+	STL_LIBDIR=$(STAGEDIR)/lib
+
+	# Some make-foo to add the --fatal-warnings linker option, if supported
+	# (with thanks to Kbuild in 2.6)
+	# LDFLAGS += $(shell if $(CC) -Wl,--fatal-warnings -nostdlib -xc /dev/null -o /tmp/$$$$.out > /dev/null 2>&1; then echo "-Wl,--fatal-warnings"; rm /tmp/$$$$.out; fi;)
+
+	PKG_CONFIG_LIBDIR=$(STAGEDIR)/lib
+	GLIBJ_ZIP=$(STAGEDIR)/lib/classpath/install/share/classpath/glibj.zip
+endif
+############################################################################
+
+# May use a different compiler for the kernel
+KERNEL_CROSS_COMPILE ?= $(CROSS_COMPILE)
+ifneq ($(SUBARCH),)
+# Using UML, so make the kernel and non-kernel with different ARCHs
+MAKEARCH = $(MAKE) ARCH=$(SUBARCH)
+MAKEARCH_KERNEL = $(MAKE) ARCH=$(ARCH) SUBARCH=$(SUBARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
+else
+MAKEARCH = $(MAKE) ARCH=$(ARCH)
+MAKEARCH_KERNEL = $(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
+endif
+MAKEARCH_KERNEL += CFLAGS_KERNEL="$(VENDOR_CFLAGS)"
+MAKEARCH_KERNEL += AFLAGS_KERNEL="$(VENDOR_AFLAGS)"
+MAKEARCH_KERNEL += EXTRA_MODULE_DIRS="$(EXTRA_MODULE_DIRS)"
+
+############################################################################

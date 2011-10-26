@@ -1,0 +1,46 @@
+: 'This is a simple test that a new made mawk seems to'
+: 'be working OK.'
+: 'It is certainly not exhaustive, but the last two tests in'
+: 'particular use most features.'
+:
+
+dat=mawktest.dat
+
+trap 'echo mawk_test failed ; rm -f temp$$ ; exit 1'  0
+
+: 'find out which mawk we are testing'
+./mawk -Wv
+
+
+echo testing input and field splitting
+./mawk -f wc.awk $dat | cmp -s - wc-awk.out || exit
+
+echo input and field splitting OK
+
+echo
+echo testing regular expression matching
+./mawk -f reg0.awk $dat > temp$$
+./mawk -f reg1.awk $dat >> temp$$
+./mawk -f reg2.awk $dat >> temp$$
+
+cmp -s reg-awk.out temp$$ || exit
+echo regular expression matching OK
+
+echo
+echo testing arrays and flow of control
+./mawk -f wfrq0.awk $dat | cmp -s - wfrq-awk.out || exit
+
+echo array test OK
+
+echo
+echo testing function calls and general stress test
+./mawk -f ../examples/decl.awk $dat | cmp -s - decl-awk.out || exit
+
+echo general stress test passed
+
+echo
+echo  tested mawk seems OK
+
+trap 0
+rm -f temp$$
+exit 0

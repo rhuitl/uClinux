@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN"
+		"http://www.oasis-open.org/docbook/xml/4.3/docbookx.dtd">
+<refentry id='userdel.8'>
+  <!-- $Id: userdel.8.xml,v 1.20 2005/11/05 17:17:30 kloczek Exp $ -->
+  <refmeta>
+    <refentrytitle>userdel</refentrytitle>
+    <manvolnum>8</manvolnum>
+    <refmiscinfo class="sectdesc">System Management Commands</refmiscinfo>
+  </refmeta>
+  <refnamediv id='name'>
+    <refname>userdel</refname>
+    <refpurpose>Delete a user account and related files</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv id='synopsis'>
+    <cmdsynopsis>
+      <command>userdel</command>
+      <arg choice='opt'>-f </arg>
+      <arg choice='opt'>-r </arg>
+      <arg choice='plain'>
+	<replaceable>login_name</replaceable>
+      </arg>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+
+  <refsect1 id='description'>
+    <title>DESCRIPTION</title>
+    <para>
+      The <command>userdel</command> command modifies the system account
+      files, deleting all entries that refer to <emphasis
+      remap='I'>login_name</emphasis>. The named user must exist.
+    </para>
+  </refsect1>
+
+  <refsect1 id='options'>
+    <title>OPTIONS</title>
+    <para>
+      The options which apply to the <command>userdel</command> command are:
+    </para>
+    <variablelist remap='IP'>
+      <varlistentry>
+	<term>
+	  <option>-f</option>
+	</term>
+	<listitem>
+	  <para>
+	    This option forces the removal of the user, even if she is still
+	    logged in. It also forces <command>userdel</command> to remove
+	    the user's home directory or her mail spool, even if another
+	    user uses the same home directory or if the mail spool is not
+	    owned by the specified user.  If
+	    <emphasis>USERGROUPS_ENAB</emphasis> is defined to <emphasis
+	    remap='I'>yes</emphasis> in <filename>/etc/login.defs</filename>
+	    and if a group exists with the same name as the deleted user,
+	    then this group will be removed, even if it is still the primary
+	    group of another user.
+	  </para>
+	  <para>
+	    <emphasis>Note:</emphasis> This option is dangerous and may let
+	    your system in an inconsistent state.
+	  </para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term>
+	  <option>-r</option>
+	</term>
+	<listitem>
+	  <para>
+	    Files in the user's home directory will be removed along with
+	    the home directory itself and the user's mail spool. Files
+	    located in other file systems will have to be searched for and
+	    deleted manually.
+	  </para>
+	  <para>
+	    The mail spool is defined by the <emphasis>MAIL_DIR</emphasis>
+	    variable in the <filename>login.defs</filename> file.
+	  </para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='files'>
+    <title>FILES</title>
+    <variablelist>
+      <varlistentry>
+	<term><filename>/etc/group</filename></term>
+	<listitem>
+	  <para>group account information</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><filename>/etc/login.defs</filename></term>
+	<listitem>
+	  <para>shadow password suite configuration</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><filename>/etc/passwd</filename></term>
+	<listitem>
+	  <para>user account information</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><filename>/etc/shadow</filename></term>
+	<listitem>
+	  <para>secure user account information</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+
+  <refsect1 id='exit_values'>
+    <title>EXIT VALUES</title>
+    <para>
+      The <command>userdel</command> command exits with the following values:
+      <variablelist>
+	<varlistentry>
+	  <term><replaceable>0</replaceable></term>
+	  <listitem>
+	    <para>success</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><replaceable>1</replaceable></term>
+	  <listitem>
+	    <para>can't update password file</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><replaceable>2</replaceable></term>
+	  <listitem>
+	    <para>invalid command syntax</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><replaceable>6</replaceable></term>
+	  <listitem>
+	    <para>specified user doesn't exist</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><replaceable>8</replaceable></term>
+	  <listitem>
+	    <para>user currently logged in</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><replaceable>10</replaceable></term>
+	  <listitem>
+	    <para>can't update group file</para>
+	  </listitem>
+	</varlistentry>
+	<varlistentry>
+	  <term><replaceable>12</replaceable></term>
+	  <listitem>
+	    <para>can't remove home directory</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </para>
+  </refsect1>
+
+  <refsect1 id='caveats'>
+    <title>CAVEATS</title>
+    <para>
+      <command>userdel</command> will not allow you to remove an account if
+      the user is currently logged in. You must kill any running processes
+      which belong to an account that you are deleting.
+    </para>
+    <para>You may not remove any NIS attributes on a NIS client. This must
+      be performed on the NIS server.
+    </para>
+    <para>If <emphasis>USERGROUPS_ENAB</emphasis> is defined to <emphasis
+      remap='I'>yes</emphasis> in <filename>/etc/login.defs</filename>,
+      <command>userdel</command> will delete the group with the same name
+      as the user. To avoid inconsistencies in the passwd and group
+      databases, <command>userdel</command> will check that this group is
+      not used as a primary group for another user, and will just warn
+      without deleting the user otherwise. The <option>-f</option> option
+      can force the deletion of this group.
+    </para>
+  </refsect1>
+
+  <refsect1 id='see_also'>
+    <title>SEE ALSO</title>
+    <para><citerefentry>
+	<refentrytitle>chfn</refentrytitle><manvolnum>1</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>chsh</refentrytitle><manvolnum>1</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>passwd</refentrytitle><manvolnum>1</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>login.defs</refentrytitle><manvolnum>5</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>gpasswd</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>groupadd</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>groupdel</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>groupmod</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>useradd</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>usermod</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>.
+    </para>
+  </refsect1>
+</refentry>

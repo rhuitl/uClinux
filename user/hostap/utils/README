@@ -1,0 +1,214 @@
+Utility programs for Host AP driver for Intersil Prism2/2.5/3
+=============================================================
+
+Copyright (c) 2002-2004, Jouni Malinen <jkmaline@cc.hut.fi>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 2 as
+published by the Free Software Foundation. See COPYING for more
+details.
+
+
+hostap_crypt_conf
+=================
+
+hostap_crypt_conf is a tool for configuring encryption keys to the
+Host AP driver. It extends the features of iwconfig by supporting
+individual per STA keys and support more than one encryption
+algorithm.
+
+hostap_crypt_conf takes following options:
+
+Usage: hostap_crypt_conf [-1]..[-9] [-t] [-p] <device> <addr> <alg> [key]
+Options:
+  -1 .. -9   key index (for WEP); only one index per command
+  -t         set TX key index (given with -1 .. -9)
+  -p         permanent station configuration (do not expire data)
+  device     wlan#
+  addr       station hwaddr or ff:ff:ff:ff:ff:ff for default/broadcast key
+  alg        crypt algorithm (WEP, NULL, none)
+  key        key data (in hex, e.g. '0011223344', or s:string)
+
+Algorithms:
+  WEP        40 or 104 bit WEP
+  TKIP       Temporal Key Integrity Protocol (TKIP), WEP with per-packet
+             temporal keys and Michael MIC
+  CCMP       AES-CCM (Counter with CBC-MAC)
+  NULL       NULL encryption (i.e., do not encrypt/decrypt);
+             used to configure no encryption for given
+             station when using default encryption
+  none       disable encryption
+
+
+IEEE 802.11 (Chap. 8.3.2) specifies that dot11WEPKeyMappings uses only
+one key per station address (whereas dot11WEDefaultKeys has four), but
+Host AP uses a more general implementation that allows four keys even
+with individual keys. However, to remain compliant with the standard,
+it is recommended to use only the first key with station-specific key
+mapping. In addition, it might be useful to configure default TX key
+to be something else than the first key to allow individual keys to be
+used even with stations that not explicitly support WEP key mapping.
+
+Examples:
+
+AP configuration
+----------------
+
+# use station specific key also with broadcast RX frames to support
+# different keys with stations that do not use WEP key mapping;
+# if the stations allow configuration of separate key for broadcast/multicast
+# bcrx_sta_key should be left to 0 (default)
+
+prism2_param wlan0 bcrx_sta_key 1
+
+# set key2 as the default key (used with broadcast/multicast frames
+# and with stations for which there is no individual key mapping)
+hostap_crypt_conf -2t wlan0 ff:ff:ff:ff:ff:ff WEP s:abcde
+
+# or with iwconfig:
+iwconfig wlan0 key s:abcde [2]
+iwconfig wlan0 key [2]
+
+# set a permanent key mapping for STA2 (hwaddr=00:11:22:33:44:55)
+hostap_crypt_conf -p wlan0 00:11:22:33:44:55 WEP s:qwert
+
+STA1 configuration
+------------------
+
+# use only the default key (i.e., no key mapping)
+iwconfig wlan0 key s:abcde [2]
+iwconfig wlan0 key [2]
+
+STA2 configuration (hwaddr=00:11:22:33:44:55)
+------------------
+
+# configure default key (idx 2) so that the station knows how to
+# decrypt broadcast/multicast frames
+iwconfig wlan0 key s:abcde [2]
+
+# configure individual key (idx 1) that will be used to decrypt unicast
+# frames from the AP and to encrypt all frames to the AP
+iwconfig wlan0 key s:qwert [1]
+iwconfig wlan0 key [1]
+
+
+hostap_diag
+===========
+
+Diagnostics tools for showing details of Prism2/2.5/3 configuration.
+
+Usage: hostap_diag [-abhpru] <device>
+Options:
+  -h      show this usage info
+  -a      show all info
+  -b      show baseband processor control registers
+  -p      show production data area (PDA)
+  -r      show known RIDs
+  -u      show unknown RIDs
+
+
+hostap_io_debug
+===============
+
+Debugging tool for generating human readable debug log from Host AP
+driver io_debug file.
+
+
+hostap_rid
+==========
+
+Debugging tool for reading and writing Prism2/2.5/3 RID values.
+
+Usage: hostap_rid <device> <get/set> <rid id> [data]
+
+Examples:
+   hostap_rid wlan0 get fc00
+   hostap_rid wlan0 set fc00 06 00
+   hostap_rid wlan0 set fc0e 06 00 66 6f 6f 62 61 72
+
+Note:
+- Prism2/2.5/3 uses little-endian byte order
+- The most common word size is 16 bits
+- Set command needs the raw RID contents, i.e., it will be written as is to the device
+
+
+prism2_param
+============
+
+prism2_param is a shell script wrapper for 'iwpriv wlan0 prism2_param
+<param> <val>' command. The wrapper translates parameter names from
+text format into a integer value used in the real iwpriv command.
+
+Usage: prism2_param <interface> <parameter> [value]
+
+Wrapper for setting hostap_{cs,plx,pci}.o parameters using iwpriv and
+prism2_param ioctl. This wrapper converts the given text parameter
+(see list below) to corresponding prism2_param ioctl() value and uses
+iwpriv to set the given value.
+
+If value argument is not given, the current value is shown (if available).
+
+interface:
+	interface name for the wireless LAN device to be used (e.g., wlan0)
+
+parameter:
+	see README in Host AP driver package for full list of prism2_param
+	parameters
+
+
+prism2_srec
+===========
+
+Firmware image downloaded for Host AP driver
+
+Usage:
+  prism2_srec [-vvrgfdpisD] [-P <PDA file>] [-O <PDA binary>] <interface> \
+              <srec file name> [srec file name]
+Options:
+  -v   verbose (add another for more verbosity
+  -r   download SREC file into RAM (volatile)
+  -g   download SREC file into RAM (volatile in Genesis mode)
+  -f   download SREC file into flash (non-volatile)
+  -d   dump SREC image into prism2_srec.dump
+  -p   persistent mode for volatile download
+  -i   ignore incompatible interfaces errors
+       Warning! This can result in failed upgrade!
+  -s   Skip PDA reading and use defaults from the firmware image
+  -D   Dump PDA in text format (this can be used without srec file)
+  -P <PDA file>   Override card PDA (with a PDA file in text format)
+       Warning! This can result in failed upgrade!
+  -O <PDA binary>   Override procfs path for binary PDA
+       Warning! This can result in failed upgrade!
+
+Options -r, -g, and -f cannot be used together.
+If -r, -g, or -f is not specified, image summary is shown and
+compatibility with WLAN card is verified without downloading
+anything.
+
+Two images, PRI and STA firmware, can be combined by giving file names
+for both images on the command line.
+
+See hostap_fw_load script for an example that loads firmware images
+for cards without firmware in a flash chip (e.g., D-Link DWL-650
+rev. P1 and D-Link DWL-520 rev. E1).
+
+PDA data can be dumped in text format (PDRs in hex format using 16-bit
+words) with -D option. This format matches with the one used in
+Intersil's PDA files and it can be used to modify PDA contents for a
+download by using -P option. This does not overwrite PDA in the flash,
+so the modified PDA text file must be specified with all download
+commands. Similarily, -O option can be used to override PDA with a
+binary file (e.g., copy of /proc/net/hostap/wlan0/pda).
+
+Note: Modifying PDA data can result in failed download and/or invalid
+operation of the card after the download. This command should not be
+used unless you are absolutely sure you know what you are doing.
+
+
+split_combined_hex
+==================
+
+Tool for splitting combined S3 image files into seprate hex
+files. This can be used to convert combined firmware image files,
+e.g., extracted from some Windows drivers, into separate image files
+that can then be downloaded using prism2_srec.

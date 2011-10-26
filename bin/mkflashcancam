@@ -1,0 +1,95 @@
+#!/bin/bash
+##############################################################################
+
+#
+#	mkflash -- construct an entire CanCam flash image.
+#
+#	(C) Copyright 1999-2003, Roman Wagner (rw@feith.de)
+#
+
+##############################################################################
+
+#
+#	The starting MAC address... 00-0C-6B-80-XX-XX
+#	This strings is in octal below, ugh...
+#	If setting up 2 ethernet devices then set MAC1 as well.
+#
+MAC0="\000\014\153\200\000\000"
+MAC1="\000\014\153\200\000\001"
+#
+#	Define the files to use.
+#
+FLASH=images/flash.bin
+BOOT=vendors/Feith/boot/CanCam/boot.bin
+IMAGE=images/imagez.bin
+
+##############################################################################
+
+usage()
+{
+	echo "usage: mkflashcancam"
+	exit 1
+}
+
+##############################################################################
+
+#
+#	Check for any args...
+#
+if [ $# -gt 0 ]
+then
+	usage
+fi
+
+#
+#	All boards get 2 MAC addresses at first.
+#
+DUALETHER=1
+
+#
+#	Boot loader first.
+#
+cat $BOOT > $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 65536 - $SIZE`
+echo "BOOT: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	Command line args next.
+#
+echo -e "CONSOLE=/dev/ttyS0\000\c" >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 131072 - $SIZE`
+echo "ARGS: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	MAC address next.
+#
+echo -e "$MAC0\c" >> $FLASH
+[ "$DUALETHER" = 1 ] && echo -e "$MAC1\c" >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 196608 - $SIZE`
+echo "MAC:  flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	Leave space for the file system.
+#
+SIZE=131072
+PAD=0
+echo "CFS:  flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$SIZE >> $FLASH 2> /dev/null
+
+#
+#	Linux and file-system image.
+#
+cat $IMAGE >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 1769472 - $SIZE`
+echo "IMG:  flash size=$SIZE padding=$PAD"
+#dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+cp $FLASH /tftpboot
+exit 0

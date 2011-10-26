@@ -1,0 +1,24 @@
+#!/bin/sh
+
+#
+#	mountflash -- mount the flash device. If not present, or corrupted,
+#		      then reconstruct it.
+#
+
+mount -o ro,noatime,data=journal /dev/sda1 /sda1
+if [ "$?" != 0 ]
+then
+	echo
+	echo "Failed to find a valid root partition, reconstructing..."
+	echo
+	/etc/mkffs
+	if [ "$?" != 0 ]
+	then
+		echo
+		echo "Serious problems with USB flash storage!"
+		echo
+		exit 1
+	fi
+fi
+
+exit 0

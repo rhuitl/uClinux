@@ -1,0 +1,182 @@
+WHAT IS IT?
+
+New_fax is a utility for mgetty+sendfax from Gert Doeringer. It is designed
+to be called after mgetty+sendfax received a fax and offers powerfull features
+for postpresessing the fax.
+
+HOW DOES IT WORK?
+
+Mgetty has an interface for postprocessing faxes. It executes a command
+called "new_fax" after it received a fax. This program is given the 
+status, the sender's id, the number of pages and a list of all files
+containing the g3-images of the faxes. The number of files equals to the
+number of pages.
+
+FEATURES
+
+- Freely configurable with a file
+- Actions depend on the sender's ID
+- Sender can be assigned a name
+- All actions are implemented as modules
+
+REQUIREMENTS
+
+New_fax requires
+
+- Mgetty+Sendfax from Gert Doeringer
+- The NetPBM-Package for modifing images non-interactively
+
+ACTIONS
+
+The actions are shell-functions that do a speecified job for the post
+precessing:
+
+- Print a fax on a printer
+- Send a notification mail to an user
+- Send a notification on a user's tty (write)
+- Send the fax as MIME-encoded mail to an user
+- Delete the fax
+- Compress the fax
+- Forward the fax to another fax machine
+
+All of these actions can be mixed together depending on a sender's ID.
+
+THE CONFIGURATION FILE
+
+The configuration file usually has the name /usr/etc/mgetty+sendfax/faxlist
+but can be moved to any destination. The file is referenced inside new_fax
+with the variable "config" in the header. The config file consists of
+sections. Each section contains at least one identifier which must be a
+substring of the sender's id. Sections are seperated with a blank line.
+A matching id will activate the current
+section. All sections are read from top to buttom and the first matching
+section will be taken. An empty identification can be taken for all faxes,
+e.g. for a default section:
+
+	id 578399 
+
+This id would match all faxes containing "578399" in the phone number, e.g.
+"49 69 5783997". To assign a name to this fax, the keyword "name" is used.
+
+	id 578399
+	name Douglas Adams
+
+I can use more ids to activate a section but assign a name seperately:
+
+	id 578399
+	name Douglas Adams
+	id 153234
+	name Desaster Area
+
+Now I can do something with the fax. If I want send a notification mail
+to myself I use the keyword "notify":
+
+	notify dekay@ipf.de
+
+If I want to send the fax as a MIME-encoded mail to myself, I can use
+the keyword "mail":
+
+	mail dekay@ipf.de
+
+In order to make a notification on the user's tty if he is online, use
+the keyword "write":
+
+	write dekay root
+
+This will send a "write"-notification to the user, but only if the user
+is logged in and did not disable writes to his tty with "mesg n". Faxes
+can be printed with "print", where a printer name can optionally be
+specified:
+
+	print hplj
+
+will print the fax to the hplj. Faxes can be deleted with "delete":
+
+	delete
+
+would delete the entire fax, regardless if it was processed before or not.
+In order to compress the fax, you can use the keyword "compress".
+
+	compress
+
+would compress the archive. The fax can also be forwarded to another
+machine using the keyword "fax":
+
+	fax 923463
+
+would fax the fax to the number 923463. This might be usefull if you are
+away from home for a while but want still receive faxes.
+
+EXAMPLES
+
+Example 1: Standard default section
+
+This is an example for a standard default section, where the fax will be
+mailed to the user dekay and a notification will be written to the tty if
+I am online. After that the fax will be deleted. Two of the faxes are named:
+
+	id 12345
+	name Douglas Adams
+	id 4563234
+	name Desaster Area
+	id
+	mail dekay@ipf.de
+	notify dekay root
+	delete
+
+Example 2: An unwanted fax sender
+
+If somebody disturbs me by sending unwanted faxes I simply trash them unread:
+
+	id 934563
+	delete
+
+Example 3: A friend receives faxes from two sender regularey
+
+A friend of mine has not fax, but needs to receive faxes from one sender. In
+this example 9788434 is the sender of the fax and peter@domain.net is the
+e-mail address of my friend.
+
+	id 9788434
+	mail peter@domain.net
+
+Example 4: I am on vacation but I want my faxes to be forwarded to me or
+somebody
+
+	id
+	fax 97843988
+
+Where 97843988 is the number of the fax I want the faxes forwarded to.
+
+HOW DO I ADD ACTION MODULES?
+
+Actions are implemented as shell functions and the list of all pages are
+given as parameters. The images are referenced with full path names!
+The function "log" offers a log facility and logs by default into the file
+/var/log/fax, each line starting with date and time.
+
+These environment variables contian more inforation:
+
+pages: 	pages containts the number of pages of the current fax and is also
+	the number of parameter passed to the action module.
+
+name:	The name of the sender. This variable only contians a name if the id
+	matched some id-keyword inside the configuration file. 
+
+id: 	The is the sender's id.
+
+data:	This are the unsplit parameters for the keyword. The line
+	"command para1 para2" would be passed in data as "para1 para2", so
+	you can split it if you need.
+
+This is an example of a stupid action module "list" listing all files of
+the fax.
+
+	list()
+	{
+		for i in $*
+		do
+			echo $i
+		done
+	}
+

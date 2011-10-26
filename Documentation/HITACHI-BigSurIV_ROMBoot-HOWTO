@@ -1,0 +1,28 @@
+-------------------------------
+HITACHI BigSurIV ROM Boot patch
+-------------------------------
+
+
+This patch will add an additional option in the kernel configuration to have
+the kernel boot from ROM instead of needing to be copied to RAM first.
+
+To apply this patch, go into the following directory,
+
+cd uClinux-dist
+and run
+patch -p0 < $PATCH_LOCATION/linux-sh-ROMBoot.patch
+
+
+This will give you a new option in the kernel configuration called
+"Boot kernel from ROM". Select this option if you want to have the
+kernel code segment running from ROM.
+
+Then you will need to give the offset into the ROM where you wish
+to store/run the image from.
+
+You will then need to modify your boot loader to jump into the specified
+offset + 0x1000. So if the offset is specified as 0x100000 (the default),
+then your boot loader needs to jump to 0x101000 to boot the kernel.
+
+Also, remove any code for copying the image into RAM. Any copying that
+needs to be done will be done by the kernel itself.

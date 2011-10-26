@@ -1,0 +1,96 @@
+Newsgroups: de.comp.os.unix
+Path: greenie!colin.muc.de!lrz-muenchen.de!fauern!news.dfn.de!news.dkrz.de!ifmsun8.ifm.uni-hamburg.de!lutzifer!mwhh!solec!hb
+From: hb@solec.hanse.de (Heiko Bobzin)
+Subject: Re: Mail an user fax soll weggefaxt werden - elm-filter oder wie?
+References: <1993Jul22.183534.2705@panda.hanse.de>
+Organization: Software & Electronix, Altona, Hamburg
+Date: Fri, 23 Jul 1993 16:11:56 GMT
+Message-ID: <1993Jul23.161156.31520@solec.hanse.de>
+Lines: 85
+
+michaelw@panda.hanse.de (Michael Will) writes:
+
+>Wie kann ich es einrichten, das jede mail die an den user fax geht
+>automatisch an das faxspool-script verf¸ttert wird?
+>Wer hat das Problem schon gelˆst?
+
+Hier !
+
+>All Information welcome :-) 
+
+Ich hab das Ganze ins smail transports/routers eingebaut (leider
+hast Du vergessen, Deinen Mail-Transport-Agent anzugeben)
+
+in "/usr/local/lib/smail/routers" steht bei mir u.A.:
+
+FAXSPOOLER:	transport=fax, driver=queryprogram;
+		cmd="/usr/bin/test X${lc:host} = Xfax"
+
+und in "/usr/local/lib/smail/transports" noch dazu:
+
+fax: max_addrs=5, max_chars=200, +from, return_path, unix_from_hack,
+     driver=pipe;
+     cmd="/bin/sh -c /usr/bin/faxq $((${strip:addr})$)",
+		 parent_env
+
+Dann muss allerdings auch "uux" mit eingetragem sein, wenn noch nicht
+vorhanden (s. Manual-Page, je nach Deinen Einstellungen)
+
+Das Gute an "smail" ist, daﬂ es so viele Environment-
+Variablen setzt (SENDER, BASENAME, ADDR ...) !
+"faxq" konvertiert die Mails, die an <nummer>@fax gehen, per "psf" und
+"ghostscript" nach G3. Das File wird dann in SPOOLDIR abgelegt.
+Ein Fax-Daemon holt die Dateien dort ab und
+verschickt sie per "mgetty/sendfax".
+
+Jetzt fehlt eigentlich nur noch "/usr/bin/faxq":
+#
+if [ "$SENDER" = "" ] ; then SENDER="$LOGNAME" ; fi
+if [ "$BASENAME" = "" ] ; then BASENAME="f.$SENDER.$$"; fi
+if [ "$ADDR" = "" ] ; then ADDR="$1"; File="$2" ; fi
+function do_error_check {
+if [ "X$?" != "X0" ] ; then
+   ( echo -e "From: root (FAX SUBSYSTEM)\nTo: $SENDER\nSubject: Kann nicht senden $*\n\n"
+     echo "$0: Dein Fax an $addr"
+     echo "$0: Fehler-Ausgabe:"
+     cat $tmp.err
+     rm $tmp.* 2>/dev/null ) | /usr/lib/sendmail $SENDER
+   exit 0
+fi
+}
+#
+addr=`echo $ADDR | sed -e 's/@fax//'`
+tmp=/usr/spool/fax/tmp/$BASENAME.fax
+SPOOLDIR=/usr/spool/fax/outgoing
+case $SENDER in
+ root)	     ;; # root darf faxen machen (he,he,)
+ *) 
+   ( echo -e "From: MAILER_DAEMON (FAX SUBSYSTEM)\nTo: $SENDER\nSubject: Faxen an $addr\n\n"
+     echo "$0: Dein Fax an $addr konnte nicht versandt werden."
+     echo "$0: Bitte lass dich bei FaxMaster@sonstwo eintragen!"
+     cat
+      ) | /usr/lib/smail $SENDER
+     exit 0
+     ;;
+esac
+#
+jobid=`date +'%H%M%S'`
+if [ "$File" = "" ] ; then
+( awk '
+ { if (flag || match($0,"^From:") || match($0,"^Date:") || match($0,"^To:")) print ;
+   if ($0 == "") flag++;
+ } ' | tee $tmp.log | psf -g Fax | \
+       gs -sDEVICE=dfaxhigh -sOutputFile=$SPOOLDIR/$jobid.%02d -dQUIET ) 2>$tmp.err
+else
+       echo | gs -sDEVICE=dfaxhigh -sOutputFile=$SPOOLDIR/$jobid.%02d -dQUIET $File 2>$tmp.err
+fi
+#
+echo "SENDER $SENDER
+ADDR $addr
+BASENAME $BASENAME" > $SPOOLDIR/$jobid.job
+do_error_check postscript-file
+
+-- 
+"Die gef‰hrlichsten Hacker sitzen bei der IBM und
+ nicht im Knast." - IBM-Anzeige
+

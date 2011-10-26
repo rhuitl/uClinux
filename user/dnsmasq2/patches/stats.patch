@@ -1,0 +1,266 @@
+Date: 2007/03/30 18:04:38
+#11480 #13964
+
+Store statistical information from DNS to determine cache usage and hit rate.
+
+Index: dnsmasq2/src/cache.c
+===================================================================
+--- dnsmasq2.orig/src/cache.c	2009-03-12 12:16:51.000000000 +1000
++++ dnsmasq2/src/cache.c	2009-03-12 12:16:53.000000000 +1000
+@@ -25,7 +25,13 @@ static struct crec *new_chain = NULL;
+ #ifdef DO_PRELOAD
+ static struct crec *dontpurge_chain = NULL;
+ static int dontpurge_needed;
+-static int dontpurge_chain_matches = 0, dontpurge_chain_inserts = 0, dontpurge_chain_deletes = 0;
++static int dontpurge_chain_matches = 0, dontpurge_chain_inserts = 0, dontpurge_chain_deletes = 0, dontpurge_chain_count = 0;
++extern int preload_lookups_pending;
++#endif
++#ifdef DO_STATS
++static int total_fixed_cache  = 0;
++static int total_cached_hosts = 0;
++static int total_cached_dhcp_hosts = 0;
+ #endif
+ static int cache_inserted = 0, cache_live_freed = 0, insert_error;
+ #ifdef USE_BIGNAMES
+@@ -79,6 +85,9 @@ static void cache_unlink(struct crec *cr
+ static void cache_link(struct crec *crecp);
+ static void rehash(int size);
+ static void cache_hash(struct crec *crecp);
++#ifdef DO_STATS
++static void cache_stats_send(void);
++#endif
+ 
+ void cache_init(void)
+ {
+@@ -183,6 +192,10 @@ static void cache_hash(struct crec *crec
+     }
+   crecp->hash_next = *up;
+   *up = crecp;
++
++#ifdef DO_STATS
++  if (!(crecp->flags & (F_HOSTS|F_DHCP))) total_fixed_cache++;
++#endif
+ }
+  
+ static void cache_free(struct crec *crecp)
+@@ -201,6 +214,10 @@ static void cache_free(struct crec *crec
+     }
+ #endif
+ 
++#ifdef DO_STATS
++  if (!(crecp->flags & (F_HOSTS|F_DHCP))) total_fixed_cache--;
++#endif
++
+   crecp->flags &= ~F_FORWARD;
+   crecp->flags &= ~F_REVERSE;
+   crecp->uid = uid++; /* invalidate CNAMES pointing to this. */
+@@ -212,7 +229,7 @@ static void cache_free(struct crec *crec
+   crecp->prev = cache_tail;
+   crecp->next = NULL;
+   cache_tail = crecp;
+-  
++
+   /* retrieve big name for further use. */
+   if (crecp->flags & F_BIGNAME)
+     {
+@@ -384,7 +401,6 @@ static int free_dontpurge_chain(void)
+ 
+   struct crec *dpc = dontpurge_chain;
+   dontpurge_chain = NULL;
+-
+   while (dpc)
+     {
+       struct crec *tmp = dpc->next;
+@@ -403,7 +419,6 @@ static struct crec *cache_unhash_name_ad
+   for (up = hash_bucket(name), crecp = *up; crecp; crecp = next)
+     {
+       next = crecp->hash_next;
+-
+       if (!(crecp->flags & F_FORWARD) ||
+ 	  !hostname_isequal(cache_get_name(crecp), name) ||
+ 	  (crecp->flags & (F_HOSTS | F_DHCP | F_CNAME)) ||
+@@ -425,6 +440,10 @@ static struct crec *cache_unhash_name_ad
+ 	  /* match.  unhash the entry. */
+ 	  *up = crecp->hash_next;
+ 	  ans = crecp;
++#ifdef DO_STATS
++	  total_fixed_cache--;
++#endif
++
+ 	  break;
+ 	}
+     }
+@@ -644,12 +663,16 @@ void cache_end_insert(void)
+ #ifdef DO_PRELOAD
+       if (dontpurge_needed)
+         {
+-	  syslog(LOG_ERR, _("Cache not large enough to contain all preloaded entries."));
+-	  syslog(LOG_ERR, _("Disabling preload feature."));
+-	  preload_disabled = 1;
+-	  free_dontpurge_chain();
++          syslog(LOG_ERR, _("Cache not large enough to contain all preloaded entries."));
++          syslog(LOG_ERR, _("Disabling preload feature."));
++          preload_disabled = 1;
++          dontpurge_chain_deletes += free_dontpurge_chain();
++          dontpurge_chain_count -= dontpurge_chain_deletes;
+         }
+ #endif
++#ifdef DO_STATS
++	  cache_stats_send();
++#endif
+       return;
+     }
+ 
+@@ -722,12 +745,17 @@ void cache_end_insert(void)
+   if (dontpurge_chain_inserts != dontpurge_chain_matches ||
+       dontpurge_chain_inserts != dontpurge_chain_deletes) {
+     preload_addrlist_updated++;
++	dontpurge_chain_count+=dontpurge_chain_inserts;
++	dontpurge_chain_count-=dontpurge_chain_deletes;
+   } else {
+ 	  // If dontpurge inserts were really just matches or deletes,
+ 	  // don't count them on the total inserted.
+ 	  cache_inserted-=dontpurge_chain_inserts;
+   }
+ #endif
++#ifdef DO_STATS
++	  cache_stats_send();
++#endif
+ }
+ 
+ struct crec *cache_find_by_name(struct crec *crecp, char *name, time_t now, unsigned short prot)
+@@ -920,9 +948,41 @@ static void add_hosts_entry(struct crec 
+       cache->uid = index;
+       memcpy(&cache->addr.addr, addr, addrlen);
+       cache_hash(cache);
++#ifdef DO_STATS
++      total_cached_hosts++;
++#endif
+     }
+ }
+ 
++#ifdef DO_STATS
++static void cache_stats_send(void) {
++  char *b;
++  int ret;
++  ret = asprintf(&b, "statsd -a"
++          " push dns cache_size %d \\;"
++          " push dns cache_tot %d \\;"
++#ifdef DO_PRELOAD
++          " push dns cache_tot_fixed %d \\;"
++          " push dns cache_tot_fixed_unres %d \\;"
++#endif
++          " push dns cache_hosts %d \\;"
++          " push dns cache_dhcp_hosts %d",
++          daemon->cachesize,
++          total_fixed_cache,
++#ifdef DO_PRELOAD
++          dontpurge_chain_count,
++          preload_lookups_pending,
++#endif
++          total_cached_hosts,
++          total_cached_dhcp_hosts);
++  if (ret > 0)
++    {
++      system(b);
++      free(b);
++    }
++}
++#endif
++
+ static int read_hostsfile(char *filename, int opts, char *buff, char *domain_suffix, int index, int cache_size)
+ {  
+   FILE *f = fopen(filename, "r");
+@@ -1032,7 +1092,12 @@ void cache_reload(int opts, char *buff, 
+   int i, total_size = daemon->cachesize;
+ 
+   cache_inserted = cache_live_freed = 0;
+-  
++#ifdef DO_STATS
++  total_fixed_cache = total_cached_hosts = 0;
++#ifdef DO_PRELOAD
++  dontpurge_chain_count = 0;
++#endif
++#endif
+   for (i=0; i<hash_size; i++)
+     for (cache = hash_table[i], up = &hash_table[i]; cache; cache = tmp)
+       {
+@@ -1093,6 +1158,10 @@ void cache_unhash_dhcp(void)
+ 	}
+       else
+ 	up = &cache->hash_next;
++
++#ifdef DO_STATS
++  total_cached_dhcp_hosts = 0;
++#endif
+ }
+ 
+ void cache_add_dhcp_entry(char *host_name, 
+@@ -1159,6 +1228,9 @@ void cache_add_dhcp_entry(char *host_nam
+       crec->addr.addr.addr.addr4 = *host_address;
+       crec->name.namep = host_name;
+       cache_hash(crec);
++#ifdef DO_STATS
++      total_cached_dhcp_hosts++;
++#endif
+     }
+ }
+ #endif
+Index: dnsmasq2/src/forward.c
+===================================================================
+--- dnsmasq2.orig/src/forward.c	2009-03-12 12:16:51.000000000 +1000
++++ dnsmasq2/src/forward.c	2009-03-12 12:16:53.000000000 +1000
+@@ -718,6 +718,10 @@ void receive_query(struct listener *list
+ 
+   m = answer_request (header, ((char *) header) + PACKETSZ, (size_t)n, 
+ 		      dst_addr_4, netmask, now);
++#ifdef DO_STATS
++  (m > 0)?system("statsd -a incr dns hits \\; incr dns total"):
++          system("statsd -a incr dns total");
++#endif
+   if (m >= 1)
+     {
+       send_from(listen->fd, daemon->options & OPT_NOWILD, (char *)header, 
+@@ -789,6 +793,10 @@ unsigned char *tcp_request(int confd, ti
+       /* Do this by steam now we're not in the select() loop */
+       check_log_writer(NULL); 
+       
++#ifdef DO_STATS
++      (m > 0)?system("statsd -a incr dns hits \\; incr dns total"):
++              system("statsd -a incr dns total");
++#endif
+       if (m == 0)
+ 	{
+ 	  unsigned short flags = 0;
+Index: dnsmasq2/makefile
+===================================================================
+--- dnsmasq2.orig/makefile	2009-03-12 12:16:51.000000000 +1000
++++ dnsmasq2/makefile	2009-03-12 12:16:53.000000000 +1000
+@@ -8,6 +8,9 @@ endif
+ ifdef CONFIG_USER_FLATFSD_FLATFSD
+ CFLAGS += -DETC_DIR=\"/etc/config\"
+ endif
++ifdef CONFIG_PROP_STATSD_STATSD
++CFLAGS += -DDO_STATS
++endif
+ 
+ EXTRA_OBJS = preload.o
+ export EXTRA_OBJS
+Index: dnsmasq2/src/preload.c
+===================================================================
+--- dnsmasq2.orig/src/preload.c	2009-03-12 12:17:00.000000000 +1000
++++ dnsmasq2/src/preload.c	2009-03-12 12:17:18.000000000 +1000
+@@ -264,10 +264,11 @@ next_line:
+     }
+ 
+   r = preload_lookup(fline, now);
+-  if (r >= 0)
++  if (r >= 0)  {
+     fline_valid = 0;
+-  else
++  }	else {
+     fline_valid = 1;
++  }
+ 
+   return 1;
+ }

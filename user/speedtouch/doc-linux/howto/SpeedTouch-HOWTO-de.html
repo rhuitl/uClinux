@@ -1,0 +1,538 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+    <title>SpeedTouch USB HOWTO Deutsch</title>
+  </head>
+  <body>
+                         
+<h1><br>
+             </h1>
+                         
+<h1>  SpeedTouch USB HOWTO mit den Benoit - Papillault's GPL Treibern</h1>
+             <br>
+                         
+<div align="right"><u>Autoren:</u><br>
+             Sylvain Trias <a href="mailto:bozo@nobodix.org">bozo@nobodix.org</a><br>
+             Edouard Gomez <a href="mailto:ed.gomez@free.fr">ed.gomez@free.fr</a><br>
+             Bernhard Brandl<a href="mailto:brandl@tuxfamily.org"> brandl@tuxfamily.org</a><br>
+  Christoph Tapler <a href="mailto:christoph@tapler.info">christoph@tapler.info</a><br>
+       <font size="-1"><i><br>
+          Letzte &Auml;nderung: 2002-05-07</i></font><br>
+             <br>
+             <br>
+              </div>
+             Inhaltsverzeichnis:<br>
+                         
+<ul>
+               <li><a href="#einfuehrung">Einf&uuml;hrung</a></li>
+               <li><a href="#benoetigte_pakete">Ben&ouml;tigte Pakete</a></li>
+               <li><a href="#installation_konfiguration">Installation / Konfiguration</a><br>
+                                                                         
+   
+    <ul>
+                   <li><a href="#kernel_konfiguration">Linux - Kernel</a></li>
+                   <li><a href="#speedtouch_treiber">Benoit's Treiber</a></li>
+                   <li><a href="#ppp_konfiguration">pppd - Konfiguration</a></li>
+                                                                         
+   
+    </ul>
+               </li>
+               <li><a href="#verbindung_starten">Verbindung aufbauen</a></li>
+               <li><a href="#weitere_hilfe">Wo kann ich weiterf&uuml;hrende 
+ Hilfe    finden?</a></li>
+       <li><a href="#bemerkungen">Bemerkungen</a><br>
+               </li>
+                         
+</ul>
+                         
+<hr width="100%" size="2">             
+<h2><a name="einfuehrung"></a>Einf&uuml;hrung</h2>
+             Dieses &nbsp;Dokument wird Sie &nbsp;durch den Installationsproze&szlig; 
+      von Benoit Papillault's GPL Treiber f&uuml;hren. Diese 
+    Treiber wurde f&uuml;r das Alcatel &nbsp;SpeedTouch USB modem geschrieben.<br>
+                         
+<hr width="100%" size="2"><br>
+                         
+<h2><a name="benoetigte_pakete"></a>Ben&ouml;tigte Pakete</h2>
+                             
+<ul>
+                 <li>GPL Treiber von Benoit</li>
+                 <li>Microcode f&uuml;r das Alcatel SpeedTouch USB modem</li>
+                 <li>Kernel mit USB - Support (vorzugsweise Linux Version 
+2.4,   sollte   aber auch mit 2.2 funktionieren)</li>
+                 <li>pppd</li>
+                             
+</ul>
+            <br>
+                       
+<h3>Download von Benoit's Treiber</h3>
+            Die letzte Version ist unter dieser <a href="http://speedtouch.sourceforge.net/download.php">
+            Adresse</a> zu finden. <br>
+<br>
+                       
+<h3>   Microcode von Thomson</h3>
+              Den Microcode vom Thomson - Teiber kann man von der Thomson 
+-  Homepage     herunterladen.  Hier ist es unerheblich, ob man den Treiber 
+von Windows   oder  Linux verwendet.  Der Microcode ist immer derselbe und 
+befindet sich in einem der folgenden Dateien:<br>
+                             
+<ul>
+                 <li>In der Datei <font face="Courier New, Courier, monospace">
+   mgmt.o</font> im GNU/Linux Paket.</li>
+                 <li>In der Datei <font face="Courier New, Courier, monospace">
+   alcaudsl.sys</font> im Windows&reg; Paket.</li>
+                             
+</ul>
+               (Wenn man das Modem schon unter Windows betreibt, kann man 
+sich   den   Downloader   sparen und unter <font face="Courier New, Courier, monospace">
+          \Windows\System</font> die Datei <font face="Courier New, Courier, monospace">
+          alcaudsl.sys</font> verwenden.)<br>
+               <font color="#cc0000"><br>
+            <u>Warnung:</u></font>    Das Paket darf entpackt aber <u>unter 
+ keinen   F&auml;llen   installiert</u>  werden! Vom Thomson - Treiber wird 
+ lediglich der  Microcode verwendet!<br>
+               <br>
+            GNU/Linux Treiber auf Thomson's Homepage : <a href="http://www.speedtouchdsl.com/dvrreg_lx.htm">
+            http://www.speedtouchdsl.com/dvrreg_lx.htm</a><br>
+            <br>
+                       
+<h3>Kernel</h3>
+            Die Treiber sind f&uuml;r die Kernel Version 2.4 geschrieben
+worden.     Es ist aber auch m&ouml;glich, die Treiber ab Version 2.2.18
+laufen zu&nbsp; lassen, da der USB - Code von der Kernel     Version   2.4
+stammt.<br>
+            Es gibt einzelne Distributionen, wo schon alle n&ouml;tigen Einstellungen
+     richtig konfiguriert sind,  soda&szlig; es nicht n&ouml;tig ist, den
+Kernel     selbst zu kompilieren (Mandrake uns SuSE 7.3 zum Beispiel). Aber
+ im Allgemeinen ist eine neue Konfiguration  n&ouml;tig RedHat zum Beispiel).
+ Ein zweiter Grund - den Kernel neu zu konfigurieren ist - da&szlig;  der
+Kernel  ein kleines Problem mit dem hdlc - Code hat, wof&uuml;r es  aber
+einen Patch  gibt (wird in der Folge  beschrieben).<br>
+            <br>
+            Also: Am besten sich den neuesten Kernel von <a href="http://www.kernel.org">
+            www.kernel.org</a> herunterladen, patchen und konfigurieren.
+Wie   man einen   Kernel  konfiguriert, kompiliert und installiert wird,
+ist in  der <a href="http://www.linuxdoc.org/HOWTO/Kernel-HOWTO.html">  
+    Kernel  - Howto</a> zu finden.<br>
+            <br>
+                       
+<h3>pppd<br>
+            </h3>
+            pppd sollte ab der Version 2.3.11 funktionieren. Aktuell ist
+die   Version     2.4.1 und ist <a href="http://www.samba.org/ppp/index.html">
+    hier</a> zu   finden.<br>
+<br>
+<u>Bemerkung:</u> Wenn Sie eine Kernel Version 2.4 verwenden, dann <u>m&uuml;ssen</u>
+ Sie eine pppd Version 2.4.x&nbsp; verwenden! (Umgekehrt &nbsp;- also Kernel
+Version 2.2 und pppd Version 2.3 bzw. 2.4 k&ouml;nnen hingegen miteinander)<br>
+                       
+<hr width="100%" size="2"><br>
+                       
+<h2><a name="installation_konfiguration"></a>Installation und Konfiguration:</h2>
+               <br>
+               Die Installation wird in zwei Schritte aufgeteilt:<br>
+                             
+<ul>
+                 <li><a href="#kernel_konfiguration">Kernel - Konfiguration</a></li>
+                 <li><a href="#ppp_konfiguration">pppd - Konfiguration</a></li>
+                             
+</ul>
+            <br>
+                       
+<h3><a name="kernel_konfiguration"></a>Kernel - Konfiguration<br>
+            </h3>
+            Da&szlig; die Software von Benoit funktionieren kann, mu&szlig; 
+ im Allgemeinen   der Kernel neu konfiguriert und kompiliert werden (siehe
+oben).<br>
+              Folgende Teile m&uuml;ssen im Kernel enthalten sein:<br>
+                           
+<ul>
+                <li><b>USB - Support</b><br>
+              Abh&auml;ngig von Ihrem Motherboard m&uuml;ssen Sie eines dieser 
+  folgenden     Protokolle verwenden:<br>
+                                                                        
+          
+    <ul>
+                    <li>uhci</li>
+                    <li>ohci</li>
+                                                                        
+          
+    </ul>
+              Diese Protokolle sind inkompatibel zueinander - deswegen mu&szlig;
+    man   vorher bestimmen,  welches Protokoll das Motherboard unterst&uuml;tzt.
+    Dies   ist aber relativ  leicht zu eruieren, indem man<br>
+                <font face="Courier New, Courier, monospace">  # lspci -v 
+|  grep   &nbsp;USB</font><br>
+              eingibt. In der Ausgabe m&uuml;&szlig;te unter anderem so etwas 
+  &auml;hnliches     wie<br>
+                <font face="Courier New, Courier, monospace">  usb-ohci : 
+CMD   technologies    Inc|USB0670B <br>
+              </font>oder<font face="Courier New, Courier, monospace"><br>
+              usb-uhci : USB Controller: Intel Corporation 82371AB PIIX4
+USB   (rev   01)   (prog-if 00 [UHCI])&nbsp;<br>
+                </font>  zu finden sein.<br>
+              Abh&auml;ngig von dieser Ausgabe wei&szlig; man jetzt, welches
+  Modul    man   ausw&auml;hlen kann. Es gibt jedoch noch zwei Module beim
+ UHCI - Protokoll.     Im allgemeinen sollte eines der beiden funktionieren.
+ Einfach probieren ;-)<br>
+              Die Auswahl der USB - Unterst&uuml;tzung schaut im Kernel folgenderma&szlig;en
+       aus:<br>
+                <font face="Courier New, Courier, monospace">  &lt;M&gt;/&lt;*&gt;
+     Support  for USB (CONFIG_USB) <br>
+              &lt;*&gt; Preliminary USB device filesystem (CONFIG_USB_DEVICEFS) 
+       <br>
+              &lt;M&gt; UHCI (Intel PIIX4, VIA, ...) support (CONFIG_USB_UHCI)
+       <br>
+              &lt;M&gt; UHCI Alternate Driver (JE) support (CONFIG_USB_UHCI_ALT)
+        <br>
+              &lt;M&gt; OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support 
+(CONFIG_USB_OHCI)           <br>
+                </font>    </li>
+                <li><b>PPP Support</b><br>
+              Man mu&szlig; die folgenden Teile integriert haben:<br>
+                <font face="Courier New, Courier, monospace">  &lt;M&gt;
+PPP   (point-to-point     protocol) support (CONFIG_PPP) <br>
+              &lt;M&gt; PPP support for sync tty ports (CONFIG_PPP_SYNC_TTY)
+      <br>
+                </font>    </li>
+                <li><b>HDLC - Support</b><br>
+HDLC - Support wird im Kernel    mit folgenden Einstellungen aktiviert:<br>
+                <font face="Courier New, Courier, monospace">  </font><font face="Courier New, Courier, monospace">
+Character Devices ---&gt; <br>
+[*] Non-standard    serial   port support <br>
+              &lt;M&gt; HDLC line discipline support <br>
+              [*]Unix98 PTY suppor</font><br>
+    <br>
+Wenn Sie eine Kernel Version &lt; 2.4.18 verwenden, dann sollten Sie noch
+einen Patch installieren, der gelegentliche Abst&uuml;rze verhindert. Ab
+der Kernel Version 2.4.18 wurde dieser Bug behoben und Sie k&ouml;nnen sich
+die folgenden Zeilen sparen.<br>
+Dieser Patch ist im Package von Benoit enthalten ist. Die Anwendung des Patches
+ geht folgenderma&szlig;en     for sich:<br>
+    <font face="Courier New, Courier, monospace">  # cd /usr/src/linux  
+       <br>
+              # patch -p1 --dry-run &lt; /path/to/drivers/n_hdlc.c.diff <br>
+    </font>  Wenn man keine Fehlermeldung bekommt, dann kann man   sich 
+ sicher  sein, da&szlig;  der Patch zu dieser Kernel - Version dazupa&szlig;t. 
+    Wenn  nicht (es kommt  also ein Fehler oder eine Warnung daher), dann 
+sollte man es lieber   mit dem  patchen lassen und  in Kauf nehmen, da&szlig; 
+der PC ab und zu abst&uuml;rzt    ;-/<br>
+              Wir gehen jetzt aber davon aus, da&szlig; der vorige Befehl 
+fehlerfrei      abgearbeitet  wurde. Jetzt patchen wir wirklich:<br>
+    <font face="Courier New, Courier, monospace"> #patch -p1 &lt;   /path/to/drivers/n_hdlc.c.diff<br>
+    </font><br>
+    <br>
+    </li>
+                           
+</ul>
+              Hiermit w&auml;re die Kernelkonfiguration abgeschlossen. Man
+ kann   jetzt   den  Kernel mit seinen Modulen kompilieren und installieren.<br>
+   <br>
+   <br>
+                     
+<h3><a name="speedtouch_treiber"></a>Installation der Treiber von Benoit</h3>
+            Die Datei <font face="Courier New, Courier, monospace">speedtouch-x_y.tar.gz</font>
+           kann man mit folgendem Befehl entpacken:<br>
+           <font face="Courier New, Courier, monospace">&nbsp;&nbsp;&nbsp;
+ #  tar   xvzf  speedtouch-x_y.tar.gz </font><br>
+              Man geht jetzt in das neu erzeugte Verzeichnis und f&uuml;hrt 
+ die   folgenden    Befehle aus: <br>
+           <font face="Courier New, Courier, monospace">&nbsp;&nbsp;&nbsp;
+ #  ./configure<br>
+           &nbsp;&nbsp;&nbsp; # make</font><br>
+           Wenn der Kompiliervorgang erfolgreich war, dann mit <br>
+           <font face="Courier New, Courier, monospace">&nbsp;&nbsp;&nbsp;
+ #  make   install</font><br>
+              installieren. (Hierf&uuml;r mu&szlig; man auf jeden Fall als
+ root   eingeloggt    sein.)<br>
+              <br>
+              Jetzt m&uuml;&szlig;ten auch die Treiber installiert sein.
+Die   Installationsprozedur      hat die erforderlichen Dateien ins Verzeichnigs
+  <font face="Courier New, Courier, monospace">/usr/local/sbin</font> kopiert. 
+    Stellen Sie sicher,  da&szlig; dieser Pfad in Ihrem PATH - Verzeichnis 
+ dabei   ist.<br>
+           <br>
+                     
+<h3><a name="ppp_konfiguration"></a>Konfiguration von PPP</h3>
+               Es mu&szlig; sichergestellt werden, da&szlig; die n&ouml;tigen 
+  "Dateien"     im <font face="Courier New, Courier, monospace">/dev</font>
+      - Verzeichnis   existieren.<br>
+              Wechseln sie ins Verzeichnis <font face="Courier New, Courier, monospace">
+          /dev</font> und f&uuml;hren Sie den Befehl <br>
+           <font face="Courier New, Courier, monospace"># ls *ppp* </font><br>
+           aus. Wenn  solche Dateien schon existieren, dann k&ouml;nnen sie 
+ folgenden     Schritt auslassen.<br>
+              Wenn keine Datei dieser Form existiert, dann erzeugen Sie die 
+ Datei    mit   <br>
+           <font face="Courier New, Courier, monospace">   #./MAKEDEV ppp</font><br>
+              <br>
+              <br>
+              Jetzt sollten Sie noch &uuml;berpr&uuml;fen, ob sie den richtigen 
+   ppp   -  D&auml;mon (im Userspace) verwenden. Die Treiber sind mit den 
+PPPD   - Versionen   2.4.0 und 2.4.1 getestet worden. Es sollte aber auch 
+&auml;ltere   Versionen   noch funktionieren (&gt;=2.3.11). Die Version des 
+ppp - D&auml;mons kann man mit <font face="Courier New, Courier, monospace"><br>
+   # pppd --version</font> <br>
+   abfragen.<br>
+              Um den pppd - D&auml;mon funktionsf&auml;hig zu machen, sind
+ folgende     Konfigurationsdateien  mit den folgenden Inhalt n&ouml;tig:<br>
+                           
+<ol>
+                <li><font face="Courier New, Courier, monospace">/etc/ppp/options<br>
+               <br>
+              ------------------ /etc/ppp/options Beginn ------------------ 
+     <br>
+              noauth <br>
+              usepeerdns <br>
+              lock <br>
+              noipdefault <br>
+              ------------------ /etc/ppp/options Ende ------------------&nbsp;<br>
+               <br>
+               </font>              </li>
+                <li><font face="Courier New, Courier, monospace">/etc/ppp/peers/adsl<br>
+    <br>
+    <font face="Times New Roman, Times, serif">Erstellen Sie das Verzeichnis
+peers und die Datei adsl:</font><br>
+# mkdir /etc/ppp/peers<br>
+# touch /etc/ppp/peers/adsl<br>
+    <br>
+    <font face="Times New Roman, Times, serif">Kopieren Sie folgenden Inhalt
+in diese Datei:<br>
+    </font><br>
+------------------&nbsp;</font><font face="Courier New, Courier, monospace">
+           /etc/ppp/peers/adsl</font><font face="Courier New, Courier, monospace">
+          Beginn ------------------ </font><br>
+               <font face="Courier New, Courier, monospace"># This file could
+be renamed but its place is under /etc/ppp/peers        <br>
+              # To connect to Internet using this configuration file <br>
+              # pppd call adsl updetach, where "adsl" stands for the name of this
+file       <br>
+               <br>
+ debug <br>
+ kdebug 1 <br>
+              noipdefault <br>
+              defaultroute <br>
+              pty "/usr/local/sbin/pppoa3 -m 1 -c -vpi 8 -vci 48" <br>
+              sync <br>
+              user "your_login_here" <br>
+              noauth <br>
+              noaccomp <br>
+              nopcomp <br>
+              noccp <br>
+              novj <br>
+              holdoff 4 <br>
+              persist <br>
+              maxfail 25 <br>
+              usepeerdns&nbsp;<br>
+               </font><font face="Courier New, Courier, monospace">------------------&nbsp;</font><font face="Courier New, Courier, monospace">
+           /etc/ppp/peers/adsl</font><font face="Courier New, Courier, monospace">
+          Ende ------------------ </font><br>
+               <br>
+ Sehr wichtig sind die Argumente, die hinter dem pty "..." stehen.    Die 
+  VPI/VCI - Kennung  ist abh&auml;ngig vom Provider. Mein Provider (Jet2Web
+     in &Ouml;sterreich)  verwendet zum Beispiel 8/48. Wenn man nicht sicher
+   ist,  dann kann man diese  zum Beispiel unter Windows in Erfahrung bringen.
+   Das  Speedtouch - Fenster  zeigt diese Information an<br>
+           <br>
+       Bemerkung zu VPI/VCI:<br>
+           <br>
+       Da &nbsp;die ADSL - Verbindung ATM - basierend ist (zumindest bei
+PPP   over  ATM) m&uuml;ssen diese zwei Parameter spezifiziert werden (wie
+schon   oben  besprochen):<br>
+                                         
+    <ul>
+             <li><b>VPI</b>: Virtual Path ID</li>
+             <li><b>VCI</b>: Virtual Circuit ID<br>
+               <br>
+             </li>
+                                         
+    </ul>
+       ATM war urspr&uuml;nglich f&uuml;r Sprach&uuml;bertragung gedacht
+und   ist  ein synchrones Protokoll. Der Teilnehmer erh&auml;lt einen fixen
+Zeitschlitz    (timeslot) und somit auch eine konstante Datenrate (zumindest
+bis zum n&auml;chsten    Gateway, der dann das synchrone Modell nicht mehr
+unterst&uuml;tzt).<br>
+           <br>
+         </li>
+                <li><font face="Courier New, Courier, monospace">/etc/ppp/chap-secrets 
+     und </font><font face="Courier New, Courier, monospace">/etc/ppp/pap-secrets</font><font face="Courier New, Courier, monospace"><br>
+               <br>
+               </font>Es gibt zwei Protokolle, sich beim ISP zu identifizieren: 
+   CHAP   oder  PAP.<br>
+             Am besten man speichert einfach beide Varianten - so wird immer
+  das   richtige   ausgew&auml;hlt. <br>
+           &nbsp;                                                       
+    <p>Die Dateien sollten dann folgenderma&szlig;en aussehen:</p>
+                                                                         
+   
+    <p><font face="Courier New, Courier, monospace">-------------------/etc/ppp/chap-secrets 
+     Beginn-------------------      <br>
+             # client                server        secret               
+          IP  addresses <br>
+             "your_login_here"   "*"        "your_password_here"        
+   "*"       <br>
+             -------------------/etc/ppp/chap-secrets Ende------------------- 
+         </font></p>
+   Die Datei <font face="Courier New, Courier, monospace">/etc/ppp/pap-secrets</font>
+    sieht ganz gleich aus, wobei nat&uuml;rlich als <font face="Courier New, Courier, monospace">
+          your_login_here</font> der login-Name eingetragen werden  mu&szlig; 
+  (bei   Jet2Web eine zehnstellige Zahl) und als Password ebenfalls  das zum
+  login-Namen   zugeh&ouml;rige Pa&szlig;wort.<br>
+               <font face="Courier New, Courier, monospace"><br>
+               </font></li>
+               <li><font face="Courier New, Courier, monospace">/etc/modules.conf<br>
+               </font>Als letztes mu&szlig; man noch sicherstellen, da&szlig; 
+  in  dieser  Datei die richtigen alias - Namen zugewiesen werden. Bei den 
+ neuen  Standarddistributionen  sollten die meisten aliasses schon eingetragen 
+ sein.  Folgende Zeilen sollte  man in dieser Datei finden: <font face="Courier New, Courier, monospace"><br>
+            <br>
+            </font><font face="Courier New, Courier, monospace">-------------------/etc/modules.conf 
+     Beginn-------------------      </font><br>
+                                                            
+    <p><font face="Courier New, Courier, monospace">alias char-major-108&nbsp; 
+     ppp_generic</font><br>
+            <font face="Courier New, Courier, monospace">       alias /dev/ppp
+   ppp_generic   <br>
+             alias tty-ldisc-3 ppp_async <br>
+             alias tty-ldisc-13 n_hdlc <br>
+             alias tty-ldisc-14 ppp_synctty <br>
+             alias ppp-compress-21 bsd_comp <br>
+             alias ppp-compress-24 ppp_deflate <br>
+             alias ppp-compress-26 ppp_deflate<br>
+            </font><font face="Courier New, Courier, monospace">-------------------/etc/modules.conf
+    Ende-------------------</font></p>
+   </li>
+   <li>Nameserver eintragen<br>
+ Im Normalfall sollte es gen&uuml;gen, die Nameserver mit dem Konfigurationsprogramm 
+ihrer Distribution einzutragen. Wenn Sie eine SuSE Distribution besitzen, 
+dann tragen sie mittels YAST die vom Provider zur Verf&uuml;gung gestellten 
+Adressen ein. (<a href="WeitereADSLTips.htm#bemerkung_1">Weitere Bemerkung</a>
+ )<br>
+                             
+    <hr width="100%" size="2">                                  </li>
+               
+</ol>
+                         
+<h2><a name="verbindung_starten"></a>Verbindung aufbauen</h2>
+             Zuerst mu&szlig; der Microcode in das Modem geladen werden und 
+ dann   mu&szlig;   der pppd - D&auml;mon gestartet werden, um die eigentliche
+  Verbindung   aufzubauen.   Dies ist nur mit root - Rechten m&ouml;glich.
+ <br>
+                         
+<ul>
+               <li>                                                     
+           
+    <h3>Laden der entsprechenden Module</h3>
+               <font face="Courier New, Courier, monospace">  # modprobe
+ppp_generic<br>
+             # modprobe ppp_synctty<br>
+             # modprobe n_hdlc</font></li>
+               <li>&Uuml;berpr&uuml;fen, ob das usbdevfs gemountet ist<br>
+               <font face="Courier New, Courier, monospace">  # modprobe
+usbcore<br>
+             # mount none /proc/bus/usb -t usbdevfs<br>
+             # modprobe usb-uhci </font>oder<font face="Courier New, Courier, monospace">
+    modprobe usb-ohci </font>oder<font face="Courier New, Courier, monospace">
+    modprobe uhci</font></li>
+               <li>Microcode ins Modem laden<br>
+               <font face="Courier New, Courier, monospace">
+               # modem_run -f /pfad/zum/microcode/mgmt.o   (Linux - Treiber)</font> oder<font face="Courier New, Courier, monospace"><br>
+             # modem_run -f /pfad/zum/microcode/alcaudl.sys (Windows - 
+Treiber)</font></li>
+               <li>PPPD - D&auml;mon starten<br>
+               <font face="Courier New, Courier, monospace">  # pppd call 
+adsl updetach</font></li>
+               <li>&Uuml;berpr&uuml;fen, ob die Verbindung aufgebaut wurde
+ (nach    ein   paar Sekunden)<br>
+               <font face="Courier New, Courier, monospace">  # ifconfig
+ppp0<br>
+               </font>  Es sollten dann Informationen, wie MTU, IP - Adresse, 
+  usw   ausgegeben  werden.<br>
+             Wenn keine Information kommt, dann eventuell nach ein paar Sekunden
+    probieren.  Wenn keine Verbindung zustande kommt, dann mu&szlig; man
+sich  die log - Dateien im Verzeichnis /var/log ansehen...<br>
+   Die Zeit des Verbindungsaufbaus variiert im Allgemeinen.</li>
+                         
+</ul>
+        Normal sollten die Module automatisch geladen werden. Zudem wird
+bei   den   aktuellen Distributionen das USB - Filesystem via <font face="Courier New, Courier, monospace">
+   /etc/fstab</font> automatisch   gemountet. Das hei&szlig;t, es bleiben 
+im  Prinzip lediglich zwei Zeilen &uuml;brig,  die f&uuml;r den Start der 
+ADSL  - Verbindung n&ouml;tig sind: Den Microcode  laden und die ppp - Verbindung 
+ starten.     
+<hr width="100%" size="2">                     
+<h2><a name="weitere_hilfe"></a>Wo finde ich weiterf&uuml;hrende Hilfe?<br>
+             </h2>
+                         
+<ul>
+               <li><b>Man - Pages</b><br>
+             Die Module <font face="Courier New, Courier, monospace">pppoa3</font>
+  und      <font face="Courier New, Courier, monospace">     modem_run</font>
+  beinhalten  man - pages. Vielleicht   findet man hier  die  gew&uuml;nschte 
+Information...</li>
+               <li><b>Mailing - List</b><br>
+             Technische Hilfe findet man am besten in der Mailinglist von 
+Benoit.     Der Gro&szlig;teil ist zwar in franz&ouml;sisch, aber wenn man 
+eine englische       Frage stellt, dann bekommt man im Allgemeinen verl&auml;&szlig;lich 
+eine     (englische ;-) ) Antwort, die einem weiterhilft. Bitte keine HTML 
+- Postings.   Bitte auch keine  Mails, die Providerspezifisch oder Netzwerkspezifisch
+  sind  (NAT, DNS, ...).<br>
+             Wenn man ein technisches Problem hat, dann sollte man zuerst 
+das       <a href="http://mail-archive.com/speedtouch@ml.free.fr/">   Online 
+  - Archiv</a> durchforsten. Wenn hier das Problem noch   nicht besprochen 
+ wurde, dann kann man sich mit einer Mail an speedtouch-request@ml.free.fr 
+     mit dem Betreff: subscribe eintragen und Mails an diese Mailinglist schicken.</li>
+               <li><b>IRC</b><br>
+             Server: irc.freenode.net<br>
+             Channel: #speedtouch<br>
+             Kurznamen, die es sich zu merken lohnt: <br>
+             benoit: Benoit Pappilault<br>
+             francois: Francois Rogler<br>
+             GomGom: Edouard Gomez</li>
+         
+</ul>
+         
+<hr width="100%" size="2"><br>
+         
+<h2><a name="bemerkungen"></a> Bemerkungen</h2>
+         
+<ul>
+       <br>
+               
+  <ul>
+        <li> [1] Wenn irgendwas unklar oder falsch ist, dann bitte eine Mail
+an <a href="mailto:christoph@tapler.com">       mich.</a></li>
+        <li>[2] Ich verwende die SuSE 7.2 Distribution und habe mir dafuer
+  ein Startup - Script geschrieben, das &nbsp;den Download &nbsp;des Microcodes
+ automatisch  beim Booten erledigt. Wenn jemand Interesse daran hat, soll
+am besten bei  meiner <a href="http://www.tapler.info/WeitereADSLTips.htm">
+ Homepage</a>  vorbeischauen. Hier kann man sich das Script herauskopieren.
+  </li>
+           
+  </ul>
+   &nbsp;<br>
+         <br>
+         <br>
+                         
+</ul>
+
+        <table width="100%" cellspacing="0" cellpadding="0"
+               style="margin-top: 1px; margin-bottom: 1px">
+          <tr>
+            <td align="left">
+
+<a href="http://validator.w3.org/check/referer">
+<img src="http://www.w3.org/Icons/valid-html401" border="0"
+     alt="Valid HTML 4.01!" height="31" width="88" align="middle"></a>
+
+<a href="http://jigsaw.w3.org/css-validator/check/referer">
+<img src="http://jigsaw.w3.org/css-validator/images/vcss" border="0"
+     alt="Valid CSS!" height="31" width="88" align="middle"></a>
+
+            </td>
+          </tr>
+        </table>
+                             
+  </body>
+</html>

@@ -1,0 +1,138 @@
+.\" manual page [] for diald 0.15
+.\" SH section heading
+.\" SS subsection heading
+.\" LP paragraph
+.\" IP indented paragraph
+.\" TP hanging label
+.TH DIALD-CONTROL 5 "DIALD 0.16 - 1997.01.28"
+.SH NAME
+diald-control \- how to control a running copy of diald
+.SH SYNOPSIS
+Any running diald process.
+
+.SH DESCRIPTION
+A running copy of diald can be controlled externally in two ways.
+The simplest way is to send it signals. This is, by necessity, somewhat
+limited. If it is necessary to send more complex commands to diald
+the
+.B fifo
+command can be used.
+
+.B Diald
+can be controlled by the following signals.
+.TP
+.B SIGINT
+Force the link down. Diald continues to run.
+.TP
+.B SIGTERM
+Shut down the link and terminate diald.
+.TP
+.B SIGUSR1
+Force the link up. This will not keep the link up beyond the
+time that diald normally waits for the first packet to cross
+a link once it goes up. If you want to force the link up and
+keep it up you must use the "force" fifo command described below.
+.TP
+.B SIGUSR2
+Dump the filter queue to the system logs.
+.LP
+If the
+.B fifo
+command is used, then additional commands can be issued to diald as follows.
+Suppose the command "fifo /etc/diald/diald.ctl" is specified in diald's
+configuration. Then programs can write the following commands to
+the named pipe /etc/diald/diald.ctl, which will then be acted upon by diald.
+Note that diald will create the named pipe if it does not exist.
+.TP
+.B block
+Block diald from making outgoing calls until a unblock command is issued.
+If the link is up this will also force it down.
+.TP
+.B unblock
+Remove a block on diald making outgoing calls.
+.TP
+.B force
+Force diald to bring the link up until an unforce command is issued.
+.TP
+.B unforce
+Remove a request for diald to keep the link forced up.
+.TP
+.B down
+Force the link down. This is a one shot operation. The next
+packet to come along that puts an entry in the connection queue
+will bring the link up again.
+.TP
+.B up
+Force the link up. This is a one shot operation. If no packets
+cross the link within the standard initial timeout the link will
+go back down.
+.TP
+.B debug \fI<flags>
+Set the debug flags to the given value. See the
+.B diald
+manual page for a description of the possible values.
+.TP
+.B delay-quit
+Terminate diald as soon as the link next goes idle.
+.TP
+.B quit
+Force the link down and terminate diald.
+.TP
+.B reset
+This will cause diald reset its configuration commands to the default
+values and then reread its configuration files as well as reprocess
+any command line arguments it might have been given. This allows
+on the fly changes in the configuration of a running copy of diald.
+WARNING: if your new configuration has errors the reset command
+may cause diald to terminate with an error condition.
+.TP
+.B dynamic \fI<local-ip> <remote-ip>\fR
+Tell diald what the dynamic IP addresses are.
+This will only have an effect if it is received by diald during
+the execution of a connect script, and diald is in a SLIP mode.
+It is intended for use with connect scripts that do some extra
+work to figure out the dynamic ip addresses, so they can
+pass that information back to diald. This will be most
+useful to you if you must parse out the IP addresses and
+then still issue a further command as part of your login sequence.
+(Note that cases like this cannot be handled by the "dslip-mode" command.)
+Receipt of this command during a given connection attempt will
+turn off diald's use of mechanisms to acquire the dynamic IP addresses.
+.TP
+.B queue
+Print the contents of the filter queue to the syslog.
+.TP
+.B monitor [\fI<file>\fR]
+Ask diald to dump monitoring information to the named pipe.
+This is intended to be used by a separate interactive monitoring program.
+If <file> is not a named pipe diald will refuse to start monitoring.
+Diald will stop issuing monitor information on the specified named pipe
+when the far end of the pipe is closed.
+Note that there can be more than one monitor command active at the
+same time. The
+.B diald-monitor
+manual page describes the output format of the information that diald
+writes to the named pipe.
+.TP
+.B message \fI<string>\fR
+Ask diald to pass \fI<string>\fR on to the monitoring process.
+.TP
+.B connect \fI<pid> <device>\fR
+If diald is not currently up, then force it to come up and
+make a connection on the specified device. Diald will open
+the named device, ignoring the device specified on the
+diald command line, skip running the "connect" script,
+and attempt to run either SLIP or PPP directly.
+This is intended to be used to rendezvous with incoming calls.
+When diald closes the connection to <device>
+it will send SIGKILL to <pid>. Normally this will be the
+program that issued the connect command to diald,
+which will be waiting to be killed to terminate a login.
+
+.SH SEE ALSO
+.LP
+diald(8), dctrl(1), diald-monitor(5), diald-examples(5)
+
+.SH AUTHOR
+.LP
+Eric Schenk (Eric.Schenk@dna.lth.se)

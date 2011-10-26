@@ -1,0 +1,99 @@
+
+'begin'
+	'comment'
+		goto test.
+		simple arithmetic with some jumps.
+	;
+
+	'begin' 'comment'  first one : ;
+
+		'integer' i;
+
+		i := 0;
+		'goto' foo;
+
+	bar:
+		i := i * 10;
+		'goto' onk;
+
+	foo:
+		i := i + 1;
+
+		'begin'
+			'goto' nase;
+
+			i := i + 999;
+		'end';
+
+		'if' i > 0 'then' onk: i := - i;
+		'goto' done;
+
+	nase:
+		i := i + 1;
+
+		'goto' bar;
+
+	done:
+		vprint (i, ` (should be -20)')
+	'end';
+
+	'begin' 'comment'  second one : ;
+
+		'integer' foo;
+
+		foo := 1;
+	bar:
+	fred:
+		'begin'
+			'begin'
+			fred:
+				'goto' bar
+			'end';
+		bar:
+			foo := foo + 1;
+			'goto' fred;
+		fred:
+		'end';
+		vprint (foo, ` (should be 2)')
+	'end';
+
+	'begin' 'comment'' third one :  ;
+
+		'integer' i;
+
+		'procedure' foo (i);
+		'begin'
+			'integer' ii;
+
+			ii := i;
+			vprint ("foo  entered... (", ii, ").");
+			'goto' nase;
+		'end';
+
+		vprint ("hi!");
+		i := 0;
+	nase:
+		i := i + 1;
+		vprint ("nase reached... (", i, ").");
+
+		'if' i < 5 'then' foo (i);
+	'end';
+
+	vprint ("\n");
+
+	'begin'
+		'procedure' foo (l);
+			'goto' l;
+		'procedure' bar (p, l);
+			p (l);
+		vprint (1);
+		foo (aa);
+		vprint (-1);
+	aa:
+		vprint (2);
+		bar (foo, bb);
+		vprint (-1);
+	bb:
+		vprint (3)
+	'end';
+'end'

@@ -1,0 +1,388 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+    <title>SpeedTouch Italian HOWTO</title>
+  </head>
+
+  <body text="#000000" bgcolor="#ffffff" link="#000099" vlink="#990099" alink="#000099">
+                 
+<div align="center">         
+<h1><font size="+3">SpeedTouch Italian HOWTO</font></h1>
+                 
+<div align="left"><big>1. <a href="#Introduzione">Introduzione</a>   <br>
+         <br>
+         2. <a href="#Requisiti">Requisiti</a>   <br>
+         <br>
+         3. <a href="#Configurazione_del_kernel">Configurazione/Installazione</a>
+         <br>
+         --&gt; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <a href="#Configurazione_del_kernel">
+         Configurazione del kernel</a>   <br>
+         --&gt;&nbsp; &nbsp; &nbsp; &nbsp; <a href="#Installazione_dei_drivers">
+       Installazione  dei drivers</a>   <br>
+         --&gt;&nbsp; &nbsp; &nbsp; &nbsp; <a href="#Configurazione_del_pppd">
+     Configurazione   del pppd</a>   <br>
+         <br>
+     4. &nbsp;<a href="#Collegarsi">Collegarsi</a><br>
+    5. &nbsp;<a href="#Dove">Dove trovare pi&ugrave; aiuto</a><br>
+          </big>  
+<hr width="100%" size="2"><big>    </big></div>
+         </div>
+                 
+<h2><big><a name="Introduzione"></a>   1. Introduzione</big></h2>
+         <big><br>
+  <font size="-1"><big>Questo documento ti aiuter&agrave; ad installare il
+  modem     Alcatel Speetouch ADSL USB utilizzando i drivers GPL
+scritti   da   Benoit  Papillault.<br>
+         </big></font></big>                
+<hr width="100%" size="2"><big><br>
+  </big>               
+<h2><big><a name="Requisiti"></a>       2. Requisiti</big></h2>
+                 
+<ul>
+    <big>         </big><li><big><font size="-1"><big>I drivers GPL</big></font></big></li>
+    <big>         </big><li><big><font size="-1"><big>Il micronode di Thomson</big></font></big></li>
+    <big>         </big><li><big><font size="-1"><big>Un kernel con il supporto
+ USB (meglio se 2.4 ma  il supporto &egrave; abilitato anche per i 2.2)</big></font></big></li>
+    <big>         </big><li><big><font size="-1"><big>pppd</big></font></big></li>
+    <big>             </big>  
+</ul>
+                 
+<h5><big><u>Drivers GPL</u></big></h5>
+         Potete scaricare gli ultimi drivers da questo sito<big><br>
+  </big>       <a href="http://speedtouch.sourceforge.net/download.php">http://speedtouch.sourceforge.net/download.php</a><big><br>
+  <br>
+  </big>                      
+<h5><big><u>Micronode di Thomson</u></big></h5>
+         Questo file &egrave; distribuito nei drivers ufficiali Thomson.
+  Potrete    trovarli a questo indirizzo<br>
+     <a href="http://www.speedtouchdsl.com/dvrreg_lx.htm">http://www.speedtouchdsl.com/dvrreg_lx.htm</a><br>
+         <br>
+         <big><font color="#ff0000"><small>Attenzione: scaricali soltanto! 
+ non   installarli.<br>
+     <br>
+     <font color="#000000">C'&egrave; anche la possibilit&agrave; di utilizzare 
+  i drivers di windows &nbsp;(quello che ci serve &egrave; il file </font></small></font><font face="Courier New, Courier, monospace"><small>
+     c:\windows\system\alcaudsl.sys</small></font>)<font color="#ff0000"><small><br>
+     </small>    </font></big>         
+<h5><big><u>Kernel</u></big></h5>
+         Se non sai compilare un kernel non preoccuparti: le distribuzioni 
+   ora contengono un kernel gi&agrave; compilato per il supporto usb. Purtroppo 
+    per&ograve; se si decide di usare questo non sar&agrave; possibile applicare 
+    una patch che corregge un bug che si mostra a volte quando si decide di
+  far  ripartire il collegamento ad internet.<br>
+         <br>
+     <u>Una nota sul kernel di linux</u><br>
+     <br>
+     Questi drivers GPL &nbsp;funzionano molto bene con i kernel 2.4.
+  Ma &egrave; possibile farli funzionare anche con i 2.2 (dalla release 18
+ in avanti) siccome usano lo stesso codice dei 2.4.<br>
+     <br>
+         <u>Concludendo</u>, &egrave; meglio compilare il kernel  da soli.<br>
+         <a href="http://www.kernel.org/">http://www.kernel.org</a>     
+ <br>
+         <big><br>
+  <u><small>NB: non usare il kernel 2.4.5 perch&egrave; c'&egrave; un bug 
+ nel supporto USB!</small></u><br>
+  </big>                  
+<h5><big><u>pppd</u></big></h5>
+         La versione minima richiesta &egrave; la 2.3.11 (meglio se la  2.4)
+ . Comunque i kernel 2.4 sono compatibili soltanto con il pppd 2.4.<big><br>
+  </big>    potrete ottenere la versione con il comando<br>
+         <big><br>
+  <font face="Courier New, Courier, monospace"><small># pppd --version</small></font><br>
+  </big>                      
+<hr width="100%" size="2"><big><br>
+  <br>
+  </big>                      
+<h2><big><a name="ConfigurazioneInstallazione"></a>       3. Configurazione/Installazione</big></h2>
+                 
+<h4><big><a name="Configurazione_del_kernel"></a>   Configurazione del kernel</big></h4>
+         A seconda del controller USB che usi dovrai scegliere tra due  moduli
+     UHCI oppure OHCI<br>
+         per saperlo lancia il comando<br>
+         <big><br>
+  <font face="Courier New, Courier, monospace"><small># lspci -v | grep 
+ USB</small><small><br>
+         </small></font></big>       &nbsp;<br>
+         Dovresti ottenere qualcosa di simile a<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small>usb-ohci 
+ :  CMD    technologies Inc|USB0670B</small><small><br>
+         </small></font></big><br>
+         oppure<br>
+         <br>
+         &nbsp;<font face="Courier New, Courier, monospace">usb-uhci    
+ : USB Controller: Intel Corporation 82371AB PIIX4 USB (rev 01) (prog-if
+   00  [UHCI])</font><big><font face="Courier New, Courier, monospace"><small><br>
+         </small></font></big>         
+<h5><big>Opzioni per permettere il supporto USB</big></h5>
+ N.B. se vuoi usare i moduli consulta anche la sezione <a href="#moduli">
+moduli</a><br>
+ <br>
+     <big><font face="Courier New, Courier, monospace"><small>&lt;*&gt;/&lt;M&gt;
+Support  for  USB (CONFIG_USB)<br>
+     &lt;*&gt; Preliminary USB device filesystem (CONFIG_USB_DEVICEFS)<br>
+     &lt;*&gt;/&lt;M&gt; UHCI (Intel PIIX4, VIA, ...) support (CONFIG_USB_UHCI)&nbsp;&nbsp;&nbsp; 
+  &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &lt;--- Se il tuo
+  controller supporta UHCI<br>
+     &lt;*&gt;/&lt;M&gt; UHCI Alternate Driver (JE) support (CONFIG_USB_UHCI_ALT)&nbsp;&nbsp;&nbsp; 
+  &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; <small><big>&lt;--- </big></small></small></font></big><font face="Courier New, Courier, monospace">
+     Se il tuo controller supporta alt UHCI</font><big><font face="Courier New, Courier, monospace"><small><small>
+     &nbsp; </small><br>
+     </small><small>&lt;*&gt;/&lt;M&gt; OHCI (Compaq, iMacs, OPTi, SiS, ALi,
+...) support   (CONFIG_USB_OHCI) &nbsp; &lt;--- Se il tuo controller supporta
+OHCI</small></font><br>
+     &nbsp; &nbsp;&nbsp; <br>
+  <br>
+  </big>               
+<h5><big>Supporto PPP</big></h5>
+         Nella scheda &nbsp; <font face="Courier New, Courier, monospace">
+    Network device support ---&gt;</font> &nbsp; seleziona     le seguenti 
+opzioni<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small>&lt;*&gt;/&lt;M&gt;
+   PPP    (point-to-point protocol) support (CONFIG_PPP)</small><small><br>
+         </small><small>&nbsp;&lt;*&gt;/&lt;M&gt; PPP support for sync tty
+ports (CONFIG_PPP_SYNC_TTY)       </small><small><br>
+         </small><small>&nbsp;&lt;*&gt;/&lt;M&gt; PPP Deflate compression</small><small><br>
+         </small></font></big>         
+<h5><big>Supporto HDLC</big></h5>
+         Per evitare il bug devi applicare questa patch. I comandi opportuni 
+      sono i seguenti<br>
+         <big><br>
+  </big>   NB: i kernel &gt;= 2.4.18 contengono gi&agrave; la patch.<br>
+     <br>
+     <big><font face="Courier New, Courier, monospace"><small>&nbsp;# cd
+ /usr/src/linux</small><small><br>
+         </small></font></big><font face="Courier New, Courier, monospace">
+   &nbsp;#      patch -p1 --dry-run &lt; /locazione/pacchetto/n_hdlc.c.diff</font>
+   &nbsp;      (l'opzione --dry-run controlla la presenza di eventuali errori 
+ prima di   applicare  la patch ) <br>
+         <br>
+         Se non ottieni alcun messaggio di errore<br>
+         <big><br>
+  <font face="Courier New, Courier, monospace"><small>&nbsp;# patch -p1 
+ &lt;    /locazione/pacchetto/n_hdlc.c.diff</small><small><br>
+         </small></font></big>       <br>
+         Ora puoi continuare con la configurazione del kernel  nella    
+scheda  &nbsp;<font face="Courier New, Courier, monospace">Character  devices
+---&gt;</font><br>
+         <br>
+         &nbsp;<font face="Courier New, Courier, monospace">[*]   Non-standard
+    serial port support</font><big><font face="Courier New, Courier, monospace"><small><br>
+         </small><small>&nbsp;&lt;*&gt;/&lt;M&gt; HDLC line discipline support</small><small><br>
+         </small><small>&nbsp;[*]Unix98 PTY support <br>
+ <br>
+ </small></font></big> 
+<h4> </h4>
+<h4><big><big><a name="moduli"></a></big></big><big>Moduli</big><br>
+ </h4>
+  <big><small>Se vuoi utilizzare i moduli &egrave; necessario configurare
+le loro impostazioni, edita quindi<br>
+<br>
+<b>/etc/modules.conf</b> e assicurati che contenga le seguenti impostazioni<br>
+</small></big><br>
+<br>
+<font face="Courier New, Courier, monospace">alias char-major-108&nbsp; ppp_generic<br>
+alias /dev/ppp ppp_generic<br>
+alias tty-ldisc-3 ppp_async<br>
+alias tty-ldisc-13 n_hdlc<br>
+alias tty-ldisc-14 ppp_synctty<br>
+alias ppp-compress-21 bsd_comp<br>
+alias ppp-compress-24 ppp_deflate<br>
+alias ppp-compress-26 ppp_deflate<br>
+</font><big><small><br>
+ <b>/etc/modules</b> (indispensabile per Debian GNU/Linux)<br>
+<b><br>
+</b></small></big><font face="Courier New, Courier, monospace">ppp_generic<br>
+</font><font face="Courier New, Courier, monospace">ppp_synctty<br>
+n_hdlc<br>
+usbcore<br>
+usb-uhci <font color="#ff0000">oppure</font> usb-ohci <font color="#ff0000">
+oppure</font> uhci<br>
+</font><big><br>
+  </big>               
+<h4><big><a name="Installazione_dei_drivers"></a>   Installazione dei drivers</big></h4>
+         Decomprimi i drivers<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small># tar xvfz 
+   speedtouch-x.tar.gz</small><small><br>
+         </small></font></big><br>
+         ora procediamo con la compilazione<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace">
+         <small># ./configure &amp;&amp; make</small><small><br>
+         </small></font></big><br>
+         e se tutto &egrave; andato liscio possiamo installarli<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small># make
+install</small><small><br>
+         </small></font></big><br>
+         I binari verranno copiati in /usr/local/sbin<big><br>
+  </big>               
+<h4><big><a name="Configurazione_del_pppd"></a>   Configurazione del pppd</big></h4>
+         Se non hai gi&agrave; la periferica ppp nella directory /dev e non
+stai utilizzando i moduli<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small># cd /dev</small><small><br>
+         </small><small># ls *ppp*</small><small><br>
+         </small></font></big><br>
+         creala con il comando<br>
+         <br>
+         <font face="Courier New, Courier, monospace"># ./MAKEDEV    ppp</font>
+        &nbsp;(per alcune distribuzioni &egrave; necessario invece  fare
+ makedev ppp)<br>
+         <br>
+         Ora devi configurare 3 files<br>
+         <big><br>
+  <font face="Courier New, Courier, monospace"><small>/etc/ppp/options</small><small><br>
+         </small><small>/etc/ppp/peers/adsl</small><small><br>
+         </small><small>/etc/ppp/pap-secrets</small><br>
+         </font></big>                
+<h4><big>/etc/ppp/options</big></h4>
+         <big><font face="Courier New, Courier, monospace"><small>#### INIZIO
+ ####</small><small><br>
+         </small><small>&nbsp;noauth</small><small><br>
+         </small><small>&nbsp;usepeerdns</small><small><br>
+         </small><small>&nbsp;lock</small><small><br>
+         </small><small>&nbsp;noipdefault</small><small><br>
+         </small><small>#### FINE ####</small><small><br>
+         </small></font></big>         
+<h4><big>/etc/ppp/peers/adsl</big></h4>
+         <big><font face="Courier New, Courier, monospace"><small>#### INIZIO
+ ####</small><small><br>
+         </small><small>&nbsp;# This file could be rename but its place is
+ under    /etc/ppp/peers</small><small><br>
+         </small><small>&nbsp;# To connect to Internet using this configuration 
+   file</small><small><br>
+         </small><small>&nbsp;# pppd call adsl updetach, where "adsl" stands for the 
+ name   of   this file</small><small><br>
+         </small><small>&nbsp;</small><small>debug</small><small><br>
+         </small><small>&nbsp;kdebug 1</small><small><br>
+         </small><small>&nbsp;noipdefault</small><small><br>
+         </small><small>&nbsp;defaultroute</small><small><br>
+         </small><small>&nbsp;pty "/usr/local/sbin/pppoa3 -m 1 -c -vpi 8 -vci
+  35"</small></font><font face="Courier New, Courier, monospace"><small><br>
+         </small><small>&nbsp;sync</small><small><br>
+         </small><small>&nbsp;</small><small><font color="#ff0000">user "il_tuo_login_qui"</font></small><small><br>
+         </small><small>&nbsp;noauth</small><small><br>
+         </small><small>&nbsp;noaccomp</small><small><br>
+         </small><small>&nbsp;nopcomp</small><small><br>
+         </small><small>&nbsp;noccp</small><small><br>
+         </small><small>&nbsp;novj</small><small><br>
+         </small><small>&nbsp;holdoff 4</small><small><br>
+         </small><small>&nbsp;persist</small><small><br>
+         </small><small>&nbsp;maxfail 25</small><small><br>
+         </small><small>&nbsp;usepeerdns</small><small><br>
+         </small><small>#### FINE ####</small></font><br>
+  <br>
+  </big>      Se per qualche ragione pppoa3 fallisce, puoi provare ad usare
+ il  demone pppoa2. Cambia<big><br>
+  <br>
+  <font face="Courier New, Courier, monospace"><small>pty "/usr/local/sbin/pppoa3 
+  -m 1 -c -vpi 8 -vci 35"</small></font><br>
+  <br>
+  </big>            con<big><br>
+  <br>
+  </big>      <font face="Courier New, Courier, monospace">pty "/usr/local/sbin/pppoa2 
+  -vpi 8 -vci 35"</font><big><br>
+  <br>
+     Per maggiori dettagli consulta comunque i manuali dei demoni (<font face="Courier New, Courier, monospace">
+     man pppoa3, man pppoa2</font>).<br>
+  </big>                  
+<h4><big>&nbsp;/etc/ppp/pap-secrets</big></h4>
+         <big><font face="Courier New, Courier, monospace"><small>#### INIZIO
+ ####</small><small><br>
+         </small><small># client server secret IP addresses</small><small><br>
+         </small><small><font color="#ff0000">&nbsp;"il_tuo_login_qui" "*"
+ "la_tua_pass_qui"      "*"</font></small><small><br>
+         </small><small>#### FINE</small><small> ####</small></font><br>
+  </big>               
+<h2><big><a name="Collegarsi"></a>  4. Collegarsi</big></h2>
+         Per prima cosa &egrave; necessario controllare che usbdevfs sia
+  montato    e, se non lo &egrave;, montalo con<br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small># mount 
+ none   /proc/bus/usb -t usbdevfs</small><small><br>
+         </small></font></big><br>
+         <big><font size="-1"><big>Ora possiamo collegarci!!! (non dimenticarti 
+  di  impostare   i nameserver in /etc/resolv.conf)<br>
+         </big></font></big><br>
+         <big><font face="Courier New, Courier, monospace"><small>
+         # modem_run -f /locazione/di/mgmt.o<br>
+     <br>
+     oppure</small></font><br>
+  <br>
+  </big>      <font face="Courier New, Courier, monospace">
+  # modem_run -f /path/to/alcaudsl.sys  </font><big><br>
+  <font face="Courier New, Courier, monospace"><small><br>
+         </small><small># pppd call adsl updetach<br>
+     <small><br>
+     </small></small></font></big>   <small><big>Aspetta 20 secondi e controlla 
+  che tutto sia andato bene</big></small><br>
+     <br>
+     <big><font face="Courier New, Courier, monospace"><small># ifconfig
+ppp0<br>
+     <br>
+     </small></font></big>Dovresti ottenere la descrizione dell'interfaccia.<big><font face="Courier New, Courier, monospace"><small><br>
+     </small></font></big><br>
+         Per disconnettersi <br>
+         <br>
+         <big><font face="Courier New, Courier, monospace"><small># killall
+   -9  pppd</small></font></big>     
+<hr width="100%" size="2">     
+<h2><big><a name="Dove"></a>5. Dove trovare pi&ugrave; aiuto</big></h2>
+         
+<h4><big>Le pagine di MAN</big></h4>
+     Per prima cosa devi guardare alle pagine di MAN che ti possono dare
+ informazioni utilissime.<br>
+     <br>
+     <font face="Courier New, Courier, monospace"># man pppoa3<br>
+     # man pppoa2<br>
+     # man modem_run</font>     
+<h4><big>Mailing list</big></h4>
+     Se cerchi aiuto da altri utenti, questa mailing list &egrave; la  scelta
+ migliore. Puoi scrivere in INGLESE, FRANCESE, ma NON in HTML!!<br>
+     Prima di iscriverti leggi l'<a href="http://www.mail-archive.com/speedtouch@ml.free.fr">
+     archivio</a>: il tuo problema potrebbe avere gi&agrave; una soluzione.<br>
+     Per iscriverti manda un'email a <a href="file:////home/yelo3/public_html/speedtouch-request@ml.free.fr">
+    speedtouch-request@ml.free.fr</a>  con subject come oggetto.<br>
+          
+<h4><big>IRC</big></h4>
+     Serveur : irc.freenode.net<br>
+     Canale : #speedtouch<br>
+     <br>
+     Nick di cui fidarsi:<br>
+     <br>
+     benoit : Benoit PAPILLAULT<br>
+     francois : Fran&ccedil;ois ROGLER<br>
+     GomGom : Edouard GOMEZ <big><br>
+  </big>               
+<hr width="100%" size="2">         
+<div align="right"><small><big>Nicol&ograve; Chieffo<br>
+  yelo3<br>
+   <a href="mailto:chievo@freemail.it">chievo@freemail.it</a>   </big>  
+   <br>
+         </small><br>
+         </div>
+
+        <table width="100%" cellspacing="0" cellpadding="0"
+               style="margin-top: 1px; margin-bottom: 1px">
+          <tr>
+            <td align="left">
+
+<a href="http://validator.w3.org/check/referer">
+<img src="http://www.w3.org/Icons/valid-html401" border="0"
+     alt="Valid HTML 4.01!" height="31" width="88" align="middle"></a>
+
+<a href="http://jigsaw.w3.org/css-validator/check/referer">
+<img src="http://jigsaw.w3.org/css-validator/images/vcss" border="0"
+     alt="Valid CSS!" height="31" width="88" align="middle"></a>
+
+            </td>
+          </tr>
+        </table>
+                 
+  </body>
+</html>

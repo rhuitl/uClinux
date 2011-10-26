@@ -1,0 +1,90 @@
+'begin'
+	'comment'
+		some kind of array manipulation, array passing
+		by-name and by-value.
+	;
+
+	'integer' 'procedure' rfoo (n);
+	'value' n; 'integer' n;
+	'begin'
+		'if' n = 1 'then' outstring (1, "array declaration:\n");
+		outinteger (1, n);
+		'if' n = 6 'then' outstring (1, "\n");
+		rfoo := n;
+	'end';
+
+	'array' afoo [rfoo (1) : rfoo (2), rfoo (3) : rfoo (4)],
+		bfoo, cfoo [rfoo (5) : rfoo (6)];
+
+
+	'procedure' initarr (a) from: (m) len: (n);
+	'begin'
+		'integer' i;
+		'for' i := 0 'step' 1 'until' n - 1 'do'
+			a [m + i] := i;
+	'end';
+
+	'boolean' 'procedure' aequ (a, b) from: (ma, mb) len: (n);
+	'value' a, ma, mb, n;
+	'integer' 'array' a, b;
+	'integer' ma, mb, n;
+	'begin'
+		'integer' i;
+		'boolean' eq;
+		eq := 'true';
+		'for' i := 0 'step' 1 'until' n - 1 'do'
+			eq := eq 'and' a [ma + i] = b [mb + i];
+		aequ := eq
+	'end';
+	
+	'procedure' bout (b);
+	'value' b; 'boolean' b;
+	'if' b 'then' outstring (1, "T ")
+		'else' outstring (1, "F ");
+
+	'integer' i, j;
+	'integer' 'array' ii, jj [1 : 10], kk [20 : 40];
+
+	initarr (ii, 1, 10);
+	initarr (jj, 1, 10);
+	initarr (kk, 20, 20);
+
+	outstring (1, "\nexpect:  T F T T F\nsee:     ");
+
+	bout (aequ (ii, jj, 1, 1, 10));
+	ii[5] := 0;
+	bout (aequ (ii, jj, 1, 1, 10));
+	bout (aequ (kk, jj, 20, 1, 10));
+	bout (aequ (jj, kk, 1, 20, 10));
+	bout (aequ (ii, kk, 1, 20, 10));
+
+	outstring (1, "\n");
+
+	'begin'
+		'integer' 'array' xx [1:2];
+		'integer' x, y;
+
+		'procedure' swap (x, y);
+		'begin' 'integer' xt;
+			xt := x; x := y; y := xt;
+		'end';
+
+		'procedure' set (arr, idx, val);
+			arr [idx] := val;
+
+		'integer' 'procedure' get (arr, idx);
+		'value' arr, idx;
+		'array' arr;
+		'integer' idx;
+			get := arr [idx];
+
+		set (xx, 1, 1);
+		set (xx, 2, 2.1);
+		x := get (xx, 1); y := get (xx, 2);
+		vprint ("expect   1  2:", x, y);
+		swap (xx [1], xx[2]);
+		x := get (xx, 1); y := get (xx, 2);
+		vprint ("expect   2  1:", x, y);
+
+	'end';
+'end'

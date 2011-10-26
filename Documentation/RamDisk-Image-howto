@@ -1,0 +1,59 @@
+
+This FAQ answers a few questions about the RAM disks used in the
+SnapGear/uClinux distribution.  Specifically,  how to increase
+the size of /var/tmp, /etc/config or /tmp.  How to build images
+and change the settings as well as some gotchas.
+
+Firstly, if you look in the /etc/rc file on the target
+you may see the following:
+
+	/bin/expand /etc/ramfs.img /dev/ram1
+	mount -t proc proc /proc
+	mount -t ext2 /dev/ram1 /var
+	mkdir /var/tmp
+	mkdir /var/log
+	mkdir /var/run
+	mkdir /var/lock
+
+The file ramfs.img is an ext2 file system image that has been compressed.
+The expand utility will unpack this into /dev/ram1.
+This can then be mounted as an ext2 file system.
+
+This is controlled by the user options specified by the "make menuconfig"
+tool, follow this path:
+
+	make menuconfig
+
+	 Target Platform Selection  ---> 
+	(enter)
+	  [*] Customize Vendor/User Settings (NEW)   
+	(exit save options )
+	 Miscellaneous Configuration  ---> 
+	  (128K) RAMFS Image   <---  ( change the option here )
+
+	exit exit yes
+	make dep
+	make
+
+And you should have a larger image.  You can easily use images up to
+4MiB,  and once you go beyond that you need to increase the RAMdisk
+maximum size in the kernel config.
+
+If you do not want all the RAM for the image allocated until you have
+filled it with files,  then you need to enable the
+
+	"expand should not write zeroes"
+
+option using the same mechanism above.
+
+If you want to look deeper then the 
+
+	user/ramimage
+
+directory contains more information including a mkrd script that shows
+you how to make one of the images.
+
+regards
+  Phil Wilshire <philwil@earthlink.net>
+  David McCullough <davidm@snapgear.com>
+

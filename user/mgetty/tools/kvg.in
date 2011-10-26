@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Kill Mgetty/Vgetty process on a given tty with a specified signal...
+#
+# (part of the "mgetty+sendfax" package)
+#
+# RCS: $Id: kvg.in,v 1.2 1998/07/03 11:03:10 gert Exp $
+#
+SIG=-15
+if expr "$1" : "-[A-Z0-9]" >/dev/null ; then SIG=$1 ; shift ; fi
+
+if [ $# -ne 1 ] ; then
+	echo "$0: kill mgetty/vgetty process on a given tty" >&2
+	echo "syntax: kvg [signal] <ttyname>" >&2
+	exit 1
+fi
+
+TTY=$1
+if [ ! -f @KVG_PID_FILE@ ] ; then
+	echo "no mgetty/vgetty on tty /dev/$TTY" >&2
+	exit 2;
+fi
+
+pid=`cat @KVG_PID_FILE@`
+echo "killing mgetty/vgetty on $TTY, pid $pid, with signal $SIG..."
+kill $SIG $pid

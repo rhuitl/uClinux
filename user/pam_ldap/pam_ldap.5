@@ -1,0 +1,514 @@
+.TH pam_ldap 5
+.\" Copyright 1997-2005 Luke Howard."
+.\" Copying restrictions apply. See COPYING.
+.\" $Id: pam_ldap.5,v 1.7 2005/03/24 00:02:00 lukeh Exp $
+.SH NAME
+pam_ldap \- LDAP pluggable authentication module
+.SH DESCRIPTION
+The
+.B pam_ldap
+module is a Pluggable Authentication Module (PAM) which provides
+for authentication, authorization and password changing against
+.I
+LDAP
+servers. 
+.LP
+Features of the PADL pam_ldap module include support for transport layer
+security, SASL authentication, directory server-enforced password policy,
+and host- and group- based logon authorization.
+.LP
+The present version of
+.B
+pam_ldap
+supports AIX 5L, FreeBSD 3.x and above, HP-UX 11i, IRIX 6.x, Linux,
+Mac OS X 10.2 and above, and Solaris 2.6 and above. Many vendors provide
+their own LDAP authentication providers, often also called pam_ldap.
+This manual page applies to the
+PADL
+.B
+pam_ldap
+module only. If you are using a vendor provided module, consult the
+relevant documentation instead.
+.LP
+When authenticating or authorizing a user,
+.B
+pam_ldap
+first maps the user's login name to a distinguished name by searching
+the directory server. This must be possible using the local system's
+identity, specified in ldap.conf. (Note that presently only simple
+authentication is supported for authenticating in this initial step.)
+.LP
+To authenticate a user,
+.B
+pam_ldap
+attempts to bind to the directory server using the distinguished name
+of the user (retrieved previously). Both simple and SASL authentication
+mechanisms are supported; in the former case, one should take care to
+use transport security to prevent the user's password being transmitted
+in the clear.
+.LP
+A variety of authorization primitives are supported by
+.B
+pam_ldap,
+discussed in the configuration section below.
+.LP
+Finally,
+.B
+pam_ldap
+supports a number of password change protocols used by directory servers
+from various vendors. (Some directory servers support
+more than one password change protocol.)
+.LP
+Whilst
+.B
+pam_ldap
+is generally configured in the system LDAP naming configuration file
+(ldap.conf), some options can be configured in the PAM configuration
+file, to allow for per-service granularity. These options include
+the path to the LDAP naming configuration file to use, so in effect
+all options can be configured on a per-service basis. Options are
+listed below under PAM Configuration.
+.SH CONFIGURATION
+.B
+pam_ldap
+stores its configuration in the
+.B
+ldap.conf
+file. (It should be noted that some LDAP client libraries, such as
+OpenLDAP, also use a configuration file of the same name.
+.B
+pam_ldap
+supports many of the same configuration file options as OpenLDAP,
+but it adds several that are specific to the functionality it provides.
+It is not guaranteed that
+.B
+pam_ldap
+will continue to match the configuration file semantics of OpenLDAP.
+You may wish to use different files.)
+.LP
+Configuration file options consist of a keyword followed by a
+space and any arguments. The following options are supported by
+both
+.B
+pam_ldap
+and the PADL
+.B
+nss_ldap
+module:
+.B
+.TP
+.B host <name:port ...>
+Specifies the name(s) or IP address(es) of the
+.I
+LDAP
+server(s) to connect to. In the case that
+.B
+nss_ldap
+is used for host name resolution, each server should be specified as an
+IP address or name that can be resolved without using
+.I
+LDAP.
+Multiple servers may be specified, each separated by a space.
+The failover time depends on whether the
+.I
+LDAP
+client library supports configurable network or connect timeouts
+(see
+.B bind_timelimit
+below).
+.TP
+.B base <base>
+Specifies the default base distinguished name (DN) to use for searches.
+.TP
+.B uri <ldap[is]://[name[:port]] ...>
+For
+.I
+LDAP
+client libraries that support it, specifies the URI(s) of the LDAP
+server(s) to connect to. The URI scheme may be
+.B
+ldap,
+.B
+ldapi,
+or
+.B
+ldaps,
+specifying LDAP over TCP, IPC and SSL respectively. If applicable,
+a port number can be specified; the default port number for the
+selected protocol is used if omitted. This option takes
+precedence over the
+.B
+host
+option; it is not possible to combine the two.
+.TP
+.B
+ldap_version <version>
+Specifies the version of the
+.I
+LDAP
+protocol to use. Presently
+.B
+version
+must be 2 or 3. The default is to use the maximum version supported
+by the client library.
+.TP
+.B binddn <binddn>
+Specifies the distinguished name with which to bind to the directory
+server(s). This option is optional; the default is to bind
+anonymously.
+.TP
+.B bindpw <bindpw>
+Specifies the cleartext credentials with which to bind. This option
+is only applicable when used with
+.B binddn
+above. The default is no credential (anonymous bind). When binding to
+the directory using
+.I
+SASL
+or other authentication mechanisms apart from simple binds, this
+option is not used.
+.TP
+.B rootbinddn <binddn>
+This option has the same syntax and effect as the
+.B binddn
+option above, except it applies when the effective user ID is
+zero. If not specified, then the identity specified in
+.B binddn
+is used instead. Because the configuration file may be readable by
+many users, the root bind DN credentials are stored in the
+.B ldap.secret
+file instead. This file is usually in the same directory as the
+configuration file.
+.TP
+.B port <port>
+Specifies the port to connect to; this option is used with the
+.B host
+option, and is ignored with the
+.B uri
+option.
+.TP
+.B scope <sub|one|base>
+Specifies the search scope (subtree, one level or base object). The
+default scope is subtree; base scope is almost never useful for
+nameservice lookups.
+.TP
+.B deref <never|searching|finding|always>
+Specifies the policy for dereferencing aliases. The default policy is
+to never dereference aliases.
+.TP
+.B timelimit <timelimit>
+Specifies the time limit (in seconds) to use when performing searches. A value
+of zero (0), which is the default, is to wait indefinitely for
+searches to be completed.
+.TP
+.B bind_timelimit <timelimit>
+Specifies the time limit (in seconds) to use when connecting to the directory
+server. This is distinct from the time limit specified in
+.B timelimit
+and affects the initial server connection only. (Server connections
+are otherwise cached.) Only some
+.I
+LDAP
+client libraries have the underlying functionality necessary to
+support this option. The default bind timelimit is 30 seconds.
+.TP
+.B referrals <yes|no>
+Specifies whether automatic referral chasing should be enabled. The
+default behaviour is specifed by the
+.I LDAP
+client library.
+.TP
+.B restart <yes|no>
+Specifies whether the
+.I LDAP
+client library should restart the
+.BR
+select(2)
+system call when interrupted. This feature is not supported by all
+client libraries.
+.TP
+.B logdir <directory>
+Specifies the directory used for logging by the
+.I LDAP
+client library. This feature is not supported by all client
+libraries.
+.TP
+.B debug <level>
+Specifies the debug level used for logging by the
+.I LDAP
+client library. This feature is not supported by all client
+libraries, and does not apply to the
+.B nss_ldap
+and
+.B pam_ldap
+modules themselves (debugging, if any, is configured separately
+and usually at compile time).
+.TP
+.B ssl <on|off|start_tls>
+Specifies whether to use SSL/TLS or not (the default is not to). If
+.B
+start_tls
+is specified then StartTLS is used rather than raw LDAP over SSL.
+Not all
+.I LDAP
+client libraries support both SSL and StartTLS, and all related
+configuration options.
+.TP
+.B sslpath <cert7_path>
+For the Netscape and Mozilla
+.I
+LDAP
+client libraries only, this specifies the path to the X.509
+certificate database.
+.TP
+.B tls_checkpeer <yes|no>
+Specifies whether to require and verify the server certificate
+or not, when using SSL/TLS with the OpenLDAP client library.
+The default is to use the default behaviour of the client
+library; for OpenLDAP 2.0 and earlier it is "no", for OpenLDAP
+2.1 and later it is "yes". At least one of
+.B tls_cacertdir
+and
+.B tls_cacertfile
+is required if peer verification is enabled.
+.TP
+.B tls_cacertdir <certificate_dir>
+Specifies the directory containing X.509 certificates for peer
+authentication.
+.TP
+.B tls_cacertfile <certificate_file>
+Specifies the path to the X.509 certificate for peer authentication.
+.TP
+.B tls_randfile <entropy_file>
+Specifies the path to an entropy source.
+.TP
+.B tls_ciphers <ciphers>
+Specifies the ciphers to use for TLS. See your TLS implementation's
+documentation for further information.
+.TP
+.B tls_cert <certificate_file>
+Specifies the path to the file containing the local certificate for
+client TLS authentication.
+.TP
+.B tls_key <key_file>
+Specifies the path to the file containing the private key for client
+TLS authentication.
+.TP
+The following configuration options apply to pam_ldap only:
+.TP
+.B pam_login_attribute <attribute>
+Specifies the attribute to use when constructing the attribute value
+assertion for retrieving a directory entry for a user's login name.
+The default is "uid", for compatibility with RFC 2307.
+.TP
+.B pam_filter <filter>
+Specifies a filter to use when retrieving user information. The user
+entry must match the attribute value assertion of
+(pam_login_attribute=login_name) as well as any filter specified
+here. There is no default for this option.
+.TP
+.B pam_lookup_policy <yes|no>
+Specifies whether to search the root DSE for password policy. The 
+default is "no".
+.TP
+.B pam_check_host_attr <yes|no>
+Specifies whether the "host" attribute should be checked for logon
+authorization ("account" in the PAM stack). The default is not to.
+If set to "yes" and a user has no
+value for the "host" attribute, then the user will be unable to
+login.
+.TP
+.B pam_check_service_attr <yes|no>
+Specifies whether the "authorizedService" attribute should be checked
+for logon authorization ("account" in the PAM stack). The default is not
+to. If set to "yes" and a user has no value for the "authorizedService"
+attribute, then the user will be unable to login.
+.TP
+.B pam_groupdn <groupdn>
+Specifies the distinguished name of a group to which a user must belong
+for logon authorization to succeed.
+.B pam_member_attribute <attribute>
+Specifies the attribute to use when testing a user's membership of a 
+group specified in the
+.B pam_groupdn
+option.
+.TP
+.B pam_min_uid <uid>
+If specified, a user must have a POSIX user ID of at least
+.B uid
+in order for logon authorization to succeed.
+.TP
+.B pam_max_uid <uid>
+If specified, a user must have a POSIX user ID of no greater than
+.B uid
+in order for logon authorization to succeed.
+.TP
+.B pam_template_login_attribute <attribute>
+When using template users (not supported by all PAM applications),
+specifies the attribute containing the user's actual login name.
+The
+.B pam_ldap
+module will set PAM_USER to the value of this attribute if present in the
+user's entry, otherwise it defaults to the user specified in the
+.B pam_template_login
+option.
+.TP
+.B pam_template_login <user>
+When using template users (not supported by all PAM applications),
+.B
+pam_ldap
+will set PAM_USER to the value of this option if the user does not
+contain a template login attribute.
+.TP
+.B pam_password <protocol>
+Specifies the password change protocol to use. The following protocols
+are supported:
+.RS
+.TP
+.B clear
+Change password using an LDAPModify request, replacing the userPassword
+value with the new cleartext password.
+.TP
+.B clear_remove_old
+Change password using an LDAPModify request, first removing the userPassword
+value containing the old cleartext password, and then adding the userPassword
+value with the new cleartext password. This protocol is necessary for use
+with Novell NDS and IBM RACF.
+.TP
+.B crypt
+Change password using an LDAPModify request, first generating a one way
+hash of the new password using
+.BR crypt(3)
+and then replacing userPassword value with the new hashed password.
+.TP
+.B md5
+Change password using an LDAPModify request, first generating a one way
+hash of the new password using MD5 and then replacing userPassword value
+with the new hashed password.
+.TP
+.B nds
+This is an alias for
+.B clear_remove_old.
+.TP
+.B racf
+This is an alias for
+.B clear_remove_old.
+.TP
+.B ad
+Change password using an LDAPModify request, using the Active Directory
+Services Interface (ADSI) password change protocol.
+.TP
+.B exop
+Change password using the RFC 3062 password modify extended operation
+(only the new password is sent).
+.TP
+.B exop_send_old
+Change password using the RFC 3062 password modify extended operation
+(both the old and new passwords are sent). This is the preferred
+choice when using the PADL XAD identity server.
+.RE
+.TP
+.B pam_password_prohibit_message <message>
+Specifies a message to send to users indicating that passwords cannot
+be changed. This could be used to redirect users to another means of
+changing passwords.
+.TP
+.B pam_sasl_mech <mechanism>
+Specifies the SASL mechanism to use for PAM authentication. This
+requires SASL libraries be installed. Support for this functionality
+presently experimental and does not support password policy controls.
+.SH PAM CONFIGURATION
+It is possible to configure some aspects of
+.B pam_ldap
+on a per-service basis, in the PAM configuration file (this is usually
+/etc/pam.conf; for PAM implementations based on Linux-PAM, per-service
+files in /etc/pam.d are also supported).
+.LP
+The following options may be specified as arguments to the
+.B pam_ldap
+module:
+.TP
+.B
+config=<path>
+Specifies that
+.B pam_ldap
+should use the configuration file in
+.B path
+instead of ldap.conf to retrieve its global configuration. Configuring
+multiple instances of
+.B pam_ldap
+for the same service with different configuration files is not supported,
+because the configuration information is cached.
+.TP
+.B
+use_first_pass
+Specifies that
+.B pam_ldap
+should always use the first password provided in the authentication
+stack.
+.TP
+.B
+try_first_pass
+Specifies that
+.B pam_ldap
+should first try the first password provided in the authentication
+stack, and then prompt the user for their
+.I
+LDAP
+password if authentication fails.
+.TP
+.B
+ignore_unknown_user
+Specifies that
+.B pam_ldap
+should return PAM_IGNORE for users that are not present in
+.I LDAP.
+This forces the PAM framework to ignore the
+.B pam_ldap
+module. This option is useful where certain accounts do not reside in
+.I LDAP,
+but one wishes to make
+.B pam_ldap
+"required" for all accounts in the directory. In this case one would
+make both
+.B pam_ldap
+and the other module (for example, pam_unix) "required" and enable
+the
+.B ignore_unknown_user
+option. (For this to work, the other module must behave similarly for
+users in the directory; in the case of a module such as pam_unix that
+uses the system accounts database, using
+.BR nss_ldap(5)
+should be sufficient to meet this requirement.)
+.TP
+.B ignore_authinfo_unavail
+Specifies that
+.B pam_ldap
+should return PAM_IGNORE if it cannot contact the
+.I LDAP
+server. This option forces the PAM framework to ignore the
+.B pam_ldap
+module in this case.
+.TP
+.B no_warn
+Specifies that warning messages should not be propagated to the PAM
+application.
+.TP
+.B use_authtok
+Analogous to
+.B use_first_pass
+for password changing only.
+.TP
+.B debug
+This option is recognized by
+.B pam_ldap
+but is presently ignored.
+.SH AUTHOR
+The
+.B pam_ldap
+module was developed by PADL Software Pty Ltd (www.padl.com).
+.SH FILES
+.TP
+/etc/ldap.conf, /etc/ldap.secret, /etc/pam.conf
+.SH SEE ALSO
+.BR pam (8)

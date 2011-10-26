@@ -1,0 +1,210 @@
+#!@PERL@
+#
+# viewfax.cgi -- show received faxes
+# 
+# Copyright 1998 Simone Demmel simone@greenie.net
+#
+# RCS: $Id: viewfax.in,v 1.9 2001/07/16 09:24:14 neko Exp $
+#
+# $Log: viewfax.in,v $
+# Revision 1.9  2001/07/16 09:24:14  neko
+# add delete fax function
+#
+# Revision 1.8  2001/04/02 07:39:30  gert
+# change sort order: show most recent faxes at top of list
+#
+# Revision 1.7  2001/02/24 11:31:10  gert
+# handle newish fax file name format without "-"
+#
+# Revision 1.6  1999/05/27 15:08:27  gert
+# add source=incoming to nph-vf-gif.cgi calls
+#
+# Revision 1.5  1998/10/27 14:20:27  gert
+# change comments to English
+# use wwwsub.pl
+# check directory arguments
+#
+# Revision 1.4  1998/10/13 15:55:57  gert
+# move %maxpages to wwwgui.conf
+# adapt <h1> header to "what all the others have"
+#
+# Revision 1.3  1998/10/07 13:07:30  gert
+# add config file, call "givgif" with correct name
+#
+# Revision 1.2  1998/09/11 13:57:04  gert
+# renamed "givgif" to "nph-vf-gif" (name too long, nph- needed)
+#
+# Revision 1.1  1998/09/09 15:30:16  gert
+# display incoming fax queue, call vf-*.cgi scripts for details
+#
+
+#
+# Script to generate an overview of all received faxes
+#
+
+# sorry, no translation
+# Aufgabe:
+# - Auflistung aller erhaltenen Faxe
+#
+
+#
+# don't forget it!
+#
+print "Content-type: text/html\n\n";
+
+#
+# Variables 
+#
+
+# read configuration file
+require "@CONFDIR@/wwwgui.conf";
+
+# read common subroutine file
+require "@LIBDIR@/wwwsub.pl";
+
+#
+# check, if all necessary variables are available
+#
+# check, if fax-incoming is defined
+if ($fax_incoming eq "")
+{
+    errormessage( "\$fax_incoming : not configured - please look at the configuration-Files and configure the Directory where you store your incoming faxes (\$fax_incoming)");
+}
+if (! -d $fax_incoming)
+    { errormessage( "\$fax_incoming : no such directory $fax_incoming");}
+if (! -r $fax_incoming)
+    { errormessage( "\$fax_incoming : no read-permission for $fax_incoming");}
+
+
+# check, if $indexpage is not empty
+if ($indexpage eq "")
+{
+    errormessage( "\$indexpage : not configured - please look at the configuration-Files and configure the URL for my main-index-page (\$indexpage)");
+}
+
+
+#
+# start
+#
+
+chdir $fax_incoming;
+
+#
+# HTML top-part
+#
+
+print <<EOF;
+<html><head>
+<title>Eingegangene Faxe</title>
+</head></html>
+<body bgcolor="#ffffff">
+
+$www_logo
+<h1 align="center">Faxmanager - Eingegangene Faxe</h1><br clear="all">
+<hr size="5">
+
+<div align="center">
+<table border="1" cellpadding="4">
+<tr>
+	<th>Datum</th>
+	<th>Senderkennung</th>
+	<th>Fax-ID</th>
+	<th>Seiten</th>
+	<th>Seitenansicht</th>
+EOF
+
+if ( $allow_delete ) { print "<th>Action</th>\n"; }
+
+print "</tr>\n";
+
+# generieren:
+# <tr>
+# 	<td>12.3.98 9:00</td>
+# 	<td>Gemini</td>
+# 	<td>fn23467</td>
+# 	<td>3</td>
+# 	<td><a href="sendgif.cgi?100">Groáansicht</a>
+#  	    <a href="sendgif.cgi?60">60%</a>
+#	    <a href="sendgif.cgi?30">30%</a>
+#	    <a href="sendg3.cgi?100">raw g3-code</a>
+#	</td>
+# </tr>
+
+opendir DIRECTORY, "." || print "cannot open $fax_incoming\n";
+foreach $DATEI (readdir DIRECTORY)
+{
+    next unless ( $DATEI =~ /^f/ );
+
+    if ($DATEI =~ /^f(.)(.......)(..-?)(.*)\.(\d+)$/) 
+    {
+        if ( ! defined($pages{$2}) ) 
+        {
+            $pages{$2}=1;
+            $basename{$2}="f$1$2$3$4";
+            $sender{$2}= ($4 eq '')?  '<i>unbekannt</i>': $4;
+	    $date{$2}=(stat($DATEI))[9];
+        }
+        else
+        {
+            $pages{$2}++;
+        }
+    }
+    else
+    {
+	print "unidentified |$DATEI|\n";
+    }
+}
+
+closedir DIRECTORY;
+
+foreach $id ( sort { -( $date{$a} <=> $date{$b} ) } ( keys %pages ) )
+{
+    $date=localtime($date{$id});
+print <<EOF;
+<tr>
+<td align="right">$date</td>
+<td>$sender{$id}</td>
+<td>$id</td>
+<td align="right">$pages{$id}</td>
+<td>
+EOF
+
+    foreach $protz ( sort { $a <=> $b } ( keys %maxpages ))
+    {
+
+	my $file =  "file=$basename{$id}";
+	my $page =  "page=overview";
+
+        if ($pages{$id} <= $maxpages{$protz})
+        {
+	    print "    <a href=\"nph-vf-gif.cgi?source=incoming&size=$protz&$file\">$protz%</a>&nbsp;\n";
+	}
+	else
+	{
+	    print "    <a href=\"nph-vf-gif.cgi?source=incoming&size=$protz&$file&$page\">$protz%</a>&nbsp;\n";
+	}
+    }
+
+	if ( $allow_delete )
+	{
+    print <<EOF ;
+    </td>
+    <td><a href="delete.cgi?source=incoming&file=$basename{$id}">$delete</a></td>
+    </tr>
+EOF
+    }
+    else { print "</td>\n</tr>\n"; }
+
+}
+
+print <<EOF;
+</table>
+</div>
+<hr size="5">
+<a href="$indexpage">^Hauptmenue</a>
+</body>
+</html>
+EOF
+
+
+exit 0

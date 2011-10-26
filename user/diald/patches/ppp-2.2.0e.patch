@@ -1,0 +1,39 @@
+diff -u -r ppp-2.2.0e/pppd/main.c ppp-2.2.0-me/pppd/main.c
+--- ppp-2.2.0e/pppd/main.c	Tue Nov 21 01:53:48 1995
++++ ppp-2.2.0-me/pppd/main.c	Thu Feb 29 11:16:01 1996
+@@ -329,7 +329,15 @@
+ 	 * the non-blocking I/O bit.
+ 	 */
+ 	nonblock = (connector || !modem)? O_NONBLOCK: 0;
+-	if ((fd = open(devnam, nonblock | O_RDWR, 0)) < 0) {
++	/* don't reopen the default device. If the default
++	 * device happens to be /dev/cua*, then this will fail
++	 * if our parent is not yet dead!
++	 */
++	if (!default_device)
++	    fd = open(devnam, nonblock | O_RDWR, 0);
++	else
++	    fd = dup(0);
++	if (fd < 0) {
+ 	    syslog(LOG_ERR, "Failed to open %s: %m", devnam);
+ 	    die(1);
+ 	}
+diff -u -r ppp-2.2.0e/pppd/sys-linux.c ppp-2.2.0-me/pppd/sys-linux.c
+--- ppp-2.2.0e/pppd/sys-linux.c	Thu Dec 28 00:58:09 1995
++++ ppp-2.2.0-me/pppd/sys-linux.c	Thu Feb 29 11:13:31 1996
+@@ -1469,7 +1469,14 @@
+     int init_disc = -1;
+     int initfdflags;
+ 
+-    local_fd = open(devnam, O_NONBLOCK | O_RDWR, 0);
++    /* don't reopen the default device. If the default
++     * device happens to be /dev/cua*, then this will fail
++     * if our parent is not yet dead!
++     */
++    if (!default_device)
++        local_fd = open(devnam, O_NONBLOCK | O_RDWR, 0);
++    else
++        local_fd = dup(0);
+     if (local_fd < 0)
+       {
+ 	syslog(LOG_ERR, "Failed to open %s: %m", devnam);

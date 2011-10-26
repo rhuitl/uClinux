@@ -1,0 +1,227 @@
+# ###############################################################
+#
+# Makefile.in for the userland GPL Speedtouch USB driver 
+#
+# Written by Francois Rogler <francois@rogler.org>
+# June 2001
+#
+# $Id: Makefile.in,v 1.19 2004/06/10 16:21:00 papillau Exp $
+#
+# ###############################################################
+
+# ###############################################################
+# Makefile variables
+# ###############################################################
+
+# Warning levels
+CWARN0 = @CWARN@
+CWARN1 = $(CWARN0) -Wwrite-strings -Wshadow
+CWARN2 = $(CWARN1) -Wcast-align -Wcast-qual -Waggregate-return
+CWARN3 = $(CWARN2) -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
+CWARN4 = $(CWARN3) -Wconversion -Winline -Wtraditional
+CWARN  = $(CWARN0)
+
+
+# Vrac
+SHELL = @SHELL@
+CONFIGURE_ARGS = @ac_configure_args@
+@SET_MAKE@
+
+rootdir=@PWD@
+
+# Driver version
+VERSION=@VERSION@
+
+# Installation directories
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+sbindir=@sbindir@
+libexecdir=@libexecdir@
+datadir=@datadir@
+sysconfdir=@sysconfdir@
+libdir=@libdir@
+includedir=@includedir@
+oldincludedir=@oldincludedir@
+infodir=@infodir@
+mandir=@mandir@
+doc=${rootdir}/@DOCDIR@
+
+srcdir=${rootdir}/src
+make_bindir=${rootdir}/bin
+include= -I. -I${includedir} -I${oldincludedir}
+INSTALL=@INSTALL@
+installuser=@installuser@
+
+# C compiler
+CC=@CC@
+
+# C compiler options
+THREAD_LIBS=@THREAD_LIBS@
+USE_SYSLOG=@syslog_flags@
+PUSB_SOURCE=@PUSB_SOURCE@
+
+CFLAGS=@CFLAGS@
+ST_CFLAGS=$(CWARN) $(include) $(CFLAGS)
+ST_COMPILE=@st_compile@
+
+# Linker options
+LINK_OPTS=@link_opts@
+
+LIBS=@LIBS@
+
+DEFS=$(CFLAGS)
+
+#RPM Variables
+RPM_ROOT=@RPM_ROOT@
+
+# ###############################################################
+# Makefile Rules
+# ###############################################################
+
+DIST_FILES = AUTHORS COPYING TODO VERSION INSTALL INSTALL.txt.fr \
+             configure.in configure config.guess config.sub \
+             ChangeLog Makefile.in speedtouch.spec.in install-sh \
+             speedtouch.spec missing
+
+DEBIAN_FILES = \
+	debian/changelog  debian/copyright  debian/docs debian/manpages \
+	debian/config     debian/examples   debian/README.Debian  \
+	debian/control    debian/dirs       debian/rules \
+    debian/templates
+
+all: $(ALLDEPS) modem
+	@echo '-------------------------------------------------------------'
+	@echo 'Driver for the SpeedTouch USB and SpeedTouch 330 is compiled'
+	@echo ''
+	@echo 'To install it, type as root:'
+	@echo ''
+	@echo 'make install'
+	@echo '-------------------------------------------------------------'
+
+install: all install-bin install-man boot.v123.bin install-hotplug
+	cd src && $(MAKE) install
+	@echo
+	@echo '-------------------------------------------------------------'
+	@echo 'Driver for the SpeedTouch USB and SpeedTouch 330 is installed'
+	@echo ''
+	@echo 'The binaries (modem_run and pppoax) have been installed in :'
+	@echo '          * $(sbindir)'
+	@echo ''
+	@echo 'You will find the documentation and example script files in : '
+	@echo '          * $(datadir)/doc/speedtouch'
+	@echo ''
+	@echo 'You can start configuring your modem by running'
+	@echo '$(bindir)/speedtouch-setup'
+	@echo ''
+	@echo '-------------------------------------------------------------'
+	@echo ''
+	@echo 'NB : Read the documentation carefully to use this driver correctly'
+
+install-bin: 
+	@echo 'Installing the Speedtouch USB driver ...'
+	test -d "$(sbindir)" || $(INSTALL) -c -d "$(sbindir)"
+	$(MAKE) $(ST_COMPILE)
+	@MAKE_INSTALL_SCRIPT@
+
+boot.v123.bin:
+	@echo 'Installing the boot block for speedtouch usb rev [1|2|3] ...'
+	test -d "$(datadir)/speedtouch" || $(INSTALL) -c -d "$(datadir)/speedtouch"
+	$(INSTALL) -m 0644 -o $(installuser) src/boot.v123.bin "$(datadir)/speedtouch"
+
+modem_run:
+	@echo 'Installing the modem_run program ...'
+	$(INSTALL) -m 0755 -o $(installuser) bin/modem_run "$(sbindir)"
+
+pppoa2:
+	@echo 'Installing the pppoa2 ppp pty slave ...'
+	$(INSTALL) -m 0755 -o $(installuser) bin/pppoa2  "$(sbindir)"
+
+pppoa3:
+	@echo 'Installing the pppoa3 ppp pty slave ...'
+	$(INSTALL) -m 0755 -o $(installuser) bin/pppoa3  "$(sbindir)"
+
+linux_sysv:
+	echo 'Installing SysV startup script ...'
+	test -d "$(sysconfdir)/init.d" || $(INSTALL) -c -d "$(sysconfdir)/init.d"
+	$(INSTALL) -m 0755 -o $(installuser) "$(doc)/speedtouch.sh" "$(sysconfdir)/init.d/speedtouch"
+
+install-man:
+	@echo 'Installing man pages ...'
+	cd "$(doc)" && $(MAKE) install
+
+install-hotplug:
+	cd hotplug && $(MAKE) install
+
+uninstall:
+	cd src && $(MAKE) uninstall
+# target install-bin
+	$(RM) "$(sbindir)/modem_run"
+	$(RM) "$(sbindir)/pppoa2"
+	$(RM) "$(sbindir)/pppoa3"
+# target install-man
+	cd "$(doc)" && $(MAKE) uninstall
+# target boot.v123.bin
+	$(RM) "$(datadir)/speedtouch/boot.v123.bin"
+# target install-hotplug
+	cd hotplug && $(MAKE) uninstall
+
+modem:
+	cd src && $(MAKE) 
+
+clean:
+	cd src       && $(MAKE) clean
+	cd hotplug   && $(MAKE) clean
+	cd doc-bsd   && $(MAKE) clean
+	cd doc-linux && $(MAKE) clean
+
+distclean: 
+	cd src       && $(MAKE) distclean
+	cd hotplug   && $(MAKE) distclean
+	cd doc-linux && $(MAKE) distclean
+	cd doc-bsd   && $(MAKE) distclean
+	rm -f speedtouch.spec Makefile
+	rm -f config.status config.log config.cache confdefs.h
+	rm -rf bin/
+
+# Prepares a tarball
+dist:
+	rm -rf speedtouch-$(VERSION)
+	rm -rf speedtouch-$(VERSION).tar
+	rm -rf speedtouch-$(VERSION).tar.bz2
+	rm -rf speedtouch-$(VERSION).tar.gz
+	mkdir speedtouch-$(VERSION)
+	cp $(DIST_FILES) speedtouch-$(VERSION)
+	mkdir speedtouch-$(VERSION)/debian
+	cp $(DEBIAN_FILES) speedtouch-$(VERSION)/debian
+	cd src       && $(MAKE) dist
+	cd hotplug   && $(MAKE) dist
+	cd doc-linux && $(MAKE) dist
+	cd doc-bsd   && $(MAKE) dist
+	tar cf speedtouch-$(VERSION).tar speedtouch-$(VERSION)
+	bzip2 -k9 speedtouch-$(VERSION).tar
+	gzip -9 speedtouch-$(VERSION).tar
+	rm -rf speedtouch-$(VERSION)
+
+# Build RPM's
+rpm: dist speedtouch.spec
+	cp -f speedtouch-$(VERSION).tar.bz2 $(RPM_ROOT)/SOURCES/
+	rpm -ba --clean speedtouch.spec
+	find $(RPM_ROOT)/SRPMS/ -name "speedtouch*.src.rpm" | xargs -i{} mv {} .
+	find $(RPM_ROOT)/RPMS/ -name "speedtouch*.rpm" | xargs -i{} mv {} .
+	rm -f $(RPM_ROOT)/SOURCES/speedtouch-$(VERSION).tar.bz2
+
+beta: 
+	version="`date +%Y%m%d`"; \
+	mkdir -p tmp ; cd tmp ; \
+	cvs -z3 -r -d:pserver:anonymous@cvs.speedtouch.sourceforge.net:/cvsroot/speedtouch co speedtouch; \
+	chmod +w speedtouch/VERSION; \
+	echo beta-$${version} > speedtouch/VERSION; \
+	chmod -w speedtouch/VERSION; \
+	mv speedtouch speedtouch-beta-$${version} ;\
+	tar cf speedtouch-beta-$${version}.tar speedtouch-beta-$${version};\
+	rm -f speedtouch-beta-$${version}.tar.gz; \
+	gzip -9 speedtouch-beta-$${version}.tar;\
+	rm -rf speedtouch-beta-$${version};\
+	mv speedtouch-beta-$${version}.tar.gz ..; \
+	cd .. ; rm -rf tmp

@@ -1,0 +1,174 @@
+#!@PERL@
+#
+# faxhists.cgi -- show fax history (reading 'acct.log')
+# 
+# Copyright 1998 Gert Doering, gert@greenie.net
+#
+# CVS: $Id: faxhists.in,v 1.2 1998/12/04 14:57:54 gert Exp $
+#
+# $Log: faxhists.in,v $
+# Revision 1.2  1998/12/04 14:57:54  gert
+# substitute regex specials for dummy users
+#
+# Revision 1.1  1998/11/24 15:51:01  gert
+# Fax History Search - first cut
+#
+
+#
+print "Content-type: text/html\n\n";
+
+# read configuration file
+require "@CONFDIR@/wwwgui.conf";
+
+$fax_acct='@FAX_SPOOL@/acct.log';
+$faxrunq_cf='@CONFDIR@/faxrunq.config';
+
+#
+# read and parse CGI arguments
+#
+if ($ENV{'REQUEST_METHOD'} eq "GET")
+{
+  $query_string=$ENV{'QUERY_STRING'};
+}
+elsif (($ENV{'REQUEST_METHOD'} eq "POST") &&
+       ($ENV{'CONTENT_TYPE'} eq "application/x-www-form-urlencoded"))
+{
+  read(STDIN,$query_string,$ENV{'CONTENT_LENGTH'});
+}
+else
+{
+  $query_string='';
+};
+
+#
+# parse CGI arguments
+#
+%args=();
+foreach (split(/\&/,$query_string))
+{
+  if ( /^(\w+)=/ && ($key=$1) && ($value=$') )
+  {
+    $value =~ s/\+/ /go;
+    $value =~ s/\%([0-9a-f]{2})/pack(C,hex($1))/eig;
+
+   $args{"$key"}=$args{"$key"} . " " . $value if ($value!~/^\s*$/);
+   $args{"$key"} =~ s/^\s*//o;
+  }
+}
+
+#
+# read 'faxrunq.config' - the path to $faxrunq_cf might have changed
+#
+if ( open( IN, "<$faxrunq_cf" ) )
+{
+    while( <IN> )
+    {
+	chomp;
+	if ( /^\s*acct-log\s+(\S+)/ )
+			{ $fax_acct = "$1"; }
+    }
+    close IN;
+}
+
+#
+# now we know which file to read...
+#
+
+#
+# open HTML page
+#
+
+print <<EOF;
+<html><head>
+<title>Fax History Search</title>
+</head></html>
+<body bgcolor="#ffffff">
+
+$www_logo
+<h1 align="center">Faxmanager - Suche in der Liste gesendeter Faxe</h1><br clear="all">
+<hr size="5">
+
+<!-- acct_log: $fax_acct -->
+EOF
+
+#
+# build form
+#
+$faxnr = ( defined( $args{faxnr} ) ? $args{faxnr} : '' );
+$user = ( defined( $args{user} ) ? $args{user} : '' );
+$acct = ( defined( $args{acct} ) ? $args{acct} : '' );
+
+print <<EOF;
+<FORM action="faxhists.cgi" method="get">
+<table>
+<tr><td>Faxnummer:
+    <td><input name="faxnr" type="text" size="20" value="$faxnr"></tr>
+<tr><td>Benutzer:
+    <td><input name="user" type="text" size="8" value="$user"></tr>
+<tr><td>Acct-Handle:
+    <td><input name="acct" type="text" size="20" value="$acct"></tr>
+<tr><td><td><input type="submit" value="Suchen"></tr>
+</table>
+</FORM>
+EOF
+
+# escape some special characters 'cause users don't understand real regex's...
+print "<!-- \$acct='$acct' =>";
+$acct =~ s/([\[\]\.])/\\$1/g;  $acct =~ s/\?/./g;  $acct =~ s/\*/.*/g;
+print "'$acct'-->\n";
+
+if ( $faxnr ne '' || $user ne '' || $acct ne '' )
+{
+    my $found = 0;
+
+    print "<hr><H3>Suchergebnis:</H3>\n";
+
+    unless( open( A, "<$fax_acct" ) )
+    {
+	print "<b>can't open '$fax_acct': $!</b><p></body></html>\n";
+	exit 0;
+    }
+    while( <A> )
+    {
+	chomp;
+	@_ = split( /\|/, $_ );
+
+	print "user: '$_[0]', faxnr: '$_[1]', acct: '$_[2]'<br>\n"
+						if ( defined($args{debug}) );
+
+	if ( $user  ne '' && $_[0] !~ /^$user / ) { next; }
+	if ( $faxnr ne '' && $_[1] !~ /$faxnr/ ) { next; }
+	if ( $acct  ne '' && $_[2] !~ /$acct/ ) { next; }
+
+	if ( $found++ == 0 )
+	{
+	    print <<EOFt;
+<table><TR><TH>User<TH>Job-ID<TH>Fax-Nr.<TH>Acct-Handle<TH>Datum<TH>Status</TR>
+<tr><td colspan="6"><hr></tr>
+EOFt
+	}
+	$_ = (shift @_) . " ";
+	$_ =~ /^(\S+)\s+(\S*)/;
+	print "<tr><td>$1<td>$2<td>" . join( " <td>", @_ ) . "</tr>\n";
+    }
+    close A;
+
+    if ( $found == 0 )
+    {
+	print "<b>Keine passenden Fax-Auftr&auml;ge gefunden.</b><p>\n";
+    }
+    else
+    {
+	print "<tr><td colspan=\"6\"><hr></tr>\n";
+	print "<tr><td colspan=\"6\"><b>$found Treffer gefunden.</b></tr></table>\n";
+    }
+}
+
+print <<EOF;
+<p>
+<hr size="5">
+<a href="$indexpage">^Hauptmenue</a>
+</body>
+EOF
+
+exit 0;

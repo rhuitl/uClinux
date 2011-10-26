@@ -1,0 +1,331 @@
+#!@PERL@
+#
+# faxsend.cgi -- handle sendfax
+# 
+# Copyright 1998 Simone Demmel simone@greenie.net
+#
+# CVS: $Id: faxsend.in,v 1.3 1999/02/16 14:34:42 gert Exp $
+#
+# $Log: faxsend.in,v $
+# Revision 1.3  1999/02/16 14:34:42  gert
+# frontend for sending faxes
+#
+
+#
+# Script to generate a webpage for sending faxes
+#
+
+# sorry, no translation possible
+# Aufgabe:
+# 1. feststellen, ob die Anfrage eine ausgefuellte page war, oder nicht
+# 2. feststellen, ob alle noetigen Angaben gemacht wurden,
+#    wenn nicht, dann mit/ohne Kommentar zurueckgeben
+#    sonst: abschicken.
+#
+
+#
+# special modules
+#
+
+#
+# not to forget...
+#
+print "Content-type: text/html\n\n";
+
+# read configuration file
+require "@CONFDIR@/wwwgui.conf";
+
+# read common subroutine file
+require "@LIBDIR@/wwwsub.pl";
+
+# faxspool command
+$faxspool = "@BINDIR@/faxspool";
+
+#
+# check, if all necessary variables are available
+#
+
+# check, if fax-outgoing is defined
+# check_outgoing();
+
+# check, if $indexpage is not empty
+if ($indexpage eq "")
+{
+    errormessage( "\$indexpage : not configured - please look at the configuration-Files and configure the URL for my main-index-page (\$indexpage)");
+}
+
+#
+# End of Variables
+#
+
+#
+# start it
+#
+
+get_cgi(1);
+$error="false";
+$new="false";
+$errormsg="";
+
+if ($query_string eq "")
+{
+    # Seite einfach ausgeben
+    $new="true";
+}
+
+if ( ( !defined $args{fax}  ||
+       $args{fax} !~ /\d/ ) &&
+       $new eq "false"
+)
+{
+   $error="true";
+   $fax_errmsg = "<br><font color=\"red\">Keine korrekte Faxnummer (nur Ziffern verwenden, ohne Leerzeichen)</font>";
+}
+else { $fax_errmsg = ""; }
+
+if ( !defined $args{files} && !defined $args{message} && $new eq "false")
+{ 
+    $error="true";
+    $files_errmsg = "<br><font color=\"red\">Weder Kurznachricht noch zu sendendes Dokument angegeben.</font>";
+}
+else { $files_errmsg = ""; }
+
+if ($error eq "true") {
+    $errormsg = "<br><font color=\"red\">Fehler: unvollständig ausgefülltes Formular.</font>";
+}
+
+if (($new eq "true") || ($error eq "true"))
+{
+
+#
+# $new="true" - errors or no entries...
+
+# set undefined values for printing
+if ( !defined $args{to}      ) { $args{to} = ""; }
+if ( !defined $args{fax}     ) { $args{fax} = ""; }
+if ( !defined $args{from}    ) { $args{from} = ""; }
+if ( !defined $args{mail}    ) { $args{mail} = ""; }
+if ( !defined $args{message} ) { $args{message} = ""; }
+
+#
+# $documents auswerten und in $options zur Ausgabe vorbereiten
+#
+
+for ($i=0 ; $i < $#documents ; $i=$i+2)
+{
+    if ( " $args{files} " =~ / $i /)
+         { $selected = " selected"; }
+    else { $selected = ""; }
+
+    $options .= "<option value=\"$i\"$selected> $documents[$i]\n";
+}
+
+print "<!-- \$query_string='$query_string'\n \$args{files}=$args{files} --> \n";
+
+print <<EOF;
+<html><head><title>Send fax</title></head>
+<body bgcolor="white">
+$www_logo
+
+<h1 align="center">Fax senden $errormsg</h1>
+
+<br clear="all"><hr>
+<p>
+
+<form action="faxsend.cgi" method="GET">
+
+<table border="1">
+<tr>
+<td>An:</td>
+<td><input type="text" name="to" size="20" value="$args{to}"></td>
+</tr>
+<tr>
+<td>Faxnummer $fax_errmsg</td>
+<td><input type="text" name="fax" size="10" value="$args{fax}"></td>
+</tr>
+<tr>
+<td>Von:</td>
+<td><input type="text" name="from" size="20" value="$args{from}"></td>
+</tr>
+<tr>
+<td>Coverpage</td>
+<td><input type="radio" name="cover" value="yes" selected> ja
+    <input type="radio" name="cover" value="no">  nein</td>
+</tr>
+<tr>
+<td>Status-Mail an:</td>
+<td><input type="text" name="mail" size="10" value="$args{mail}"></td>
+</tr>
+</table>
+
+$files_errmsg
+<br>
+Zu sendende Dokumente:
+<select multiple name="files" size="3">
+$options
+</select>
+
+<p>
+
+Kurznachricht:
+<p>
+<textarea name="message" rows="20" cols="70" WRAP>$args{message}</textarea>
+
+<p>
+<input type="submit" value="abschicken">
+<input type="reset"  value="loeschen">
+</form>
+
+<hr size="5">
+<a href="$indexpage">^Hauptmenue</a>
+</body>
+</html>
+EOF
+}
+
+#
+# $new=false - not new, no errors - just send it
+
+else
+{
+
+# $faxspool aus einem der grossen config-files
+# $mailto statusmail
+if (defined $args{mail}) { $mailto = "-f $args{mail}"; }
+else { $mailto = ""; $args{mail} = ""; }
+
+# $coverpage
+if ($args{cover} eq "yes") { $coverpage = ""; }
+else { $coverpage = "-C -"; }
+
+# $to_name 
+if (defined $args{to}) { $to_name = "-D \"$args{to}\""; }
+else { $to_name = ""; $args{to} = "";}
+
+# $from_name von wem
+if (defined $args{from}) { $from_name = "-F \"$args{from}\""; }
+else { $from_name = ""; $args{from} = "";}
+
+# $fax Faxnummer
+if (defined $args{fax}) { $fax = $args{fax}; }
+else { $args{fax} = ""; }
+
+# $args{message}
+if ( !defined $args{message} ) { $args{message} = ""; }
+
+# $memo File, in dem $message zwischengelagert ist
+$memo = "/tmp/message$$.txt";
+open (MEMO, ">$memo") || errormessage ("memofile $memo schreiben ging nicht");
+print MEMO "$args{message}";
+close MEMO;
+
+# $files - zu sendende Dokumentenliste.
+if ( defined $args{files} ) { $files = $args{files}; }
+else { $files = ""; $args{files} = ""; }
+#
+# $files wieder auf das richtige mappen
+#
+@_ = split / /, $files;
+$files = "";
+$files_descr = "";
+foreach $f (@_) {
+    $files .= $documents[$f+1]." ";
+    $files_descr .= "<li> ".$documents[$f];
+}
+
+
+print <<EOF;
+<html><head><title>Sending Fax...</title></head>
+<body bgcolor="white">
+$www_logo
+
+<h1 align="center">sending Fax</h1>
+
+<br clear="all"><hr>
+<p>
+
+
+<table border="1">
+<tr>
+<td>An:</td>
+<td>$args{to}</td>
+</tr>
+<tr>
+<td>Faxnummer</td>
+<td>$args{fax}</td>
+</tr>
+<tr>
+<td>Von:</td>
+<td>$args{from}</td>
+</tr>
+<tr>
+<td>Coverpage</td>
+<td> $args{cover}
+</tr>
+<tr>
+<td>Status-Mail an:</td>
+<td>$args{mail}</td>
+</tr>
+</table>
+
+<br>
+Zu sendende Dokumente:<br>
+<ul>
+$files_descr
+</ul>
+
+<p>
+Kurznachricht:
+<p>
+$args{message}
+<p>
+<hr>
+
+EOF
+
+# 
+# send it
+# 
+
+print <<EOF;
+DEBUGGING:<p>
+-- call:<br>
+$faxspool $mailto $coverpage $to_name $from_name $fax $memo $files
+<p>
+en detail:<br>
+\$faxspool: $faxspool<br>
+\$mailto: $mailto<br>
+\$coverpage: $coverpage<br>
+\$to_name: $to_name<br>
+\$from_name: $from_name<br>
+\$fax: $fax<br>
+\$memo: $memo<br>
+\$files: $files<br>
+<p>
+Faxspool-OUTPUT:<p>
+
+EOF
+
+open (FAX, "$faxspool $mailto $coverpage $to_name $from_name $fax $memo $files 2>&1 |") || errormessage("Konnte faxspool nicht ausfuehren: $!<p>\n");
+
+print "<pre>\n";
+while( <FAX> )
+{
+    print $_;
+}
+close FAX;
+
+print <<EOF;
+</pre>
+
+<hr size="5">
+<a href="$indexpage">^Hauptmenue</a>
+</body>
+</html>
+EOF
+
+unlink ($memo);
+}
+
+exit 0
+

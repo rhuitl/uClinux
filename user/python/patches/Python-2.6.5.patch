@@ -1,0 +1,220 @@
+diff --exclude='*.swp' --exclude=makefile -Nuar Python-2.6.5/configure.in python.new/configure.in
+--- Python-2.6.5/configure.in	2010-03-10 07:47:28.000000000 +1000
++++ python.new/configure.in	2010-04-19 14:45:34.231102106 +1000
+@@ -3844,7 +3844,7 @@
+   AC_MSG_RESULT(no)
+ fi
+ 
+-AC_MSG_CHECKING(for %zd printf() format support)
++AC_CACHE_CHECK([for %zd printf() format support], [py_cv_has_zd_printf], [dnl
+ AC_TRY_RUN([#include <stdio.h>
+ #include <stddef.h>
+ #include <string.h>
+@@ -3878,10 +3878,13 @@
+ 	return 1;
+ 
+     return 0;
+-}],
+-[AC_MSG_RESULT(yes)
+- AC_DEFINE(PY_FORMAT_SIZE_T, "z", [Define to printf format modifier for Py_ssize_t])],
+- AC_MSG_RESULT(no))
++}], [py_cv_has_zd_printf="yes"],
++    [py_cv_has_zd_printf="no"],
++    [py_cv_has_zd_printf="cross -- assuming yes"]
++)])
++if test "$py_cv_has_zd_printf" != "no" ; then
++  AC_DEFINE(PY_FORMAT_SIZE_T, "z", [Define to printf format modifier for Py_ssize_t])
++fi
+ 
+ AC_CHECK_TYPE(socklen_t,,
+   AC_DEFINE(socklen_t,int,
+diff --exclude='*.swp' --exclude=makefile -Nuar Python-2.6.5/Makefile.pre.in python.new/Makefile.pre.in
+--- Python-2.6.5/Makefile.pre.in	2009-12-25 00:19:38.000000000 +1000
++++ python.new/Makefile.pre.in	2010-04-19 17:29:37.091832625 +1000
+@@ -175,6 +175,7 @@
+ 
+ PYTHON=		python$(EXE)
+ BUILDPYTHON=	python$(BUILDEXE)
++HOSTPYTHON=	$(BUILDPYTHON)
+ 
+ # The task to run while instrument when building the profile-opt target
+ PROFILE_TASK=	$(srcdir)/Tools/pybench/pybench.py -n 2 --with-gc --with-syscheck
+@@ -205,6 +206,7 @@
+ ##########################################################################
+ # Parser
+ PGEN=		Parser/pgen$(EXE)
++HOSTPGEN=	$(PGEN)$(EXE)
+ 
+ POBJS=		\
+ 		Parser/acceler.o \
+@@ -370,7 +372,7 @@
+ 	$(MAKE) all CFLAGS="$(CFLAGS) -fprofile-generate" LIBS="$(LIBS) -lgcov"
+ 
+ run_profile_task:
+-	./$(BUILDPYTHON) $(PROFILE_TASK)
++	$(HOSTPYTHON) $(PROFILE_TASK)
+ 
+ build_all_use_profile:
+ 	$(MAKE) all CFLAGS="$(CFLAGS) -fprofile-use"
+@@ -388,14 +390,14 @@
+ 			$(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS) $(LDLAST)
+ 
+ platform: $(BUILDPYTHON)
+-	$(RUNSHARED) ./$(BUILDPYTHON) -E -c 'import sys ; from distutils.util import get_platform ; print get_platform()+"-"+sys.version[0:3]' >platform
++	$(RUNSHARED) $(HOSTPYTHON) -E -c 'import sys ; from distutils.util import get_platform ; print get_platform()+"-"+sys.version[0:3]' >platform
+ 
+ 
+ # Build the shared modules
+ sharedmods: $(BUILDPYTHON)
+ 	@case $$MAKEFLAGS in \
+-	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+-	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
++	*s*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' $(HOSTPYTHON) -E $(srcdir)/setup.py -q build;; \
++	*) $(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' $(HOSTPYTHON) -E $(srcdir)/setup.py build;; \
+ 	esac
+ 
+ # Build static library
+@@ -517,7 +519,7 @@
+ 
+ $(GRAMMAR_H) $(GRAMMAR_C): $(PGEN) $(GRAMMAR_INPUT)
+ 		-@$(INSTALL) -d Include
+-		-$(PGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
++		-$(HOSTPGEN) $(GRAMMAR_INPUT) $(GRAMMAR_H) $(GRAMMAR_C)
+ 
+ $(PGEN):	$(PGENOBJS)
+ 		$(CC) $(OPT) $(LDFLAGS) $(PGENOBJS) $(LIBS) -o $(PGEN)
+@@ -676,7 +678,7 @@
+ 
+ TESTOPTS=	-l $(EXTRATESTOPTS)
+ TESTPROG=	$(srcdir)/Lib/test/regrtest.py
+-TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) -E -tt
++TESTPYTHON=	$(RUNSHARED) $(HOSTPYTHON) -E -tt
+ test:		all platform
+ 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
+ 		-$(TESTPYTHON) $(TESTPROG) $(TESTOPTS)
+@@ -887,23 +889,23 @@
+ 	done
+ 	$(INSTALL_DATA) $(srcdir)/LICENSE $(DESTDIR)$(LIBDEST)/LICENSE.txt
+ 	PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -tt $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -tt $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST) -f \
+ 		-x 'bad_coding|badsyntax|site-packages' $(DESTDIR)$(LIBDEST)
+ 	PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -tt -O $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -tt -O $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST) -f \
+ 		-x 'bad_coding|badsyntax|site-packages' $(DESTDIR)$(LIBDEST)
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST)  $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -t $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST)/site-packages -f \
+ 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t -O $(DESTDIR)$(LIBDEST)/compileall.py \
++		$(HOSTPYTHON) -Wi -t -O $(DESTDIR)$(LIBDEST)/compileall.py \
+ 		-d $(LIBDEST)/site-packages -f \
+ 		-x badsyntax $(DESTDIR)$(LIBDEST)/site-packages
+ 	-PYTHONPATH=$(DESTDIR)$(LIBDEST) $(RUNSHARED) \
+-		./$(BUILDPYTHON) -Wi -t -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
++		$(HOSTPYTHON) -Wi -t -c "import lib2to3.pygram, lib2to3.patcomp;lib2to3.patcomp.PatternCompiler()"
+ 
+ # Create the PLATDIR source directory, if one wasn't distributed..
+ $(srcdir)/Lib/$(PLATDIR):
+@@ -1001,7 +1003,7 @@
+ # Install the dynamically loadable modules
+ # This goes into $(exec_prefix)
+ sharedinstall:
+-	$(RUNSHARED) ./$(BUILDPYTHON) -E $(srcdir)/setup.py install \
++	$(RUNSHARED) $(HOSTPYTHON) -E $(srcdir)/setup.py install \
+ 	   	--prefix=$(prefix) \
+ 		--install-scripts=$(BINDIR) \
+ 		--install-platlib=$(DESTSHARED) \
+@@ -1039,7 +1041,7 @@
+ 		fi; \
+ 	done
+ 	$(LN) -fsn include/python$(VERSION) $(DESTDIR)$(prefix)/Headers
+-	sed 's/%VERSION%/'"`$(RUNSHARED) ./$(BUILDPYTHON) -c 'import platform; print platform.python_version()'`"'/g' < $(RESSRCDIR)/Info.plist > $(DESTDIR)$(prefix)/Resources/Info.plist
++	sed 's/%VERSION%/'"`$(RUNSHARED) $(HOSTPYTHON) -c 'import platform; print platform.python_version()'`"'/g' < $(RESSRCDIR)/Info.plist > $(DESTDIR)$(prefix)/Resources/Info.plist
+ 	$(LN) -fsn $(VERSION) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Versions/Current
+ 	$(LN) -fsn Versions/Current/$(PYTHONFRAMEWORK) $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/$(PYTHONFRAMEWORK)
+ 	$(LN) -fsn Versions/Current/Headers $(DESTDIR)$(PYTHONFRAMEWORKINSTALLDIR)/Headers
+@@ -1082,7 +1084,7 @@
+ # This installs a few of the useful scripts in Tools/scripts
+ scriptsinstall:
+ 	SRCDIR=$(srcdir) $(RUNSHARED) \
+-	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/setup.py install \
++	$(HOSTPYTHON) $(srcdir)/Tools/scripts/setup.py install \
+ 	--prefix=$(prefix) \
+ 	--install-scripts=$(BINDIR) \
+ 	--root=/$(DESTDIR)
+@@ -1104,7 +1106,7 @@
+ 
+ # Run reindent on the library
+ reindent:
+-	./$(BUILDPYTHON) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
++	$(HOSTPYTHON) $(srcdir)/Tools/scripts/reindent.py -r $(srcdir)/Lib
+ 
+ # Rerun configure with the same options as it was run last time,
+ # provided the config.status script exists
+@@ -1201,7 +1203,7 @@
+ 
+ # Perform some verification checks on any modified files.
+ patchcheck:
+-	$(RUNSHARED) ./$(BUILDPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
++	$(RUNSHARED) $(HOSTPYTHON) $(srcdir)/Tools/scripts/patchcheck.py
+ 
+ # Dependencies
+ 
+diff --exclude='*.swp' --exclude=makefile -Nuar Python-2.6.5/setup.py python.new/setup.py
+--- Python-2.6.5/setup.py	2010-03-08 17:08:25.000000000 +1000
++++ python.new/setup.py	2010-04-21 16:18:31.781141339 +1000
+@@ -17,7 +17,10 @@
+ from distutils.command.install_lib import install_lib
+ 
+ # This global variable is used to hold the list of modules to be disabled.
+-disabled_module_list = []
++try:
++   disabled_module_list = os.environ["PYTHON_DISABLE_MODULES"].split()
++except KeyError:
++   disabled_module_list = []
+ 
+ def add_dir_to_list(dirlist, dir):
+     """Add the directory 'dir' to the list 'dirlist' (at the front) if
+@@ -270,36 +273,6 @@
+         ext_filename = os.path.join(
+             self.build_lib,
+             self.get_ext_filename(self.get_ext_fullname(ext.name)))
+-        try:
+-            imp.load_dynamic(ext.name, ext_filename)
+-        except ImportError, why:
+-            self.failed.append(ext.name)
+-            self.announce('*** WARNING: renaming "%s" since importing it'
+-                          ' failed: %s' % (ext.name, why), level=3)
+-            assert not self.inplace
+-            basename, tail = os.path.splitext(ext_filename)
+-            newname = basename + "_failed" + tail
+-            if os.path.exists(newname):
+-                os.remove(newname)
+-            os.rename(ext_filename, newname)
+-
+-            # XXX -- This relies on a Vile HACK in
+-            # distutils.command.build_ext.build_extension().  The
+-            # _built_objects attribute is stored there strictly for
+-            # use here.
+-            # If there is a failure, _built_objects may not be there,
+-            # so catch the AttributeError and move on.
+-            try:
+-                for filename in self._built_objects:
+-                    os.remove(filename)
+-            except AttributeError:
+-                self.announce('unable to remove files (ignored)')
+-        except:
+-            exc_type, why, tb = sys.exc_info()
+-            self.announce('*** WARNING: importing extension "%s" '
+-                          'failed with %s: %s' % (ext.name, exc_type, why),
+-                          level=3)
+-            self.failed.append(ext.name)
+ 
+     def get_platform(self):
+         # Get value of sys.platform

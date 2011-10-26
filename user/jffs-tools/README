@@ -1,0 +1,53 @@
+
+The quick start guide to jffs :-)
+---------------------------------
+
+1.	Make sure you change linuc/drivers/block/flash.c to know where your
+	flash chip sits in memory.  Currently it is setup to point to the
+	second 2Mb chip on a NETtel.  Look in flash_probe() for the chip start
+	addresses.
+
+	Do not point this at flash that contains code and other bits as
+	it will try to write over it.
+
+2.	Add this directory to the user/Makefile and erase to the romfs.mk
+	Edit the romfs_cvs.mk and make sure that the "flash-devices" get
+	included in the "make romfs".  Rebuild the romfs after making changes
+	to this file.
+
+3.	Erase the partition you want to use,  for example:
+
+		erase /dev/flash1
+
+4.	Mount the newly erased partition,  you will need the full blown mount.
+
+		mount -t jffs /dev/flash1 /mnt
+
+5.	Copy and remove your files at will :-)
+
+
+Building jffs filesystems
+-------------------------
+
+1.	Go into the mkfs.jffs directory.
+
+2.	Check the swap/endianess of the target system v. that of the system
+	you are building the jffs on.  Change SWAP_XXXX macros to suit.  If the
+	endianess is the same then use the NOP versions.
+
+3.	Create a directory containing the filesystem layout you want
+	(ie., jffs-dir).
+
+4.	Create the fs image with:
+
+		mkfs.jffs -d jffs-dir > jffs.image
+
+	You can pad this image with 0xff and include it in a full system image
+	or just "dd" it into the flash as follows (remember to use the
+	character device):
+
+		dd if=jffs.image of=/dev/flashc1
+
+	The image must be padded with 0xff as the jffs/flash driver needs to be
+	able to write to the unused areas.
+

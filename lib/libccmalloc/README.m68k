@@ -1,0 +1,209 @@
+Steve Bennett <steveb@snapgear.com>
+Mon Sep 30 10:56:30 EST 2002
+
+I have made a few hacks to ccmalloc to allow it to work in a uClinux embedded environment.
+Specifically on an m68k-based system.
+
+1. I replaced the use of the system malloc()/free() via libdl with our own separate implementation
+   in src/myalloc.c. This code is taken from uClibc.
+
+2. Because of the flat memory model, we can't rely on SEGV to be generated and trapped when we run
+   outside our processing while examining call frames. Instead we rely on a6 linking of call frames.
+   In order for this to work, you MUST NOT use -fomit-frame-pointer.
+
+3. Again, because of the flat memory model, symbols are relocated when loading. So we need
+   to fix all symbols with the appropriate offset. We do this by comparing the address of main
+   with the address which nm gives us.
+
+4. We (typically) don't have nm on the target device, so we allow nm to be run in advance.
+   We then simply read the resulting nm output.
+
+So here is a step-by-step guide on how to use ccmalloc to catch memory leaks in your applications.
+
+a. Enable building of libccmalloc and set correct compiler options with make xconfig
+   Debug Builds
+     ->build debugable libraries        (CONFIG_LIB_DEBUG)
+     ->build debugable applications     (CONFIG_USER_DEBUG)
+     ->Debug Libraries
+       ->ccmalloc                       (CONFIG_LIB_LIBCCMALLOC)
+
+    Rebuild all of lib and user to pick up these changes
+
+b.  Now change the build rule for your executable in your Makefile
+
+    For C++, you should add something like:
+
+    $(CXX) $(LDFLAGS) -o $@ $(CCMALLOC_CXX_OBJ) $(OBJS) $(USELIBS) $(SLIBCONFIGDD) $(SLIBSNAPGEAR) $(CCMALLOC_LIB) $(LDLIBS_static) -lc -lgcc
+    nm -C --defined-only $(EXEC).gdb | grep ' [tTwW] ' | grep -v 't [.]' >$(EXEC).nm
+
+    For C, it looks like:
+
+    $(CXX) $(LDFLAGS) -o $@ $(CCMALLOC_OBJ) $(OBJS) $(USELIBS) $(SLIBCONFIGDD) $(SLIBSNAPGEAR) $(CCMALLOC_LIB) $(LDLIBS_static) -lc -lgcc
+    nm -C --defined-only $(EXEC).gdb | grep ' [tTwW] ' | grep -v 't [.]' >$(EXEC).nm
+
+    In case I haven't fixed up all the config.arch files yet, you may need to define the following:
+
+    CCMALLOC_CXX_OBJ=$(ROOTDIR)/lib/libccmalloc/obj/ccmalloc-g++.o
+    CCMALLOC_OBJ=$(ROOTDIR)/lib/libccmalloc/obj/ccmalloc-gcc.o
+    CCMALLOC_LIB=$(ROOTDIR)/lib/libccmalloc/lib/libccmalloc.a
+
+c.  Create a .ccmalloc file in the current dir. It may look something like:
+    (Note: I send my ccmalloc output to an nfs mounted file system in case it gets
+           too large and because it's easier to examine. You may wish to start with
+           /tmp/ccmalloc.out
+     Note: The name after 'file' must by $(EXEC) so that the appropriate symbols can 
+           be loaded)
+
+    file snmpd
+    log /mnt/ccmalloc.out
+    set file-info 0
+
+d.  Add the following lines to your romfs target in your Makefile
+    (Note: Actually, you should install these two into whichever directory
+           you want to run the target.)
+
+    if [ -f $(EXEC).nm ]; then \
+      $(ROMFSINST) /bin/$(EXEC).nm; \
+      $(ROMFSINST) /bin/.ccmalloc; \
+    fi
+
+e.  Now build your executable, romfs and image and install it.
+
+f.  Run your executable from the directory which contains .ccmalloc and *.nm
+    (/bin in the example above) and look at the resulting log file.
+    It will look something like the following.
+    You can match the addresses up with the output of m68k-elf-objdump -d $(EXEC).gdb
+
+.--------------------------------------------------------------------------.
+|================ ccmalloc-0.3.9 (C) 1997-2001 Armin Biere ================|
++--------------------------------------------------------------------------+
+| executable       = snmpd                                                 |
+| startup file     = .ccmalloc                                             |
+| log file         = /mnt/ccmalloc.out                                     |
+| start time       = Mon Sep 30 01:19:04 2002                              |
+| operating system = uClinux 2.4.17-uc0 m68knommu on soho                  |
++--------------------------------------------------------------------------+
+| only-count        = 0            keep-deallocated-data = 0               |
+| check-interval    = 0            check-free-space      = 0               |
+| check-start       = 0            file-info             = 1               |
+| chain-length      = 0            additional-line       = 1               |
+| check-underwrites = 0            print-addresses       = 0               |
+| check-overwrites  = 0            print-on-one-line     = 0               |
+| sort-by-wasted    = 1            sort-by-size          = 1               |
+| # only-log-chain  = 0            continue              = 0               |
+| # dont-log-chain  = 0            statistics            = 0               |
+| debug             = 0            library-chains        = 0               |
+| load-dynlibs      = 0            align-8-byte          = 0               |
+| only-wasting-alloc= 1                                                    |
+`--------------------------------------------------------------------------'
+
+.---------------.
+|ccmalloc report|
+=======================================================
+| total # of|   allocated | deallocated |     garbage |
++-----------+-------------+-------------+-------------+
+|      bytes|      192457 |      192344 |         113 |
++-----------+-------------+-------------+-------------+
+|allocations|        3856 |        3849 |           7 |
++-----------------------------------------------------+
+| number of checks: 1                                 |
+| number of counts: 7705                              |
+| retrieving function names for addresses ... done.   |
+| reading file info from gdb ...oops, something went wrong while reading gdb output
+| sorting by number of not reclaimed bytes ... done.  |
+| number of call chains: 7                            |
+| number of ignored call chains: 0                    |
+| number of reported call chains: 7                   |
+| number of internal call chains: 7                   |
+| number of library call chains: 0                    |
+=======================================================
+|
+* 21.2% = 24 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x0000035c in <main>
+|       |
+|       |       0x0000137c in <mib_ext_init(void)>
+|       |
+|       |       0x00001c82 in <framework_init(void)>
+|       |
+|       |       0x000013c2 in <register_mib(OIDType &, MibModuleOps const *, void *)>
+|       |
+|       |       0x00012b18 in <__builtin_new>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+* 21.2% = 24 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x0000035c in <main>
+|       |
+|       |       0x0000137c in <mib_ext_init(void)>
+|       |
+|       |       0x00001c82 in <framework_init(void)>
+|       |
+|       |       0x000013e8 in <register_mib(OIDType &, MibModuleOps const *, void *)>
+|       |
+|       |       0x00002f50 in <OIDType::operator=(OIDType const &)>
+|       |
+|       |       0x00012c4e in <__builtin_vec_new>
+|       |
+|       |       0x00012b18 in <__builtin_new>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+* 17.7% = 20 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x0000035c in <main>
+|       |
+|       |       0x0000134e in <mib_ext_init(void)>
+|       |
+|       |       0x00012b18 in <__builtin_new>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+* 17.7% = 20 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x0000035c in <main>
+|       |
+|       |       0x00001382 in <mib_ext_init(void)>
+|       |
+|       |       0x00002250 in <rego_init(void)>
+|       |
+|       |       0x000020fc in <rego_callback(TimerQueue *, void *)>
+|       |
+|       |       0x00001db6 in <TimerQueue::add(unsigned long, void (*)(TimerQueue *, void *), void *)>
+|       |
+|       |       0x00012b18 in <__builtin_new>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+* 12.4% = 14 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x0000011e in <main>
+|       |
+|       |       0x0000dd84 in <strdup>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+|  6.2% = 7 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x000000fa in <main>
+|       |
+|       |       0x0000dd84 in <strdup>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+|  3.5% = 4 Bytes of garbage allocated in 1 allocation
+|       |
+|       |       0x0000035c in <main>
+|       |
+|       |       0x0000137c in <mib_ext_init(void)>
+|       |
+|       |       0x00001c44 in <framework_init(void)>
+|       |
+|       |       0x00012b18 in <__builtin_new>
+|       |
+|       `-----> 0x0000beae in <malloc>
+|        
+`------------------------------------------------------
+
+    

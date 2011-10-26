@@ -1,0 +1,45 @@
+#!/bin/sh
+
+# This is a short-cut to execute tests on the parser.
+# ./conf/torture_msgs{,2} contain various kind of messages.
+
+#echo "=="
+#echo "== Testing the SDP parser and the SDP negociator in libosip."
+#echo "== You can use the verbose mode (-v) to see the full message."
+#echo "=="
+
+ok=0
+nok=0
+
+i=0
+while [ $i -lt 16 ]
+do
+    ./torture_sdp_test $1/sdp$i 0 $2
+
+   code=$? 
+   if [ "$code" -eq 0 ]; then
+      echo "checking sdp$i : passed";
+       ok=`expr $ok + 1`;
+   elif [ "$code" -eq 1 ]; then
+      echo "checking sdp$i : bad arguments";
+       ok=`expr $nok + 1`;
+   elif [ "$code" -eq 2 ]; then
+      echo "checking sdp$i : error while calling sdp_message_parse()";
+       ok=`expr $nok + 1`;
+   elif [ "$code" -eq 3 ]; then
+      echo "checking sdp$i : error while calling sdp_message_to_str()";
+      nok=`expr $nok + 1`
+   elif [ "$code" -eq 4 ]; then
+      echo "checking sdp$i : negotiation failed";
+      nok=`expr $nok + 1`
+   else
+      echo "checking sdp$i : undefined error ($code)";
+      nok=`expr $nok + 1`
+   fi;
+
+   i=`expr $i + 1`
+done
+
+echo "checked well formed SDP messages:   $i"
+echo "errors                          :   $nok"
+

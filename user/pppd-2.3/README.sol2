@@ -1,0 +1,48 @@
+This file describes the installation process for ppp-2.3 on systems
+running Solaris 2.  The Solaris 2 and SVR4 ports share a lot of code
+but are not identical.  The STREAMS kernel modules and driver for
+Solaris 2 are in the svr4 directory (and use some code from the
+modules directory).
+
+This version has been tested under Solaris 2.6.
+
+NOTE: Although the kernel driver and modules have been designed to
+operate correctly on SMP systems, they have not been extensively
+tested on SMP machines.  Some users of SMP Solaris x86 systems have
+reported system problems apparently linked to the use of previous
+versions of this software.  I believe these problems have been fixed.
+
+
+Installation.
+*************
+
+1. Run the configure script and make the user-level programs and the
+kernel modules.
+
+	./configure
+	make
+
+If you wish to use gcc (or another compiler) instead of Sun's cc, edit
+the svr4/Makedefs file and uncomment the definition of CC.  You can
+also change the options passed to the C compiler by editing the COPTS
+definition.
+
+2. Install the programs and kernel modules: as root, do
+
+	make install
+
+This installs pppd, chat and pppstats in /usr/local/bin and the kernel
+modules in /kernel/drv and /kernel/strmod, and creates the /etc/ppp
+directory and populates it with default configuration files.  You can
+change the installation directories by editing svr4/Makedefs.
+
+If your system normally has only one network interface, the default
+Solaris 2 system startup scripts will disable IP forwarding in the IP
+kernel module.  This will prevent the remote machine from using the
+local machine as a gateway to access other hosts.  The solution is to
+create an /etc/ppp/ip-up script containing something like this:
+
+	#!/bin/sh
+	/usr/sbin/ndd -set /dev/ip ip_forwarding 1
+
+See the man page for ip(7p) for details.

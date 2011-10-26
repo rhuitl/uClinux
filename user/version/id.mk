@@ -1,0 +1,5 @@
+BANNER="Welcome to uClinux/ColdFire!"
+TOOLCHAIN = $(TOOLS)
+VERSION = 1
+PATCHLEVEL = 0
+SUBLEVEL = 0

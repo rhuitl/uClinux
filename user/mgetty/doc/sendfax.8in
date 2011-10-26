@@ -1,0 +1,162 @@
+.TH sendfax 8 "27 Oct 93" "greenie" "mgetty+sendfax manual"
+.IX sendfax
+.SH NAME
+sendfax \- send group 3 fax files (G3 files) with a class 2 faxmodem
+.SH SYNOPSIS
+.B sendfax
+.RB [ -p ]
+.RB [ -x <debug level> ]
+.RB [ -v ]
+.RB [ -l <modem lines> ]
+.RB [ -m <initstring> ]
+.RB [ -d <poll directory> ]
+.RB [ -C <modem class> ]
+.RB [ -S ]
+.RB [ -n ]
+.RB [ -r ]
+.RB [ -D <dial prefix> ]
+.RI phone-number
+.RI [ g3file(s) ]
+...
+.SH DESCRIPTION
+Send the named g3 fax files to the fax machine at "phone number". The g3
+files can be created with pbm2g3(1) or GNU's GhostScript with the
+"digifax" driver.
+.IX "Group 3 fax"
+.IX fax
+.SH OPTIONS
+.TP
+.B -p
+Tells
+.I sendfax
+to try fax polling, that is, get any documents queued in the remote fax
+machine for you (used for weather maps and the like)
+.TP
+.B -x <debug level>
+Use the given level of verbosity for logging - 0 means no logging, 5 is
+really noisy.
+.TP
+.B -v
+Give some progress report on stdout.
+.TP
+.B -l <modem lines>
+Use the given modem lines. Multiple lines can be separated by ":".
+Example: sendfax -l tty1a:tty2a
+.TP
+.B -m <initstring>
+Send an additional init string. This string is sent right after
+initializing the modem and setting it into class 2 mode. You can use
+this to set the speaker value, some special registers, whatsoever. The
+modem must return "OK". If it returns "ERROR", sendfax prints an error
+message and aborts.
+You do not have to prepend the "AT" prefix, but it won't do harm either.
+.TP
+.B -d <directory>
+Specify the directory where polled fax files should go to. Defaults to "."
+for the current directory. Unused if not polling a fax.
+.TP
+.B -C <class>
+Tells
+.I sendfax
+how to treat the modem. Possible values for <class> are "auto" (default,
+try to find out which fax command set the modem supports), "cls2" (use
+the class 2 fax command set, even if the modem claims to support class 2.0)
+and "c2.0" (use the class 2.0 fax command set). Obviously, "data" (which
+is valid for "mgetty -C ...") is not of much use here.
+.TP
+.B -S
+Assume modem connection on stdin, do not try to lock or initialize
+anything. To take over existing connection (for interworking with
+vgetty et.al.) use with a dial string of "T1" (just a short beep, no
+phone number at all would confuse many modems, a pulse dialed number
+may confuse the telco switch) and "-m ATX1" (do not wait for dial
+tone).
+.TP
+.B -n
+Tells
+.I sendfax
+to send the fax pages in ``normal'' (204x98 dpi) mode. Default is ``fine''
+mode (204x196 dpi).
+.TP
+.B -r
+If this option is given,
+.I sendfax
+will rename all the fax G3 files to ``<filename>.done'' after successfully
+sending this. This is intended to be used from ``faxrunq'', to make sure
+that a partially-sended fax isn't retransmitted as a whole every time.
+
+If this option is set, sendfax will not (!) complain if not all files named
+on the command line exist.
+.TP
+.B -D <dial prefix>
+Override the default (set by sendfax.config or in policy.h) for the 'ATxxx'
+command to dial the remote number.  This is rarely used from the command
+line, but you might want to use it in combination with faxrunqd's policy 
+routing option (see example in faxrunqd.policy(5)).
+.TP
+.B -M <max speed>
+Sets the maximum transmission (modem to modem) speed.  This is only needed
+in very rare cases, because normally the modems negotiate the correct 
+speed automatically.  Example: "-M 7200".
+
+.SH CONFIG FILE
+If compiled accordingly,
+.I sendfax
+can read all its configuration from at run-time from a file, usually
+called @CONFDIR@/sendfax.config. See the documentation in the mgetty.info
+manual for details.
+
+.SH DIAGNOSTICS
+.I sendfax
+returns an error code, according to the reason why the program terminated.
+If everything went OK,
+.I sendfax
+returns 0. If ``harmless'' errors (didn't cost money) occured, an error
+code below 10 is returned. If a dial attempt failed after the remote end
+picked up (it will cost money), a return code of 10 or higher is returned.
+
+In Detail, the return codes are as follows:
+.RS
+.IP 0
+all pages have been transmitted successfully
+.IP 1
+error on the sendfax command line
+.IP 2
+cannot open fax device (e.g. due to locked modem)
+.IP 3
+cannot initialize modem (e.g. modem switched off)
+.IP 4
+dialup failed with BUSY
+.IP 5
+dialup failed with NO DIALTONE
+.IP 10
+dialup failed with ERROR or NO CARRIER (modem handshake failed)
+.IP 11
+waiting for XON failed (rarely seen)
+.IP 12
+transmitting or polling page(s) failed (connection dropped)
+.RE
+
+Very detailed debug information is written to the log file.  It can be
+found in "@FAX_LOG@". If it doesn't contain enough details, enhance the 
+log level with the "-x" option to sendfax, e.g. "-x 5".
+
+Many of the common problems and solutions are discussed in the mgetty
+manual and the FAQ.  Please see the WWW page at 
+http://alpha.greenie.net/mgetty/ for both.
+
+
+.SH REFERENCES
+The standard for Group 3 fax is defined in CCITT Recommendation T.4.
+.SH BUGS
+.I sendfax
+should be able to put a header on the page.
+
+.I sendfax
+should be able to read TIFF g3 input files.
+
+.SH "SEE ALSO"
+g3cat(1), pbm2g3(1), mgetty(1), faxspool(1), faxrunq(1), faxrunqd(8)
+.SH AUTHOR
+.I sendfax
+is Copyright (C) 1993 by Gert Doering, <gert@greenie.muc.de>.

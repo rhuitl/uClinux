@@ -1,0 +1,184 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+<TITLE> Introduction to FreeS/WAN</TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+<BODY>
+<A HREF="toc.html">Contents</a>
+<A HREF="faq.html">Previous</a>
+<HR>
+<H1><A name="performance">Performance of FreeS/WAN</A></H1>
+ The performance of FreeS/WAN is adequate for most applications. 
+Perhaps because of that, there are few detailed measurements. Those we 
+know of are below. 
+<P> The University of Wales at Aberystwyth has done quite detailed 
+ tests and put <A href="http://tsc.llwybr.org.uk/public/reports/SWANTIME/">
+their  results</A> on the web.</P>
+<P><EM> Even a 486 can handle a T1 line</EM>, according to this mailing 
+ list message:</P>
+<PRE>Subject: Re: linux-ipsec: IPSec Masquerade
+   Date: Fri, 15 Jan 1999 11:13:22 -0500
+   From: Michael Richardson 
+
+. . . A 486/66 has been clocked by Phil Karn to do
+10Mb/s encryption.. that uses all the CPU, so half that to get some CPU,
+and you have 5Mb/s. 1/3 that for 3DES and you get 1.6Mb/s....</PRE>
+<P>and a piece of mail from project technical lead Henry Spencer:</P>
+<PRE>Oh yes, and a new timing point for Sandy's docs...  A P60 -- yes, a 60MHz
+Pentium, talk about antiques -- running a host-to-host tunnel to another
+machine shows an FTP throughput (that is, end-to-end results with a real
+protocol) of slightly over 5Mbit/s either way.  (The other machine is much
+faster, the network is 100Mbps, and the ether cards are good ones... so
+the P60 is pretty definitely the bottleneck.)</PRE>
+<P> Here is some additional data from the mailing list. </P>
+<PRE>
+Subject: FreeSWAN (specically KLIPS) performance measurements
+   Date: Thu, 01 Feb 2001
+   From: Nigel Metheringham &lt;Nigel.Metheringham@intechnology.co.uk&gt;
+
+
+I've spent a happy morning attempting performance tests against KLIPS 
+(this is due to me not being able to work out the CPU usage of KLIPS so 
+resorting to the crude measurements of maximum throughput to give a 
+baseline to work out loading of a box).
+
+Measurements were done using a set of 4 boxes arranged in a line, each 
+connected to the next by 100Mbit duplex ethernet.  The inner 2 had an 
+ipsec tunnel between them (shared secret, but I was doing measurements 
+when the tunnel was up and running - keying should not be an issue 
+here).  The outer pair of boxes were traffic generators or traffic sink.
+
+The crypt boxes are Compaq DL380s - Uniprocessor PIII/733 with 256K 
+cache.  They have 128M main memory.  Nothing significant was running on 
+the boxes other than freeswan.  The kernel was a 2.2.19pre7 patched 
+with freeswan and ext3.
+
+Without an ipsec tunnel in the chain (ie the 2 inner boxes just being 
+100BaseT routers), throughput (measured with ttcp) was between 10644 
+and 11320 KB/sec
+
+With an ipsec tunnel in place, throughput was between 3268 and 3402 
+KB/sec
+
+These measurements are for data pushed across a TCP link, so the 
+traffic on the wire between the 2 ipsec boxes would have been higher 
+than this....
+
+vmstat (run during some other tests, so not affecting those figures) on 
+the encrypting box shows approx 50% system 50% idle CPU - which I 
+don't believe at all.  Interactive feel of the box was significantly 
+sluggish.
+
+I also tried running the kernel profiler (see man readprofile) during 
+test runs.
+
+A box doing primarily decrypt work showed basically nothing happening - 
+I assume interrupts were off.
+A box doing encrypt work showed the following:-
+ Ticks Function                                   Load
+ ~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    ~~~~~~
+   956 total                                      0.0010
+   532 des_encrypt2                               0.1330
+   110 MD5Transform                               0.0443
+    97 kmalloc                                    0.1880
+    39 des_encrypt3                               0.1336
+    23 speedo_interrupt                           0.0298
+    14 skb_copy_expand                            0.0250
+    13 ipsec_tunnel_start_xmit                    0.0009
+    13 Decode                                     0.1625
+    11 handle_IRQ_event                           0.1019
+    11 .des_ncbc_encrypt_end                      0.0229
+    10 speedo_start_xmit                          0.0188
+     9 satoa                                      0.0225
+     8 kfree                                      0.0118
+     8 ip_fragment                                0.0121
+     7 ultoa                                      0.0365
+     5 speedo_rx                                  0.0071
+     5 .des_encrypt2_end                          5.0000
+     4 _stext                                     0.0140
+     4 ip_fw_check                                0.0035
+     2 rj_match                                   0.0034
+     2 ipfw_output_check                          0.0200
+     2 inet_addr_type                             0.0156
+     2 eth_copy_and_sum                           0.0139
+     2 dev_get                                    0.0294
+     2 addrtoa                                    0.0143
+     1 speedo_tx_buffer_gc                        0.0024
+     1 speedo_refill_rx_buf                       0.0022
+     1 restore_all                                0.0667
+     1 number                                     0.0020
+     1 net_bh                                     0.0021
+     1 neigh_connected_output                     0.0076
+     1 MD5Final                                   0.0083
+     1 kmem_cache_free                            0.0016
+     1 kmem_cache_alloc                           0.0022
+     1 __kfree_skb                                0.0060
+     1 ipsec_rcv                                  0.0001
+     1 ip_rcv                                     0.0014
+     1 ip_options_fragment                        0.0071
+     1 ip_local_deliver                           0.0023
+     1 ipfw_forward_check                         0.0139
+     1 ip_forward                                 0.0011
+     1 eth_header                                 0.0040
+     1 .des_encrypt3_end                          0.0833
+     1 des_decrypt3                               0.0034
+     1 csum_partial_copy_generic                  0.0045
+     1 call_out_firewall                          0.0125
+
+Hope this data is helpful to someone... however the lack of visibility 
+into the decrypt side makes things less clear
+</PRE>
+<H2><A name="methods">Methods of mesasuring</A></H2>
+ If you want to measure the loads FreeS/WAN puts on a system, note that 
+tools such as top or measurements such as load average are more-or-less 
+useless for this. They are not designed to measure something that does 
+most of its work inside the kernel.
+<P> Here is a message from FreeS/WAN kernel programmer Richard Guy 
+Briggs on this: </P>
+<PRE>
+&gt; I have a batch of boxes doing Freeswan stuff.
+&gt; I want to measure the CPU loading of the Freeswan tunnels, but am 
+&gt; having trouble seeing how I get some figures out...
+&gt; 
+&gt;  - Keying etc is in userspace so will show up on the per-process
+&gt;    and load average etc (ie pluto's load)
+
+Correct.
+
+&gt;  - KLIPS is in the kernel space, and does not show up in load average
+&gt;    I think also that the KLIPS per-packet processing stuff is running
+&gt;    as part of an interrupt handler so it does not show up in the
+&gt;    /proc/stat system_cpu or even idle_cpu figures
+
+It is not running in interrupt handler.  It is in the bottom half.
+This is somewhere between user context (careful, this is not
+userspace!) and hardware interrupt context.
+
+&gt; Is this correct, and is there any means of instrumenting how much the 
+&gt; cpu is being loaded - I don't like the idea of a system running out of 
+&gt; steam whilst still showing 100% idle CPU :-)
+
+vmstat seems to do a fairly good job, but use a running tally to get a
+good idea.  A one-off call to vmstat gives different numbers than a
+running stat.  To do this, put an interval on your vmstat command
+line.
+</PRE>
+ and another suggestion from the same thread: 
+<PRE>
+Subject: Re: Measuring the CPU usage of Freeswan
+   Date: Mon, 29 Jan 2001
+   From: Patrick Michael Kane &lt;modus@pr.es.to&gt;
+ 
+The only truly accurate way to accurately track FreeSWAN CPU usage is to use
+a CPU soaker. You run it on an unloaded system as a benchmark, then start up
+FreeSWAN and take the difference to determine how much FreeSWAN is eating.
+I believe someone has done this in the past, so you may find something in
+the FreeSWAN archives.  If not, someone recently posted a URL to a CPU
+soaker benchmark tool on linux-kernel.
+</PRE>
+<HR>
+<A HREF="toc.html">Contents</a>
+<A HREF="faq.html">Previous</a>
+</BODY>
+</HTML>

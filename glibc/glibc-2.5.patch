@@ -1,0 +1,136 @@
+diff -ur glibc-2.5/Makeconfig glibc/Makeconfig
+--- glibc-2.5/Makeconfig	2006-07-11 07:42:27.000000000 +1000
++++ glibc/Makeconfig	2008-07-05 00:01:41.000000000 +1000
+@@ -526,12 +526,12 @@
+   libunwind = -lunwind
+ endif
+ ifneq ($(have-as-needed),yes)
+- libgcc_eh := -lgcc_eh $(libunwind)
++ libgcc_eh := $(libunwind)
+ else
+  libgcc_eh := -Wl,--as-needed -lgcc_s$(libgcc_s_suffix) $(libunwind) -Wl,--no-as-needed
+ endif
+ gnulib := -lgcc $(libgcc_eh)
+-static-gnulib := -lgcc -lgcc_eh $(libunwind)
++static-gnulib := -lgcc $(libunwind)
+ libc.so-gnulib := -lgcc
+ endif
+ ifeq ($(elf),yes)
+diff -ur glibc-2.5/dlfcn/Makefile glibc/dlfcn/Makefile
+--- glibc-2.5/dlfcn/Makefile	2006-09-01 02:59:15.000000000 +1000
++++ glibc/dlfcn/Makefile	2008-07-05 00:02:11.000000000 +1000
+@@ -136,7 +136,7 @@
+ $(objpfx)bug-atexit2-lib.so: $(common-objpfx)libc.so \
+ 			     $(common-objpfx)libc_nonshared.a
+ 
+-LDLIBS-bug-atexit3-lib.so = -lstdc++ -lgcc_eh $(common-objpfx)elf/ld.so \
++LDLIBS-bug-atexit3-lib.so = -lstdc++ $(common-objpfx)elf/ld.so \
+ 			    $(common-objpfx)libc_nonshared.a
+ $(objpfx)bug-atexit3: $(libdl)
+ $(objpfx)bug-atexit3.out: $(objpfx)bug-atexit3-lib.so
+diff -ur glibc-2.5/malloc/memusage.c glibc/malloc/memusage.c
+--- glibc-2.5/malloc/memusage.c	2005-10-15 07:09:34.000000000 +1000
++++ glibc/malloc/memusage.c	2008-07-05 00:30:28.000000000 +1000
+@@ -33,6 +33,9 @@
+ #include <sys/mman.h>
+ #include <sys/time.h>
+ 
++#ifndef LONG_BIT
++#define LONG_BIT 32
++#endif
+ #include <memusage.h>
+ 
+ /* Pointer to the real functions.  These are determined used `dlsym'
+@@ -110,7 +113,7 @@
+ };
+ 
+ static struct entry buffer[2 * DEFAULT_BUFFER_SIZE];
+-static uatomic32_t buffer_cnt;
++static uint32_t buffer_cnt;
+ static struct entry first;
+ 
+ 
+@@ -160,7 +163,7 @@
+   /* Store the value only if we are writing to a file.  */
+   if (fd != -1)
+     {
+-      uatomic32_t idx = atomic_exchange_and_add (&buffer_cnt, 1);
++      uint32_t idx = atomic_exchange_and_add (&buffer_cnt, 1);
+       if (idx >= 2 * buffer_size)
+ 	{
+ 	  /* We try to reset the counter to the correct range.  If
+@@ -790,13 +793,13 @@
+     }
+ 
+   /* Write a colorful statistic.  */
+-  fprintf (stderr, "\n\
+-\e[01;32mMemory usage summary:\e[0;0m heap total: %llu, heap peak: %lu, stack peak: %lu\n\
+-\e[04;34m         total calls   total memory   failed calls\e[0m\n\
+-\e[00;34m malloc|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n\
+-\e[00;34mrealloc|\e[0m %10lu   %12llu   %s%12lu\e[00;00m   (in place: %ld, dec: %ld)\n\
+-\e[00;34m calloc|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n\
+-\e[00;34m   free|\e[0m %10lu   %12llu\n",
++  fprintf (stderr, "\n"
++"\e[01;32mMemory usage summary:\e[0;0m heap total: %llu, heap peak: %lu, stack peak: %lu\n"
++"\e[04;34m         total calls   total memory   failed calls\e[0m\n"
++"\e[00;34m malloc|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n"
++"\e[00;34mrealloc|\e[0m %10lu   %12llu   %s%12lu\e[00;00m   (in place: %ld, dec: %ld)\n"
++"\e[00;34m calloc|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n"
++"\e[00;34m   free|\e[0m %10lu   %12llu\n",
+ 	   (unsigned long long int) grand_total, (unsigned long int) peak_heap,
+ 	   (unsigned long int) peak_stack,
+ 	   (unsigned long int) calls[idx_malloc],
+@@ -816,12 +819,12 @@
+ 	   (unsigned long long int) total[idx_free]);
+ 
+   if (trace_mmap)
+-    fprintf (stderr, "\
+-\e[00;34mmmap(r)|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n\
+-\e[00;34mmmap(w)|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n\
+-\e[00;34mmmap(a)|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n\
+-\e[00;34m mremap|\e[0m %10lu   %12llu   %s%12lu\e[00;00m   (in place: %ld, dec: %ld)\n\
+-\e[00;34m munmap|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n",
++    fprintf (stderr, ""
++"\e[00;34mmmap(r)|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n"
++"\e[00;34mmmap(w)|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n"
++"\e[00;34mmmap(a)|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n"
++"\e[00;34m mremap|\e[0m %10lu   %12llu   %s%12lu\e[00;00m   (in place: %ld, dec: %ld)\n"
++"\e[00;34m munmap|\e[0m %10lu   %12llu   %s%12lu\e[00;00m\n",
+ 	     (unsigned long int) calls[idx_mmap_r],
+ 	     (unsigned long long int) total[idx_mmap_r],
+ 	     failed[idx_mmap_r] ? "\e[01;41m" : "",
+diff -ur glibc-2.5/sysdeps/generic/memusage.h glibc/sysdeps/generic/memusage.h
+--- glibc-2.5/sysdeps/generic/memusage.h	2005-08-20 11:07:03.000000000 +1000
++++ glibc/sysdeps/generic/memusage.h	2008-07-05 00:26:00.000000000 +1000
+@@ -38,14 +38,14 @@
+ #endif
+ 
+ #if LONG_BIT == 32
+-# define memusage_cntr_t uatomic32_t
++# define memusage_cntr_t uint32_t
+ #else
+-# define memusage_cntr_t uatomic64_t
++# define memusage_cntr_t uint64_t
+ #endif
+ #ifndef memusage_size_t
+ # if LONG_BIT == 32
+-#  define memusage_size_t uatomic32_t
++#  define memusage_size_t uint32_t
+ # else
+-#  define memusage_size_t uatomic64_t
++#  define memusage_size_t uint64_t
+ # endif
+ #endif
+diff -ur glibc-2.5/sysdeps/unix/sysv/linux/getcwd.c glibc/sysdeps/unix/sysv/linux/getcwd.c
+--- glibc-2.5/sysdeps/unix/sysv/linux/getcwd.c	2006-04-03 03:58:28.000000000 +1000
++++ glibc/sysdeps/unix/sysv/linux/getcwd.c	2008-07-04 23:11:52.000000000 +1000
+@@ -78,6 +78,9 @@
+     return generic_getcwd (buf, size);
+ 
+ #ifndef NO_ALLOCATION
++#ifndef MAX
++#define MAX(a,b) ((a) > (b) ? (a) : (b))
++#endif
+   size_t alloc_size = size;
+   if (size == 0)
+     {

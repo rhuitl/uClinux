@@ -1,0 +1,59 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" ifport.8 1.9 2000/06/12 21:24:48
+.\"
+.TH IFPORT 8 "2000/06/12 21:24:48" "pcmcia-cs"
+
+.SH NAME
+ifport \- select the transceiver type for a network interface
+
+.SH SYNOPSIS
+.B ifport
+.I interface
+.RB [ auto | 10baseT | 10base2 | aui | 100baseT | ## ]
+
+.SH DESCRIPTION
+.B Ifport
+sets the transceiver type for the specified network interface, for
+drivers that support multiple transceiver types.  If a type is not
+specified on the command line, then the current type is displayed.
+The type can be specified either numerically or by keyword.  The five
+standard transceiver types
+.RB ( auto ,
+.BR 10baseT ,
+.BR 10base2 ,
+.BR aui ,
+and
+.BR 100baseT )
+correspond to codes 0 to 3, for all the Linux PCMCIA network drivers.
+The keyword match is case insensitive.
+.PP
+The network drivers may not reconfigure a card for a new transceiver
+type if the interface is already open.  It is best to invoke
+.B ifport
+prior to configuring the interface with
+.B ifconfig
+to ensure that the new setting takes effect immediately.
+.PP
+This utility only works with a limited set of 16-bit PC Card drivers:
+.BR 3c589_cs ,
+.BR nmclan_cs ,
+.BR pcnet_cs ,
+.BR smc91c92_cs ,
+and
+.BR xirc2ps_cs .
+If invoked for other drivers,
+.B ifport
+may report bogus transceiver
+settings, or report ``Operation not supported''.
+
+.SH DIAGNOSTICS
+.TP
+.B ioctl: Operation not supported
+Indicates that this network device does not support manual transceiver
+selection.  There may be only one transceiver option, or the device
+may always autodetect the appropriate transceiver.
+
+.SH AUTHOR
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+ifconfig(8).

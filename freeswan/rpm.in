@@ -1,0 +1,69 @@
+# fairly minimal RPM spec file, does only packaging
+# Based on work by Paul Lahaie of Steamballoon.
+# This file is touched up by sed (in the Makefile) before it is actually used.
+Summary: Kernel with FreeS/WAN
+Name: freeswan
+Version: @IPSECVERSION@_@KERNELVERSION@
+Release: 0
+Copyright: GPL
+Group: System Environment/Daemons
+Source: freeswan-%{version}.tar.gz
+BuildRoot: /var/tmp/%{name}-%{PACKAGE_VERSION}-root
+%define __spec_install_post /usr/lib/rpm/brp-compress || :
+%define KernelVer @KERNELVERSION@
+
+%package module
+Summary: FreeS/Wan kernel module
+Group: System Environment/Kernel
+
+%description
+This package contains the daemons and userland tools for setting up
+FreeS/WAN on a freeswan enabled kernel.
+
+%description module
+This package contains only the ipsec module for the RedHat series of kernels.
+
+%prep
+
+%build
+
+%install
+
+%clean
+rm -rf ${RPM_BUILD_ROOT}
+
+%files
+%defattr(-,root,root)
+@PUBDIR@/ipsec
+@FINALBINDIR@/*
+/etc/rc.d/init.d/ipsec
+
+%attr(0644,root,root)	%config	/etc/ipsec.conf
+
+@MANTREE@/man3/ipsec_*.3*
+@MANTREE@/man5/ipsec_*.5*
+@MANTREE@/man5/ipsec.*.5*
+@MANTREE@/man8/ipsec_*.8*
+
+%files module
+%defattr (-,root,root)
+/lib/modules/ipsec
+
+%preun
+sh /etc/rc.d/init.d/ipsec stop
+
+%post
+chkconfig --add ipsec
+echo "invoke /etc/rc.d/init.d/ipsec start or reboot to begin"
+
+%changelog
+#
+# $Log: rpm.in,v $
+# Revision 1.3.2.2  2002/04/11 02:52:51  mcr
+# 	post/pre stuff from head
+#
+# Revision 1.5  2002/04/11 02:50:30  mcr
+# 	added %post to make ipsec start, and %post to shut it down.
+# 	added %changelog as well.
+#
+#

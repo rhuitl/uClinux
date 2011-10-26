@@ -1,0 +1,570 @@
+<!DOCTYPE HTML PUBLIC "-//W3C/DTD/ HTML 3.2//EN">
+
+<HTML>
+
+    <HEAD>
+        <TITLE>LIRC - Linux Infrared Remote Control</TITLE>
+        <META NAME="description" CONTENT="LIRC - linux infrared remote control">
+        <META NAME="keywords" CONTENT="linux, kernel module, remote control, animax, multimedia">
+    </HEAD>
+
+    <BODY BACKGROUND="../images/marb18.jpg"
+          BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#7070E0" 
+          VLINK="#808080" ALINK="#8080FF">
+        <TABLE WIDTH="100%" BORDER="0" CELLSPACING="0" CELLPADDING="0">
+            <TR>
+                <TD WIDTH="100%" HEIGHT="150" BGCOLOR="#000080" 
+                    ALIGN="RIGHT" VALIGN="TOP">
+                <IMG SRC="../images/diode.gif" ALT=""
+                     WIDTH="300" HEIGHT="150" BORDER="0" HSPACE="20"
+                     VSPACE="0" ALIGN="LEFT"> 
+                <IMG SRC="../images/lirc.gif" ALT=""
+                     WIDTH="300" HEIGHT="150" BORDER="0" HSPACE="20"
+                     VSPACE="0" ALIGN="RIGHT">
+                </TD>
+            </TR>
+            <TR>
+                <TD WIDTH="100%" ALIGN="LEFT" VALIGN="TOP">&#160;<BR>
+                    <TABLE WIDTH="100%" BORDER="0" CELLSPACING="0" CELLPADDING="0"
+                           HSPACE="0" VSPACE="0">
+                        <TR>
+                            <TD WIDTH="15%">&#160;<BR></TD>
+                            <TD WIDTH="70%" ALIGN="LEFT" VALIGN="TOP">&#160;<BR>
+
+<!-- Text ------------------------------------------------------------------->
+
+
+
+
+    <!-- Overview ----------------------------------------------------------->
+
+<A NAME="overview"><HR></A>
+<CENTER><H1>Driver Model</H1></CENTER>
+<HR WIDTH="70%">
+
+<PRE>
+  |  +------------------------------------------------------+
+S |  | 'gpm -t msc -m /dev/lircm' or a well configured X    |
+O |  | (see section 'Configuring lircmd') for details       |
+F |  +--------------+---------------------------------------+
+T |                 |
+W |   /dev/lircm (named pipe (FIFO) ==> one connection)
+A |                 |
+R |     +-----------+-----------+   +-------------------------------+
+E |     | mouse daemon (lircmd) |   | tools (irexec, irxevent, ...) |
+  |     | configured with       |   | configured with ~/.lircrc     |
+  |     | lircmd.conf           |   |                               |
+  |     +-----------+-----------+   +-----------+-------------------+
+  |                 |                           |
+  |                 +-------------+-------------+
+  |                               |
+  |                       /dev/lircd (socket ==> multiple connections)
+  |                               |
+S |              +----------------+--------------------------+
+O |              | decoder daemon (lircd), irrecord or mode2 |    TCP/IP
+F |              | lircd is configured through lircd.conf    +---  port
+T | User space   |                                           |     8765
+W |              +------------------+------------------------+
+A |                                 |
+R |                                 |
+E |                                 |
+  |                                 |
+  |                                 |
+  |                                 |
+  +---------------------------------+----------------------------------
+  | Kernel space                    |              (character device
+  |                                 |                  driver ==>
+  |                    +------------+----------+    one connection)
+  |                    |                       |  
+  |                /dev/lirc               /dev/ttySx
+  |                    |                       |
+  |       +------------+-------------+   +-----+---------------+
+  |       |  LIRC device driver      |   | Linux serial driver |
+  |       | (with ioctl-interface)   |   |                     |
+  |       +------------+-------------+   +----------+----------+
+  |                    |                            |
+--+--------------------+----------------------------+------------------
+  |                    |                            |
+  |         +----------+------------+               |
+  |         |                       |               |
+  | +-------+----------------+ +----+-----+ +-------+-----------------+
+H | | serial / parallel port | | TV cards | | Irman/RemoteMaster/etc. |
+W | +------------------------+ +----------+ +-------------------------+
+  |
+</PRE>
+
+
+
+
+<A NAME="formats"><HR></A>
+<H1 ALIGN="CENTER">Formats</H1>
+<HR WIDTH="70%">
+
+<UL>
+<LI><B>/dev/lirc:</B><BR>
+    <P>
+    highly depends on the mode selected with ioctls:
+    </P>
+    <DL>
+    <DT>LIRC_MODE_MODE2</DT>
+    <DD>
+    <P>
+    outputs packets containing an int value describing a IR signal<BR>
+    <UL>
+        <LI>bits 0-23 contain the length of the pulse/space in
+        microseconds</LI>
+        <LI>bit 24 is either 0, meaning space, or 1, meaning
+        pulse</LI>
+       <LI>all other bits are unused</LI>
+    </UL>
+    Lengths greater than or equal to 16 seconds are clamped to
+    0xffffff.
+    </P>
+    <P>References:
+    <UL>
+        <LI>drivers/lirc_serial/lirc_serial.c</LI>
+        <LI>drivers/lirc_parallel/lirc_parallel.c</LI>
+        <LI>tools/mode2.c (dumps the output from the driver to stdout)</LI>
+    </UL>
+    </P>
+    </DD>
+    <DT>LIRC_MODE_CODE</DT>
+    <DD>
+    <P>
+    outputs chars (8 bits)
+    </P>
+    </DD>
+    <DT>LIRC_MODE_LIRCCODE</DT>
+    <DD>
+    <P>
+    outputs codes of configurable length in big endian byte order
+    </P>
+    </DD>
+    </DL>
+</LI>
+<LI><B>/dev/lircd:</B><BR>
+    outputs strings containing all information about the remote and the
+    pressed button.
+    <P>References:
+    <UL>
+        <LI>daemons/lircd.c</LI>
+        <LI>tools/irw.c</LI>
+    </UL></P>
+</LI>
+<LI><B>/dev/lircm:</B><BR>
+    <UL>
+    <LI>MouseSystems<BR>
+    5 byte packets:
+    <UL>
+        <LI>byte 1: button information</LI>
+        <LI>byte 2: change on X axis</LI>
+        <LI>byte 3: change on Y axis</LI>
+        <LI>byte 4,5: 0</LI>
+    </UL>
+    </LI>
+    <LI>IMPS/2<BR>
+    4 byte packets: check the source code for details
+    </LI>
+    </UL>
+
+    <P>References:
+    <UL>
+        <LI>daemons/lircmd.c</LI>
+    </UL></P>
+</LI>
+</UL>
+
+
+
+
+
+<A NAME="lirc_dev"><HR></A>
+<H1 ALIGN="CENTER">Writing TV card drivers using lirc_dev</H1>
+<HR WIDTH="70%">
+
+<P>
+The <em>lirc_dev</em> module is a helper and abstraction layer for
+other modules.  It registers <em>/dev/lirc</em> device in a system 
+(including support for devfs) and waits for plugin registration. 
+After that it serves device requests (open, read, poll, ioctl, close) 
+and if needed calls callback functions from plugin(s) to communicate 
+with the physical device.
+</P>
+<P>
+Plugins can be registered and unregistered many times. The current
+implementation allows two concurrent plugins, but can be easily
+changed by increasing the MAX_IRCTL_DEVICES definition. It also allows
+receiving of scan codes, which have more than 8 bits. Current limit
+for a scan code is 16*8 bits and also can be changed by increasing the
+BUFLEN definition.
+</P>
+<P>
+For an API description see <em>lirc_dev.h</em>. The lirc_gpio module
+can be treated as examples of using this API.<br>
+This code contains many lines with debug messages (activated by
+<em>debug</em> option) and they will sustain until more tests will be
+performed.
+</P>
+<P>
+<B>Warning:</B> Due to the used kernel API it requires kernel 2.2.4 or
+higher.<br>
+Any suggestions and questions are welcome. <A
+href="mailto:alipowski@kki.net.pl">Artur Lipowski</A>
+</P>
+
+
+
+
+    <!-- Writing LIRC Applications ------------------------------------------>
+
+<A NAME="applications"><HR></A>
+<H1 ALIGN="CENTER">Writing Applications for LIRC</H1>
+<HR WIDTH="70%">
+
+<P>
+As LIRC is able to both receive and send IR commands there are two
+possible types of applications. Programs that send IR commands like
+<em>xrc</em> and <em>rc</em> or programs that receive commands like
+<em>irexec</em>, <em>irxevent</em> and <em>irpty</em>.  Both types of
+applications will have to connect to the lircd daemon using the socket
+interface usually located in /dev/lircd. Communication on the socket
+uses human readable format. The end of a line is indicated by a
+newline character.
+</P>
+<P>
+Whenever lircd receives a IR signal it will broadcast the following
+string to each client:
+<PRE>
+  &lt;code&gt; &lt;repeat count&gt; &lt;button name&gt; &lt;remote control name&gt;
+</PRE>
+
+<em>code</em> is a 64-bit encoding (in hexadecimal representation) of
+the IR signal. It's usage in applications is deprecated and should be
+ignored. The <em>repeat count</em> shows how long the user has been
+holding down a button. The counter will start at 0 and increment each
+time a new IR signal has been received. The <em>button name</em> and
+<em>remote control name</em> are defined in the lircd config
+file. Their purpose should be quite self-explanatory. They must not
+contain any whitespace.<BR>
+
+The only other situation when lircd broadcasts to all clients is when
+it receives the SIGHUP signal and successfully re-reads its config
+file. Then it will send a SIGHUP packet to its clients indicating that
+its configuration might have changed. This feature is
+<NOBR>e.g.</NOBR> used in <em>xrc</em> to rebuild the list of
+supported remote controls each time lircd's configuration changes. The
+format of the packet will be explained later.
+</P>
+<P>
+Applications that want to send out IR commands can use the following
+commands:
+
+<PRE>
+  SEND_ONCE &lt;remote control name&gt; &lt;button name&gt;
+  SEND_START &lt;remote control name&gt; &lt;button name&gt;
+  SEND_STOP &lt;remote control name&gt; &lt;button name&gt;
+</PRE>
+
+The SEND_ONCE directive tells lircd to send the IR signal associated
+with the given remote control and button name once. Consequently
+SEND_START tells lircd to start repeating the given button until it
+receives a SEND_STOP command. As repeating of IR signals is very CPU
+intensive on most systems there should be a limit on the time for
+repeating buttons in every application. The number of repeats is
+internally limited to 600 which for most remotes is equal to one
+minute of repeating. lircd won't accept any new send commands while it
+is repeating.
+</P>
+
+<P>
+lircd also understands the following commands:
+<PRE>
+  VERSION
+  LIST [&lt;remote control name&gt;]
+</PRE>
+
+The response to the VERSION command will be a packet containing
+lircd's version.<BR>
+The LIST command without further arguments can be used to get a list
+of all remote controls known to lircd. If a name of a supported remote 
+control is given as argument all buttons of the given remote control
+are listed in the reply packet. Have a look at <em>xrc</em> for an
+example how this can be used.
+</P>
+<P>
+There still remains to explain the format of lircd's reply
+packets. Here is a formal description of the packets:
+
+<PRE>
+  BEGIN
+  &lt;command&gt;
+  [SUCCESS|ERROR]
+  [DATA
+  n
+  n lines of data]
+  END
+</PRE>
+
+The protocol guarantees that broadcasted messages won't interfere with
+reply packets. But broadcasts may appear at any point between
+packets. <em>command</em> is the command lircd is currently
+processing. Its an exact copy of the command the client application
+has sent. The only exception are SIGHUP packages where
+<em>command</em> is substituted with SIGHUP. Note that SIGHUP packages
+may appear just after you have sent a command to lircd, so you have to
+make sure you don't confuse them with replies. SIGHUP packages come
+without any further data while each reply to a command contains either
+SUCCESS or ERROR indicating the result of processing the command. In
+case of an error the following data is a message explaining the
+problem. This message can be used to create an error message for the
+user.<BR>
+
+If the command was successful, data is only sent for the commands that
+return some information. Note that a packet containing 0 lines of data
+can be a valid reply.
+</P>
+
+    <!-- Writing LIRC Applications ------------------------------------------>
+
+<A NAME="library"><HR></A>
+
+<H2 ALIGN="CENTER">The lirc_client library</H2>
+<HR WIDTH="70%">
+
+<P>
+If you only want to make your application receive IR commands and if
+you don't want to mess with all the protocol stuff you can use the
+<em>lirc_client</em> library that comes with LIRC since version
+0.6.0. With the help of this library your program can look as simple
+as this:
+
+<PRE>
+/*      &#36;Id: irexec.c,v 5.2 2000/02/02 20:28:42 columbus Exp $      */
+
+/****************************************************************************
+ ** irexec.c ****************************************************************
+ ****************************************************************************
+ *
+ * irexec  - execute programs according to the pressed remote control buttons
+ *
+ * Copyright (C) 1998 Trent Piepho &lt;xyzzy@u.washington.edu&gt;
+ * Copyright (C) 1998 Christoph Bartelmus &lt;lirc@bartelmus.de&gt;
+ *
+ */
+
+#ifdef HAVE_CONFIG_H
+# include &lt;config.h&gt;
+#endif
+
+#include &lt;errno.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;stdarg.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include "lirc_client.h"
+
+char *progname;
+
+int main(int argc, char *argv[])
+{
+	struct lirc_config *config;
+
+	progname=argv[0];
+	if(argc&gt;2)
+	{
+		fprintf(stderr,"Usage: %s &lt;config file&gt;\n",progname);
+		exit(EXIT_FAILURE);
+	}
+	if(lirc_init("irexec",1)==-1) exit(EXIT_FAILURE);
+
+	if(lirc_readconfig(argc==2 ? argv[1]:NULL,&config,NULL)==0)
+	{
+		char *code;
+		char *c;
+		int ret;
+
+		while(lirc_nextcode(&code)==0)
+		{
+			if(code==NULL) continue;
+			while((ret=lirc_code2char(config,code,&c))==0 &&
+			      c!=NULL)
+			{
+#ifdef DEBUG
+				printf("Execing command \"%s\"\n",c);
+#endif
+				system(c);
+			}
+			free(code);
+			if(ret==-1) break;
+		}
+		lirc_freeconfig(config);
+	}
+
+	lirc_deinit();
+	exit(EXIT_SUCCESS);
+}
+</PRE>
+</P>
+
+<P>
+Before anything else you have to include the header file for the
+lirc_client library. This is done with 
+<PRE>
+#include &lt;lirc/lirc_client.h&gt;
+</PRE>
+Note that our example differs in this point because it was taken
+directly from the lirc-0.6.0 source that comes with its own
+<em>lirc_client.h</em> but we have to use the one that is already
+installed on the system.
+</P>
+<P>
+The next step is to initialize the library code with
+<em>lirc_init()</em>. This function connects to lircd and does some
+internal init stuff.
+<PRE>
+int lirc_init(char *prog,int verbose);
+</PRE>
+The first argument to this function is the string users will have to
+provide as <em>prog</em> token in their .lircrc config files. If the
+second argument is non-zero error messages will be printed to
+<em>stderr</em>. Otherwise no error messages will ever be displayed.
+This function returns the file descriptor of the socket that is
+connected to lircd or -1 if an error occurred.
+</P>
+<P>
+The example continues by reading a config file. This is done by the
+<em>lirc_readconfig()</em> function:
+<PRE>
+int lirc_readconfig(char *file,struct lirc_config **config,
+		    int (check)(char *s));
+</PRE>
+If you want to load the default config file you should pass NULL as
+first argument. If you want to load some other config file the
+<em>file</em> argument should contain the complete path to the
+file. Your program should give the user the possibility to use an
+other than the default config file. You should also be able to load
+multiple config files by calling this function several times.<BR>
+
+The <em>config</em> argument is used to pass the pointer to the config
+file data structures back to your application. You will need it for
+calls to the <em>lirc_code2char()</em> function. The last argument is
+a call-back function that can be used to do syntax checks with the
+config strings. The library code will call the call-back function for
+all config strings where the <em>prog</em> token in the config file
+matches the prog string you provided with the <em>lirc_init()</em>
+function. If there is an error in the config string the call-back
+function should return -1, otherwise 0. If you don't need to do any
+syntax checks you can pass NULL here. The function returns -1 if an
+error occurred, 0 otherwise.
+</P>
+<P>
+The <em>lirc_nextcode()</em> function blocks until there is something
+available on the lircd socket. This way it can be used in the main
+loop of your program like in our example.
+<PRE>
+int lirc_nextcode(char **code);
+</PRE>
+If an error occurs (usually this means that the socket has been closed
+by the daemon) this function returns -1. Otherwise it returns 0 and
+<em>code</em> points to the next string available in the data
+stream. This string has to be freed by your application using the
+<em>free(3)</em> function. If no complete string is available
+<em>code</em> will be NULL.<BR>
+
+If you use some GUI-toolkit for your program then you probably won't
+be able to use this function in your program's main loop because this
+is already handled by the GUI-toolkit. In this situation you should
+use the call-back abilities of the toolkit that will notify you
+whenever there is some input available from a file descriptor (you get
+the file descriptor from the <em>lirc_init()</em> function). E.g. you
+can use the <em>gdk_input_add()</em>/<em>gdk_input_remove</em>()
+functions with gtk or the <em>QSocketNotifier</em> class with Qt. If
+you don't have such functionality in your toolkit or can't use it for
+some reason you can still use SIGIO signals for this purpose. Check
+the documentation for your GUI-toolkit and signal(2) for further
+information.<BR>
+
+Please note that using call-backs you still have to use some kind of
+while loop to read strings from the socket because several strings may
+be available in the data stream and you will only get a notification
+for the first one. This poses a problem for us because
+<em>lirc_nextcode()</em> blocks until there is something available
+from the socket which is not what we need here. You can solve this
+problem by setting the <b>O_NONBLOCK</b> flag for the socket using the
+<em>fcntl(2)</em> function. Have a look at the current xirw code that
+is available from the LIRC homepage for an implementation example.
+</P>
+<P>
+To get the config string that the user has provided in the config file 
+in response to a button press you use the following function:
+<PRE>
+int lirc_code2char(struct lirc_config *config,char *code,char **string);
+</PRE>
+<em>config</em> is a pointer to the config file data structure that
+you can get with <em>lirc_readconfig()</em> and <em>code</em> is the
+code transmitted to your application on the lircd socket. If an action
+should be taken <em>string</em> will point to the config string the
+user has provided in the config file. The user might want to take
+several actions on a button press so you have to execute this function
+until <em>string</em> is NULL, which means that no more actions shall
+be taken, or an error occurs. The function returns -1 if an error
+occurred, 0 otherwise.
+</P>
+<P>
+In our example there are only two clean-up functions to be explained.
+<PRE>
+void lirc_freeconfig(struct lirc_config *config);
+</PRE>
+This functions frees the data structures associated with <em>config</em>.
+<PRE>
+int lirc_deinit();
+</PRE>
+<em>lirc_deinit()</em> closes the connection to lircd and does some
+internal clean-up stuff.
+</P>
+<P>
+I encourage you to use autoconf and automake for your projects. To
+check for the lirc_client library all you have to insert to your
+<em>configure.in</em> file is the following:
+<PRE>
+dnl Check for LIRC client support
+dnl This really is not worth making a separate file for it.
+
+have_lirc=yes
+AC_REQUIRE_CPP
+AC_CHECK_LIB(lirc_client,lirc_init,
+  AC_CHECK_HEADER(lirc/lirc_client.h,true,have_lirc=no),have_lirc=no)
+
+if test "$have_lirc" = "yes"; then
+dnl  AC_DEFINE(HAVE_LIRC);
+  true;
+else
+  AC_MSG_ERROR([*** LIRC client support not available ***]);
+fi
+</PRE>
+There is also a more complex m4 macro in the contrib directory of the
+current LIRC distribution if you plan to add LIRC support to your
+application without using the lirc_client library.
+</P>
+
+<!--------------------------------------------------------------------------->
+
+                        <BR> <BR>
+                        <CENTER>[<A HREF="http://www.lirc.org/">LIRC homepage</A>]<BR>
+                                <I>The LIRC Manual, last update: 10-Sep-2000</I></CENTER>
+                        <BR> <BR>
+                        </TD>
+                        <TD WIDTH="15%">&#160;<BR></TD>
+                    </TR></TABLE>
+                </TD>
+            </TR>
+            <TR>
+                <TD WIDTH="100%" BGCOLOR="#000080" ALIGN="LEFT" 
+                    VALIGN="TOP">&#160;<BR>
+                </TD>
+            </TR>
+        </TABLE>
+    </BODY>
+
+</HTML>

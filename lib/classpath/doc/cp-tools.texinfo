@@ -1,0 +1,1875 @@
+\input texinfo @c -*-texinfo-*-
+
+@c %**start of header
+@setfilename cp-tools.info
+@settitle GNU Classpath Tools Guide
+@c %**end of header
+
+@setchapternewpage on
+
+@c Common macros to support generating man pages:
+
+@macro gcctabopt{body}
+@code{\body\}
+@end macro
+@macro gccoptlist{body}
+@smallexample
+\body\
+@end smallexample
+@end macro
+
+@ifinfo
+This file documents the Tools included in a standard distribution of the GNU
+Classpath project deliverables.
+
+Copyright (C) 2006, 2007 Free Software Foundation, Inc.
+
+@ifnotplaintext
+@dircategory GNU Libraries
+@direntry
+* Classpath Tools: (cp-tools).  GNU Classpath Tools Guide
+@end direntry
+@end ifnotplaintext
+@end ifinfo
+
+@titlepage
+@title GNU Classpath Tools Guide
+@author The GNU Classpath Team
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 2006 Free Software Foundation, Inc.
+@sp 2
+Permission is granted to make and distribute verbatim copies of this document provided the copyright notice and this permission notice are preserved on all copies.
+
+Permission is granted to copy and distribute modified versions of this document under the conditions for verbatim copying, provided that the entire resulting derived work is distributed under the terms of a permission notice identical to this one.
+
+Permission is granted to copy and distribute translations of this manual into another language, under the above conditions for modified versions, except that this permission notice may be stated in a translation approved by the Free Software Foundation.
+
+@end titlepage
+
+@contents
+
+@ifinfo
+@node Top, Applet Tools, (dir), (dir)
+@top GNU Classpath Tools Guide
+
+This document contains important information you need to know in order to use
+the tools included in the GNU Classpath project deliverables.
+
+The Tools aim at providing a free replacement, similar in their behavior, to
+their counter-parts found in the Reference Implementation (RI) of the Java
+Software Development Kit (SDK).
+
+@end ifinfo
+
+@menu
+* Applet Tools::               Work with applets
+* Security Tools::             Work securely with Java applications
+* Other Tools::                Other tools in classpath
+* I18N Issues::                How to add support for non-English languages
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Applet Tools
+
+* appletviewer Tool::          Load applets
+* gcjwebplugin::               Load applets in a web browser
+
+Security Tools
+
+* jarsigner Tool::             Sign and verify .JAR files
+* keytool Tool::               Manage private keys and public certificates
+
+jarsigner Tool
+
+* Common jarsigner Options::   Options used when signing or verifying a file
+* Signing Options::            Options only used when signing a .JAR file
+* Verification Options::       Options only used when verifying a .JAR file
+
+keytool Tool
+
+* Getting Help::               How to get help with keytool commands
+* Common keytool Options::     Options used in more than one command
+* Distinguished Names::        X.500 Distinguished Names used in certificates
+* Add/Update Commands::        Commands for adding data to a Key Store
+* Export Commands::            Commands for exporting data from a Key Store
+* Display Commands::           Commands for displaying data in a Key Store
+* Management Commands::        Commands for managing a Key Store
+
+Add/Update Commands
+
+* Command -genkey::            Generate private key and self-signed certificate
+* Command -import::            Import certificates and certificate replies
+* Command -selfcert::          Generate self-signed certificate
+* Command -cacert::            Import a CA Trusted Certificate
+* Command -identitydb::        Import JDK-1 style identities
+
+Export Commands
+
+* Command -certreq::           Generate Certificate Signing Requests (CSR)
+* Command -export::            Export a certificate in a Key Store
+
+Display Commands
+
+* Command -list::              Display information about one or all Aliases
+* Command -printcert::         Print a certificate or a certificate fingerprint
+
+Management Commands
+
+* Command -keyclone::          Clone a Key Entry in a Key Store
+* Command -storepasswd::       Change the password protecting a Key Store
+* Command -keypasswd::         Change the password protecting a Key Entry
+* Command -delete::            Remove an entry in a Key Store
+
+Other Tools
+
+* jar Tool::                   Archive tool for Java archives
+* javah Tool::                 A java header compiler
+* gcjh Tool::                  A java header compiler (old version)
+* native2ascii Tool::          An encoding converter
+* orbd Tool::                  An object request broker daemon
+* serialver Tool::             A serial version command
+* rmid Tool::                  RMI activation daemon
+* rmiregistry Tool::           Remote object registry
+* tnameserv Tool::             Naming service
+
+I18N Issues
+
+* Language Resources::         Where resources are located
+* Message Formats::            How messages are internationalized
+
+@end detailmenu
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Applet Tools, Security Tools, Top, Top
+@comment node-name, next, previous, up
+@chapter Applet Tools
+
+Two Applet Tools are available with GNU Classpath: @b{appletviewer}
+and @b{gcjwebplugin}.
+
+To avoid conflicts with other implementations, the appletviewer
+executable is called ``gappletviewer''.
+
+@menu
+* appletviewer Tool::          Load applets
+* gcjwebplugin::               Load applets in a web browser
+@end menu
+
+If while using these tools you think you found a bug, then please report it at @uref{http://www.gnu.org/software/classpath/bugs.html,classpath-bugs}.
+
+@comment ----------------------------------------------------------------------
+
+@node appletviewer Tool, gcjwebplugin, Applet Tools, Applet Tools
+@comment node-name, next, previous, up
+@section The @code{appletviewer} Tool
+@c man title gappletviewer Load and runs an applet
+
+SYNOPSIS
+
+@c man begin SYNOPSIS gappletviewer
+appletviewer [@var{OPTION}]@dots{} @var{URL}@dots{} @var{@*}
+
+appletviewer [@var{OPTION}]@dots{} @option{-code} @var{CODE} @var{@*}
+
+appletviewer [@var{OPTION}]@dots{} @option{-plugin} @var{INPUT},@var{OUTPUT}
+@c man end
+
+DESCRIPTION
+@c man begin DESCRIPTION gappletviewer
+The @command{appletviewer} tool loads and runs an applet.
+
+Use the first form to test applets specified by tag.  The URL should
+resolve to an HTML document from which the @command{appletviewer} will
+extract applet tags.  The APPLET, EMBED and OBJECT tags are supported.
+If a given document contains multiple applet tags, all the applets
+will be loaded, with each applet appearing in its own window.
+Likewise, when multiple URLs are specified, each applet tag instance
+is given its own window.  If a given document contains no recognized
+tags the @command{appletviewer} does nothing.
+
+@smallexample
+appletviewer http://www.gnu.org/software/classpath/
+@end smallexample
+
+Use the second form to test an applet in development.  This form
+allows applet tag attributes to be supplied on the command line.  Only
+one applet may be specified using the @option{-code} option.  The
+@option{-code} option overrides the URL form -- any URLs specified will
+be ignored.
+
+@smallexample
+appletviewer -code Test.class -param datafile,data.txt
+@end smallexample
+
+@command{gcjwebplugin} uses the third form to communicate with the
+@command{appletviewer} through named pipes.
+@c man end
+
+@c man begin OPTIONS gappletviewer
+URL OPTIONS
+@table @gcctabopt
+@item -debug
+This option is not yet implemented but is provided for compatibility.
+
+@item -encoding @var{CHARSET}
+Use this option to specify an alternate character encoding for the
+specified HTML page.
+
+@end table
+
+APPLET TAG OPTIONS
+@table @gcctabopt
+@item -code @var{CODE}
+Use the @option{-code} option to specify the value of the applet tag
+@var{CODE} attribute.
+
+@item -codebase @var{CODEBASE}
+Use the @option{-codebase} option to specify the value of the applet tag
+@var{CODEBASE} attribute.
+
+@item -archive @var{ARCHIVE}
+Use the @option{-archive} option to specify the value of the applet tag
+@var{ARCHIVE} attribute.
+
+@item -width @var{WIDTH}
+Use the @option{-width} option to specify the value of the applet tag
+@var{WIDTH} attribute.
+
+@item -height @var{HEIGHT}
+Use the @option{-height} option to specify the value of the applet tag
+@var{HEIGHT} attribute.
+
+@item -param @var{NAME},@var{VALUE}
+Use the @option{-param} option to specify values for the @var{NAME}
+and @var{VALUE} attributes of an applet PARAM tag.
+
+@end table
+
+PLUGIN OPTION
+@table @gcctabopt
+@item -plugin @var{INPUT},@var{OUTPUT}
+@command{gcjwebplugin} uses the @option{-plugin} option to specify the
+named pipe the @command{appletviewer} should use for receiving commands
+(@var{INPUT}) and the one it should use for sending commands to
+@command{gcjwebplugin} (@var{OUTPUT}).
+
+@end table
+
+DEBUGGING OPTION
+@table @gcctabopt
+@item -verbose
+Use the @option{-verbose} option to have the @command{appletviewer} print
+debugging messages.
+
+@end table
+
+STANDARD OPTIONS
+
+@table @gcctabopt
+@item -help
+Use the @option{-help} option to have the @command{appletviewer} print a
+usage message, then exit.
+
+@item -version
+Use the @option{-version} option to have the @command{appletviewer} print
+its version, then exit.
+
+@item -J@var{OPTION}
+Use the @option{-J} option to pass @var{OPTION} to the virtual machine that
+will run the @command{appletviewer}.  Unlike other options, there must
+not be a space between the @option{-J} and @var{OPTION}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node gcjwebplugin, , appletviewer Tool, Applet Tools
+@comment node-name, next, previous, up
+@section The @code{gcjwebplugin} Tool
+
+@code{gcjwebplugin} is a plugin that adds applet support to web
+browsers.  Currently @code{gcjwebplugin} only supports Mozilla-based
+browsers (e.g., Firefox, Galeon, Mozilla).
+
+@comment ----------------------------------------------------------------------
+
+@node Security Tools, Other Tools, Applet Tools, Top
+@comment node-name, next, previous, up
+@chapter Security Tools
+
+Two Security Tools are available with GNU Classpath:
+@command{jarsigner} and @command{keytool}.
+
+To avoid conflicts with other implementations, the jarsigner
+executable is called @command{gjarsigner} and the keytool executable is
+called @command{gkeytool}.
+
+@menu
+* jarsigner Tool::             Sign and verify .JAR files
+* keytool Tool::               Manage private keys and public certificates
+@end menu
+
+If while using these tools you think you found a bug, then please report it at @uref{http://www.gnu.org/software/classpath/bugs.html,classpath-bugs}.
+
+@comment ----------------------------------------------------------------------
+
+@node jarsigner Tool, keytool Tool, Security Tools, Security Tools
+@comment node-name, next, previous, up
+@section The @code{jarsigner} Tool
+@c man title gjarsigner Java ARchive (JAR) file signing and verification tool
+
+The @command{jarsigner} tool is invoked from the command line, in one
+of two forms, as follows:
+
+@example
+@c man begin SYNOPSIS gjarsigner
+jarsigner [@var{OPTION}]@dots{} @var{FILE} @var{ALIAS}
+
+jarsigner @option{-verify} [@var{OPTION}]@dots{} @var{FILE}
+@c man end
+@end example
+
+@c man begin DESCRIPTION gjarsigner
+When the first form is used, the tool signs the designated JAR file. The second form, on the other hand, is used to verify a previously signed JAR file.
+
+@var{FILE} is the .JAR file to process; i.e., to sign if the first syntax form is used, or to verify if the second syntax form is used instead.
+
+@var{ALIAS} must be a known @i{Alias} of a @i{Key Entry} in the designated @i{Key Store}. The private key material associated with this @i{Alias} is then used for signing the designated .JAR file.
+@c man end
+
+@menu
+* Common jarsigner Options::   Options used when signing or verifying a file
+* Signing Options::            Options only used when signing a .JAR file
+* Verification Options::       Options only used when verifying a .JAR file
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Common jarsigner Options, Signing Options, jarsigner Tool, jarsigner Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gjarsigner
+@subsection Common options
+
+The following options may be used when the tool is used for either signing, or verifying, a .JAR file.
+
+@table @gcctabopt
+@item -verbose
+Use this option to force the tool to generate more verbose messages, during its processing.
+
+@item -internalsf
+When present, the tool will include --which otherwise it does not-- the @code{.SF} file in the @code{.DSA} generated file.
+
+@item -sectionsonly
+When present, the tool will include in the @code{.SF} generated file --which otherwise it does not-- a header containing a hash of the whole manifest file.  When that header is included, the tool can quickly check, during verification, if the hash (in the header) matches or not the manifest file.
+
+@item -provider PROVIDER_CLASS_NAME
+A fully qualified class name of a @i{Security Provider} to add to the current list of @i{Security Providers} already installed in the JVM in-use. If a provider class is specified with this option, and was successfully added to the runtime --i.e.@: it was not already installed-- then the tool will attempt to remove this @i{Security Provider} before exiting.
+
+@item -help
+Prints a help text similar to this one.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Signing Options, Verification Options, Common jarsigner Options, jarsigner Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gjarsigner
+@subsection Signing options
+
+The following options may be specified when using the tool for signing purposes.
+
+@table @gcctabopt
+@item -keystore @var{URL}
+Use this option to specify the location of the key store to use. The default value is a file URL referencing the file named @file{.keystore} located in the path returned by the call to @code{java.lang.System#getProperty(String)} using @code{user.home} as argument.
+
+If a URL was specified, but was found to be malformed --e.g.@: missing protocol element-- the tool will attempt to use the URL value as a file-name (with absolute or relative path-name) of a key store --as if the protocol was @code{file:}.
+
+@item -storetype @var{STORE_TYPE}
+Use this option to specify the type of the key store to use. The default value, if this option is omitted, is that of the property @code{keystore.type} in the security properties file, which is obtained by invoking the static method call @code{getDefaultType()} in @code{java.security.KeyStore}.
+
+@item -storepass @var{PASSWORD}
+Use this option to specify the password which will be used to unlock the key store. If this option is missing, the User will be prompted to provide a password.
+
+@item -keypass @var{PASSWORD}
+Use this option to specify the password which the tool will use to unlock the @i{Key Entry} associated with the designated @i{Alias}.
+
+If this option is omitted, the tool will first attempt to unlock the @i{Key Entry} using the same password protecting the key store. If this fails, you will then be prompted to provide a password.
+
+@item -sigfile @var{NAME}
+Use this option to designate a literal that will be used to construct file names for both the @code{.SF} and @code{.DSA} signature files. These files  will be generated, by the tool, and placed in the @file{META-INF} directory of the signed JAR@.  Permissible characters for @var{NAME} must be in the range "a-zA-Z0-9_-".  All characters will be converted to upper-case ones.
+
+If this option is missing, the first eight characters of the @var{ALIAS} argument will be used. When this is the case, any character in @var{ALIAS} that is outside the permissible range of characters will be replaced by an underscore.
+
+@item -signedjar @var{FILE}
+Use this option to specify the file name of the signed JAR@. If this option is omitted, then the signed JAR will be named the same as @var{FILE}; i.e., the input JAR file will be replaced with the signed copy.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Verification Options, , Signing Options, jarsigner Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gjarsigner
+@subsection Verification options
+
+The following options may be specified when using the tool for verification purposes.
+
+@table @gcctabopt
+@item -verify
+Use this option to indicate that the tool is to be used for verification purposes.
+
+@item -certs
+This option is used in conjunction with the @option{-verbose} option. When present, along with the @option{-verbose} option, the tool will print more detailed information about the certificates of the signer(s) being processed.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node keytool Tool, , jarsigner Tool, Security Tools
+@comment node-name, next, previous, up
+@section The @code{keytool} Tool
+@c man title gkeytool Manage private keys and public certificates
+
+@ignore
+@c man begin SYNOPSIS gkeytool
+keytool [@var{COMMAND}] @dots{}
+@c man end
+@end ignore
+
+@c man begin DESCRIPTION gkeytool
+Cryptographic credentials, in a Java environment, are usually stored in a @i{Key Store}. The Java SDK specifies a @i{Key Store} as a persistent container of two types of objects: @i{Key Entries} and @i{Trusted Certificates}. The security tool @command{keytool} is a Java-based application for managing those types of objects.
+
+A @i{Key Entry} represents the private key part of a key-pair used in Public-Key Cryptography, and a signed X.509 certificate which authenticates the public key part for a known entity; i.e.@: the owner of the key-pair. The X.509 certificate itself contains the public key part of the key-pair.
+
+A @i{Trusted Certificate} is a signed X.509 certificate issued by a trusted entity. The @i{Trust} in this context is relative to the User of the @command{keytool}. In other words, the existence of a @i{Trusted Certificate} in the @i{Key Store} processed by a @command{keytool} command implies that the User trusts the @i{Issuer} of that @i{Trusted Certificate} to also sign, and hence authenticates, other @i{Subjects} the tool may process.
+
+@i{Trusted Certificates} are important because they allow the tool to mechanically construct @i{Chains of Trust} starting from one of the @i{Trusted Certificates} in a @i{Key Store} and ending with a certificate whose @i{Issuer} is potentially unknown. A valid chain is an ordered list, starting with a @i{Trusted Certificate} (also called the @i{anchor}), ending with the target certificate, and satisfying the condition that the @i{Subject} of certificate @code{#i} is the @i{Issuer} of certificate @code{#i + 1}.
+
+The @command{keytool} is invoked from the command line as follows:
+
+@smallexample
+keytool [COMMAND] ...
+@end smallexample
+
+Multiple @var{COMMAND}s may be specified at once, each complete with its own options. @command{keytool} will parse all the arguments, before processing, and executing, each @code{COMMAND}. If an exception occurs while executing one @var{COMMAND} @command{keytool} will abort. Note however that because the implementation of the tool uses code to parse command line options that also supports GNU-style options, you have to separate each command group with a double-hyphen; e.g
+
+@smallexample
+keytool -list -- -printcert -alias mykey
+@end smallexample
+@c man end
+
+Here is a summary of the commands supported by the tool:
+
+@c man begin OPTIONS gkeytool
+@enumerate
+@item Add/Update commands
+@table @gcctabopt
+@item -genkey [@var{OPTION}]@dots{}
+Generate a new @i{Key Entry}, eventually creating a new key store.
+
+@item -import [@var{OPTION}]@dots{}
+Add, to a key store, @i{Key Entries} (private keys and certificate chains authenticating the public keys) and @i{Trusted Certificates} (3rd party certificates which can be used as @i{Trust Anchors} when building chains-of-trust).
+
+@item -selfcert [@var{OPTION}]@dots{}
+Generate a new self-signed @i{Trusted Certificate}.
+
+@item -cacert [@var{OPTION}]@dots{}
+Import a CA @i{Trusted Certificate}.
+
+@item -identitydb [@var{OPTION}]@dots{}
+@b{NOT IMPLEMENTED YET}.@*
+Import a JDK 1.1 style Identity Database.
+@end table
+
+@item Export commands
+@table @gcctabopt
+@item -certreq [@var{OPTION}]@dots{}
+Issue a @i{Certificate Signing Request} (CSR) which can be then sent to a @i{Certification Authority} (CA) to issue a certificate signed (by the CA) and authenticating the @i{Subject} of the request.
+
+@item -export [@var{OPTION}]@dots{}
+Export a certificate from a key store.
+@end table
+
+@item  Display commands
+@table @gcctabopt
+@item -list [@var{OPTION}]@dots{}
+Print one or all certificates in a key store to @code{STDOUT}.
+
+@item -printcert [@var{OPTION}]@dots{}
+Print a human-readable form of a certificate, in a designated file, to @code{STDOUT}.
+@end table
+
+@item Management commands
+@table @gcctabopt
+@item -keyclone [@var{OPTION}]@dots{}
+Clone a @i{Key Entry} in a key store.
+
+@item -storepasswd [@var{OPTION}]@dots{}
+Change the password protecting a key store.
+
+@item -keypasswd [@var{OPTION}]@dots{}
+Change the password protecting a @i{Key Entry} in a key store.
+
+@item -delete [@var{OPTION}]@dots{}
+Delete a @i{Key Entry} or a @i{Trusted Certificate} from a key store.
+@end table
+@end enumerate
+@c man end
+
+@menu
+* Getting Help::               How to get help with keytool commands
+* Common keytool Options::     Options used in more than one command
+* Distinguished Names::        X.500 Distinguished Names used in certificates
+* Add/Update Commands::        Commands for adding data to a Key Store
+* Export Commands::            Commands for exporting data from a Key Store
+* Display Commands::           Commands for displaying data in a Key Store
+* Management Commands::        Commands for managing a Key Store
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Getting Help, Common keytool Options, keytool Tool, keytool Tool
+@comment node-name, next, previous, up
+@subsection Getting help
+
+To get a general help text about the tool, use the @code{-help} option; e.g.
+
+@example
+@code{keytool -help}
+@end example
+
+To get more specific help text about one of the tool's command use the @code{-help} option for that command; e.g.
+
+@example
+@code{keytool -genkey -help}
+@end example
+
+In both instances, the tool will print a help text and then will exit the running JVM.
+
+It is worth noting here that the help messages printed by the tool are I18N-ready. This means that if/when the contents of the tool's @i{Message Bundle} properties file are available in languages other than English, you may see those messages in that language.
+
+@comment ----------------------------------------------------------------------
+
+@node Common keytool Options, Distinguished Names, Getting Help, keytool Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsection Common options
+
+The following @option{OPTION}s are used in more than one @command{COMMAND}. They are described here to reduce redundancy.
+
+@table @gcctabopt
+@anchor{alias}
+@item -alias @var{Alias}
+Every entry, be it a @i{Key Entry} or a @i{Trusted Certificate}, in a key store is uniquely identified by a user-defined @var{Alias} string. Use this option to specify the @var{Alias} to use when referring to an entry in the key store. Unless specified otherwise, a default value of @code{mykey} shall be used when this option is omitted from the command line.
+
+@anchor{keyalg}
+@item -keyalg @var{ALGORITHM}
+Use this option to specify the canonical name of the key-pair generation algorithm. The default value for this option is @code{DSS} (a synonym for the Digital Signature Algorithm also known as DSA).
+
+@anchor{keysize}
+@item -keysize @var{SIZE}
+Use this option to specify the number of bits of the shared modulus (for both the public and private keys) to use when generating new keys. A default value of @code{1024} will be used if this option is omitted from the command line.
+
+@anchor{validity}
+@item -validity @var{DAY_COUNT}
+Use this option to specify the number of days a newly generated certificate will be valid for. The default value is @code{90} (days) if this option is omitted from the command line.
+
+@anchor{storetype}
+@item -storetype @var{STORE_TYPE}
+Use this option to specify the type of the key store to use. The default value, if this option is omitted, is that of the property @code{keystore.type} in the security properties file, which is obtained by invoking the static method call @code{getDefaultType()} in @code{java.security.KeyStore}.
+
+@anchor{storepass}
+@item -storepass @var{PASSWORD}
+Use this option to specify the password protecting the key store. If this option is omitted from the command line, you will be prompted to provide a password.
+
+@anchor{keystore}
+@item -keystore @var{URL}
+Use this option to specify the location of the key store to use. The default value is a file URL referencing the file named @file{.keystore} located in the path returned by the call to @code{java.lang.System#getProperty(String)} using @code{user.home} as argument.
+
+If a URL was specified, but was found to be malformed --e.g.@: missing protocol element-- the tool will attempt to use the URL value as a file-name (with absolute or relative path-name) of a key store --as if the protocol was @code{file:}.
+
+@anchor{provider}
+@item -provider @var{PROVIDER_CLASS_NAME}
+A fully qualified class name of a @i{Security Provider} to add to the current list of @i{Security Providers} already installed in the JVM in-use. If a provider class is specified with this option, and was successfully added to the runtime --i.e.@: it was not already installed-- then the tool will attempt to removed this @i{Security Provider} before exiting.
+
+@anchor{file}
+@item -file @var{FILE}
+Use this option to designate a file to use with a command. When specified with this option, the value is expected to be the fully qualified path of a file accessible by the File System. Depending on the command, the file may be used as input or as output. When this option is omitted from the command line, @code{STDIN} will be used instead, as the source of input, and @code{STDOUT} will be used instead as the output destination.
+
+@anchor{verbose}
+@item -v
+Unless specified otherwise, use this option to enable more verbose output.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Distinguished Names, Add/Update Commands, Common keytool Options, keytool Tool
+@comment node-name, next, previous, up
+@subsection X.500 Distinguished Names
+
+@anchor{dn}
+A @i{Distinguished Name} (or DN) MUST be supplied with some of the @code{COMMAND}s using a @code{-dname} option. The syntax of a valid value for this option MUST follow RFC-2253 specifications. Namely the following components (with their accepted meaning) will be recognized. Note that the component name is case-insensitive:
+
+@ftable @var
+@item CN
+The Common Name; e.g.@: @kbd{host.domain.com}
+@item OU
+The Organizational Unit; e.g.@: @kbd{IT Department}
+@item O
+The Organization Name; e.g.@: @kbd{The Sample Company}
+@item L
+The Locality Name; e.g.@: @kbd{Sydney}
+@item ST
+The State Name; e.g.@: @kbd{New South Wales}
+@item C
+The 2-letter Country identifier; e.g.@: @kbd{AU}
+@end ftable
+
+When specified with a @code{-dname} option, each pair of component/value will be separated from the other with a comma. Each component and value pair MUST be separated by an equal sign. For example, the following is a valid DN value:@*
+
+@format
+CN=host.domain.com, O=The Sample Company, L=Sydney, ST=NSW, C=AU
+@end format
+@*
+If the @i{Distinguished Name} is required, and no valid default value can be used, the tool will prompt you to enter the information through the console.
+
+@comment ----------------------------------------------------------------------
+
+@node Add/Update Commands, Export Commands, Distinguished Names, keytool Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsection Add/Update commands
+@c man end
+
+@menu
+* Command -genkey::            Generate private key and self-signed certificate
+* Command -import::            Import certificates and certificate replies
+* Command -selfcert::          Generate self-signed certificate
+* Command -cacert::            Import a CA Trusted Certificate
+* Command -identitydb::        Import JDK-1 style identities
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Command -genkey, Command -import, Add/Update Commands, Add/Update Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-genkey} command
+
+Use this command to generate a new key-pair (both private and public keys), and save these credentials in the key store as a @i{Key Entry}, associated with the designated (if was specified with the @option{-alias} option) or default (if the @option{-alias} option is omitted) @i{Alias}.
+
+The private key material will be protected with a user-defined password (see @option{-keypass} option). The public key on the other hand will be part of a self-signed X.509 certificate, which will form a 1-element chain and will be saved in the key store.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -keyalg @var{ALGORITHM}
+For more details @pxref{keyalg,, ALGORITHM}.
+
+@item -keysize @var{KEY_SIZE}
+For more details @pxref{keysize,, KEY_SIZE}.
+
+@item -sigalg @var{ALGORITHM}
+The canonical name of the digital signature algorithm to use for signing certificates. If this option is omitted, a default value will be chosen based on the type of the key-pair; i.e., the algorithm that ends up being used by the -keyalg option. If the key-pair generation algorithm is @code{DSA}, the value for the signature algorithm will be @code{SHA1withDSA}. If on the other hand the key-pair generation algorithm is @code{RSA}, then the tool will use @code{MD5withRSA} as the signature algorithm.
+
+@item -dname @var{NAME}
+This a mandatory value for the command. If no value is specified --i.e.@: the @option{-dname} option is omitted-- the tool will prompt you to enter a @i{Distinguished Name} to use as both the @i{Owner} and @i{Issuer} of the generated self-signed certificate.
+
+For more details @pxref{dn,, X.500 DISTINGUISHED NAME}.
+
+@item -keypass @var{PASSWORD}
+Use this option to specify the password which the tool will use to protect the newly created @i{Key Entry}.
+
+If this option is omitted, you will be prompted to provide a password.
+
+@item -validity @var{DAY_COUNT}
+For more details @pxref{validity,, DAY_COUNT}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -import, Command -selfcert, Command -genkey, Add/Update Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-import} command
+
+Use this command to read an X.509 certificate, or a PKCS#7 @i{Certificate Reply} from a designated input source and incorporate the certificates into the key store.
+
+If the @i{Alias} does not already exist in the key store, the tool treats the certificate read from the input source as a new @i{Trusted Certificate}. It then attempts to discover a chain-of-trust, starting from that certificate and ending at another @i{Trusted Certificate}, already stored in the key store. If the @option{-trustcacerts} option is present, an additional key store, of type @code{JKS} named @file{cacerts}, and assumed to be present in @file{$@{JAVA_HOME@}/lib/security} will also be consulted if found --@code{$@{JAVA_HOME@}} refers to the location of an installed @i{Java Runtime Environment} (JRE). If no chain-of-trust can be established, and unless the @code{-noprompt} option has been specified, the certificate is printed to @code{STDOUT} and the user is prompted for a confirmation.
+
+If @i{Alias} exists in the key store, the tool will treat the certificate(s) read from the input source as a @i{Certificate Reply}, which can be a chain of certificates, that eventually would replace the chain of certificates associated with the @i{Key Entry} of that @i{Alias}. The substitution of the certificates only occurs if a chain-of-trust can be established between the bottom certificate of the chain read from the input file and the @i{Trusted Certificates} already present in the key store. Again, if the @option{-trustcacerts} option is specified, additional @i{Trusted Certificates} in the same @file{cacerts} key store will be considered. If no chain-of-trust can be established, the operation will abort.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -file @var{FILE}
+For more details @pxref{file,, FILE}.
+
+@item -keypass @var{PASSWORD}
+Use this option to specify the password which the tool will use to protect the @i{Key Entry} associated with the designated @i{Alias}, when replacing this @i{Alias}' chain of certificates with that found in the certificate reply.
+
+If this option is omitted, and the chain-of-trust for the certificate reply has been established, the tool will first attempt to unlock the @i{Key Entry} using the same password protecting the key store. If this fails, you will then be prompted to provide a password.
+
+@item -noprompt
+Use this option to prevent the tool from prompting the user.
+
+@item -trustcacerts
+Use this option to indicate to the tool that a key store, of type @code{JKS}, named @file{cacerts}, and usually located in @file{lib/security} in an installed @i{Java Runtime Environment} should be considered when trying to establish chain-of-trusts.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -selfcert, Command -cacert, Command -import, Add/Update Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-selfcert} command
+
+Use this command to generate a self-signed X.509 version 1 certificate. The newly generated certificate will form a chain of one element which will replace the previous chain associated with the designated @i{Alias} (if @option{-alias} option was specified), or the default @i{Alias} (if @option{-alias} option was omitted).
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -sigalg @var{ALGORITHM}
+The canonical name of the digital signature algorithm to use for signing the certificate. If this option is omitted, a default value will be chosen based on the type of the private key associated with the designated @i{Alias}. If the private key is a @code{DSA} one, the value for the signature algorithm will be @code{SHA1withDSA}. If on the other hand the private key is an @code{RSA} one, then the tool will use @code{MD5withRSA} as the signature algorithm.
+
+@item -dname @var{NAME}
+Use this option to specify the @i{Distinguished Name} of the newly generated self-signed certificate. If this option is omitted, the existing @i{Distinguished Name} of the base certificate in the chain associated with the designated @i{Alias} will be used instead.
+
+For more details @pxref{dn,, X.500 DISTINGUISHED NAME}.
+
+@item -validity @var{DAY_COUNT}
+For more details @pxref{validity,, DAY_COUNT}.
+
+@item -keypass @var{PASSWORD}
+Use this option to specify the password which the tool will use to unlock the @i{Key Entry} associated with the designated @i{Alias}.
+
+If this option is omitted, the tool will first attempt to unlock the @i{Key Entry} using the same password protecting the key store. If this fails, you will then be prompted to provide a password.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -cacert, Command -identitydb, Command -selfcert, Add/Update Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-cacert} command
+
+Use this command to import, a CA certificate and add it to the key store as a @i{Trusted Certificate}. The @i{Alias} for this new entry will be constructed from the FILE's base-name after replacing hyphens and dots with underscores.
+
+This command is useful when used in a script that recursively visits a directory of CA certificates to populate a @code{cacerts.gkr} @i{Key Store} of trusted certificates which can then be used commands that specify the @option{-trustcacerts} option.
+
+@table @gcctabopt
+@item -file @var{FILE}
+For more details @pxref{file,, FILE}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -identitydb, , Command -cacert, Add/Update Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-identitydb} command
+
+@b{NOT IMPLEMENTED YET}.
+
+Use this command to import a JDK 1.1 style Identity Database.
+
+@table @gcctabopt
+@item -file @var{FILE}
+For more details @pxref{file,, FILE}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Export Commands, Display Commands, Add/Update Commands, keytool Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsection Export commands
+@c man end
+
+@menu
+* Command -certreq::           Generate Certificate Signing Requests (CSR)
+* Command -export::            Export a certificate in a Key Store
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Command -certreq, Command -export, Export Commands, Export Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-certreq} command
+
+Use this command to generate a PKCS#10 @i{Certificate Signing Request} (CSR) and write it to a designated output destination. The contents of the destination should look something like the following:
+
+@example
+-----BEGIN NEW CERTIFICATE REQUEST-----
+MI...QAwXzEUMBIGA1UEAwwLcnNuQGdudS5vcmcxGzAZBgNVBAoMElUg
+Q2...A0GA1UEBwwGU3lkbmV5MQwwCgYDVQQIDANOU1cxCzAJBgNVBACC
+...
+FC...IVwNVOfQLRX+O5kAhQ/a4RTZme2L8PnpvgRwrf7Eg8D6w==
+-----END NEW CERTIFICATE REQUEST-----
+@end example
+
+@b{IMPORTANT}: Some documentation (e.g.@: RSA examples) claims that the @code{Attributes} field, in the CSR is @code{OPTIONAL} while RFC-2986 implies the opposite. This implementation considers this field, by default, as @code{OPTIONAL}, unless the option @option{-attributes} is specified on the command line.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -sigalg @var{ALGORITHM}
+The canonical name of the digital signature algorithm to use for signing the certificate. If this option is omitted, a default value will be chosen based on the type of the private key associated with the designated @i{Alias}. If the private key is a @code{DSA} one, the value for the signature algorithm will be @code{SHA1withDSA}. If on the other hand the private key is an @code{RSA} one, then the tool will use @code{MD5withRSA} as the signature algorithm.
+
+@item -file @var{FILE}
+For more details @pxref{file,, FILE}.
+
+@item -keypass @var{PASSWORD}
+Use this option to specify the password which the tool will use to unlock the @i{Key Entry} associated with the designated @i{Alias}.
+
+If this option is omitted, the tool will first attempt to unlock the @i{Key Entry} using the same password protecting the key store. If this fails, you will then be prompted to provide a password.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@item -attributes
+Use this option to force the tool to encode a @code{NULL} DER value in the CSR as the value of the @code{Attributes} field.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -export, , Command -certreq, Export Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-export} command
+
+Use this command to export a certificate stored in a key store to a designated output destination, either in binary format (if the @option{-v} option is specified), or in RFC-1421 compliant encoding (if the @option{-rfc} option is specified instead).
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -file @var{FILE}
+For more details @pxref{file,, FILE}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -rfc
+Use RFC-1421 specifications when encoding the output.
+
+@item -v
+Output the certificate in binary DER encoding. This is the default output format of the command if neither @option{-rfc} nor @code{-v} options were detected on the command line. If both this option and the @option{-rfc} option are detected on the command line, the tool will opt for the RFC-1421 style encoding.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Display Commands, Management Commands, Export Commands, keytool Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsection Display commands
+@c man end
+
+@menu
+* Command -list::              Display information about one or all Aliases
+* Command -printcert::         Print a certificate or a certificate fingerprint
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Command -list, Command -printcert, Display Commands, Display Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-list} command
+
+Use this command to print one or all of a key store entries to @code{STDOUT}. Usually this command will only print a @i{fingerprint} of the certificate, unless either the @option{-rfc} or the @option{-v} option is specified.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+If this option is omitted, the tool will print ALL the entries found in the key store.
+
+For more details @pxref{alias,, ALIAS}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -rfc
+Use RFC-1421 specifications when encoding the output.
+
+@item -v
+Output the certificate in human-readable format. If both this option and the @option{-rfc} option are detected on the command line, the tool will opt for the human-readable form and will not abort the command.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -printcert, , Command -list, Display Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-printcert} command
+
+Use this command to read a certificate from a designated input source and print it to @code{STDOUT} in a human-readable form.
+
+@table @gcctabopt
+@item -file @var{FILE}
+For more details @pxref{file,, FILE}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Management Commands, , Display Commands, keytool Tool
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsection Management commands
+@c man end
+
+@menu
+* Command -keyclone::          Clone a Key Entry in a Key Store
+* Command -storepasswd::       Change the password protecting a Key Store
+* Command -keypasswd::         Change the password protecting a Key Entry
+* Command -delete::            Remove an entry in a Key Store
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Command -keyclone, Command -storepasswd, Management Commands, Management Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-keyclone} command
+
+Use this command to clone an existing @i{Key Entry} and store it under a new (different) @i{Alias} protecting, its private key material with possibly a new password.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -dest @var{ALIAS}
+Use this option to specify the new @i{Alias} which will be used to identify the cloned copy of the @i{Key Entry}.
+
+@item -keypass @var{PASSWORD}
+Use this option to specify the password which the tool will use to unlock the @i{Key Entry} associated with the designated @i{Alias}.
+
+If this option is omitted, the tool will first attempt to unlock the @i{Key Entry} using the same password protecting the key store. If this fails, you will then be prompted to provide a password.
+
+@item -new @var{PASSWORD}
+Use this option to specify the password protecting the private key material of the newly cloned copy of the @i{Key Entry}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -storepasswd, Command -keypasswd, Command -keyclone, Management Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-storepasswd} command
+
+Use this command to change the password protecting a key store.
+
+@table @gcctabopt
+@item -new @var{PASSWORD}
+The new, and different, password which will be used to protect the designated key store.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -keypasswd, Command -delete, Command -storepasswd, Management Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-keypasswd} command
+
+Use this command to change the password protecting the private key material of a designated @i{Key Entry}.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+Use this option to specify the password which the tool will use to unlock the @i{Key Entry} associated with the designated @i{Alias}.
+
+If this option is omitted, the tool will first attempt to unlock the @i{Key Entry} using the same password protecting the key store. If this fails, you will then be prompted to provide a password.
+
+@item -new @var{PASSWORD}
+The new, and different, password which will be used to protect the private key material of the designated @i{Key Entry}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Command -delete, , Command -keypasswd, Management Commands
+@comment node-name, next, previous, up
+@c man begin OPTIONS gkeytool
+@subsubsection The @option{-delete} command
+
+Use this command to delete a designated key store entry.
+
+@table @gcctabopt
+@item -alias @var{ALIAS}
+For more details @pxref{alias,, ALIAS}.
+
+@item -storetype @var{STORE_TYPE}
+For more details @pxref{storetype,, STORE_TYPE}.
+
+@item -keystore @var{URL}
+For more details @pxref{keystore,, URL}.
+
+@item -storepass @var{PASSWORD}
+For more details @pxref{storepass,, PASSWORD}.
+
+@item -provider @var{PROVIDER_CLASS_NAME}
+For more details @pxref{provider,, PROVIDER_CLASS_NAME}.
+
+@item -v
+For more details @pxref{verbose}.
+
+@end table
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node Other Tools, I18N Issues, Security Tools, Top
+@comment node-name, next, previous, up
+@chapter Other Tools
+
+This is a list of currently undocumented classpath tools: @b{jar},
+@b{javah}, @b{gcjh}, @b{native2ascii}, @b{orbd}, @b{serialver}, @b{rmid}, @b{rmiregistry}
+and @b{tnameserv}.
+
+@menu
+* jar Tool::                   Archive tool for Java archives
+* javah Tool::                 A java header compiler
+* gcjh Tool::                  A java header compiler (old version)
+* native2ascii Tool::          An encoding converter
+* orbd Tool::                  An object request broker daemon
+* serialver Tool::             A serial version command
+* rmid Tool::                  RMI activation daemon
+* rmiregistry Tool::           Remote object registry
+* tnameserv Tool::             Naming service
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node jar Tool, javah Tool, , Other Tools
+@comment node-name, next, previous, up
+@section The @command{jar} Tool
+@c man title gjar - Archive tool for Java archives
+
+@c man begin DESCRIPTION gjar
+
+@command{gjar} is an implementation of Sun's jar utility that comes with
+the JDK.
+
+If any file is a directory then it is processed recursively.  The
+manifest file name and the archive file name needs to be specified in
+the same order the @option{-m} and @option{-f} flags are specified.
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gjar
+gjar @option{-ctxui} [@var{OPTIONS}] @var{jar-file} [@option{-C} @var{DIR} @var{FILE}] @var{FILE}@dots{}
+@c man end
+@end ignore
+
+@c man begin OPTIONS gjar
+
+Operation mode:
+
+@table @gcctabopt
+@item -c
+Create new archive.
+
+@item -t
+List table of contents for archive.
+
+@item -x
+Extract named (or all) files from archive.
+
+@item -u
+Update existing archive.
+
+@item -i @var{FILE}
+Compute archive index.
+@end table
+
+Operation modifiers:
+
+@table @gcctabopt
+@item -f @var{FILE}
+Specify archive file name.
+
+@item -0
+Store only; use no ZIP compression.
+
+@item -v
+Generate verbose output on standard output.
+
+@item -M
+Do not create a manifest file for the entries.
+
+@item -m @var{manifest}
+Include manifest information from specified @var{manifest} file.
+@end table
+
+File name selection:
+
+@table @gcctabopt
+@item -C @var{DIR} @var{FILE}
+Change to the @var{DIR} and include the following @var{FILE}.
+
+@item -@@
+Read the names of the files to add to the archive from stdin.  This
+option is supported only in combination with @option{-c} or @option{-u}.
+Non standard option added in the GCC version.
+@end table
+
+Standard options:
+
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO gjar
+java(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node javah Tool, gcjh Tool, jar Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{javah} Tool
+@c man title gjavah - generate header files from Java class files
+
+@c man begin DESCRIPTION gjavah
+
+The @command{gjavah} program is used to generate header files from class
+files.  It can generate both CNI and JNI header files, as well as stub
+implementation files which can be used as a basis for implementing the
+required native methods.
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gjavah
+gjavah @dots{}
+@c man end
+@end ignore
+
+@c man begin OPTIONS gjavah
+
+@table @gcctabopt
+@item -d @var{DIR}
+Set output directory.
+
+@item -o @var{FILE}
+Set output file (only one of @option{-d} or @option{-o} may be used).
+
+@item -cmdfile @var{FILE}
+Read command file.
+
+@item -all @var{DIR}
+Operate on all class files under directory @var{DIR}.
+
+@item -stubs
+Emit stub implementation.
+
+@item -jni
+Emit JNI stubs or header (default).
+
+@item -cni
+Emit CNI stubs or header (default JNI).
+
+@item -verbose
+Set verbose mode.
+
+@item -force
+Output files should always be written.
+@end table
+
+Class path options:
+@table @gcctabopt
+@item -classpath @var{PATH}
+Set the class path.
+
+@item -I@var{DIR}
+Add directory to class path.
+
+@item -bootclasspath @var{PATH}
+Set the boot class path.
+
+@item -extdirs @var{PATH}
+Set the extension directory path.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+@c man end
+
+@c man begin SEEALSO gjavah
+javac(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node gcjh Tool, native2ascii Tool, javah Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{gcjh} Tool
+@c man title gcjh - generate header files from Java class files
+
+@c man begin DESCRIPTION gcjh
+
+The @code{gcjh} program is used to generate header files from class
+files.  It can generate both CNI and JNI header files, as well as stub
+implementation files which can be used as a basis for implementing the
+required native methods.  It is similar to @code{javah} but has
+slightly different command line options, and defaults to CNI.
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gcjh
+gcjh [@var{OPTIONS}]@dots{} @var{CLASS}@dots{}
+@c man end
+@end ignore
+
+@c man begin OPTIONS gcjh
+
+See @code{javah} for a full description; this page only lists the
+additional options provided by @code{gcjh}.
+
+CNI text options
+@table @gcctabopt
+@item -add @var{text}
+Insert @var{text} into class body.
+@item -append @var{text}
+Append @var{text} after class declaration.
+@item -friend @var{text}
+Insert @var{text} as a @code{friend} declaration.
+@item -prepend @var{text}
+Insert @var{text} before start of class.
+@end table
+
+Compatibility options (unused)
+@table @gcctabopt
+@item -td @var{DIR}
+@itemx -M
+@itemx -MM
+@itemx -MD
+@itemx -MMD
+Unused compatibility option.
+@end table
+
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+@c man end
+
+@c man begin SEEALSO gcjh
+javac(1), javah(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node native2ascii Tool, orbd Tool, gcjh Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{native2ascii} Tool
+@c man title gnative2ascii - An encoding converter
+
+@c man begin DESCRIPTION gnative2ascii
+
+To be written @dots{}
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gnative2ascii
+gnative2ascii [@var{OPTIONS}]@dots{} [@var{INPUTFILE} [@var{OUTPUTFILE}]]
+@c man end
+@end ignore
+
+@c man begin OPTIONS gnative2ascii
+
+@table @gcctabopt
+@item -encoding @var{NAME}
+Set the encoding to use.
+
+@item -reversed
+Convert from encoding to native.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO gnative2ascii
+javac(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node orbd Tool, serialver Tool, native2ascii Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{orbd} object request broker daemon
+@c man title gorbd - An object request broker daemon
+
+@c man begin DESCRIPTION gorbd
+
+To be written @dots{}
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gorbd
+gorbd @dots{}
+@c man end
+@end ignore
+
+@c man begin OPTIONS gorbd
+
+@table @gcctabopt
+@item -ORBInitialPort @var{PORT}
+Port on which persistent naming service is to be started.
+
+@item -ior @var{FILE}
+File in which to store persistent naming service's IOR reference
+
+@item -directory @var{DIR}
+Directory in which to store persistent data.
+
+@item -restart
+Restart persistent naming service, clearing persistent naming
+database.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO gorbd
+java(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node serialver Tool, rmid Tool, orbd Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{serialver} version command
+@c man title gserialver version command
+
+@c man begin DESCRIPTION gserialver
+
+Print the serialVersionUID of the specified classes.
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gserialver
+gserialver [@var{OPTIONS}]@dots{} @var{CLASS}@dots{}
+@c man end
+@end ignore
+
+@c man begin OPTIONS gserialver
+
+@table @gcctabopt
+@item -classpath @var{PATH}
+Class path to use to find classes.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO gserialver
+javac(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node rmid Tool, rmiregistry Tool, serialver Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{rmid} RMI activation system daemon
+@c man title grmid - RMI activation system daemon
+
+@c man begin DESCRIPTION grmid
+
+@command{rmiregistry} starts a remote object registry on the current
+host.  If no port number is specified, then port 1099 is used.
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS grmid
+grmid [@var{OPTIONS}]@dots{}
+@c man end
+@end ignore
+
+@c man begin OPTIONS grmid
+
+Activation process control:
+@table @gcctabopt
+@item -port @var{PORT}
+Port on which activation system is to be started.
+
+@item -restart
+Restart activation system, clearing persistent naming database, if
+any.
+
+@item -stop
+Stop activation system.
+@end table
+
+Persistence:
+@table @gcctabopt
+@item -persistent
+Make activation system persistent.
+
+@item -directory @var{DIR}
+Directory in which to store persistent data.
+@end table
+
+Debugging:
+@table @gcctabopt
+@item -verbose
+Log binding events to standard out.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO grmid
+java(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node rmiregistry Tool, tnameserv Tool, rmid Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{rmiregistry} Tool
+@c man title grmiregistry - Remote object registry
+
+@c man begin DESCRIPTION grmiregistry
+
+@command{grmiregistry} starts a remote object registry on the current
+host.  If no port number is specified, then port 1099 is used.
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS grmiregistry
+grmiregistry [@var{OPTIONS}]@dots{} @var{PORT}
+@c man end
+@end ignore
+
+@c man begin OPTIONS grmiregistry
+
+Registry process control:
+@table @gcctabopt
+@item -restart
+Restart RMI naming service, clearing persistent naming database, if
+any.
+
+@item -stop
+Stop RMI naming service.
+@end table
+
+Persistence:
+@table @gcctabopt
+@item -persistent
+Make RMI naming service persistent.
+
+@item -directory @var{DIR}
+Directory in which to store persistent data.
+@end table
+
+Debugging:
+@table @gcctabopt
+@item -verbose
+Log binding events to standard out.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO grmiregistry
+java(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node tnameserv Tool, , rmiregistry Tool, Other Tools
+@comment node-name, next, previous, up
+@section The @command{tnameserv} Tool
+@c man title gtnameserv Naming service
+
+@c man begin DESCRIPTION gtnameserv
+
+To be written @dots{}
+
+@c man end
+
+@ignore
+@c man begin SYNOPSIS gtnameserv
+tnameserv [@var{OPTIONS}]
+@c man end
+@end ignore
+
+@c man begin OPTIONS gtnameserv
+
+@table @gcctabopt
+@item -ORBInitialPort @var{PORT}
+Port on which naming service is to be started.
+
+@item -ior @var{FILE}
+File in which to store naming service's IOR reference.
+@end table
+
+Standard options:
+@table @gcctabopt
+@item -help
+Print help text, then exit.
+@item -version
+Print version number, then exit.
+@item -J@var{OPTION}
+Pass argument to the Java runtime.
+@end table
+
+@c man end
+
+@c man begin SEEALSO gtnameserv
+java(1), @dots{}
+@c man end
+
+@comment ----------------------------------------------------------------------
+
+@node I18N Issues, , Other Tools, Top
+@comment node-name, next, previous, up
+@chapter I18N Issues
+
+Some tools --@pxref{Security Tools}-- allow using other than the English language when prompting the User for input, and outputting messages. This chapter describes the elements used to offer this support and how they can be adapted for use with specific languages.
+
+@menu
+* Language Resources::         Where resources are located
+* Message Formats::            How messages are internationalized
+@end menu
+
+@comment ----------------------------------------------------------------------
+
+@node Language Resources, Message Formats, I18N Issues, I18N Issues
+@comment node-name, next, previous, up
+@section Language-specific resources
+
+The Tools use Java @code{ResourceBundle}s to store messages, and message templates they use at runtime to generate the message text itself, depending on the locale in use at the time.
+
+The @i{Resource Bundles} these tools use are essentially Java @i{Properties} files consisting of a set of @i{Name/Value} pairs. The @i{Name} is the @i{Property Name} and the @i{Value} is a substitution string that is used when the code references the associated @i{Name}. For example the following is a line in a @i{Resource Bundle} used by the @code{keytool} Tool:
+
+@example
+Command.23=A correct key password MUST be provided
+@end example
+
+When the tool needs to signal a mandatory but missing key password, it would reference the property named @code{Command.23} and the message "@kbd{A correct key password MUST be provided}" will be used instead. This indirect referencing of "resources" permits replacing, as late as possible, the English strings with strings in other languages, provided of course @i{Resource Bundles} in those languages are provided.
+
+For the GNU Classpath Tools described in this Guide, the @i{Resource Bundles} are files named @file{messages[_ll[_CC[_VV]]].properties} where:
+
+@ftable @var
+@item ll
+Is the 2-letter code for the Language,
+@item CC
+Is the 2-letter code for the Region, and
+@item VV
+Is the 2-letter code for the Variant of the language.
+@end ftable
+
+The complete list of language codes can be found at @uref{http://ftp.ics.uci.edu/pub/ietf/http/related/iso639.txt, Code for the representation of names of languages}. A similar list for the region codes can be found at @uref{http://userpage.chemie.fu-berlin.de/diverse/doc/ISO_3166.html, ISO 3166 Codes (Countries)}.
+
+The location of the @i{Resource Bundles} for the GNU Classpath Tools is specific to each tool. The next table shows where these files are found in a standard GNU Classpath distribution:
+
+@ftable @code
+@item jarsigner
+@file{gnu/classpath/tools/jarsigner}
+@item keytool
+@file{gnu/classpath/tools/keytool}
+@end ftable
+
+The collection of @i{Resource Bundles} in a location act as an inverted tree with a parent-child relationship. For example suppose in the @file{gnu/classpath/tools/keytool} there are 3 message bundles named:
+
+@enumerate
+@item @code{messages.properties}
+@item @code{messages_fr.properties}
+@item @code{messages_fr_FR.properties}
+@end enumerate
+
+In the above example, bundle #1 will act as the parent of bundle #2, which in turn will act as the parent for bundle #3. This ordering is used by the Java runtime to choose which file to load based on the set Locale. For example if the Locale is @code{fr_CH}, @code{messages_fr.properties} will be used because (a) @code{messages_fr_CH.properties} does not exist, but (b) @code{messages_fr.properties} is the parent for the required bundle, and it exists. As another example, suppose the Locale was set to @code{en_AU}; then the tool will end up using @code{messages.properties} because (a) @code{messages_en_AU.properties} does not exist, (b) @code{messages_en.properties} which is the parent for the required bundle does not exist, but (c) @code{messages.properties} exists and is the root of the hierarchy.
+
+You can see from the examples above that @file{messages.properties} is the safety net that the Java runtime falls back to when failing to find a specific bundle and its parent(s). This file is always provided with the Tool. In time, more localized versions will be included to cater for other languages.
+
+In the meantime, if you are willing to contribute localized versions of these resources, grab the @file{messages.properties} for a specific tool; translate it; save it with the appropriate language and region suffix and mail it to @code{classpath@@gnu.org}.
+
+@comment ----------------------------------------------------------------------
+
+@node Message Formats, , Language Resources, I18N Issues
+@comment node-name, next, previous, up
+@section Message formats
+
+If you open any of the @file{messages.properties} described in the previous section, you may see properties that look like so:
+
+@example
+Command.67=Issuer: @{0@}
+Command.68=Serial number: @{0,number@}
+Command.69=Valid from: @{0,date,full@} - @{0,time,full@}
+Command.70=\ \ \ \ \ until: @{0,date,full@} - @{0,time,full@}
+@end example
+
+These are @i{Message Formats} used by the tools to customize a text string that will then be used either as a prompt for User input or as output.
+
+If you are translating a @file{messages.properties} be careful not to alter text between curly braces.
+
+@comment ----------------------------------------------------------------------
+
+@bye

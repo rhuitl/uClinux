@@ -1,0 +1,59 @@
+# Example configuration for ulogd
+# $Id: ulogd.conf.in 6276 2005-11-24 17:56:18Z laforge $
+# Adapted to Debian by Achilleas Kotsis <achille@debian.gr>
+
+[global]
+######################################################################
+# GLOBAL OPTIONS
+######################################################################
+
+
+# logfile for status messages
+logfile="/var/log/ulogd.log"
+
+# loglevel: debug(1), info(3), notice(5), error(7) or fatal(8)
+loglevel=1
+
+# socket receive buffer size (should be at least the size of the
+# in-kernel buffer (ipt_ULOG.o 'nlbufsiz' parameter)
+rmem=131071
+
+# libipulog/ulogd receive buffer size, should be > rmem
+bufsize=150000
+
+######################################################################
+# PLUGIN OPTIONS
+######################################################################
+
+# We have to configure and load all the plugins we want to use
+
+# general rules:
+# 1. load the plugins _first_ from the global section
+# 2. options for each plugin in seperate section below
+
+
+plugin="@libdir@/ulogd/ulogd_inppkt_NFLOG.so"
+plugin="@libdir@/ulogd/ulogd_inpflow_NFCT.so"
+plugin="@libdir@/ulogd/ulogd_filter_IFINDEX.so"
+plugin="@libdir@/ulogd/ulogd_output_LOGEMU.so"
+plugin="@libdir@/ulogd/ulogd_output_OPRINT.so"
+plugin="@libdir@/ulogd/ulogd_raw2packet_BASE.so"
+
+# this is a stack for packet-based logging via LOGEMU
+#stack=log1:NFLOG,base1:BASE,ifi1:IFINDEX,emu1:LOGEMU
+
+# this is a stack for flow-based logging via OPRINT
+#stack=ct1:NFCT,op1:OPRINT
+
+[log1]
+# netlink multicast group (the same as the iptables --ulog-nlgroup param)
+group=0
+
+[emu1]
+file="/var/log/ulogd_syslogemu.log"
+sync=1
+
+[op1]
+file="/var/log/ulogd_oprint.log"
+sync=1
+

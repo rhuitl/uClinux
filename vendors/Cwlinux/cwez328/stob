@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+
+sub S0 {
+	for ($i=0; $i<$length - 1; $i++) {
+	    $ch = hex (substr($data, $i*2, 2));
+	    printf STDERR "%c", $ch;
+	}
+	printf STDERR "\n";
+}
+
+sub S1 {
+	printf "0100%s%02X%s\n", 
+		substr($data, 0, 4), $length - 3, substr($data, 4);
+}
+
+sub S2 {
+	printf "011%s%02X%s\n",
+		substr($data, 1, 5), $length - 4, substr($data, 6);
+}
+
+sub S3 {
+	printf "%s%02X%s\n",
+		substr($data, 0, 8), $length - 5, substr($data, 8);
+}
+
+sub S5 {
+}
+
+sub S7 {
+	if ($start_slag) {
+		printf "%s00\n", substr($data, 0, 8);
+	}
+}
+
+sub S8 {
+	if ($start_slag) {
+		printf "00%s00\n", substr($data, 0, 6);
+	}
+} 
+
+sub S9 {
+	if ($start_slag) {
+		printf "0000%s00\n", substr($data, 0, 4);
+	}
+}
+
+#
+# MAIN
+#
+while(<>) {
+	if ( /^S([0-357-9])([0-9A-F]{2})/ ) {
+	   $record_type = $1;
+	   $length = hex($2);
+	   $data = substr($_, 4, ($length-1) * 2);
+	   $checksum = hex(substr($_, ($length - 1) * 2 + 4, 2));
+	   $sub = "S$record_type";
+	   &$sub;
+	}
+}

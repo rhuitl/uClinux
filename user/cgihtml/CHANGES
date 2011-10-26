@@ -1,0 +1,210 @@
+CHANGES for cgihtml
+$Id: CHANGES,v 1.8 1997/02/03 06:42:26 eekim Exp $
+===================
+
+1.65 -> 1.66
+------------
+o Finally replaced all \r\n with \n.  To heck with standards.
+
+o Slightly modified Makefile to handle UPLOADDIR modifications
+properly.
+
+1.6 -> 1.65
+-----------
+o Rewrote parse_CGI_encoded.  Plugged some memory leaks, improved
+performance and robustness, and simply made it look better.  Now
+returns -1 if the string is not properly encoded.  Should be mostly
+transparent to most users.
+
+o Fixed Windows portability bug in parse_file_encoded.
+
+o Fixed parse_file_encoded support for Netscape's Windows browsers.
+
+o Changed functions in html-lib.c to use \n rather than \r\n if
+compiled under Windows.
+
+o Added HTTP_USER_AGENT macro to cgi-lib.h
+
+o Added lower_case() to string-lib.h.
+
+o Moved examples to a subdirectory.
+
+o Modified Makefiles.
+
+1.51 -> 1.6
+-----------
+o Fixed newstr() to properly handle failed malloc.
+
+o Removed die() function and signal() calls in example programs.  Was
+causing confusion amongst non-UNIX users.
+
+o Fixed print_cgi_env().
+
+o Added is_field_exists() and is_field_empty().
+
+o Fixed bug in mail.cgi.c so that it allocates correctly for
+destination string.
+
+o File upload now puts filename in linked list.
+
+o Fixed buffer problems in file upload.  Now allocates buffers
+correctly, and handles non-file information correctly as well.
+
+o Fixed minor bug in file upload that would lose the first line of
+information.
+
+o Added set_cookie() in html-lib.c.
+
+o Modified parse_cgi_encoded() to ignore all input if there is no
+equals sign in the string.
+
+o Fixed bug in parse_cgi_encoded(); would not return proper value if
+input string had one field with no value.
+
+o Added parse_cookies() to cgi-lib.c.
+
+1.5 -> 1.51
+-----------
+o Got rid of h() and img() from html-lib.h because var_arg was causing
+trouble.  Specifically, I couldn't figure out a good, consistent way
+of determining when the end of the argument list was reached without
+the user specifying it.
+
+o Fixed stupid type in Makefile: gnore.cgi -> ignore.cgi.
+
+o Internal change: Changed all the (*var).structvar (a relic from my
+Pascal programming days) to var->structvar.
+
+1.21 -> 1.5
+-----------
+o Added an interactive debugging mode for interactive form entry from
+the command line.
+
+o read_cgi_input() now supports file upload!
+
+o Renames llist.h -> cgi-llist.h.  This is to prevent conflicts with
+other linked list packages you may be using.
+
+o Added cgi_name() and cgi_name_multi(), counterparts to cgi_val() and
+cgi_val_multi().
+
+o Added var_arg functionality to some HTML functions in html-lib.h.
+See documentation for examples.
+
+o h1() .. h6() replaced by more general h().  See documentation for
+usage.
+
+o Added the following new functions:
+
+     html-lib.h   cgi-lib.h          string-lib.h
+     ----------   ---------          ------------
+     img()        cgi_name()         substr()
+     hidden()     cgi_name_multi()
+                  is_form_empty()
+
+See documentation for more details.
+
+o Modularized read_cgi_input() and improved robustness.
+
+o Moved replace_ltg() from cgi-lib.c to string-lib.c.  Made it
+available via string-lib.h.
+
+o <malloc.h> should have been <stdlib.h>.  Thanks to Dan Fetzer
+<fetzerdt@ornl.gov> for pointing this out.
+
+o Got rid of extra \r in print_entries().
+
+o Fixed minor bug in Makefile (nph-ignore becomes ignore).
+
+1.2 -> 1.21
+-----------
+
+o Fixed bug that prevented die() from being compiled.  Thanks to
+Rosemary Paquola <paquola@vega.unive.it> for the bug fix.
+
+1.1 -> 1.2
+----------
+o Rewrote parsing functions for read_cgi_input().  No longer uses
+messy NCSA code (except for unescape_url()).  Improved robustness.
+
+o Defined macros for the standard CGI environment variables.
+
+o Added cgi_val_multi to deal with multiple values with the same
+name.  Contributed by Mitch Garnaat <garnaat@wrc.xerox.com> and
+modified by yours truly.
+
+o Strengthened escape_input().  Now escapes all non-alphanumeric
+characters.
+
+o Modified print_entries() to replace greater than (>) and less than
+(<) characters with the appropriate escaped HTML (&gt; and &lt;
+respectively).
+
+o Modified some functions for portability to NT.  Thanks to Eliot Muir
+<e.m.muir@iprolink.co.nz> for patches.
+
+o Added test.cgi example application.
+
+o Replaced nph-ignore.cgi.c with ignore.cgi.c.  Uses a status header
+rather than no-parse-header.
+
+o Added status(), pragma(), print_env_cgi() functions.
+
+o Removed no_parse_header() function.
+
+o Changed int die() to void die().  Thanks to Graham Potts
+<graham@pncl.co.uk> for the report.
+
+o Removed carriage returns (\r) from HTML functions.  Unnecessary;
+carriage returns are only required in the HTTP headers.
+
+o Fixed stupid bug in h2() .. h6().  Thanks to Andrea Cozzolino
+<andcoz@mikonos.diaedu.unisa.it> for reporting this.
+
+o Updated documentation.
+
+1.0 -> 1.1
+----------
+
+o Renamed functions to use a more standard naming scheme.  This will
+break old programs; make sure you search and replace to rename the
+appropriate functions.
+
+     Old function name     New function name
+     -----------------     -----------------
+     ReadParse             read_cgi_input
+     val                   cgi_val
+     PrintHeader           html_header
+     MethodGet             method_get
+     PrintEntries          print_entries
+
+o read_cgi_input now returns a 1 if input is received, and a 0 otherwise.
+ReadParse in version 1.0 did just the opposite.
+
+o Used dynamically allocated strings rather than arrays of characters.
+There is now no theoretical limit to the size of item.name or item.value.
+
+o Added string-lib library:
+   - newstr()
+
+o New cgi-lib functions:
+
+   - accept_images() -- determines whether the client browser will
+        accept images.
+   - escape_input()  -- filter out shell metacharacters for security
+        purposes
+
+o New html-lib functions:
+
+   - mime_header()
+   - no_parse_header()
+   - show_html_page()
+   - h1() ... h6()
+
+o Added two new example programs: index-sample.cgi and nph-ignore.cgi
+
+o Removed example: mailform.cgi
+
+o Included debug-cgi.sh, a shell script which runs CGI programs from
+the command line to help debug code.
+

@@ -1,0 +1,46 @@
+HOST="mcspx1.ucom.lsi.nec.co.jp"
+ADDR="10.30.114.220"
+NETMASK="255.255.255.0"
+BROADCAST="10.30.114.255"
+GATEWAY="10.30.114.254"
+INTERFACE=eth0
+
+NFSROOT="10.30.114.174:/usr/local/export/ucl-v850"
+
+echo init: hostname "$HOST"
+hostname "$HOST"
+
+echo init: mount -t proc proc /proc
+mount -t proc proc /proc
+echo init: mount -t ramfs ram /var
+mount -t ramfs ram /var
+
+for VD in tmp log run lock; do
+  echo init: mkdir "/var/$VD"
+  mkdir "/var/$VD"
+done
+echo init: chmod 01777 /var/tmp
+chmod 01777 /var/tmp
+
+echo init: ifconfig lo 127.0.0.1
+ifconfig lo 127.0.0.1
+echo init: route add -net 127.0.0.0 netmask 255.0.0.0 lo
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+
+echo init: ifconfig "$INTERFACE" "$ADDR" netmask "$NETMASK" broadcast "$BROADCAST"
+ifconfig "$INTERFACE" "$ADDR" netmask "$NETMASK" broadcast "$BROADCAST"
+echo init: route add "$ADDR" "$INTERFACE"
+route add "$ADDR" "$INTERFACE"
+echo init: route add default gw "$GATEWAY"
+route add default gw "$GATEWAY"
+
+echo init: portmap
+portmap &
+
+for MP in bin etc usr home lib; do
+  echo init: mount "$NFSROOT/$MP" "/$MP"
+  mount "$NFSROOT/$MP" "/$MP"
+done
+
+echo ''
+cat /etc/motd

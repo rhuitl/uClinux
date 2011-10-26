@@ -1,0 +1,158 @@
+#!/bin/sh
+#
+# make.coverpg -- slightly advanced version, use ghostscript
+#                 (just a sample, naturally you have to adapt all the texts!)
+#
+# Author: gert@greenie.muc.de
+#
+# Syntax:
+#	make.coverpg   <pages>  <sender-ID>   <sender-NAME>   <receiver-ID>
+#	<receiver-NAME> <date> <time>
+
+#
+# if called with "-m <memo-file>", put that file on cover page:
+MEMO=""
+if [ X$1 = X-m ] ; then
+    MEMO=$2
+    shift ; shift
+fi
+
+#
+# get arguments
+#
+PAGES=$1
+S_ID="$2"
+S_NAME="$3"
+R_ID="$4"
+R_NAME="$5"
+DATE="$6"
+TIME="$7"
+
+tmp=/tmp/cover.$$.ps
+
+#
+# chose proper driver for resolution
+driver=dfaxhigh ; test X$normal_res != X && driver=dfaxlow
+
+cat << EOF >$tmp
+%! PS-Adobe-1.0
+%%Title: Sendfax Fax Header Page
+
+%
+% simple logo, "top right" corner is at x/y=570/750
+%
+1 5 100
+{
+   dup 100 div setgray
+   dup 10 div 1 add setlinewidth
+   dup 5 mul 570 exch sub	% x = 10*i + 50
+   750 moveto			% y = 100
+   dup 5 mul 750 exch sub
+   570 exch lineto	% x, y as above but swapped
+   pop
+   stroke
+} for
+
+%
+% change encoding to ISO8859-1 (important for my German umlauts) [Fritz Elfert]
+%
+/ISOfindfont {
+    dup 100 string cvs (ISO-) exch concatstrings cvn exch
+    findfont dup maxlength dict begin
+        { 1 index /FID ne {def}{pop pop} ifelse } forall
+        /Encoding ISOLatin1Encoding def
+        currentdict
+    end definefont
+} def
+
+%
+% page title
+%
+/Times-BoldItalic findfont 37 scalefont setfont
+0 setgray
+100 600 moveto
+(TELEFAX - NACHRICHT) dup 
+    gsave true charpath 1 setgray 1 setlinewidth stroke grestore
+    show
+EOF
+
+# now the page layout differs, depending on the use of "MEMO" or not
+
+if [ -z "$MEMO" ] ; then
+cat <<EOF >>$tmp
+%
+% data
+%
+/Times-Roman ISOfindfont 19 scalefont setfont
+100 500 moveto (Absender:  ) show
+currentpoint ($S_ID) show
+-20 add moveto ($S_NAME) show
+
+100 420 moveto (Empfänger:  ) show
+currentpoint ($R_ID) show
+-20 add moveto ($R_NAME) show
+
+100 340 moveto (Sendezeit:  $TIME  $DATE) show
+
+100 280 moveto (Seiten \(inkl. Deckblatt\):  $PAGES) show
+
+%
+% blatant advertising...
+%
+/Courier ISOfindfont 9 scalefont setfont
+100 100 moveto
+  (Fax software used: mgetty+sendfax 1.1.x on SCO Unix, (c) 1994-97 Gert Döring)
+  show
+
+showpage
+EOF
+
+# end "no memo"
+
+else
+
+# start "with memo"
+
+cat <<EOF >>$tmp
+%
+% data (squeezed somewhat)
+%
+/Times-Roman ISOfindfont 19 scalefont setfont
+100 550 moveto (Absender:  ) show
+currentpoint ($S_ID) show
+-20 add moveto ($S_NAME) show
+
+100 500 moveto (Empfänger:  ) show
+currentpoint ($R_ID) show
+-20 add moveto ($R_NAME) show
+
+100 450 moveto (Sendezeit:  $TIME  $DATE) show
+
+100 420 moveto (Seiten \(inkl. Deckblatt\):  $PAGES) show
+
+50 380 moveto (Kurznachricht:) show
+
+%
+% blatant advertising...
+%
+/Courier ISOfindfont 9 scalefont setfont
+100 50 moveto
+  (Fax software used: mgetty+sendfax 1.1.x on SCO Unix, (c) 1994 Gert Döring)
+  show
+
+/Courier-BoldOblique ISOfindfont 14 scalefont setfont
+
+EOF
+
+# now put text from file "MEMO" on page (mini "a2ps")
+    sed -e "s/(/\\\(/g" -e "s/)/\\\)/g" $MEMO | \
+      awk 'BEGIN { x=50; y=350 }
+	   END { printf "showpage\n" }
+           { printf "%d %d moveto (%s) show\n", x, y, $0 ;
+             y -= 15; }' - >>$tmp
+
+# end "with memo"
+fi
+
+cat $tmp | gs -sDEVICE=$driver -sOutputFile=- -dSAFER -dNOPAUSE -q -
+rm -f $tmp

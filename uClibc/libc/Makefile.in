@@ -1,0 +1,97 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+libc_DIR := $(top_srcdir)libc
+libc_OUT := $(top_builddir)libc
+
+# Check if the target architecture has a version script for
+# libc, and if so, include it when linking.
+VERSION_SCRIPT := $(wildcard $(libc_DIR)/sysdeps/linux/$(TARGET_ARCH)/libc.map)
+ifneq ($(VERSION_SCRIPT),)
+VERSION_SCRIPT := --version-script $(VERSION_SCRIPT)
+endif
+
+LDFLAGS-libc.so := $(LDFLAGS) $(VERSION_SCRIPT) -init __uClibc_init
+
+LIBS-libc.so := $(interp) $(ldso) $(top_builddir)lib/$(NONSHARED_LIBNAME)
+
+# we have SHARED_MAJORNAME=libc.so.$(MAJOR_VERSION) defined in Rules.mak
+libc_FULL_NAME := libuClibc-$(VERSION).so
+
+# this comes first, so duplicate removal works correctly
+include $(libc_DIR)/sysdeps/Makefile.in
+
+include $(libc_DIR)/misc/Makefile.in
+include $(libc_DIR)/pwd_grp/Makefile.in
+include $(libc_DIR)/stdio/Makefile.in
+include $(libc_DIR)/string/Makefile.in
+include $(libc_DIR)/termios/Makefile.in
+include $(libc_DIR)/inet/Makefile.in
+include $(libc_DIR)/signal/Makefile.in
+include $(libc_DIR)/stdlib/Makefile.in
+include $(libc_DIR)/unistd/Makefile.in
+
+ifeq ($(DOPIC),y)
+libc-a-y = $(libc-y:.o=.os) $(libc-static-y:.o=.os)
+else
+libc-a-y = $(libc-y) $(libc-static-y)
+endif
+
+ifeq ($(DOMULTI),n)
+libc-so-y = $(libc-y:.o=.os) $(libc-shared-y)
+else
+all_sources = $(libc-y:.o=.c)
+all_sources += $(libc-shared-y:.oS=.c)
+libc-multi-y = $(filter-out $(libc-nomulti-y:.o=.c),$(all_sources))
+endif
+
+lib-a-y += $(top_builddir)lib/libc.a
+lib-gdb-y += $(top_builddir)lib/libc.gdb
+lib-so-y += $(libc)
+objclean-y += libc_clean
+
+ifeq ($(DOMULTI),n)
+$(libc:.$(MAJOR_VERSION)=): $(libc_OUT)/libc_so.a $(LIBS-libc.so)
+	$(call link.so,$(libc_FULL_NAME),$(MAJOR_VERSION))
+else
+$(libc:.$(MAJOR_VERSION)=): $(libc_OUT)/libc.oS $(libc-nomulti-y:.o=.oS) | $(LIBS-libc.so)
+	$(do_strip)
+	$(call linkm.so,$(libc_FULL_NAME),$(MAJOR_VERSION))
+endif
+	$(Q)$(RM) $@
+	$(Q)cp $(top_srcdir)extra/scripts/format.lds $@
+ifeq ($(COMPAT_ATEXIT),y)
+	$(Q)echo "GROUP ( $(NONSHARED_LIBNAME) $(SHARED_MAJORNAME) $(ASNEEDED) )" >> $@
+else
+	$(Q)echo "GROUP ( $(SHARED_MAJORNAME) $(NONSHARED_LIBNAME) $(ASNEEDED) )" >> $@
+endif
+
+$(libc_OUT)/libc_so.a: $(libc-so-y) | $(top_builddir)lib/libc.a $(top_builddir)lib/$(NONSHARED_LIBNAME)
+	$(Q)$(RM) $@
+ifeq ($(DOPIC),y)
+	$(Q)$(STRIPTOOL) $(STRIP_FLAGS) $(libc-shared-y)
+else
+	$(do_strip)
+endif
+	$(do_ar)
+
+$(libc_OUT)/libc.oS: $(libc-multi-y) | $(top_builddir)lib/libc.a $(top_builddir)lib/$(NONSHARED_LIBNAME)
+	$(Q)$(RM) $@
+	$(compile-m)
+	#(do_t_strip)
+
+$(top_builddir)lib/libc.a: $(libc-a-y) | $(crt-y)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+$(top_builddir)lib/libc.gdb: $(top_builddir)lib/libc.a $(LINK_FLAT_CRTS)
+	$(call link-flat.so,$(@:.gdb=),$(SHARED_FLAT_ID))
+
+libc_clean:
+	$(RM) $(libc_OUT)/*.{o,os,oS,a}

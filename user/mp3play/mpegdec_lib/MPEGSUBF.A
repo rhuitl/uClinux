@@ -1,0 +1,1234 @@
+;------------------------------------------------------------------------------
+;
+;   File    :   MPEGSUBF.a
+;
+;   Author  :   Stéphane TAVENARD
+;
+;   (C) Copyright 1997-1998 Stéphane TAVENARD
+;       All Rights Reserved
+;
+;   #Rev|   Date   |                      Comment
+;   ----|----------|--------------------------------------------------------
+;   0   |02/06/1997| Initial revision                                     ST
+;   1   |01/11/1997| Use link instead of static vars                      ST
+;   2   |21/06/1998| Use external scaled dewindow now                     ST
+;
+;   ------------------------------------------------------------------------
+;
+;   MPEG SUBroutines optimized (FPU version) !
+;   *** WARNING BUG in GENAM -> 0.5 is set as 0.05 !!! ***
+;
+;------------------------------------------------------------------------------
+               XDEF     @MPEGSUBF_antialias
+               XDEF     _MPEGSUBF_antialias
+
+               XDEF     @MPEGSUBF_filter_band
+               XDEF     _MPEGSUBF_filter_band
+
+               XDEF     @MPEGSUBF_window_band
+               XDEF     _MPEGSUBF_window_band
+
+;               XDEF     @MPEGSUBF_config ; #1
+;               XDEF     _MPEGSUBF_config ; #1
+
+
+SSIZE          equ      4 ; Source size in bytes
+DSIZE          equ      4 ; Destination size in bytes
+TSIZE          equ      4 ; Temp data size in bytes
+WSIZE          equ      4 ; Window data size in bytes
+
+ps1            equr     a3
+ps2            equr     a4
+pd1            equr     a5
+; pd2            equr     a6 ; #1
+
+;
+;              Filter COS values for fast cosine transform
+;
+
+COS1_64        fequ      0.50060299823520
+COS3_64        fequ      0.50547095989754
+COS5_64        fequ      0.51544730992262
+COS7_64        fequ      0.53104259108978
+COS9_64        fequ      0.55310389603444
+COS11_64       fequ      0.58293496820613
+COS13_64       fequ      0.62250412303566
+COS15_64       fequ      0.67480834145501
+COS17_64       fequ      0.74453627100230
+COS19_64       fequ      0.83934964541553
+COS21_64       fequ      0.97256823786196
+COS23_64       fequ      1.16943993343288
+COS25_64       fequ      1.48416461631417
+COS27_64       fequ      2.05778100995341
+COS29_64       fequ      3.40760841846872
+COS31_64       fequ      10.1900081235480
+
+COS1_32        fequ      0.50241928618816
+COS3_32        fequ      0.52249861493969
+COS5_32        fequ      0.56694403481636
+COS7_32        fequ      0.64682178335999
+COS9_32        fequ      0.78815462345125
+COS11_32       fequ      1.06067768599035
+COS13_32       fequ      1.72244709823833
+COS15_32       fequ      5.10114861868917
+
+COS1_16        fequ      0.50979557910416
+COS3_16        fequ      0.60134488693505
+COS5_16        fequ      0.89997622313642
+COS7_16        fequ      2.56291544774151
+
+COS1_8         fequ      0.54119610014620
+COS3_8         fequ      1.30656296487638
+
+COS1_4         fequ      0.70710678118655
+
+
+
+;               section  ASMVARS,bss (#1 suppressed vars)
+;               CNOP     0,4
+
+;filter_p       ds.l     16
+;filter_pp      ds.l     16
+
+;               section  ASMVARS,bss
+
+;freq_div       ds.w     1  ; 1,2 or 4
+;output_8bits   ds.w     1  ; 0 if 16 bits output
+;quality        ds.w     1  ; 0..2 (best)
+
+;w_begin        ds.w     1  ; start offset for windowing
+;w_width        ds.w     1  ; #coeff used for windowing
+;pcm_count      ds.w     1  ; # of samples per subband
+
+               section  ASMDATA,data
+               CNOP     0,4
+
+filter_cos64   dc.s     5.0060299823520e-1, 5.0547095989754e-1
+               dc.s     5.1544730992262e-1, 5.3104259108978e-1
+               dc.s     5.5310389603444e-1, 5.8293496820613e-1
+               dc.s     6.2250412303566e-1, 6.7480834145501e-1
+               dc.s     7.4453627100230e-1, 8.3934964541553e-1
+               dc.s     9.7256823786196e-1, 1.16943993343288
+               dc.s     1.48416461631417, 2.05778100995341
+               dc.s     3.40760841846872, 10.1900081235480
+
+               ; #1 Begin
+               ; pcm_loops[ freq_div ] = = (32 / freq_div) - 1
+pcm_loops      dc.w     0, 31, 15, 9, 7, 0
+
+               ; #1 End
+
+               section  ASMCODE,code
+
+               ; #1 Begin (suppressed)
+
+               IFNE  0
+
+;              Configure subband routines
+;
+;              d0 = freq_div
+;              d1 = quality
+;              d2 = output_8bits
+;
+@MPEGSUBF_config
+_MPEGSUBF_config
+               movem.l  d2-d7/a2-a6,-(sp)
+               move.w   d0,freq_div
+               move.w   d1,quality
+               move.w   d2,output_8bits
+
+               move.w   #32,d3         ; pcm_count for full freq output
+               cmp.w    #2,d0
+               beq      init_decode_1
+               cmp.w    #4,d0
+               beq      init_decode_2
+               bra      init_decode_5
+init_decode_1  move.w   #16,d3         ; pcm_count for half freq output
+               bra      init_decode_5
+init_decode_2  moveq.l  #8,d3          ; pcm_count for quarter freq output
+init_decode_5  move.w   d3,pcm_count
+               moveq.l  #0,d3          ; start offset for windowing
+               moveq.l  #16,d4         ; #coeff used for windowing
+               move.w   quality,d2
+               cmp.b    #2,d2          ; best quality
+               beq.s    init_decode_6
+               move.w   #4,d3
+               moveq.l  #8,d4
+               cmp.b    #1,d2
+               beq.s    init_decode_6
+               move.w   #6,d3
+               moveq.l  #4,d4
+init_decode_6  move.w   d3,w_begin
+               move.w   d4,w_width
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+               ENDC
+               ; #1 End
+
+; MOVM <reg>,<ea>
+; MOVM <ea>,<reg>
+; Move a value from/to memory
+MOVM           MACRO
+               fmove.s  \1,\2
+               ENDM
+
+; MOVR <reg1>,<reg2>
+; Move a from register to register
+MOVR           MACRO
+               fmove.x  \1,\2
+               ENDM
+
+; ADDR <reg>,<ea>
+; Add a register value with <ea>
+ADDR           MACRO
+               fadd.x   \1,\2
+               ENDM
+
+; ADDM <mem>,<ea>
+; Add a memory value with <ea>
+ADDM           MACRO
+               fadd.s    \1,\2
+               ENDM
+
+
+; SUBR <reg>,<ea>
+; Sub a register value with <ea>
+SUBR           MACRO
+               fsub.x   \1,\2
+               ENDM
+
+; SUBM <mem>,<ea>
+; Sub a memory value with <ea>
+SUBM           MACRO
+               fsub.s   \1,\2
+               ENDM
+
+; NEGR <reg>
+; Negate a register
+NEGR           MACRO
+               fneg.x   \1
+               ENDM
+
+
+; MULI <imm>,<ea>
+; Multiply immediate value with <ea>
+MULI           MACRO
+               fmul.s   #\1,\2
+               ENDM
+
+; MULR <reg>,<ea>
+; Multiply a register value with <ea>
+MULR           MACRO
+               fmul.x   \1,\2
+               ENDM
+
+; MULM <mem>,<reg>
+; Multiply a memory value with <reg>
+MULM           MACRO
+               fmul.s   \1,\2
+               ENDM
+
+
+;
+; ALIAS_U bu,csi,bd,cai,<tmp reg>,<reg>
+; performs: (bu * csi) - (bd * cai) -> <reg>
+; <tmp reg> is used for calculation
+; d6 must be set to ALIAS_BITS
+;
+ALIAS_U        MACRO
+               MOVR     \1,\6
+               MULI     \2,\6
+               MOVR     \3,\5
+               MULI     \4,\5
+               SUBR     \5,\6
+               ENDM
+;
+; ALIAS_D bd,csi,bu,cai,<tmp reg>,<reg>
+; performs: (bd * csi) + (bu * cai) -> <reg>
+; <tmp reg> is used for calculation
+; d6 must be set to ALIAS_BITS
+;
+ALIAS_D        MACRO
+               MOVR     \1,\6
+               MULI     \2,\6
+               MOVR     \3,\5
+               MULI     \4,\5
+               ADDR     \5,\6
+               ENDM
+
+bd             equr     a1
+bu             equr     a2
+
+;
+; ALIAS_B csi,cai
+; perform 1 alias butterfly
+; uses fp0..fp3
+;
+ALIAS_B        MACRO
+               MOVM     -(bu),fp2
+               MOVM     (bd),fp3
+               ALIAS_U  fp2,\1,fp3,\2,fp0,fp1
+               MOVM     fp1,(bu)
+               ALIAS_D  fp3,\1,fp2,\2,fp0,fp1
+               MOVM     fp1,(bd)+
+               ENDM
+
+; Layer III antialiasing filter
+;
+; a0 = sample buffer xr (INT16)
+; d0 = sblimit
+;
+@MPEGSUBF_antialias
+_MPEGSUBF_antialias
+
+               movem.l  d2-d7/a2,-(sp)
+               fmovem.x fp0-fp3,-(sp)
+
+               move.w   d0,d7
+               subq.w   #1,d7
+               bmi      antialias2
+               clr.l    d5              ; d5 = i = 0
+antialias1
+               add.l    #18,d5          ; i += SSLIMIT
+               lea      (a0,d5.w*4),bu  ; bu = xr[ i ]
+               move.l   bu,bd           ; bd = bu
+               ALIAS_B  8.57492924e-1,-5.14495730e-1
+               ALIAS_B  8.81741941e-1,-4.71731961e-1
+               ALIAS_B  9.49628592e-1,-3.13377440e-1
+               ALIAS_B  9.83314574e-1,-1.81913197e-1
+               ALIAS_B  9.95517790e-1,-9.4574191e-2
+               ALIAS_B  9.99160528e-1,-4.0965579e-2
+               ALIAS_B  9.99899149e-1,-1.4198568e-2
+               ALIAS_B  9.99993145e-1,-3.699975e-3
+               dbra     d7,antialias1
+antialias2
+               fmovem.x (sp)+,fp0-fp3
+               movem.l  (sp)+,d2-d7/a2
+               rts
+
+
+
+FFF_MUL        MACRO
+               MOVM     (ps1)+,fp0
+               MOVR     fp0,fp1
+               MOVM     -(ps2),fp2
+               ADDR     fp2,fp1
+               MOVM     fp1,(pd1)+
+               SUBR     fp2,fp0
+               MULI     \1,fp0
+               MOVM     fp0,\2*TSIZE-TSIZE(pd1)
+               ENDM
+
+;
+;              FF4_MUL s1,s2,s3,s4
+;              s1..s4 must be registers
+;              fp0, s1, s2 modified
+;
+;              s1 + s4 -> (pd1)+
+;              s2 + s3 -> (pd1)+
+;              (s1 - s4) * 0.54119610014620 -> (pd1)+
+;              (s2 - s3) * 1.30656296487638 -> (pd1)+
+;
+FF4_MUL        MACRO
+               MOVR     \1,fp0
+               ADDR     \4,fp0
+               MOVM     fp0,(pd1)+
+               MOVR     \2,fp0
+               ADDR     \3,fp0
+               MOVM     fp0,(pd1)+
+               SUBR     \4,\1
+               MULI     5.4119610014620e-1,\1
+               MOVM     \1,(pd1)+
+               SUBR     \3,\2
+               MULI     1.30656296487638,\2
+               MOVM     \2,(pd1)+
+               ENDM
+
+;
+;              FF2_MUL s1,s2,COSx
+;              s1..s2, COSx must be registers
+;              fp0, s1 modified
+;
+;              s1 + s2 -> (pd1)+
+;              (s1 - s2) * COSx -> (pd1)+
+;
+FF2_MUL        MACRO
+               MOVR     \1,fp0
+               ADDR     \2,fp0
+               MOVM     fp0,(pd1)+
+               SUBR     \2,\1
+               MULR     \3,\1
+               MOVM     \1,(pd1)+
+               ENDM
+
+fast_filter_sub
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+               lea      16*TSIZE(ps1),ps2  ; ps2=@p(16)
+               lea      -16*4(a6),pd1  ; pd1=@pp(0) ; #1
+               FFF_MUL  5.0241928618816e-1,8      ; pp(i=0..7)  = p(i) + p(15-i)
+               FFF_MUL  5.2249861493969e-1,8      ; pp(i=8..15) = COSx*[p(i) - p(15-i)]
+               FFF_MUL  5.6694403481636e-1,8
+               FFF_MUL  6.4682178335999e-1,8
+               FFF_MUL  7.8815462345125e-1,8
+               FFF_MUL  1.06067768599035,8
+               FFF_MUL  1.72244709823833,8
+               FFF_MUL  5.10114861868917,8
+
+               lea      -16*4(a6),ps1  ; ps1=@pp(0) ; #1
+               lea      8*TSIZE(ps1),ps2   ; ps2=@pp(8)
+               lea      -32*4(a6),pd1   ; pd1=@p(0) ; #1
+               FFF_MUL  5.0979557910416e-1,4      ; p(i=0..3) = pp(i) + pp(7-i)
+               FFF_MUL  6.0134488693505e-1,4      ; p(i=4..7) = COSx*[pp(i) - pp(7-i)]
+               FFF_MUL  8.9997622313642e-1,4
+               FFF_MUL  2.56291544774151,4
+               lea      4*TSIZE(ps1),ps1   ; ps1=@pp(8)
+               lea      8*TSIZE(ps1),ps2   ; ps2=@pp(16)
+               lea      4*TSIZE(pd1),pd1   ; pd1=@p(8)
+               FFF_MUL  5.0979557910416e-1,4
+               FFF_MUL  6.0134488693505e-1,4
+               FFF_MUL  8.9997622313642e-1,4
+               FFF_MUL  2.56291544774151,4
+
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+               lea      -16*4(a6),pd1  ; pd1=@pp(0) ; #1
+               MOVM     (ps1)+,fp1     ; get p0..p3
+               MOVM     (ps1)+,fp2
+               MOVM     (ps1)+,fp3
+               MOVM     (ps1)+,fp4
+               FF4_MUL  fp1,fp2,fp3,fp4
+               MOVM     (ps1)+,fp1     ; get p4..p7
+               MOVM     (ps1)+,fp2
+               MOVM     (ps1)+,fp3
+               MOVM     (ps1)+,fp4
+               FF4_MUL  fp1,fp2,fp3,fp4
+               MOVM     (ps1)+,fp1     ; get p8..p11
+               MOVM     (ps1)+,fp2
+               MOVM     (ps1)+,fp3
+               MOVM     (ps1)+,fp4
+               FF4_MUL  fp1,fp2,fp3,fp4
+               MOVM     (ps1)+,fp1     ; get p12..p15
+               MOVM     (ps1)+,fp2
+               MOVM     (ps1)+,fp3
+               MOVM     (ps1)+,fp4
+               FF4_MUL  fp1,fp2,fp3,fp4
+
+               lea      -16*4(a6),ps1  ; ps1=@pp(0) ; #1
+               lea      -32*4(a6),pd1   ; pd1=@p(0) ; #1
+               MOVM     #7.0710678118655e-1,fp3
+               moveq.l  #8-1,d4
+fast_filter_s2
+               MOVM     (ps1)+,fp1
+               MOVM     (ps1)+,fp2
+               FF2_MUL  fp1,fp2,fp3
+               dbra     d4,fast_filter_s2
+
+               rts
+
+;
+; GET_P <index> <dest ea>
+; copy p[ index ] into a destination <ea>
+; p is ps1
+;
+GET_P          MACRO
+               MOVM     \1*TSIZE(ps1),\2
+               ENDM
+;
+; ADD_P <index> <dest ea>
+; add p[ index ] to a destination <ea>
+; p is ps1
+;
+ADD_P          MACRO
+               ADDM     \1*TSIZE(ps1),\2
+               ENDM
+
+;
+; SET_S0 <index> <src ea>
+; copy a source <ea> into s0[ index ]
+; s0 is a1
+;
+SET_S0         MACRO
+               MOVM     \2,\1*DSIZE*16(a1)
+               ENDM
+;
+; SET_S1 <index> <src ea>
+; copy a source <ea> into s1[ index ]
+; s1 is a2
+;
+SET_S1         MACRO
+               MOVM     \2,\1*DSIZE*16(a2)
+               ENDM
+
+;
+; SET_S0_P <index> <src reg>
+; copy <reg>  into s0[ index ]
+; copy -<reg> into s0[ 32-index ]
+; s0 is a1
+; <reg> is modified
+;
+SET_S0_P       MACRO
+               MOVM     \2,\1*DSIZE*16(a1)
+               NEGR     \2
+               MOVM     \2,-\1*DSIZE*16+32*DSIZE*16(a1)
+               ENDM
+;
+; SET_S1_P <index> <src reg>
+; copy -<reg> into s1[ index ]
+; copy -<reg> into s1[ 32-index ]
+; s1 is a2
+; <reg> is modified
+;
+SET_S1_P       MACRO
+               NEGR     \2
+               MOVM     \2,\1*DSIZE*16(a2)
+               MOVM     \2,-\1*DSIZE*16+32*DSIZE*16(a2)
+               ENDM
+
+;              Apply the FAST synthesis filter to a sub band
+;              Generate full frequency sample
+;
+;              a0: bandPtr (=fraction) (float *)
+;              a1: out_filter_buffer 0 (float *)
+;              a2: out_filter_buffer 1 (float *)
+;              d0.w: freq_div ; #1
+;
+; registers allocation: d6=MUL_SHIFT
+;
+@MPEGSUBF_filter_band
+_MPEGSUBF_filter_band
+
+               movem.l  d2-d7/a2-a6,-(sp)
+               fmovem.x fp0-fp7,-(sp)
+               move.w   d0,d7 ; #1
+
+               link     a6,#-32*4      ; #1 need of 2*16 longs
+
+               move.l   a0,ps1         ; ps1=fraction(0)
+               lea      32*SSIZE(ps1),ps2  ; ps2=fraction(32)
+               lea      -32*4(a6),pd1   ; pd1=@p(0) ; #1
+
+;               move.w   freq_div,d0
+;               cmp.w    #4,d0
+               cmp.w    #4,d7 ; #1
+               bne      filter_band1
+               ; Filter only 1/4 freq
+               moveq.l  #8-1,d2
+filter_band_q1                          ; p(i=0..7) = f(i)
+               move.l   (ps1)+,(pd1)+   ; FPU Version -> Floats on both sides
+               dbra     d2,filter_band_q1
+
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+               lea      8*TSIZE(ps1),ps2   ; ps2=@p(8)
+               lea      -16*4(a6),pd1  ; pd1=@pp(0) ; #1
+               FFF_MUL  5.0979557910416e-1,4      ; pp(i=0..3) = p(i) + p(7-i)
+               FFF_MUL  6.0134488693505e-1,4      ; pp(i=4..7) = COSx*[p(i) - p(7-i)]
+               FFF_MUL  8.9997622313642e-1,4
+               FFF_MUL  2.56291544774151,4
+
+               lea      -16*4(a6),ps1  ; ps1=@pp(0) ; #1
+               lea      -32*4(a6),pd1   ; pd1=@p(0) ; #1
+               MOVM     (ps1)+,fp1     ; get pp0..pp3
+               MOVM     (ps1)+,fp2
+               MOVM     (ps1)+,fp3
+               MOVM     (ps1)+,fp4
+               FF4_MUL  fp1,fp2,fp3,fp4
+               MOVM     (ps1)+,fp1     ; get pp4..pp7
+               MOVM     (ps1)+,fp2
+               MOVM     (ps1)+,fp3
+               MOVM     (ps1)+,fp4
+               FF4_MUL  fp1,fp2,fp3,fp4
+
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+               lea      -32*4(a6),pd1   ; pd1=@p(0) ; #1
+               MOVM     #7.0710678118655e-1,fp3
+               moveq.l  #4-1,d4
+fast_filter_q2
+               MOVM     (ps1)+,fp1
+               MOVM     (ps1)+,fp2
+               FF2_MUL  fp1,fp2,fp3
+               dbra     d4,fast_filter_q2
+
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+
+               GET_P    1,fp1
+               SET_S0   0,fp1
+               NEGR     fp1
+               SET_S1   0,fp1
+
+               GET_P    5,fp1
+               ADD_P    7,fp1
+               SET_S0_P 4,fp1
+
+               GET_P    3,fp1
+               SET_S0_P 8,fp1
+
+               GET_P    7,fp1
+               SET_S0_P 12,fp1
+
+;               SET_S0   16,#0
+               clr.l    16*DSIZE*16(a1)
+
+               GET_P    6,fp3
+               ADD_P    7,fp3
+
+               MOVR     fp3,fp4
+               ADD_P    5,fp4
+               SET_S1_P 4,fp4
+
+               GET_P    2,fp4
+               ADD_P    3,fp4
+               SET_S1_P 8,fp4
+
+               MOVR     fp3,fp4
+               ADD_P    4,fp4
+               SET_S1_P 12,fp4
+
+               GET_P    0,fp4
+               NEGR     fp4
+               SET_S1   16,fp4
+
+               bra      filter_band9
+
+filter_band1
+;               cmp.w    #2,d0
+               cmp.w    #2,d7 ; #1
+               bne      filter_band2
+               ; Filter only 1/2 freq
+               moveq.l  #16-1,d2
+filter_band_h1                         ; p(i=0..15) = f(i)
+; WARNING whith integer: ps1 is w and pd1 is l
+               move.l   (ps1)+,(pd1)+
+               dbra     d2,filter_band_h1
+               bra      filter_band3
+
+filter_band2
+               ; Filter full freq
+               moveq.l  #16-1,d2
+filter_band_f1                         ; p(i=0..15) = f(i) + f(31-i)
+               MOVM     (ps1)+,fp0
+               ADDM     -(ps2),fp0
+               MOVM     fp0,(pd1)+
+               dbra     d2,filter_band_f1
+filter_band3
+               bsr      fast_filter_sub
+
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+
+               GET_P    13,fp0
+               ADD_P    15,fp0
+
+               GET_P    1,fp1
+               SET_S0   0,fp1
+               NEGR     fp1
+               SET_S1   0,fp1
+
+               MOVR     fp0,fp1
+               ADD_P    9,fp1
+               SET_S0_P 2,fp1
+
+               GET_P    5,fp1
+               ADD_P    7,fp1
+               SET_S0_P 4,fp1
+
+               MOVR     fp0,fp1
+               ADD_P    11,fp1
+               SET_S0_P 6,fp1
+
+               GET_P    3,fp1
+               SET_S0_P 8,fp1
+
+               GET_P    11,fp1
+               ADD_P    15,fp1
+               SET_S0_P 10,fp1
+
+               GET_P    7,fp1
+               SET_S0_P 12,fp1
+
+               GET_P    15,fp1
+               SET_S0_P 14,fp1
+
+;               SET_S0   16,#0
+               clr.l    16*DSIZE*16(a1)
+
+
+               ADD_P    14,fp0
+               GET_P    12,fp1
+               ADD_P    14,fp1
+               ADD_P    15,fp1
+               GET_P    10,fp2
+               ADD_P    11,fp2
+               GET_P    6,fp3
+               ADD_P    7,fp3
+
+               MOVR     fp0,fp4
+               ADD_P    9,fp4
+               SET_S1_P 2,fp4
+
+               MOVR     fp3,fp4
+               ADD_P    5,fp4
+               SET_S1_P 4,fp4
+
+               MOVR     fp0,fp4
+               ADDR     fp2,fp4
+               SET_S1_P 6,fp4
+
+               GET_P    2,fp4
+               ADD_P    3,fp4
+               SET_S1_P 8,fp4
+
+               MOVR     fp1,fp4
+               ADDR     fp2,fp4
+               SET_S1_P 10,fp4
+
+               MOVR     fp3,fp4
+               ADD_P    4,fp4
+               SET_S1_P 12,fp4
+
+               MOVR     fp1,fp4
+               ADD_P    8,fp4
+               SET_S1_P 14,fp4
+
+               GET_P    0,fp4
+               NEGR     fp4
+               SET_S1   16,fp4
+
+;               move.w   freq_div,d0
+;               cmp.w    #1,d0
+               cmp.w    #1,d7 ; #1
+               bne      filter_band9
+
+               move.l   a0,ps1         ; ps1=fraction(0)
+               lea      32*SSIZE(ps1),ps2  ; ps2=fraction(32)
+               lea      -32*4(a6),pd1   ; pd1=@p(0) ; #1
+
+               lea      filter_cos64,a0
+               moveq.l  #16-1,d2
+filter_band_f2                         ; p(i=0..15) = COSx*[f(i) - f(31-i)]
+               MOVM     (ps1)+,fp0
+               MOVM     -(ps2),fp1
+               SUBR     fp1,fp0
+               MULM     (a0)+,fp0
+               MOVM     fp0,(pd1)+
+               dbra     d2,filter_band_f2
+
+               bsr      fast_filter_sub
+
+               lea      -32*4(a6),ps1   ; ps1=@p(0) ; #1
+
+               GET_P    13,fp0
+               ADD_P    15,fp0
+               GET_P    11,fp1
+               ADD_P    15,fp1
+               GET_P    5,fp2
+               ADD_P    7,fp2
+
+               MOVR     fp0,fp3
+               ADD_P    9,fp3
+               MOVR     fp3,fp4
+               ADD_P    1,fp4
+               SET_S0_P 1,fp4
+
+               MOVR     fp2,fp4
+               ADDR     fp3,fp4
+               SET_S0_P 3,fp4
+
+               MOVR     fp0,fp3
+               ADD_P    11,fp3
+               MOVR     fp3,fp4
+               ADDR     fp2,fp4
+               SET_S0_P 5,fp4
+
+               MOVR     fp3,fp4
+               ADD_P    3,fp4
+               SET_S0_P 7,fp4
+
+               MOVR     fp1,fp4
+               ADD_P    3,fp4
+               SET_S0_P 9,fp4
+
+               MOVR     fp1,fp4
+               ADD_P    7,fp4
+               SET_S0_P 11,fp4
+
+               GET_P    7,fp4
+               ADD_P    15,fp4
+               SET_S0_P 13,fp4
+
+               GET_P    15,fp4
+               SET_S0_P 15,fp4
+
+
+               ADD_P    14,fp0
+               GET_P    12,fp1
+               ADD_P    14,fp1
+               ADD_P    15,fp1
+               GET_P    10,fp2
+               ADD_P    11,fp2
+               GET_P    6,fp3
+               ADD_P    7,fp3
+
+               GET_P    1,fp4
+               ADD_P    9,fp4
+               ADDR     fp0,fp4
+               SET_S1_P 1,fp4
+
+               GET_P    5,fp5
+               ADDR     fp3,fp5
+               ADDR     fp0,fp5
+               GET_P    9,fp4
+               ADDR     fp5,fp4
+               SET_S1_P 3,fp4
+
+               MOVR     fp5,fp4
+               ADDR     fp2,fp4
+               SET_S1_P 5,fp4
+
+               GET_P    2,fp5
+               ADD_P    3,fp5
+               ADDR     fp2,fp5
+               MOVR     fp0,fp4
+               ADDR     fp5,fp4
+               SET_S1_P 7,fp4
+
+               MOVR     fp1,fp4
+               ADDR     fp5,fp4
+               SET_S1_P 9,fp4
+
+               GET_P    4,fp5
+               ADDR     fp3,fp5
+               ADDR     fp1,fp5
+               MOVR     fp2,fp4
+               ADDR     fp5,fp4
+               SET_S1_P 11,fp4
+
+               GET_P    8,fp4
+               ADDR     fp5,fp4
+               SET_S1_P 13,fp4
+
+               GET_P    0,fp4
+               ADD_P    8,fp4
+               ADDR     fp1,fp4
+               SET_S1_P 15,fp4
+
+filter_band9
+               unlk     a6    ; #1
+               fmovem.x (sp)+,fp0-fp7
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+
+
+               section  ASMCODE,code
+
+
+WINDOW_CLIP    equ      1
+
+;
+;              Window a sub band filtered sample
+;
+;              a0: out_filter_buffer (float *)
+;              a1: out_sample_buffer (float *)
+;              a2: dewindow (float *) (##2)
+;              d0: buffer offset
+;              d1.w: w_begin  (#1)
+;              d2.w: w_width  (#1)
+;              d3.w: freq_div (#1)
+;              -> a1 = out_sample_buffer + out_sample_length
+@MPEGSUBF_window_band
+_MPEGSUBF_window_band
+
+               movem.l  d2-d7/a2-a6,-(sp)
+               fmovem.x fp0-fp7,-(sp)
+
+;               move.w   w_begin,d1 ; #1
+               move.w   d2,-(sp) ; #1
+               move.l   a2,a4    ; ##2
+               lea.l    pcm_loops,a2 ; #1
+               move.w   (a2,d3.w*2),d6 ; #1
+               move.w   d3,d2 ; #1
+
+;               lea.l    window_table,a2 ; #2 Suppressed (external now)
+;               lea.l    (a2,d1.w*2),a2       ; a2 = &dewindow[ w_begin ]
+               lea.l    (a4,d1.w*4),a2       ; ##2 a2 = &dewindow[ w_begin ]
+               add.w    d0,d1
+               and.w    #15,d1               ; d1 = start
+               move.l   a0,a4                ; buf0 = &buf_ptr[ 0 ]
+;               lea      (a0,d1.w*2),a3       ; buf1 = &buf_ptr[ start ]
+               lea      (a0,d1.w*4),a3       ; buf1 = &buf_ptr[ start ]
+;               move.w   w_width,d3 ; #1
+               move.w   (sp),d3 ; #1
+               add.w    d1,d3
+               cmp.w    #16,d3
+               ble      window_band1
+               moveq.l  #16,d3               ; d3 = top
+window_band1   sub.w    d1,d3                ; d3 = cnt1
+;               move.w   w_width,d4 ; #1
+               move.w   (sp),d4 ; #1
+               sub.w    d3,d4                ; d4 = cnt0
+
+;               move.w   freq_div,d2 ; #1
+               lsl.w    #4,d2
+               move.w   d2,d5
+               sub.w    d3,d5                ; off1 = freq_div*16 - cnt1
+               ext.l    d5
+;               add.l    d5,d5
+               lsl.l    #2,d5
+               move.l   d5,a5                ; a5 = off1
+               move.w   d2,d5
+               sub.w    d4,d5                ; off0 = freq_div*16 - cnt0
+               ext.l    d5
+;               add.l    d5,d5
+               lsl.l    #2,d5
+               move.l   d5,a6                ; a6 = off0
+;               sub.w    w_width,d2           ; offd = freq_div*16 - w_width ; #1
+               sub.w    (sp),d2           ; offd = freq_div*16 - w_width ; #1
+               ext.l    d2
+;               add.l    d2,d2
+               lsl.l    #2,d2
+
+;               move.w   pcm_count,d6  ; #1
+;               subq.w   #1,d6                ; for DBRA loop ; #1
+
+               IFD      OLD_WIN  ; ##1
+
+               subq.w   #1,d3                ; for DBRA loop
+               subq.w   #1,d4                ; for DBRA loop
+window_band2
+;               clr.l    d5                   ; d5 = sum
+               MOVM     #0,fp5
+
+               move.w   d3,d0                ; d0 = cnt1
+               bmi      window_band4
+window_band3   MOVM     (a3)+,fp1
+               MULM     (a2)+,fp1
+               ADDR     fp1,fp5
+               dbra     d0,window_band3
+window_band4
+               add.l    a5,a3                ; buf1 += off1
+
+               move.w   d4,d0                ; d0 = cnt0
+               bmi      window_band6
+window_band5   MOVM     (a4)+,fp1
+               MULM     (a2)+,fp1
+               ADDR     fp1,fp5
+               dbra     d0,window_band5
+window_band6
+               add.l    a6,a4                ; buf0 += off0
+               add.l    d2,a2                ; dewindow += offd
+
+;               asr.l    d7,d5                ; sum >>= (WINDOW_FACTOR+INT_FACTOR-15)
+;               MULI     32768,fp5 -> done in dewindow table
+               fmove.l  fp5,d5
+
+               IFD      WINDOW_CLIP
+               cmp.l    #-32768,d5
+               blt      window_band4l
+               cmp.l    #32767,d5
+               bgt      window_band4h
+window_band4n
+               ENDC
+
+               move.w   d5,(a1)+
+               dbra     d6,window_band2
+
+               IFD      WINDOW_CLIP
+               bra      window_band9
+window_band4l  move.l   #-32768,d5
+               bra.s    window_band4n
+window_band4h  move.l   #32767,d5
+               bra.s    window_band4n
+               ENDC
+
+window_band9
+               move.w   (sp)+,d2 ; #1
+               fmovem.x (sp)+,fp0-fp7
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+               ; ##1 Begin
+
+               ELSE
+
+;              MULADDWIN {a3|a4}
+MULADDWIN      MACRO
+               MOVM     (\1)+,fp1
+               MULM     (a2)+,fp1
+               ADDR     fp1,fp5
+               ENDM
+
+               ; WARING GENAM bug in rept & macros
+               ; rept part is moved to END of MACRO !
+               ;
+;              MULADDN <rept num>,{a3|a4}
+MULADDN        MACRO
+               IFNE     \2
+               REPT     \2
+               MULADDWIN \1
+               ENDR
+               ENDC
+               ENDM
+
+;              MULADD0 <rept num>
+MULADD0        MACRO
+;               clr.l    d5
+               MOVM     #0,fp5
+               MULADDN  a3,\1
+               ENDM
+
+;              MULADD1 <rept num>
+MULADD1        MACRO
+               add.l    a5,a3
+               MULADDN  a4,\1
+               ENDM
+
+               ; CHECKBOUNDS <loop label>
+CHECKBOUNDS    MACRO
+               add.l    a6,a4
+               add.l    d2,a2
+;               asr.l    d7,d5
+;               MULI     32768,fp5 -> done in dewindow table
+               fmove.l  fp5,d5
+               IFD      WINDOW_CLIP
+               cmp.l    #-32768,d5
+               blt      .window_bandl
+               cmp.l    #32767,d5
+               bgt      .window_bandh
+.window_bandn
+               ENDC
+               move.w   d5,(a1)+
+               dbra     d6,\1
+               bra      window_band9
+               IFD      WINDOW_CLIP
+               bra      window_band9
+.window_bandl  move.w   #-32768,d5
+               bra.s    .window_bandn
+.window_bandh  move.w   #32767,d5
+               bra.s    .window_bandn
+               ENDC
+               ENDM
+
+
+;               move.w   w_width,d3 ; #1
+               move.w   (sp),d3 ; #1
+               lea      window_q0muls,a0
+               cmp.w    #4,d3
+               ble      window_qmul
+               lea      window_q1muls,a0
+               cmp.w    #8,d3
+               ble      window_qmul
+               lea      window_q2muls,a0
+window_qmul
+               move.l   (a0,d4.w*4),a0
+               jmp      (a0)
+
+window_q2mul0
+               MULADD0  16
+               MULADD1  0
+               CHECKBOUNDS window_q2mul0
+window_q2mul1
+               MULADD0  15
+               MULADD1  1
+               CHECKBOUNDS window_q2mul1
+window_q2mul2
+               MULADD0  14
+               MULADD1  2
+               CHECKBOUNDS window_q2mul2
+window_q2mul3
+               MULADD0  13
+               MULADD1  3
+               CHECKBOUNDS window_q2mul3
+window_q2mul4
+               MULADD0  12
+               MULADD1  4
+               CHECKBOUNDS window_q2mul4
+window_q2mul5
+               MULADD0  11
+               MULADD1  5
+               CHECKBOUNDS window_q2mul5
+window_q2mul6
+               MULADD0  10
+               MULADD1  6
+               CHECKBOUNDS window_q2mul6
+window_q2mul7
+               MULADD0  9
+               MULADD1  7
+               CHECKBOUNDS window_q2mul7
+window_q2mul8
+               MULADD0  8
+               MULADD1  8
+               CHECKBOUNDS window_q2mul8
+window_q2mul9
+               MULADD0  7
+               MULADD1  9
+               CHECKBOUNDS window_q2mul9
+window_q2mul10
+               MULADD0  6
+               MULADD1  10
+               CHECKBOUNDS window_q2mul10
+window_q2mul11
+               MULADD0  5
+               MULADD1  11
+               CHECKBOUNDS window_q2mul11
+window_q2mul12
+               MULADD0  4
+               MULADD1  12
+               CHECKBOUNDS window_q2mul12
+window_q2mul13
+               MULADD0  3
+               MULADD1  13
+               CHECKBOUNDS window_q2mul13
+window_q2mul14
+               MULADD0  2
+               MULADD1  14
+               CHECKBOUNDS window_q2mul14
+window_q2mul15
+               MULADD0  1
+               MULADD1  15
+               CHECKBOUNDS window_q2mul15
+
+window_q1mul0
+               MULADD0  8
+               MULADD1  0
+               CHECKBOUNDS window_q1mul0
+window_q1mul1
+               MULADD0  7
+               MULADD1  1
+               CHECKBOUNDS window_q1mul1
+window_q1mul2
+               MULADD0  6
+               MULADD1  2
+               CHECKBOUNDS window_q1mul2
+window_q1mul3
+               MULADD0  5
+               MULADD1  3
+               CHECKBOUNDS window_q1mul3
+window_q1mul4
+               MULADD0  4
+               MULADD1  4
+               CHECKBOUNDS window_q1mul4
+window_q1mul5
+               MULADD0  3
+               MULADD1  5
+               CHECKBOUNDS window_q1mul5
+window_q1mul6
+               MULADD0  2
+               MULADD1  6
+               CHECKBOUNDS window_q1mul6
+window_q1mul7
+               MULADD0  1
+               MULADD1  7
+               CHECKBOUNDS window_q1mul7
+
+
+window_q0mul0
+               MULADD0  4
+               MULADD1  0
+               CHECKBOUNDS window_q0mul0
+window_q0mul1
+               MULADD0  3
+               MULADD1  1
+               CHECKBOUNDS window_q0mul1
+window_q0mul2
+               MULADD0  2
+               MULADD1  2
+               CHECKBOUNDS window_q0mul2
+window_q0mul3
+               MULADD0  1
+               MULADD1  3
+               CHECKBOUNDS window_q0mul3
+
+window_band9
+               move.w   (sp)+,d2 ; #1
+               fmovem.x (sp)+,fp0-fp7
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+window_q2muls  dc.l     window_q2mul0, window_q2mul1, window_q2mul2, window_q2mul3
+               dc.l     window_q2mul4, window_q2mul5, window_q2mul6, window_q2mul7
+               dc.l     window_q2mul8, window_q2mul9, window_q2mul10, window_q2mul11
+               dc.l     window_q2mul12, window_q2mul13, window_q2mul14, window_q2mul15
+
+window_q1muls  dc.l     window_q1mul0, window_q1mul1, window_q1mul2, window_q1mul3
+               dc.l     window_q1mul4, window_q1mul5, window_q1mul6, window_q1mul7
+
+window_q0muls  dc.l     window_q0mul0, window_q0mul1, window_q0mul2, window_q0mul3
+
+               ENDC
+
+               ; ##1 End
+
+; ##2 Begin (suppressed)
+               IFD OLD_DEW_TABLE
+
+               section  ASM_TABLES,data
+
+               even
+window_table
+               dc.s     0.0,  -14.5,  106.5, -229.5, 1018.5,-2576.5, 3287.0,-18744.5
+               dc.s 37519.0,18744.5, 3287.0, 2576.5, 1018.5,  229.5,  106.5,   14.5
+               dc.s    -5e-1,  -15.5,  109.0, -259.5, 1000.0,-2758.5, 2979.5,-19668.0
+               dc.s 37496.0,17820.0, 3567.0, 2394.0, 1031.5,  200.5,  104.0,   13.0
+               dc.s    -5e-1,  -17.5,  111.0, -290.5,  976.0,-2939.5, 2644.0,-20588.0
+               dc.s 37428.0,16895.5, 3820.0, 2212.5, 1040.0,  173.5,  101.0,   12.0
+               dc.s    -5e-1,  -19.0,  112.5, -322.5,  946.5,-3118.5, 2280.5,-21503.0
+               dc.s 37315.0,15973.5, 4046.0, 2031.5, 1043.5,  147.0,   98.0,   10.5
+               dc.s    -5e-1,  -20.5,  113.5, -355.5,  911.0,-3294.5, 1888.0,-22410.5
+               dc.s 37156.5,15056.0, 4246.0, 1852.5, 1042.5,  122.0,   95.0,    9.5
+               dc.s    -5e-1,  -22.5,  114.0, -389.5,  869.5,-3467.5, 1467.5,-23308.5
+               dc.s 36954.0,14144.5, 4420.0, 1675.5, 1037.5,   98.5,   91.5,    8.5
+               dc.s    -5e-1,  -24.5,  114.0, -424.0,  822.0,-3635.5, 1018.5,-24195.0
+               dc.s 36707.5,13241.0, 4569.5, 1502.0, 1028.5,   76.5,   88.0,    8.0
+               dc.s    -1.0,  -26.5,  113.5, -459.5,  767.5,-3798.5,  541.0,-25068.5
+               dc.s 36417.5,12347.0, 4694.5, 1331.5, 1016.0,   55.5,   84.5,    7.0
+               dc.s    -1.0,  -29.0,  112.0, -495.5,  707.0,-3955.0,   35.0,-25926.5
+               dc.s 36084.5,11464.5, 4796.0, 1165.0, 1000.5,   36.0,   80.5,    6.5
+               dc.s    -1.0,  -31.5,  110.5, -532.0,  640.0,-4104.5, -499.0,-26767.0
+               dc.s 35710.0,10594.5, 4875.0, 1003.0,  981.0,   18.0,   77.0,    5.5
+               dc.s    -1.0,  -34.0,  107.5, -568.5,  565.5,-4245.5,-1061.0,-27589.0
+               dc.s 35295.0, 9739.0, 4931.5,  846.0,  959.5,    1.0,   73.5,    5.0
+               dc.s    -1.5,  -36.5,  104.0, -605.0,  485.0,-4377.5,-1650.0,-28389.0
+               dc.s 34839.5, 8899.5, 4967.5,  694.0,  935.0,  -14.5,   69.5,    4.5
+               dc.s    -1.5,  -39.5,  100.0, -641.5,  397.0,-4499.0,-2266.5,-29166.5
+               dc.s 34346.0, 8077.5, 4983.0,  547.5,  908.5,  -28.5,   66.0,    4.0
+               dc.s    -2.0,  -42.5,   94.5, -678.0,  302.5,-4609.5,-2909.0,-29919.0
+               dc.s 33814.5, 7274.0, 4979.5,  407.0,  879.5,  -41.5,   62.5,    3.5
+               dc.s    -2.0,  -45.5,   88.5, -714.0,  201.0,-4708.0,-3577.0,-30644.5
+               dc.s 33247.0, 6490.0, 4958.0,  272.5,  849.0,  -53.0,   58.5,    3.5
+               dc.s    -2.5,  -48.5,   81.5, -749.0,   92.5,-4792.5,-4270.0,-31342.0
+               dc.s 32645.0, 5727.5, 4919.0,  144.0,  817.0,  -63.5,   55.5,    3.0
+               dc.s    -2.5,  -52.0,   73.0, -783.5,  -22.5,-4863.5,-4987.5,-32009.5
+               dc.s 32009.5, 4987.5, 4863.5,   22.5,  783.5,  -73.0,   52.0,    2.5
+               dc.s    -3.0,  -55.5,   63.5, -817.0, -144.0,-4919.0,-5727.5,-32645.0
+               dc.s 31342.0, 4270.0, 4792.5,  -92.5,  749.0,  -81.5,   48.5,    2.5
+               dc.s    -3.5,  -58.5,   53.0, -849.0, -272.5,-4958.0,-6490.0,-33247.0
+               dc.s 30644.5, 3577.0, 4708.0, -201.0,  714.0,  -88.5,   45.5,    2.0
+               dc.s    -3.5,  -62.5,   41.5, -879.5, -407.0,-4979.5,-7274.0,-33814.5
+               dc.s 29919.0, 2909.0, 4609.5, -302.5,  678.0,  -94.5,   42.5,    2.0
+               dc.s    -4.0,  -66.0,   28.5, -908.5, -547.5,-4983.0,-8077.5,-34346.0
+               dc.s 29166.5, 2266.5, 4499.0, -397.0,  641.5, -100.0,   39.5,    1.5
+               dc.s    -4.5,  -69.5,   14.5, -935.0, -694.0,-4967.5,-8899.5,-34839.5
+               dc.s 28389.0, 1650.0, 4377.5, -485.0,  605.0, -104.0,   36.5,    1.5
+               dc.s    -5.0,  -73.5,   -1.0, -959.5, -846.0,-4931.5,-9739.0,-35295.0
+               dc.s 27589.0, 1061.0, 4245.5, -565.5,  568.5, -107.5,   34.0,    1.0
+               dc.s    -5.5,  -77.0,  -18.0, -981.0,-1003.0,-4875.0,-10594.5,-35710.0
+               dc.s 26767.0,  499.0, 4104.5, -640.0,  532.0, -110.5,   31.5,    1.0
+               dc.s    -6.5,  -80.5,  -36.0,-1000.5,-1165.0,-4796.0,-11464.5,-36084.5
+               dc.s 25926.5,  -35.0, 3955.0, -707.0,  495.5, -112.0,   29.0,    1.0
+               dc.s    -7.0,  -84.5,  -55.5,-1016.0,-1331.5,-4694.5,-12347.0,-36417.5
+               dc.s 25068.5, -541.0, 3798.5, -767.5,  459.5, -113.5,   26.5,    1.0
+               dc.s    -8.0,  -88.0,  -76.5,-1028.5,-1502.0,-4569.5,-13241.0,-36707.5
+               dc.s 24195.0,-1018.5, 3635.5, -822.0,  424.0, -114.0,   24.5,    5e-1
+               dc.s    -8.5,  -91.5,  -98.5,-1037.5,-1675.5,-4420.0,-14144.5,-36954.0
+               dc.s 23308.5,-1467.5, 3467.5, -869.5,  389.5, -114.0,   22.5,    5e-1
+               dc.s    -9.5,  -95.0, -122.0,-1042.5,-1852.5,-4246.0,-15056.0,-37156.5
+               dc.s 22410.5,-1888.0, 3294.5, -911.0,  355.5, -113.5,   20.5,    5e-1
+               dc.s   -10.5,  -98.0, -147.0,-1043.5,-2031.5,-4046.0,-15973.5,-37315.0
+               dc.s 21503.0,-2280.5, 3118.5, -946.5,  322.5, -112.5,   19.0,    5e-1
+               dc.s   -12.0, -101.0, -173.5,-1040.0,-2212.5,-3820.0,-16895.5,-37428.0
+               dc.s 20588.0,-2644.0, 2939.5, -976.0,  290.5, -111.0,   17.5,    5e-1
+               dc.s   -13.0, -104.0, -200.5,-1031.5,-2394.0,-3567.0,-17820.0,-37496.0
+               dc.s 19668.0,-2979.5, 2758.5,-1000.0,  259.5, -109.0,   15.5,    5e-1
+
+               ENDC
+; ##2 End
+

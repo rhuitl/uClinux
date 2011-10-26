@@ -1,0 +1,790 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML
+><HEAD
+><TITLE
+>punycode</TITLE
+><META
+NAME="GENERATOR"
+CONTENT="Modular DocBook HTML Stylesheet Version 1.7"><LINK
+REL="HOME"
+TITLE="GNU Libidn API Reference Manual"
+HREF="index.html"><LINK
+REL="UP"
+TITLE="GNU Libidn API Reference Manual"
+HREF="c4.html"><LINK
+REL="PREVIOUS"
+TITLE="stringprep"
+HREF="libidn-stringprep.html"><LINK
+REL="NEXT"
+TITLE="idna"
+HREF="libidn-idna.html"><STYLE
+TYPE="text/css"
+>.synopsis, .classsynopsis {
+    background: #eeeeee;
+    border: solid 1px #aaaaaa;
+    padding: 0.5em;
+}
+.programlisting {
+    background: #eeeeff;
+    border: solid 1px #aaaaff;
+    padding: 0.5em;
+}
+.variablelist {
+    padding: 4px;
+    margin-left: 3em;
+}
+.navigation {
+    background: #ffeeee;
+    border: solid 1px #ffaaaa;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+.navigation a {
+    color: #770000;
+}
+.navigation a:visited {
+    color: #550000;
+}
+.navigation .title {
+    font-size: 200%;
+}</STYLE
+></HEAD
+><BODY
+CLASS="REFENTRY"
+BGCOLOR="#FFFFFF"
+TEXT="#000000"
+LINK="#0000FF"
+VLINK="#840084"
+ALINK="#0000FF"
+><TABLE
+WIDTH="100%"
+CLASS="navigation"
+SUMMARY="Navigation header"
+CELLPADDING="2"
+CELLSPACING="2"
+><TR
+VALIGN="middle"
+><TD
+><A
+ACCESSKEY="p"
+HREF="libidn-stringprep.html"
+><IMG
+SRC="left.png"
+WIDTH="24"
+HEIGHT="24"
+BORDER="0"
+ALT="Prev"></A
+></TD
+><TD
+><A
+ACCESSKEY="u"
+HREF="c4.html"
+><IMG
+SRC="up.png"
+WIDTH="24"
+HEIGHT="24"
+BORDER="0"
+ALT="Up"></A
+></TD
+><TD
+><A
+ACCESSKEY="h"
+HREF="index.html"
+><IMG
+SRC="home.png"
+WIDTH="24"
+HEIGHT="24"
+BORDER="0"
+ALT="Home"></A
+></TD
+><TH
+WIDTH="100%"
+align="center"
+>GNU Libidn API Reference Manual</TH
+><TD
+><A
+ACCESSKEY="n"
+HREF="libidn-idna.html"
+><IMG
+SRC="right.png"
+WIDTH="24"
+HEIGHT="24"
+BORDER="0"
+ALT="Next"></A
+></TD
+></TR
+></TABLE
+><H1
+><A
+NAME="LIBIDN-PUNYCODE"
+></A
+>punycode</H1
+><DIV
+CLASS="REFNAMEDIV"
+><A
+NAME="AEN899"
+></A
+><H2
+>Name</H2
+>punycode&nbsp;--&nbsp;</DIV
+><DIV
+CLASS="REFSYNOPSISDIV"
+><A
+NAME="AEN902"
+></A
+><H2
+>Synopsis</H2
+><PRE
+CLASS="SYNOPSIS"
+>&#13;
+
+enum        <A
+HREF="libidn-punycode.html#PUNYCODE-STATUS"
+>Punycode_status</A
+>;
+typedef     <A
+HREF="libidn-punycode.html#PUNYCODE-UINT"
+>punycode_uint</A
+>;
+int         <A
+HREF="libidn-punycode.html#PUNYCODE-ENCODE"
+>punycode_encode</A
+>                 (size_t input_length,
+                                             const <A
+HREF="libidn-punycode.html#PUNYCODE-UINT"
+>punycode_uint</A
+> input[],
+                                             unsigned char case_flags[],
+                                             size_t *output_length,
+                                             char output[]);
+int         <A
+HREF="libidn-punycode.html#PUNYCODE-DECODE"
+>punycode_decode</A
+>                 (size_t input_length,
+                                             const char input[],
+                                             size_t *output_length,
+                                             <A
+HREF="libidn-punycode.html#PUNYCODE-UINT"
+>punycode_uint</A
+> output[],
+                                             unsigned char case_flags[]);</PRE
+></DIV
+><DIV
+CLASS="REFSECT1"
+><A
+NAME="AEN921"
+></A
+><H2
+>Description</H2
+><P
+></P
+></DIV
+><DIV
+CLASS="REFSECT1"
+><A
+NAME="AEN924"
+></A
+><H2
+>Details</H2
+><DIV
+CLASS="REFSECT2"
+><A
+NAME="AEN926"
+></A
+><H3
+><A
+NAME="PUNYCODE-STATUS"
+></A
+>enum Punycode_status</H3
+><PRE
+CLASS="PROGRAMLISTING"
+>  typedef enum
+  {
+    PUNYCODE_SUCCESS = punycode_success,
+    PUNYCODE_BAD_INPUT = punycode_bad_input,
+    PUNYCODE_BIG_OUTPUT = punycode_big_output,
+    PUNYCODE_OVERFLOW = punycode_overflow
+  } Punycode_status;</PRE
+><P
+>Enumerated return codes of <A
+HREF="libidn-punycode.html#PUNYCODE-ENCODE"
+><CODE
+CLASS="FUNCTION"
+>punycode_encode()</CODE
+></A
+> and <A
+HREF="libidn-punycode.html#PUNYCODE-DECODE"
+><CODE
+CLASS="FUNCTION"
+>punycode_decode()</CODE
+></A
+>.
+The value 0 is guaranteed to always correspond to success.</P
+><P
+></P
+><P
+></P
+><TABLE
+CLASS="variablelist"
+BORDER="0"
+CELLSPACING="0"
+CELLPADDING="4"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN939"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="LITERAL"
+>PUNYCODE_SUCCESS</VAR
+></SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> Successful operation.  This value is guaranteed
+  to always be zero, the remaining ones are only guaranteed to hold
+  non-zero values, for logical comparison purposes.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN944"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="LITERAL"
+>PUNYCODE_BAD_INPUT</VAR
+></SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> Input is invalid.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN949"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="LITERAL"
+>PUNYCODE_BIG_OUTPUT</VAR
+></SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> Output would exceed the space provided.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN954"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="LITERAL"
+>PUNYCODE_OVERFLOW</VAR
+></SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> Input needs wider integers to process.</P
+></TD
+></TR
+></TBODY
+></TABLE
+></DIV
+><HR><DIV
+CLASS="REFSECT2"
+><A
+NAME="AEN959"
+></A
+><H3
+><A
+NAME="PUNYCODE-UINT"
+></A
+>punycode_uint</H3
+><PRE
+CLASS="PROGRAMLISTING"
+>  typedef uint32_t punycode_uint;</PRE
+><P
+>Unicode code point data type, this is always a 32 bit unsigned
+integer.</P
+><P
+></P
+></DIV
+><HR><DIV
+CLASS="REFSECT2"
+><A
+NAME="AEN967"
+></A
+><H3
+><A
+NAME="PUNYCODE-ENCODE"
+></A
+>punycode_encode ()</H3
+><PRE
+CLASS="PROGRAMLISTING"
+>int         punycode_encode                 (size_t input_length,
+                                             const <A
+HREF="libidn-punycode.html#PUNYCODE-UINT"
+>punycode_uint</A
+> input[],
+                                             unsigned char case_flags[],
+                                             size_t *output_length,
+                                             char output[]);</PRE
+><P
+>Converts a sequence of code points (presumed to be Unicode code
+points) to Punycode.</P
+><P
+></P
+><P
+></P
+><TABLE
+CLASS="variablelist"
+BORDER="0"
+CELLSPACING="0"
+CELLPADDING="4"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN982"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>input_length</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> The number of code points in the <VAR
+CLASS="PARAMETER"
+>input</VAR
+> array and
+  the number of flags in the <VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+> array.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN989"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>input</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> An array of code points.  They are presumed to be Unicode
+  code points, but that is not strictly REQUIRED.  The array
+  contains code points, not code units.  UTF-16 uses code units
+  D800 through DFFF to refer to code points 10000..10FFFF.  The
+  code points D800..DFFF do not occur in any valid Unicode string.
+  The code points that can occur in Unicode strings (0..D7FF and
+  E000..10FFFF) are also called Unicode scalar values.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN994"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> A <VAR
+CLASS="LITERAL"
+>NULL</VAR
+> pointer or an array of boolean values parallel
+  to the <VAR
+CLASS="PARAMETER"
+>input</VAR
+> array.  Nonzero (true, flagged) suggests that the
+  corresponding Unicode character be forced to uppercase after
+  being decoded (if possible), and zero (false, unflagged) suggests
+  that it be forced to lowercase (if possible).  ASCII code points
+  (0..7F) are encoded literally, except that ASCII letters are
+  forced to uppercase or lowercase according to the corresponding
+  case flags.  If <VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+> is a <VAR
+CLASS="LITERAL"
+>NULL</VAR
+> pointer then ASCII letters
+  are left as they are, and other code points are treated as
+  unflagged.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1003"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>output_length</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> The caller passes in the maximum number of ASCII
+  code points that it can receive.  On successful return it will
+  contain the number of ASCII code points actually output.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1008"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>output</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> An array of ASCII code points.  It is *not*
+  null-terminated; it will contain zeros if and only if the <VAR
+CLASS="PARAMETER"
+>input</VAR
+>
+  contains zeros.  (Of course the caller can leave room for a
+  terminator and add one if needed.)</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1014"><SPAN
+STYLE="white-space: nowrap"
+><SPAN
+CLASS="emphasis"
+><I
+CLASS="EMPHASIS"
+>Returns</I
+></SPAN
+> :</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> The return value can be any of the punycode_status
+  values defined above except <VAR
+CLASS="LITERAL"
+>punycode_bad_input</VAR
+>.  If not
+  <VAR
+CLASS="LITERAL"
+>punycode_success</VAR
+>, then <VAR
+CLASS="PARAMETER"
+>output_size</VAR
+> and <VAR
+CLASS="PARAMETER"
+>output</VAR
+> might contain
+  garbage.</P
+></TD
+></TR
+></TBODY
+></TABLE
+></DIV
+><HR><DIV
+CLASS="REFSECT2"
+><A
+NAME="AEN1023"
+></A
+><H3
+><A
+NAME="PUNYCODE-DECODE"
+></A
+>punycode_decode ()</H3
+><PRE
+CLASS="PROGRAMLISTING"
+>int         punycode_decode                 (size_t input_length,
+                                             const char input[],
+                                             size_t *output_length,
+                                             <A
+HREF="libidn-punycode.html#PUNYCODE-UINT"
+>punycode_uint</A
+> output[],
+                                             unsigned char case_flags[]);</PRE
+><P
+>Converts Punycode to a sequence of code points (presumed to be
+Unicode code points).</P
+><P
+></P
+><P
+></P
+><TABLE
+CLASS="variablelist"
+BORDER="0"
+CELLSPACING="0"
+CELLPADDING="4"
+><TBODY
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1038"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>input_length</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> The number of ASCII code points in the <VAR
+CLASS="PARAMETER"
+>input</VAR
+> array.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1044"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>input</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> An array of ASCII code points (0..7F).</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1049"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>output_length</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> The caller passes in the maximum number of code
+  points that it can receive into the <VAR
+CLASS="PARAMETER"
+>output</VAR
+> array (which is also
+  the maximum number of flags that it can receive into the
+  <VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+> array, if <VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+> is not a <VAR
+CLASS="LITERAL"
+>NULL</VAR
+> pointer).  On
+  successful return it will contain the number of code points
+  actually output (which is also the number of flags actually
+  output, if case_flags is not a null pointer).  The decoder will
+  never need to output more code points than the number of ASCII
+  code points in the input, because of the way the encoding is
+  defined.  The number of code points output cannot exceed the
+  maximum possible value of a punycode_uint, even if the supplied
+  <VAR
+CLASS="PARAMETER"
+>output_length</VAR
+> is greater than that.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1059"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>output</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> An array of code points like the input argument of
+  <A
+HREF="libidn-punycode.html#PUNYCODE-ENCODE"
+><CODE
+CLASS="FUNCTION"
+>punycode_encode()</CODE
+></A
+> (see above).</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1066"><SPAN
+STYLE="white-space: nowrap"
+><VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+>&nbsp;:</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> A <VAR
+CLASS="LITERAL"
+>NULL</VAR
+> pointer (if the flags are not needed by the
+  caller) or an array of boolean values parallel to the <VAR
+CLASS="PARAMETER"
+>output</VAR
+>
+  array.  Nonzero (true, flagged) suggests that the corresponding
+  Unicode character be forced to uppercase by the caller (if
+  possible), and zero (false, unflagged) suggests that it be forced
+  to lowercase (if possible).  ASCII code points (0..7F) are output
+  already in the proper case, but their flags will be set
+  appropriately so that applying the flags would be harmless.</P
+></TD
+></TR
+><TR
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><A
+NAME="AEN1073"><SPAN
+STYLE="white-space: nowrap"
+><SPAN
+CLASS="emphasis"
+><I
+CLASS="EMPHASIS"
+>Returns</I
+></SPAN
+> :</SPAN
+></TD
+><TD
+ALIGN="LEFT"
+VALIGN="TOP"
+><P
+> The return value can be any of the punycode_status
+  values defined above.  If not <VAR
+CLASS="LITERAL"
+>punycode_success</VAR
+>, then
+  <VAR
+CLASS="PARAMETER"
+>output_length</VAR
+>, <VAR
+CLASS="PARAMETER"
+>output</VAR
+>, and <VAR
+CLASS="PARAMETER"
+>case_flags</VAR
+> might contain garbage.&#13;</P
+></TD
+></TR
+></TBODY
+></TABLE
+></DIV
+></DIV
+><TABLE
+CLASS="navigation"
+WIDTH="100%"
+SUMMARY="Navigation footer"
+CELLPADDING="2"
+CELLSPACING="2"
+><TR
+VALIGN="middle"
+><TD
+ALIGN="left"
+><A
+ACCESSKEY="p"
+HREF="libidn-stringprep.html"
+><B
+>&lt;&lt;&lt;&nbsp;stringprep</B
+></A
+></TD
+><TD
+ALIGN="right"
+><A
+ACCESSKEY="n"
+HREF="libidn-idna.html"
+><B
+>idna&nbsp;&gt;&gt;&gt;</B
+></A
+></TD
+></TR
+></TABLE
+></BODY
+></HTML
+>

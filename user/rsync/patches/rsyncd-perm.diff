@@ -1,0 +1,162 @@
+--- orig/loadparm.c	2005-07-28 18:48:38
++++ loadparm.c	2005-07-28 17:27:15
+@@ -143,6 +143,10 @@ typedef struct
+ 	int timeout;
+ 	int max_connections;
+ 	int max_verbosity;
++	int create_mask;
++	int force_create_mode;
++	int directory_mask;
++	int force_directory_mode;
+ 	BOOL ignore_nonreadable;
+ } service;
+ 
+@@ -178,6 +182,10 @@ static service sDefault =
+ 	0,        /* timeout */
+ 	0,        /* max connections */
+ 	1,        /* max verbosity */
++	CHMOD_BITS,/* create mask */
++	0,        /* force create mode */
++	CHMOD_BITS,/* directory mask */
++	0,        /* force directory mode */
+ 	False     /* ignore nonreadable */
+ };
+ 
+@@ -272,6 +280,10 @@ static struct parm_struct parm_table[] =
+   {"timeout",          P_INTEGER, P_LOCAL,  &sDefault.timeout,     NULL,  0},
+   {"max connections",  P_INTEGER, P_LOCAL,  &sDefault.max_connections,NULL, 0},
+   {"max verbosity",    P_INTEGER, P_LOCAL,  &sDefault.max_verbosity,NULL,  0},
++  {"create mask",      P_OCTAL,   P_LOCAL,  &sDefault.create_mask, NULL, 0},
++  {"force create mode",P_OCTAL,   P_LOCAL,  &sDefault.force_create_mode, NULL, 0},
++  {"directory mask",   P_OCTAL,   P_LOCAL,  &sDefault.directory_mask, NULL, 0},
++  {"force directory mode",P_OCTAL,P_LOCAL,  &sDefault.force_directory_mode, NULL, 0},
+   {"name",             P_STRING,  P_LOCAL,  &sDefault.name,        NULL,   0},
+   {"comment",          P_STRING,  P_LOCAL,  &sDefault.comment,     NULL,   0},
+   {"lock file",        P_STRING,  P_LOCAL,  &sDefault.lock_file,   NULL,   0},
+@@ -382,6 +394,10 @@ FN_LOCAL_STRING(lp_dont_compress, dont_c
+ FN_LOCAL_INTEGER(lp_timeout, timeout)
+ FN_LOCAL_INTEGER(lp_max_connections, max_connections)
+ FN_LOCAL_INTEGER(lp_max_verbosity, max_verbosity)
++FN_LOCAL_INTEGER(lp_create_mask, create_mask)
++FN_LOCAL_INTEGER(lp_force_create_mode, force_create_mode)
++FN_LOCAL_INTEGER(lp_directory_mask, directory_mask)
++FN_LOCAL_INTEGER(lp_force_directory_mode, force_directory_mode)
+ 
+ /* local prototypes */
+ static int    strwicmp(char *psz1, char *psz2);
+--- orig/rsync.c	2005-07-28 18:48:38
++++ rsync.c	2005-07-28 19:10:16
+@@ -32,6 +32,8 @@ extern int am_server;
+ extern int am_sender;
+ extern int am_generator;
+ extern int am_starting_up;
++extern int am_daemon;
++extern int module_id;
+ extern int preserve_uid;
+ extern int preserve_gid;
+ extern int inplace;
+@@ -56,6 +58,7 @@ int set_perms(char *fname,struct file_st
+ 	int updated = 0;
+ 	STRUCT_STAT st2;
+ 	int change_uid, change_gid;
++	mode_t mode = file->mode; /* file->mode shouldn't be modified */
+ 
+ 	if (!st) {
+ 		if (dry_run)
+@@ -124,11 +127,21 @@ int set_perms(char *fname,struct file_st
+ 		updated = 1;
+ 	}
+ 
++	if (am_daemon) {
++		if (S_ISDIR(st->st_mode)) {
++			mode = (mode & lp_directory_mask(module_id))
++			     | lp_force_directory_mode(module_id);
++		} else {
++			mode = (mode & lp_create_mask(module_id))
++			     | lp_force_create_mode(module_id);
++		}
++	}
++
+ #ifdef HAVE_CHMOD
+ 	if (!S_ISLNK(st->st_mode)) {
+-		if ((st->st_mode & CHMOD_BITS) != (file->mode & CHMOD_BITS)) {
++		if ((st->st_mode & CHMOD_BITS) != (mode & CHMOD_BITS)) {
+ 			updated = 1;
+-			if (do_chmod(fname,(file->mode & CHMOD_BITS)) != 0) {
++			if (do_chmod(fname,(mode & CHMOD_BITS)) != 0) {
+ 				rsyserr(FERROR, errno, "failed to set permissions on %s",
+ 					full_fname(fname));
+ 				return 0;
+--- orig/rsyncd.conf.yo	2005-07-28 19:26:48
++++ rsyncd.conf.yo	2005-03-31 08:28:41
+@@ -218,6 +218,70 @@ file transfers to and from that module s
+ was run as root. This complements the "uid" option. The default is gid -2,
+ which is normally the group "nobody".
+ 
++dit(bf(create mask)) When a file is created (or touched) by rsyncd the
++permissions will be taken from the source file bit-wise 'AND'ed with this
++parameter. This parameter may be thought of as a bit-wise MASK for the UNIX
++modes of a file. Any bit not set here will be removed from the modes set
++on a file when it is created.
++
++The default value of this parameter is set to 07777 to be provide the
++default behaviour of older versions.
++
++Following this rsync  will bit-wise 'OR' the UNIX mode created from this
++parameter with the value  of the force create mode parameter which is set
++to 000 by default.
++
++This parameter does not affect directory modes. See the parameter
++"directory mask" for details.
++
++See also the "force create mode" parameter for forcing particular mode bits
++to be set on created files. See also the "directory mask" parameter for
++masking mode bits on created directories.
++
++dit(bf(force create mode)) This parameter specifies a set of UNIX
++mode bit permissions that will always be set on a file created by
++rsyncd. This is done by bitwise 'OR'ing these bits onto the mode
++bits of a file that is being created or having its permissions changed.
++
++The default for this parameter is (in octal) 000.  The modes in this
++parameter are bitwise 'OR'ed onto the file mode after the mask set in
++the "create mask" parameter is applied.
++
++See also the parameter "create mask" for details on
++masking mode bits on files.
++
++
++dit(bf(directory mask)) When a directory is created (or touched) by
++rsyncd the permissions will be taken from the source directory
++bit-wise 'AND'ed with this parameter. This parameter may be thought
++of as a bit-wise MASK for the UNIX modes of a file. Any bit not set
++here will be removed from the modes set on a file when it is created.
++
++The default value of this parameter is set to 07777 to be provide the
++default behaviour of older versions.
++ 
++Following this rsync  will bit-wise 'OR' the UNIX mode created from this
++parameter with the value  of the "force directory mode" parameter which
++is set to 000 by default.
++
++This parameter does not affect file modes. See the parameter "create mask"
++for details.  
++
++See also the "force directory mode" parameter for forcing particular
++mode bits to be set on created directories. See also the "create mask"
++parameter for masking mode bits on created files.
++ 
++dit(bf(force directory mode)) This parameter specifies a set of UNIX mode
++bit permissions that will always be set on a directory created by rsyncd.
++This is done by bitwise 'OR'ing these bits onto the mode bits of a directory
++that is being created. The default for this parameter is (in octal) 0000
++which will not add any extra permission bits to a created directory. This
++operation is done after the mode mask in the parameter "directory mask"
++is applied.
++
++See also the parameter  directory mask for details on masking mode bits on
++created directories.
++
+ dit(bf(filter)) The "filter" option allows you to specify a space-separated
+ list of filter rules that the daemon will not allow to be read or written.
+ This is only superficially equivalent to the client specifying these

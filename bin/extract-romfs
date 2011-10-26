@@ -1,0 +1,142 @@
+#!/bin/sh
+# set -x
+#
+# take a Snapgear upgrade image (or just an image) and try to extract the
+# filesystem (minus dev nodes) creating a tar file based on the name of the
+# original image.  This way we can easily extract proprietry files form a
+# released image and add them to the romfs directory of a public tree for a
+# customer to play with
+#
+# David McCullough <davidm@snapgear.com>
+#
+############################################################################
+
+EXE="$0"
+IMAGE="$1"
+TARFILE="$2"
+
+############################################################################
+
+usage()
+{
+	[ "$*" ] && echo "$*"
+	echo "usage: $EXE flash-upgrade-image [optional-output-filename]"
+	exit 1
+}
+
+############################################################################
+
+transfer()
+{
+	(
+		cd $1
+		find . -depth \( ! -type c -a ! -type b \) -print |
+			tar cvzfT $TARFILE - --no-recursion
+	)
+}
+
+############################################################################
+
+handle_fs()
+{
+	mkdir -p /tmp/image.$$/romfs
+	if mount -o loop $1 /tmp/image.$$/romfs; then
+		INITRD="`find /tmp/image.$$ -name initrd.gz`"
+		[ "$INITRD" ] || INITRD="`find /tmp/image.$$ -name initrd`"
+		if [ -f "$INITRD" ]; then
+			$EXE $INITRD
+		else
+			transfer /tmp/image.$$
+		fi
+		umount /tmp/image.$$/romfs
+		rm -rf /tmp/image.$$
+	else
+		rm -rf /tmp/image.$$
+		echo "Failed to mount filesystem"
+		echo "Ensure loopback and cramfs/romfs/etc work"
+		return 1
+	fi
+	return 0
+}
+
+############################################################################
+
+if [ $# -lt 1 -o $# -gt 2 ]; then
+	usage "bad number of arguments"
+fi
+
+if [ ! -f "$IMAGE" ]; then
+	usage "image '$IMAGE' does not exist."
+fi
+
+
+if [ $# -eq 1 ]
+then
+	TARFILE="`basename $IMAGE | sed 's/\.[^.]*$//'`_romfs.tar.gz"
+fi
+
+case "$TARFILE" in
+/*) ;;
+*)  TARFILE="`pwd`/$TARFILE" ;;
+esac
+
+
+if [ -f "$TARFILE" ]; then
+	usage "Output file '$TARFILE' already exists, will not overwrite, exiting."
+fi
+
+if ! id 2>&1 | fgrep "uid=0(" > /dev/null 2>&1
+then
+	echo "You must be root to run this script."
+	echo "You may also need to add loopback/cramfs/romfs or other"
+	echo "support to your linux system. Watch for errors."
+	exit 1
+fi
+
+echo "Creating '$TARFILE'"
+echo "From     '$IMAGE' ..."
+
+TYPE="`file $IMAGE`"
+
+case "$TYPE" in
+*"Linux Compressed ROM File System"*)
+	echo "$IMAGE is a CRAMFS image, extracting..."
+	handle_fs $IMAGE
+	exit $?
+	;;
+*"romfs filesystem"*)
+	echo "$IMAGE is a ROMFS image, extracting..."
+	handle_fs $IMAGE
+	exit $?
+	;;
+*"ISO 9660"*)
+	echo "$IMAGE is a ISO 9660 image, extracting..."
+	handle_fs $IMAGE
+	exit $?
+	;;
+*"gzip compressed data"*)
+	echo "$IMAGE is a COMPRESSED image, extracting..."
+	gunzip < $IMAGE > /tmp/image.$$
+	$EXE /tmp/image.$$
+	rm -f /tmp/image.$$
+	exit 0
+	;;
+*)
+	# find the romfs (use last one if many)
+	ROFF="`strings -t d $IMAGE | grep -e -rom1fs- |tail -1|awk '{ print $1 }'`"
+	if [ "$ROFF" ]; then
+		echo "Trying romfs@$ROFF ..."
+		dd if=$IMAGE bs=$ROFF skip=1 of=/tmp/image.$$
+		$EXE /tmp/image.$$
+		OK=$?
+		rm -f /tmp/image.$$
+		[ "$OK" -eq 0 ] && exit 0
+	fi
+	echo "$IMAGE is an unknown/unhandled file type: $TYPE"
+	exit 1
+	;;
+esac
+
+exit 0
+
+############################################################################

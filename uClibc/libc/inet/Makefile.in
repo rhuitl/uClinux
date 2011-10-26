@@ -1,0 +1,47 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+include $(top_srcdir)libc/inet/rpc/Makefile.in
+
+CSRC :=	getservice.c getproto.c hostid.c getnetent.c getnetbynm.c getnetbyad.c \
+	inet_net.c ntop.c herror.c if_index.c gai_strerror.c getaddrinfo.c \
+	in6_addr.c ether_addr.c ntohl.c opensock.c ifaddrs.c
+
+# multi source addr.c
+CSRC +=	inet_aton.c inet_addr.c inet_ntoa.c inet_makeaddr.c inet_lnaof.c \
+	inet_netof.c
+
+# multi source resolv.c
+CSRC +=	encodeh.c decodeh.c encoded.c decoded.c lengthd.c encodeq.c \
+	decodeq.c lengthq.c encodea.c decodea.c \
+	dnslookup.c resolveaddress.c opennameservers.c \
+	closenameservers.c resolvename.c gethostbyname.c res_init.c \
+	res_query.c gethostbyaddr.c read_etc_hosts_r.c get_hosts_byname_r.c \
+	get_hosts_byaddr_r.c gethostbyname2.c getnameinfo.c gethostent.c \
+	gethostbyname_r.c gethostbyname2_r.c gethostbyaddr_r.c \
+	res_comp.c ns_name.c
+
+# unused ATM
+CSRC += encodep.c decodep.c formquery.c
+
+# multi source socketcalls.c
+CSRC +=	accept.c bind.c connect.c getpeername.c getsockname.c getsockopt.c \
+	listen.c recv.c recvfrom.c recvmsg.c send.c sendmsg.c sendto.c \
+	setsockopt.c shutdown.c socket.c socketpair.c 
+
+INET_DIR := $(top_srcdir)libc/inet
+INET_OUT := $(top_builddir)libc/inet
+
+INET_SRC := $(patsubst %.c,$(INET_DIR)/%.c,$(CSRC))
+INET_OBJ := $(patsubst %.c,$(INET_OUT)/%.o,$(CSRC))
+
+libc-y += $(INET_OBJ)
+
+objclean-y += inet_objclean
+
+inet_objclean:
+	$(RM) $(INET_OUT)/*.{o,os}

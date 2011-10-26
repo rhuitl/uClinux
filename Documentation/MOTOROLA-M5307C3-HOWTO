@@ -1,0 +1,35 @@
+Motorola M5307C3 Evaluation Board
+---------------------------------
+
+uClinux/Coldfire is configured to use 8MB of RAM on the M5307C3 board.
+I beleive that most M5307C3 boards are equiped with 16MB of RAM. However,
+some earlier revisions of the dBUG firmware did not set up all 16MB
+correctly and only the first 8MB is fully functional.
+
+Both the linux-2.0.x and linux-2.4.x kernels are supported, and both the
+uC-libc and uClibc libraries as well. (Note that glibc is *not* supported
+on this target).
+
+The build process results in a file, images/image.bin, that can be loaded
+into the M5307C3 board.
+
+To load using the ethernet network download: 
+
+    dn -i image.bin
+
+To start up the image use: 
+
+    go 0x20000
+
+The serial port console is configured to be the first ColdFire UART. On the
+M5307C3 board this is the same serial port that dBUG runs on. Its is the
+port labeled "Terminal". uClinux/Coldfire configures this port for 19200
+baud, 8 data bits, no parity, 1 stop bit. You should see the kernel boot
+messages come out on this port, and uClinux/Coldfire will boot to an
+interactive Linux shell. 
+
+You could also use the serial port download. The serial download is slow,
+it will take several minutes to load the image. You must use an S-record
+format binary when loading over the serial line. (You can use
+m68k-elf-objcopy to convert the binary file to S-Record format.) 
+

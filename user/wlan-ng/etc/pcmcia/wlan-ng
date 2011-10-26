@@ -1,0 +1,204 @@
+#! /bin/sh
+#
+# etc/pcmcia/wlan-ng
+#
+# Copyright (C) 1999 AbsoluteValue Systems, Inc.  All Rights Reserved.
+# --------------------------------------------------------------------
+#
+# linux-wlan
+#
+#   The contents of this file are subject to the Mozilla Public
+#   License Version 1.1 (the "License"); you may not use this file
+#   except in compliance with the License. You may obtain a copy of
+#   the License at http://www.mozilla.org/MPL/
+#
+#   Software distributed under the License is distributed on an "AS
+#   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+#   implied. See the License for the specific language governing
+#   rights and limitations under the License.
+#
+#   Alternatively, the contents of this file may be used under the
+#   terms of the GNU Public License version 2 (the "GPL"), in which
+#   case the provisions of the GPL are applicable instead of the
+#   above.  If you wish to allow the use of your version of this file
+#   only under the terms of the GPL and not to allow others to use
+#   your version of this file under the MPL, indicate your decision
+#   by deleting the provisions above and replace them with the notice
+#   and other provisions required by the GPL.  If you do not delete
+#   the provisions above, a recipient may use your version of this
+#   file under either the MPL or the GPL.
+#
+# --------------------------------------------------------------------
+#
+# Inquiries regarding the linux-wlan Open Source project can be
+# made directly to:
+#
+# AbsoluteValue Systems Inc.
+# info@linux-wlan.com
+# http://www.linux-wlan.com
+#
+# --------------------------------------------------------------------
+#
+# Portions of the development of this software were funded by 
+# Intersil Corporation as part of PRISM(R) chipset product development.
+#
+# --------------------------------------------------------------------
+
+
+# [MSM]: Moved here because wlan/shared may is intended to be used by 
+#  other scripts
+wlan_usage ()
+{
+    echo "usage: wlan-ng [action] [device name] [debug]"
+    echo "  actions: start|resume, stop|suspend, check|cksum|restart"
+    echo "  debug  : enables shell debug"
+    exit 1
+}
+
+if [ "$3" = "debug" ]; then set -x ; fi
+
+# Note: this 'shared' comes with the WLAN package
+if [ ! -f /etc/wlan/shared ] ; then
+    echo "/etc/wlan/shared not present"
+    exit 0
+fi
+
+. /etc/wlan/shared
+
+# [MSM]: This test supplied by rlazarev, it's commented out due to pcmcia
+#   stab file movement.  This test needs to be 'functionized' and made a
+#   little more robust.
+#if [ ! -f /var/run/stab ] ; then
+#	echo "Error: Possibly PCMCIA CS is not started";
+#	wlan_usage;
+#	exit 1;
+#fi
+
+# If number of args is less than 2 display usage
+if [ $# -lt 2 ]; then wlan_usage ; fi
+
+# Note: this 'shared' comes with the PCMCIA package
+# ACTION=$1 and DEVICE=$2 are assigned in pcmcia/shared
+if [ -f /etc/pcmcia/shared ] ; then . /etc/pcmcia/shared ; fi
+
+# XXXX we can do stuff with $SCHEME still..?
+case "$ACTION" in
+
+'start'|'resume')
+	#=======ENABLE========================================
+	# Do we want to init the card at all?
+	eval 'WLAN_ENABLE=$ENABLE_'$DEVICE
+
+	if ! is_true $WLAN_ENABLE ; then
+		exit 0
+	fi
+
+	if is_true $WLAN_DOWNLOAD; then
+	    wlan_download $DEVICE
+        fi
+
+	wlan_enable $DEVICE
+
+	#=======MAC STARTUP=========================================
+	wlan_supports_scan $DEVICE
+	if [ $? = 0 ] ; then
+	    wlan_scan $DEVICE 
+	    if [ $? = 0 ] ; then
+		wlan_source_config_for_ssid "$ssid" "$bssid"
+
+		wlan_user_mibs $DEVICE
+		wlan_wep $DEVICE
+
+		grep 'autojoin' /proc/net/p80211/$DEVICE/wlandev > /dev/null
+		if [ $? = 0 ]; then
+		    wlan_infra $DEVICE
+		else
+		    wlan_dot11_join $DEVICE
+		fi
+	    else
+		echo "network not found.  maybe start IBSS?"
+	    fi
+	else
+	    wlan_source_config $DEVICE
+
+	    wlan_user_mibs $DEVICE
+	    wlan_wep $DEVICE
+
+	    if is_true $IS_ADHOC ; then	
+		wlan_adhoc $DEVICE
+	    else
+		wlan_infra $DEVICE
+	    fi
+	fi
+
+	# ==========PCMCIA NETDEVICE=============================
+	# Append the SSID to the pcmcia scheme name
+	wlan_set_ssid_schemefile "$WLAN_SCHEMESSID"
+
+	# Call the normal network initialization
+	./network $1 $2
+	if [ $? = 1 ] ; then
+#		echo "/etc/pcmcia/network $1 $2 failed."
+		wlan_restore_schemefile
+		exit 1
+	fi
+	
+	# Restore scheme file to it's prior contents
+	wlan_restore_schemefile
+	;;
+
+'stop'|'suspend')
+
+	# ==========PCMCIA NETDEVICE=============================
+	# Append the SSID to the pcmcia scheme name
+	wlan_set_ssid_schemefile "$DesiredSSID"
+
+	# Call the normal network initialization
+	./network $1 $2
+	if [ $? = 1 ] ; then
+#		echo "/etc/pcmcia/network $1 $2 failed."
+		wlan_restore_schemefile
+		exit 1
+	fi
+	
+	#=======DISABLE IFSTATE=============================
+	# Take the device down to a quiescent state.
+	wlan_disable $DEVICE
+
+	# Restore scheme file to it's prior contents
+	wlan_restore_schemefile
+	;;
+
+'check'|'cksum'|'restart')
+	# ==========STA ====================================
+	# Just passes through for normal network device
+	# behavior.
+	if is_true $IS_ADHOC; then
+		WLAN_SCHEMESSID="$SSID"
+	else
+		WLAN_SCHEMESSID="$DesiredSSID"
+	fi
+
+	# ==========PCMCIA NETDEVICE=============================
+	# Append the SSID to the pcmcia scheme name
+	wlan_set_ssid_schemefile "$WLAN_SCHEMESSID"
+	
+	# Call the normal network initialization
+	./network $1 $2 $3:$WLAN_SCHEMESSID
+	if [ $? = 1 ] ; then
+#		echo "/etc/pcmcia/network $1 $2 $3 failed."
+		wlan_restore_schemefile
+		exit 1
+	fi
+
+	# Restore scheme file to it's prior contents
+	wlan_restore_schemefile
+	;;
+
+*)
+    usage
+    ;;
+
+esac
+
+exit 0

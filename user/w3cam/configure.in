@@ -1,0 +1,53 @@
+AC_INIT()
+AC_ISC_POSIX
+
+LDFLAGS="$LDFLAGS -L/usr/local/lib -L/usr/local/X11/lib"
+CFLAGS="$CFLAGS -I/usr/local/include"
+
+AC_CHECK_LIB(m, pow)
+AC_CHECK_LIB(z, gzopen)
+AC_CHECK_LIB(png, png_create_write_struct)
+AC_CHECK_LIB(jpeg, jpeg_set_defaults)
+
+AC_MSG_CHECKING(--with-syslog=?)
+AC_ARG_WITH(syslog,
+	[  --with-syslog           use syslog [default=no]],
+	[ac_syslog=$withval],
+	[ac_syslog=no]
+)
+if test "$ac_syslog" = "yes" ; then
+	CFLAGS="$CFLAGS -DUSE_SYSLOG"
+else
+	ac_syslog=no
+fi
+AC_MSG_RESULT($ac_syslog)
+
+AC_MSG_CHECKING(--with-device=?)
+AC_ARG_WITH(device,
+	[  --with-device=<device>  video4linux device [default=/dev/video]],
+	[ac_device=$withval],
+	[ac_device=/dev/video]
+)
+AC_MSG_RESULT($ac_device)
+if ! test -c $ac_device; then
+	echo "** Warning: can't see '$ac_device'"
+fi
+
+AC_MSG_CHECKING(--with-ttf-inc=?)
+AC_ARG_WITH(ttf-inc,
+	[  --with-ttf-inc=<dir>    include directory for the freetype headers],
+	[ac_ttf=$withval],
+	[ac_ttf=/usr/local/X11/include]
+)
+AC_MSG_RESULT($ac_ttf)
+CFLAGS="$CFLAGS -I$ac_ttf"
+AC_CHECK_LIB(ttf, TT_Init_FreeType)
+
+
+AC_SUBST(ac_device)
+
+AC_OUTPUT(
+Makefile
+w3camd/Makefile
+)
+

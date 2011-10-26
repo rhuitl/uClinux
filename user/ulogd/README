@@ -1,0 +1,97 @@
+Userspace logging facility for iptables / linux 2.4
+$Id: README 344 2003-03-05 23:03:49Z laforge $
+
+Project Homepage: http://www.gnumonks.org/projects/ulogd
+Mailinglist: http://lists.gnumonks.org/mailman/listinfo/ulogd/
+
+This is just a short README, pleaes see the more extensive documentation
+in the doc/ subdirectory.
+
+===> IDEA
+
+This packages is intended for passing packets from the kernel to userspace 
+to do some logging there. It should work like that:
+
+- Register a target called ULOG with iptables
+- if the target is hit: 
+	- send the packet out using netlink multicast facility
+	- return NF_CONTINUE immediately
+
+New with ipt_ULOG 0.8 we can accumulate packets in userspace and send
+them in small batches (1-50) to userspace. This reduces the amount of
+expensive context switches.
+
+More than one logging daemon may listen to the netlink multicast address.
+
+===> CONTENTS
+
+= Ulog library (libipulog.a)
+Just a little library like libipq.a which provides a convenient way to 
+write userspace logging daemons. The functions provided are described 
+in the source code, a small demo program (ulog_test) is also included.
+
+= ulogd daemon (ulogd) 
+A sophisticated logging daemon which uses libipulog. The daemon provides 
+an easy to use plugin interface to write additional packet interpreters and
+output targets. Example plugins (interpreter: ip, tcp, icmp output: simple
+logging to a file) are included.
+
+= documentation (doc)
+A quite verbose documentation of this package and it's configuration exists,
+please actually make use of it and read it :)
+
+===> USAGE
+
+The kernel part of the userspace logging facility (ipt_ULOG.o) is included
+in kernels >= 2.4.18-pre8.  If you are running older kernel versions, you MUST
+install the ulog-patch from netfilter patch-o-matic FIRST !!
+
+Please go to the netfilter homepage (http://www.netfilter.org/)
+and download the latest iptables package.  There is a system called
+patch-o-matic, which manages recent netfilter development, which has
+not been included in the stock kernel yet.
+
+Just apply the ulog-patch from patch-o-matic (there is some documentation
+included in the iptables package how to use patch-o-matic).
+
+Next you have to enable the kernel config option CONFIG_IP_NF_TARGET_ULOG in
+the netfilter subsection of the network options. 
+
+Then recompile the kernel or just recompile the netfilter modules using 'make
+modules SUBDIRS=net/ipv4/netfilter'.  Next step is installing the module using
+'make modules_install'
+
+It is also a good idea to recompile and re-install the iptables package,
+if you don't already have libipt_ULOG.so in /usr/local/lib/iptables or
+/usr/lib/iptables
+
+Now You are ready to go. You may now insert logging rules to every chain.
+To see the full syntax, type 'iptables -j ULOG -h'
+
+===> EXAMPLES
+
+At first a simple example, which passes every outgoing packet to the 
+userspace logging, using netlink multicast group 3.
+
+iptables -A OUTPUT -j ULOG --ulog-nlgroup 3
+
+A more advanced one, passing all incoming tcp packets with destination 
+port 80 to the userspace logging daemon listening on netlink multicast 
+group 32. All packets get tagged with the ulog prefix "inp"
+
+iptables -A INPUT -j ULOG -p tcp --dport 80 --ulog-nlgroup 32 --ulog-prefix inp
+
+Since version 0.2,  I added another parameter (--ulog-cprange). 
+Using this parameter You are able to specify how much octets of the 
+packet should be copied from the kernel to userspace. 
+Setting --ulog-cprange to 0 does always copy the whole packet. Default is 0
+
+===> COPYRIGHT + CREDITS
+
+The code is (C) 2000-2003 by Harald Welte <laforge@gnumonks.org>
+
+Thanks also to the valuable Contributions of Daniel Stone, Alexander
+Janssen and Michael Stolovitzsky.
+
+Credits to Rusty Russel, James Morris, Marc Boucher and all the other 
+netfilter hackers. 

@@ -1,0 +1,657 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+<TITLE> Introduction to FreeS/WAN</TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<STYLE>
+BODY { font-family: serif; font-size: 11.0pt }
+H1 { font-family: sans-serif; font-size: 20.0pt }
+H2 { font-family: sans-serif; font-size: 17.0pt }
+H3 { font-family: sans-serif; font-size: 14.0pt }
+H4 { font-family: sans-serif; font-size: 11.0pt }
+H5 { font-family: sans-serif; font-size: 9.0pt }
+H6 { font-family: sans-serif; font-size: 8.0pt }
+SUB { font-size: 8.0pt }
+SUP { font-size: 8.0pt }
+PRE { font-size: 9.0pt }
+</STYLE>
+</HEAD>
+<BODY>
+<H1 ALIGN="CENTER"><A NAME="CONTENTS">Table of Contents</A></H1>
+<BR>
+<BR><B><A HREF="intro.html#intro">Introduction</A></B>
+<UL>
+<LI><A HREF="intro.html#ipsec.intro">IPSEC, Security for the Internet 
+Protocol</A></LI>
+<UL>
+<LI><A HREF="intro.html#intro.interop">Interoperating with other IPSEC 
+implementations</A></LI>
+<LI><A HREF="intro.html#applications">Applications of IPSEC</A></LI>
+<LI><A HREF="intro.html#types">The need to authenticate gateways</A></LI>
+</UL>
+<LI><A HREF="intro.html#project">The FreeS/WAN project</A></LI>
+<UL>
+<LI><A HREF="intro.html#goals">Project goals</A></LI>
+<LI><A HREF="intro.html#staff">Project team</A></LI>
+<LI><A HREF="intro.html#webdocs">Information on the web</A></LI>
+<LI><A HREF="intro.html#sites">Distribution sites</A></LI>
+<LI><A HREF="intro.html#archives">Archives of the project mailing list</A>
+</LI>
+</UL>
+<LI><A HREF="intro.html#products">Products containing FreeS/WAN</A></LI>
+<UL>
+<LI><A HREF="intro.html#distwith">Full Linux distributions</A></LI>
+<LI><A HREF="intro.html#fw_dist">Firewall distributions</A></LI>
+<LI><A HREF="intro.html#turnkey">Firewall and VPN products</A></LI>
+</UL>
+<LI><A HREF="intro.html#docs">Documentation</A></LI>
+<UL>
+<LI><A HREF="intro.html#docformats">This HowTo, in multiple formats</A></LI>
+<LI><A HREF="intro.html#text">Other documents in the distribution</A></LI>
+<LI><A HREF="intro.html#howto">User-written HowTo information</A></LI>
+<LI><A HREF="intro.html#applied">Papers on FreeS/WAN</A></LI>
+<LI><A HREF="intro.html#test">Test results</A></LI>
+</UL>
+<LI><A HREF="intro.html#licensing">License and copyright information</A></LI>
+<LI><A HREF="intro.html#1_6">Links to other sections</A></LI>
+</UL>
+<B><A HREF="install.html#install">Installing FreeS/WAN</A></B>
+<UL>
+<LI><A HREF="install.html#who.install">Who needs to perform an 
+installation?</A></LI>
+<LI><A HREF="install.html#re-install">Re-installs</A></LI>
+<LI><A HREF="install.html#before">Before starting the install</A></LI>
+<UL>
+<LI><A HREF="install.html#choosek">Choosing a kernel</A></LI>
+<LI><A HREF="install.html#getkernel">Things you must have installed</A></LI>
+<LI><A HREF="install.html#2_3_3">Getting FreeS/WAN</A></LI>
+<LI><A HREF="install.html#kconfig">Kernel configuration</A></LI>
+<LI><A HREF="install.html#inst-test">Install and test a kernel before 
+adding FreeS/WAN</A></LI>
+</UL>
+<LI><A HREF="install.html#building">Building and installing the software</A>
+</LI>
+<UL>
+<LI><A HREF="install.html#allbut">Everything but kernel installation</A></LI>
+<LI><A HREF="install.html#newk">Installing the new kernel</A></LI>
+<LI><A HREF="install.html#2_4_3">Make sure Lilo knows about the new 
+kernel</A></LI>
+</UL>
+<LI><A HREF="install.html#testinstall">Testing to see if install 
+succeeded</A></LI>
+<LI><A HREF="install.html#2_6">Where to go from here</A></LI>
+</UL>
+<B><A HREF="config.html#setup">Configuration</A></B>
+<UL>
+<LI><A HREF="config.html#example">Our example networks</A></LI>
+<LI><A HREF="config.html#testnet">Configuration for a testbed network</A>
+</LI>
+<LI><A HREF="config.html#setupnet">Set up and test networking</A></LI>
+<UL>
+<LI><A HREF="config.html#forward">Enabling packet forwarding</A></LI>
+<LI><A HREF="config.html#othersoft">Other software</A></LI>
+</UL>
+<LI><A HREF="config.html#rtfm">RTFM (please Read The Fine Manuals)</A></LI>
+<LI><A HREF="config.html#usersakey">Setting up RSA authentication keys</A>
+</LI>
+<UL>
+<LI><A HREF="config.html#genrsakey">Generating an RSA key pair</A></LI>
+<LI><A HREF="config.html#keyexchange">Exchanging authentication keys</A></LI>
+<LI><A HREF="config.html#useRSA">Using RSA signatures for authentication</A>
+</LI>
+</UL>
+<LI><A HREF="config.html#basic.conf">The configuration file</A></LI>
+<UL>
+<LI><A HREF="config.html#setup.conf">The setup section of ipsec.conf(5)</A>
+</LI>
+<LI><A HREF="config.html#conn.default">Connection defaults</A></LI>
+<LI><A HREF="config.html#edit.conn">Editing a connection description</A></LI>
+<LI><A HREF="config.html#which">Which is which?</A></LI>
+</UL>
+<LI><A HREF="config.html#examples">Example setups</A></LI>
+<UL>
+<LI><A HREF="config.html#VPNex">VPN</A></LI>
+<LI><A HREF="config.html#roadex">Road Warrior</A></LI>
+<LI><A HREF="config.html#oppex">Opportunistic encryption</A></LI>
+</UL>
+<LI><A HREF="config.html#handy">Simplifying ipsec.conf files</A></LI>
+<LI><A HREF="config.html#fw.basic">Is there a firewall in play?</A></LI>
+<LI><A HREF="config.html#testing">Testing the installation</A></LI>
+<UL>
+<LI><A HREF="config.html#matching">Matching numbers</A></LI>
+<LI><A HREF="config.html#testsetup">Sanity checking</A></LI>
+<LI><A HREF="intro.html#test">Starting a connection</A></LI>
+<LI><A HREF="config.html#pingtest">Ping tests</A></LI>
+<LI><A HREF="config.html#tcpdump">Testing with tcpdump</A></LI>
+</UL>
+<LI><A HREF="config.html#links.conf">What next?</A></LI>
+<LI><A HREF="config.html#otherconf">Other configuration possibilities</A>
+</LI>
+<UL>
+<LI><A HREF="config.html#choose">Choosing connection types</A></LI>
+<LI><A HREF="config.html#prodsecrets">Using shared secrets in production</A>
+</LI>
+<LI><A HREF="config.html#prodman">Using manual keying in production</A></LI>
+<LI><A HREF="config.html#boot">Setting up connections at boot time</A></LI>
+<LI><A HREF="config.html#multitunnel">Multiple tunnels between the same 
+two gateways</A></LI>
+<LI><A HREF="config.html#biggate">Many tunnels from a single gateway</A></LI>
+<LI><A HREF="glossary.html#extruded">Extruded Subnets</A></LI>
+<LI><A HREF="config.html#roadvirt">Road Warrior with virtual IP address</A>
+</LI>
+<LI><A HREF="config.html#dynamic">Dynamic Network Interfaces</A></LI>
+<LI><A HREF="config.html#unencrypted">Unencrypted tunnels</A></LI>
+</UL>
+</UL>
+<B><A HREF="manpages.html#manpages">FreeS/WAN manual pages</A></B>
+<UL>
+<LI><A HREF="manpages.html#man.file">Files</A></LI>
+<LI><A HREF="manpages.html#man.command">Commands</A></LI>
+<LI><A HREF="manpages.html#man.lib">Library routines</A></LI>
+</UL>
+<B><A HREF="firewall.html#firewall">FreeS/WAN and firewalls</A></B>
+<UL>
+<LI><A HREF="firewall.html#packets">IPSEC packets</A></LI>
+<UL>
+<LI><A HREF="firewall.html#noport">ESP and AH do not have ports</A></LI>
+<LI><A HREF="firewall.html#header">Header layout</A></LI>
+</UL>
+<LI><A HREF="firewall.html#filters">Filtering rules for IPSEC packets</A>
+</LI>
+<UL>
+<LI><A HREF="firewall.html#through">IPSEC through the gateway</A></LI>
+<LI><A HREF="firewall.html#ipsec_only">Preventing non-IPSEC traffic</A></LI>
+<LI><A HREF="firewall.html#unknowngate">Filtering packets from unknown 
+gateways</A></LI>
+</UL>
+<LI><A HREF="firewall.html#otherfilter">Other packet filters</A></LI>
+<UL>
+<LI><A HREF="glossary.html#ICMP">ICMP filtering</A></LI>
+<LI><A HREF="firewall.html#traceroute">UDP packets for traceroute</A></LI>
+<LI><A HREF="firewall.html#l2tp">UDP for L2TP</A></LI>
+</UL>
+<LI><A HREF="firewall.html#NAT">IPSEC and NAT</A></LI>
+<UL>
+<LI><A HREF="firewall.html#nat_ok">NAT on or behind the IPSEC gateway 
+works</A></LI>
+<LI><A HREF="firewall.html#nat_bad">NAT between gateways is problematic</A>
+</LI>
+<LI><A HREF="firewall.html#">Other references on NAT and IPSEC</A></LI>
+</UL>
+<LI><A HREF="firewall.html#updown">Calling firewall scripts, named in 
+ipsec.conf(5)</A></LI>
+<UL>
+<LI><A HREF="firewall.html#pre_post">Scripts called at IPSEC start and 
+stop</A></LI>
+<LI><A HREF="firewall.html#up_down">Scripts called at connection up and 
+down</A></LI>
+<LI><A HREF="firewall.html#ipchains.script">Scripts for ipchains</A></LI>
+<LI><A HREF="firewall.html#dhr">DHR on the updown script</A></LI>
+<LI><A HREF="firewall.html#exupdownchains">Example updown script for 
+ipchains</A></LI>
+</UL>
+<LI><A HREF="firewall.html#examplefw">Ipchains firewall configuration 
+at boot</A></LI>
+<UL>
+<LI><A HREF="firewall.html#Ranch.trinity">Scripts based on Ranch's work</A>
+</LI>
+<LI><A HREF="firewall.html#seawall">The Seattle firewall</A></LI>
+<LI><A HREF="firewall.html#rcf">The RCF scripts</A></LI>
+</UL>
+</UL>
+<B><A HREF="trouble.html#debug">Linux FreeS/WAN Troubleshooting</A></B>
+<UL>
+<LI><A HREF="trouble.html#report">Problem Reporting</A></LI>
+<LI><A HREF="trouble.html#logusage">Logs used</A></LI>
+<LI><A HREF="trouble.html#info">Information available on your system</A></LI>
+<UL>
+<LI><A HREF="trouble.html#pages">man pages provided</A></LI>
+<LI><A HREF="trouble.html#statusinfo">Status information</A></LI>
+</UL>
+<LI><A HREF="trouble.html#pluto.problems">Pluto problem hints</A></LI>
+<UL>
+<LI><A HREF="trouble.html#gdb.pluto">Using GDB on Pluto</A></LI>
+</UL>
+<LI><A HREF="trouble.html#ifconfig">ifconfig reports for KLIPS debugging</A>
+</LI>
+<LI><A HREF="trouble.html#testgates">Testing between security gateways</A>
+</LI>
+<LI><A HREF="trouble.html#c.guide">Claudia's guide</A></LI>
+</UL>
+<B><A HREF="kernel.html#kernelconfig">Kernel configuration for FreeS/WAN</A>
+</B>
+<UL>
+<LI><A HREF="kernel.html#notall">Not everyone needs to worry about 
+kernel configuration</A></LI>
+<LI><A HREF="kernel.html#assume">Assumptions and notation</A></LI>
+<UL>
+<LI><A HREF="kernel.html#labels">Labels used</A></LI>
+</UL>
+<LI><A HREF="kernel.html#kernelopt">Kernel options for FreeS/WAN</A></LI>
+</UL>
+<B><A HREF="roadmap.html#roadmap">Distribution Roadmap: What's Where in 
+Linux FreeS/WAN</A></B>
+<UL>
+<LI><A HREF="roadmap.html#top">Top directory</A></LI>
+<LI><A HREF="roadmap.html#doc">Documentation</A></LI>
+<LI><A HREF="roadmap.html#klips.roadmap">KLIPS: kernel IP security</A></LI>
+<LI><A HREF="roadmap.html#pluto.roadmap">Pluto key and connection 
+management daemon</A></LI>
+<LI><A HREF="roadmap.html#utils">Utils</A></LI>
+<LI><A HREF="roadmap.html#lib">Libraries</A></LI>
+<UL>
+<LI><A HREF="roadmap.html#fswanlib">FreeS/WAN Library</A></LI>
+<LI><A HREF="roadmap.html#otherlib">Imported Libraries</A></LI>
+</UL>
+</UL>
+<B><A HREF="compat.html#compat">Linux FreeS/WAN Compatibility Guide</A></B>
+<UL>
+<LI><A HREF="compat.html#spec">Implemented parts of the IPSEC 
+Specification</A></LI>
+<UL>
+<LI><A HREF="compat.html#in">In Linux FreeS/WAN</A></LI>
+<LI><A HREF="compat.html#dropped">Deliberately ommitted</A></LI>
+<LI><A HREF="compat.html#not">Not (yet) in Linux FreeS/WAN</A></LI>
+</UL>
+<LI><A HREF="compat.html#pfkey">Our PF-Key implementation</A></LI>
+<UL>
+<LI><A HREF="compat.html#pfk.port">PF-Key portability</A></LI>
+</UL>
+<LI><A HREF="compat.html#otherk">Kernels other than 2.0.38 and 2.2.18</A>
+</LI>
+<UL>
+<LI><A HREF="compat.html#kernel.2.0">Other 2.0.x Intel Kernels</A></LI>
+<LI><A HREF="compat.html#kernel.production">2.2 and 2.4 Kernels</A></LI>
+</UL>
+<LI><A HREF="compat.html#otherdist">Intel Linux distributions other 
+than Redhat</A></LI>
+<UL>
+<LI><A HREF="compat.html#rh7">Redhat 7.0</A></LI>
+<LI><A HREF="compat.html#suse">SuSE Linux</A></LI>
+<LI><A HREF="compat.html#slack">Slackware</A></LI>
+<LI><A HREF="compat.html#deb">Debian</A></LI>
+<LI><A HREF="compat.html#caldera">Caldera</A></LI>
+</UL>
+<LI><A HREF="compat.html#CPUs">CPUs other than Intel</A></LI>
+<UL>
+<LI><A HREF="compat.html# strongarm">Corel Netwinder (StrongARM CPU)</A></LI>
+<LI><A HREF="compat.html#yellowdog">Yellow Dog Linux on Power PC</A></LI>
+<LI><A HREF="compat.html#mklinux">Mklinux</A></LI>
+<LI><A HREF="compat.html#alpha">Alpha 64-bit processors</A></LI>
+<LI><A HREF="compat.html#SPARC">Sun SPARC processors</A></LI>
+<LI><A HREF="compat.html#mips">MIPS processors</A></LI>
+<LI><A HREF="compat.html#coldfire">Motorola Coldfire</A></LI>
+</UL>
+<LI><A HREF="compat.html#multiprocessor">Multiprocessor machines</A></LI>
+<LI><A HREF="compat.html#hardware">Support for crypto hardware</A></LI>
+<LI><A HREF="compat.html#ipv6">IP version 6 (IPng)</A></LI>
+<UL>
+<LI><A HREF="compat.html#v6.back">IPv6 background</A></LI>
+</UL>
+</UL>
+<B><A HREF="interop.html#10">Interoperation with other IPSEC 
+implementations</A></B>
+<UL>
+<LI><A HREF="interop.html#patch.interop">Patches to extend 
+interoperability</A></LI>
+<LI><A HREF="interop.html#interop.problem">Interoperability problems</A></LI>
+<UL>
+<LI><A HREF="interop.html#noDES">Systems that want to use single DES</A></LI>
+</UL>
+<LI><A HREF="interop.html#otherpub">Interop HowTo documents</A></LI>
+<LI><A HREF="interop.html#mail.interop">Interoperation with specific 
+products</A></LI>
+<UL>
+<LI><A HREF="interop.html#oldswan">Older versions of FreeS/WAN</A></LI>
+<LI><A HREF="interop.html#OpenBSD">OpenBSD</A></LI>
+<LI><A HREF="interop.html#FreeBSD">FreeBSD</A></LI>
+<LI><A HREF="interop.html#NetBSD">NetBSD</A></LI>
+<LI><A HREF="interop.html#Cisco">Cisco Routers</A></LI>
+<LI><A HREF="interop.html#bay">Nortel (Bay Networks) Contivity switch</A>
+</LI>
+<LI><A HREF="interop.html#Raptor">Raptor Firewall</A></LI>
+<LI><A HREF="interop.html#gauntlet">Gauntlet firewall GVPN</A></LI>
+<LI><A HREF="interop.html#checkpoint">Checkpoint Firewall-1</A></LI>
+<LI><A HREF="interop.html#redcreek">Redcreek Ravlin</A></LI>
+<LI><A HREF="interop.html#sentinel">SSH Sentinel</A></LI>
+<LI><A HREF="interop.html#Fsecure">F-Secure VPN for Windows</A></LI>
+<LI><A HREF="interop.html#watchguard">Watchguard</A></LI>
+<LI><A HREF="interop.html#Xedia">Xedia Access Point/QVPN</A></LI>
+<LI><A HREF="interop.html#pgpnet">PGP Mac and Windows IPSEC Client</A></LI>
+<LI><A HREF="interop.html#IRE">IRE Safenet/SoftPK</A></LI>
+<LI><A HREF="interop.html#borderware">Borderware</A></LI>
+<LI><A HREF="interop.html#freegate">Freegate</A></LI>
+<LI><A HREF="interop.html#timestep">Timestep</A></LI>
+<LI><A HREF="interop.html#shiva">Shiva/Intel LANrover</A></LI>
+<LI><A HREF="interop.html#solaris">Sun Solaris</A></LI>
+<LI><A HREF="interop.html#sonicwall">Sonicwall</A></LI>
+<LI><A HREF="interop.html#radguard">Radguard</A></LI>
+<LI><A HREF="interop.html#winclient">Windows clients</A></LI>
+<LI><A HREF="interop.html#NTdomain">NT domains vs. tunnels</A></LI>
+<LI><A HREF="interop.html#win2k">Windows 2000</A></LI>
+</UL>
+</UL>
+<B><A HREF="politics.html#politics">History and politics of cryptography</A>
+</B>
+<UL>
+<LI><A HREF="politics.html#intro.politics">Introduction</A></LI>
+<UL>
+<LI><A HREF="politics.html#11_1_1">History</A></LI>
+<LI><A HREF="politics.html#intro.poli">Politics</A></LI>
+<LI><A HREF="politics.html#11_1_3">Links</A></LI>
+<LI><A HREF="politics.html#11_1_4">Outline of this section</A></LI>
+</UL>
+<LI><A HREF="politics.html#leader">From our project leader</A></LI>
+<UL>
+<LI><A HREF="politics.html#gilmore">Swan: Securing the Internet against 
+Wiretapping</A></LI>
+<LI><A HREF="politics.html#policestate">Stopping wholesale monitoring</A>
+</LI>
+</UL>
+<LI><A HREF="politics.html#weak">Government promotion of weak crypto</A></LI>
+<UL>
+<LI><A HREF="politics.html#escrow">Escrowed encryption</A></LI>
+<LI><A HREF="politics.html#shortkeys">Limited key lengths</A></LI>
+</UL>
+<LI><A HREF="politics.html#exlaw">Cryptography Export Laws</A></LI>
+<UL>
+<LI><A HREF="politics.html#USlaw">US Law</A></LI>
+<LI><A HREF="politics.html#wrong">What's wrong with restrictions on 
+cryptography</A></LI>
+<LI><A HREF="politics.html#Wassenaar">The Wassenaar Arrangement</A></LI>
+<LI><A HREF="politics.html#status">Export status of Linux FreeS/WAN</A></LI>
+<LI><A HREF="politics.html#help">Help spread IPSEC around</A></LI>
+</UL>
+<LI><A HREF="politics.html#desnotsecure">DES is Not Secure</A></LI>
+<UL>
+<LI><A HREF="politics.html#deshware">Dedicated hardware breaks DES in a 
+few days</A></LI>
+<LI><A HREF="politics.html#spooks">Spooks may break DES faster yet</A></LI>
+<LI><A HREF="politics.html#desnet">Networks break DES in a few weeks</A></LI>
+<LI><A HREF="politics.html#no_des">We disable DES</A></LI>
+<LI><A HREF="politics.html#40joke">40-bits is laughably weak</A></LI>
+<LI><A HREF="politics.html#altdes">Triple DES is almost certainly secure</A>
+</LI>
+<LI><A HREF="politics.html#aes.ipsec">AES in IPSEC</A></LI>
+</UL>
+<LI><A HREF="politics.html#press">Press coverage of Linux FreeS/WAN:</A></LI>
+<UL>
+<LI><A HREF="politics.html#11_6_1">FreeS/WAN 1.0 press</A></LI>
+<LI><A HREF="politics.html#release">Press release for version 1.0</A></LI>
+</UL>
+</UL>
+<B><A HREF="ipsec.html#ipsec.detail">The IPSEC protocols</A></B>
+<UL>
+<LI><A HREF="ipsec.html#others">Applying IPSEC</A></LI>
+<UL>
+<LI><A HREF="ipsec.html#advantages">Advantages of IPSEC</A></LI>
+<LI><A HREF="ipsec.html#limitations">Limitations of IPSEC</A></LI>
+<LI><A HREF="ipsec.html#uses">IPSEC is a general mechanism for securing 
+IP</A></LI>
+<LI><A HREF="ipsec.html#authonly">Using authentication without 
+encryption</A></LI>
+<LI><A HREF="ipsec.html#encnoauth">Encryption without authentication is 
+dangerous</A></LI>
+<LI><A HREF="ipsec.html#multilayer">Multiple layers of IPSEC processing 
+are possible</A></LI>
+<LI><A HREF="ipsec.html#traffic.resist">Resisting traffic analysis</A></LI>
+</UL>
+<LI><A HREF="ipsec.html#primitives">Cryptographic components</A></LI>
+<UL>
+<LI><A HREF="ipsec.html#block.cipher">Block ciphers</A></LI>
+<LI><A HREF="ipsec.html#hash.ipsec">Hash functions</A></LI>
+<LI><A HREF="ipsec.html#DH.keying">Diffie-Hellman key agreement</A></LI>
+<LI><A HREF="ipsec.html#RSA.auth">RSA authentication</A></LI>
+</UL>
+<LI><A HREF="ipsec.html#structure">Structure of IPSEC</A></LI>
+<UL>
+<LI><A HREF="ipsec.html#IKE.ipsec">IKE (Internet Key Exchange)</A></LI>
+<LI><A HREF="ipsec.html#services">IPSEC Services, AH and ESP</A></LI>
+<LI><A HREF="ipsec.html#AH.ipsec">The Authentication Header (AH)</A></LI>
+<LI><A HREF="ipsec.html#ESP.ipsec">Encapsulated Security Payload (ESP)</A>
+</LI>
+</UL>
+<LI><A HREF="ipsec.html#modes">IPSEC modes</A></LI>
+<UL>
+<LI><A HREF="ipsec.html#tunnel.ipsec">Tunnel mode</A></LI>
+<LI><A HREF="ipsec.html#transport.ipsec">Transport mode</A></LI>
+</UL>
+<LI><A HREF="ipsec.html#parts">FreeS/WAN parts</A></LI>
+<UL>
+<LI><A HREF="ipsec.html#KLIPS.ipsec">KLIPS: Kernel IPSEC Support</A></LI>
+<LI><A HREF="ipsec.html#Pluto.ipsec">The Pluto daemon</A></LI>
+<LI><A HREF="ipsec.html#command">The ipsec(8) command</A></LI>
+<LI><A HREF="ipsec.html#ipsec.conf">Linux FreeS/WAN configuration file</A>
+</LI>
+</UL>
+<LI><A HREF="ipsec.html#key">Key management</A></LI>
+<UL>
+<LI><A HREF="ipsec.html#current">Currently Implemented Methods</A></LI>
+<LI><A HREF="ipsec.html#notyet">Methods not yet implemented</A></LI>
+</UL>
+</UL>
+<B><A HREF="mail.html#lists">Mailing lists and newsgroups</A></B>
+<UL>
+<LI><A HREF="mail.html#list.fs">Mailing lists about FreeS/WAN</A></LI>
+<UL>
+<LI><A HREF="mail.html#projlist">The project mailing lists</A></LI>
+<LI><A HREF="mail.html#archive">Archives of the lists</A></LI>
+</UL>
+<LI><A HREF="mail.html#indexes">Indexes of mailing lists</A></LI>
+<LI><A HREF="mail.html#otherlists">Lists for related software and topics</A>
+</LI>
+<UL>
+<LI><A HREF="mail.html#linux.lists">Linux mailing lists</A></LI>
+<LI><A HREF="glossary.html#ietf">Lists for IETF working groups</A></LI>
+<LI><A HREF="mail.html#other">Other mailing lists</A></LI>
+</UL>
+<LI><A HREF="mail.html#newsgroups">Usenet newsgroups</A></LI>
+</UL>
+<B><A HREF="web.html#weblink">Web links</A></B>
+<UL>
+<LI><A HREF="web.html#freeswan">The Linux FreeS/WAN Project</A></LI>
+<UL>
+<LI><A HREF="web.html#patch">Add-ons and patches for FreeS/WAN</A></LI>
+<LI><A HREF="web.html#dist">Distributions including FreeS/WAN</A></LI>
+<LI><A HREF="web.html#used">Things FreeS/WAN uses or could use</A></LI>
+<LI><A HREF="web.html#alternatives">Other approaches to VPNs for Linux</A>
+</LI>
+</UL>
+<LI><A HREF="web.html#ipsec.link">The IPSEC Protocols</A></LI>
+<UL>
+<LI><A HREF="web.html#general">General IPSEC or VPN information</A></LI>
+<LI><A HREF="web.html#overview">IPSEC overview documents or slide sets</A>
+</LI>
+<LI><A HREF="web.html#otherlang">IPSEC information in languages other 
+than English</A></LI>
+<LI><A HREF="web.html#RFCs1">RFCs and other reference documents</A></LI>
+<LI><A HREF="web.html#analysis">Analysis and critiques of IPSEC 
+protocols</A></LI>
+<LI><A HREF="web.html#IP.background">Background information on IP</A></LI>
+</UL>
+<LI><A HREF="web.html#implement">IPSEC Implementations</A></LI>
+<UL>
+<LI><A HREF="web.html#linuxprod">Linux products</A></LI>
+<LI><A HREF="web.html#router">IPSEC in router products</A></LI>
+<LI><A HREF="web.html#fw.web">IPSEC in firewall products</A></LI>
+<LI><A HREF="web.html#ipsecos">Operating systems with IPSEC support</A></LI>
+<LI><A HREF="web.html#opensource">Open source IPSEC implementations</A></LI>
+<LI><A HREF="web.html#interop">Interoperability</A></LI>
+</UL>
+<LI><A HREF="web.html#linux.link">Linux links</A></LI>
+<UL>
+<LI><A HREF="web.html#linux.basic">Basic and tutorial Linux information</A>
+</LI>
+<LI><A HREF="web.html#general">General Linux sites</A></LI>
+<LI><A HREF="web.html#docs1">Documentation</A></LI>
+<LI><A HREF="web.html#advroute.web">Advanced routing</A></LI>
+<LI><A HREF="web.html#linsec">Security for Linux</A></LI>
+<LI><A HREF="web.html#firewall.linux">Linux firewalls</A></LI>
+<LI><A HREF="web.html#linux.misc">Miscellaneous Linux information</A></LI>
+</UL>
+<LI><A HREF="web.html#crypto.link">Crypto and security links</A></LI>
+<UL>
+<LI><A HREF="web.html#security">Crypto and security resources</A></LI>
+<LI><A HREF="web.html#policy">Cryptography law and policy</A></LI>
+<LI><A HREF="web.html#crypto.tech">Cryptography technical information</A>
+</LI>
+<LI><A HREF="web.html#compsec">Computer and network security</A></LI>
+<LI><A HREF="web.html#people">Links to home pages</A></LI>
+</UL>
+</UL>
+<B><A HREF="glossary.html#ourgloss">Glossary for the Linux FreeS/WAN 
+project</A></B>
+<UL>
+<LI><A HREF="glossary.html#jump">Jump to a letter in the glossary</A></LI>
+<LI><A HREF="glossary.html#gloss">Other glossaries</A></LI>
+<LI><A HREF="glossary.html#definitions">Definitions</A></LI>
+</UL>
+<B><A HREF="biblio.html#biblio">Bibliography for the Linux FreeS/WAN 
+project</A></B>
+<BR>
+<BR><B><A HREF="rfc.html#RFC">IPSEC RFCs and related documents</A></B>
+<UL>
+<LI><A HREF="rfc.html#RFCfile">The RFCs.tar.gz Distribution File</A></LI>
+<LI><A HREF="rfc.html#sources">Other sources for RFCs &amp; Internet drafts</A>
+</LI>
+<UL>
+<LI><A HREF="rfc.html#RFCdown">RFCs</A></LI>
+<LI><A HREF="rfc.html#drafts">Internet Drafts</A></LI>
+<LI><A HREF="rfc.html#FIPS1">FIPS standards</A></LI>
+<LI><A HREF="rfc.html#doc.cd">Document CDs</A></LI>
+</UL>
+<LI><A HREF="rfc.html#RFCs.tar.gz">What's in the RFCs.tar.gz bundle?</A></LI>
+<UL>
+<LI><A HREF="rfc.html#rfc.ov">Overview RFCs</A></LI>
+<LI><A HREF="rfc.html#basic.prot">Basic protocols</A></LI>
+<LI><A HREF="rfc.html#key.ike">Key management</A></LI>
+<LI><A HREF="rfc.html#rfc.detail">Details of various things used</A></LI>
+<LI><A HREF="rfc.html#rfc.ref">Older RFCs which may be referenced</A></LI>
+<LI><A HREF="rfc.html#rfc.dns">RFCs for secure DNS service, which IPSEC 
+may use</A></LI>
+<LI><A HREF="rfc.html#rfc.exp">RFCs labelled &quot;experimental&quot;</A></LI>
+<LI><A HREF="rfc.html#rfc.rel">Related RFCs</A></LI>
+</UL>
+</UL>
+<B><A HREF="faq.html#18">FreeS/WAN FAQ</A></B>
+<UL>
+<LI><A HREF="faq.html#questions">Questions</A></LI>
+<LI><A HREF="faq.html#whatzit"> What is FreeS/WAN?</A></LI>
+<LI><A HREF="faq.html#problems">How do I report a problem or seek help?</A>
+</LI>
+<LI><A HREF="faq.html#generic">Generic questions</A></LI>
+<UL>
+<LI><A HREF="faq.html#lemme_out">This is too complicated. Isn't there 
+an easier way?</A></LI>
+<LI><A HREF="faq.html#commercial">Can I get commercial support for this 
+product?</A></LI>
+<LI><A HREF="faq.html#modify.faq">Can I modify FreeS/WAN to ...?</A></LI>
+<LI><A HREF="faq.html#contrib.faq">Can I contribute to the project?</A></LI>
+<LI><A HREF="faq.html#ddoc.faq">Is there detailed design documentation?</A>
+</LI>
+<LI><A HREF="faq.html#interop.faq">Can FreeS/WAN talk to ...?</A></LI>
+<LI><A HREF="faq.html#old_to_new">Can different FreeS/WAN versions talk 
+to each other?</A></LI>
+<LI><A HREF="faq.html#versions">Does FreeS/WAN run on my version of 
+Linux?</A></LI>
+<LI><A HREF="faq.html#k.versions">Does FreeS/WAN run on the latest 
+kernel version?</A></LI>
+<LI><A HREF="faq.html#faq.speed">Is a ... fast enough to handle 
+FreeS/WAN with ... connections?</A></LI>
+</UL>
+<LI><A HREF="faq.html#compile.faq">Compilation problems</A></LI>
+<UL>
+<LI><A HREF="faq.html#gmp.h_missing">gmp.h: No such file or directory</A>
+</LI>
+<LI><A HREF="faq.html#noVM">... virtual memory exhausted</A></LI>
+</UL>
+<LI><A HREF="faq.html#setup.faq">Life's little mysteries</A></LI>
+<UL>
+<LI><A HREF="faq.html#cantping">I cannot ping ....</A></LI>
+<LI><A HREF="faq.html#forever">It takes forever to ...</A></LI>
+<LI><A HREF="faq.html#route">I send packets to the tunnel with route(8) 
+but they vanish</A></LI>
+<LI><A HREF="faq.html#down_route">When a tunnel goes down, packets 
+vanish</A></LI>
+<LI><A HREF="faq.html#firewall_ate">The firewall ate my packets!</A></LI>
+<LI><A HREF="faq.html#dropconn">Dropped connections</A></LI>
+<LI><A HREF="faq.html#tcpdump.faq">TCPdump on the gateway shows strange 
+things</A></LI>
+<LI><A HREF="faq.html#no_trace">Traceroute does not show anything 
+between the gateways</A></LI>
+</UL>
+<LI><A HREF="faq.html#man4debug">Testing in stages</A></LI>
+<UL>
+<LI><A HREF="faq.html#nomanual">Manually keyed connections don't work</A>
+</LI>
+<LI><A HREF="faq.html#spi_error">One manual connection works, but 
+second one fails</A></LI>
+<LI><A HREF="faq.html#man_no_auto">Manual connections work, but 
+automatic keying doesn't</A></LI>
+<LI><A HREF="faq.html#nocomp">IPSEC works, but connections using 
+compression fail</A></LI>
+<LI><A HREF="faq.html#pmtu.broken">Small packets work, but large 
+transfers fail</A></LI>
+<LI><A HREF="faq.html#subsub">Subnet-to-subnet works, but tests from 
+the gateways don't</A></LI>
+</UL>
+<LI><A HREF="faq.html#error">Interpreting error messages</A></LI>
+<UL>
+<LI><A HREF="faq.html#unreachable">SIOCADDRT:Network is unreachable</A></LI>
+<LI><A HREF="faq.html#noKLIPS">ipsec_setup: Fatal error, kernel appears 
+to lack KLIPS</A></LI>
+<LI><A HREF="faq.html#noDNS">ipsec_setup: ... failure to fetch key for 
+... from DNS</A></LI>
+<LI><A HREF="faq.html#dup_address">ipsec_setup: ... interfaces ... and 
+... share address ...</A></LI>
+<LI><A HREF="faq.html#kflags">ipsec_setup: Cannot adjust kernel flags</A>
+</LI>
+<LI><A HREF="faq.html#conn_name">Connection names in Pluto error 
+messages</A></LI>
+<LI><A HREF="faq.html#cantorient">Pluto: ... can't orient connection</A></LI>
+<LI><A HREF="faq.html#noconn">Pluto: ... no connection is known</A></LI>
+<LI><A HREF="faq.html#nosuit">Pluto: ... no suitable connection ...</A></LI>
+<LI><A HREF="faq.html#noconn.auth">Pluto: ... no connection has been 
+authorized</A></LI>
+<LI><A HREF="faq.html#noDESsupport">Pluto: ... OAKLEY_DES_CBC is not 
+supported.</A></LI>
+<LI><A HREF="faq.html#notransform"> Pluto: ... no acceptable transform</A>
+</LI>
+<LI><A HREF="faq.html#econnrefused">ECONNREFUSED error message</A></LI>
+<LI><A HREF="faq.html#SAused">... trouble writing to /dev/ipsec ... SA 
+already in use</A></LI>
+<LI><A HREF="faq.html#ignore">... ignoring ... payload</A></LI>
+</UL>
+<LI><A HREF="faq.html#canI">Can I ...</A></LI>
+<UL>
+<LI><A HREF="faq.html#reload">Can I reload connection info without 
+restarting?</A></LI>
+<LI><A HREF="faq.html#masq.faq">Can I use several masqueraded subnets?</A>
+</LI>
+<LI><A HREF="faq.html#dup_route">Can I use subnets masqueraded to the 
+same addresses?</A></LI>
+<LI><A HREF="faq.html#road.masq">Can I assign a road warrior an address 
+on my net?</A></LI>
+<LI><A HREF="faq.html#QoS">Can I use Quality of Service routing with 
+FreeS/WAN?</A></LI>
+<LI><A HREF="faq.html#deadtunnel">Can I recognise dead tunnels and shut 
+them down?</A></LI>
+<LI><A HREF="faq.html#demanddial">Can I build IPSEC tunnels over a 
+demand-dialed link?</A></LI>
+<LI><A HREF="faq.html#GRE">Can I build GRE tunnels over IPSEC?</A></LI>
+<LI><A HREF="faq.html#PKIcert"> Does FreeS/WAN support X.509 or other 
+PKI certificates?</A></LI>
+<LI><A HREF="faq.html#Radius">Does FreeS/WAN support Radius or other 
+user authentication?</A></LI>
+<LI><A HREF="faq.html#noDES.faq">Does FreeS/WAN support single DES 
+encryption?</A></LI>
+</UL>
+<LI><A HREF="faq.html#spam">Why don't you restrict the mailing lists to 
+reduce spam?</A></LI>
+</UL>
+<B><A HREF="performance.html#performance">Performance of FreeS/WAN</A></B>
+<UL>
+<LI><A HREF="performance.html#methods">Methods of mesasuring</A></LI>
+</UL>
+</BODY>
+</HTML>

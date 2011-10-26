@@ -1,0 +1,155 @@
+# ###############################################################
+#
+# Makefile for the GPL speedtouch USB driver 
+#
+# Written by Francois Rogler <francois@rogler.org>
+# June 2001
+#
+# $Id: Makefile.in,v 1.9 2004/05/18 00:10:47 papillau Exp $
+#
+# ###############################################################
+
+# ###############################################################
+# Makefile variables
+# ###############################################################
+
+# Warning levels
+CWARN0 = @CWARN@
+CWARN1 = $(CWARN0) -Wwrite-strings -Wshadow
+CWARN2 = $(CWARN1) -Wcast-align -Wcast-qual -Waggregate-return
+CWARN3 = $(CWARN2) -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
+CWARN4 = $(CWARN3) -Wconversion -Winline -Wtraditional
+CWARN  = $(CWARN0)
+
+
+# Vrac
+SHELL = @SHELL@
+CONFIGURE_ARGS = @ac_configure_args@
+@SET_MAKE@
+
+rootdir=@PWD@
+
+# Driver version
+VERSION=@VERSION@
+
+# Installation directories
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+sbindir=@sbindir@
+libexecdir=@libexecdir@
+datadir=@datadir@
+sysconfdir=@sysconfdir@
+libdir=@libdir@
+includedir=@includedir@
+oldincludedir=@oldincludedir@
+infodir=@infodir@
+mandir=@mandir@
+doc=${rootdir}/@DOCDIR@
+
+srcdir=${rootdir}/src
+make_bindir=${rootdir}/bin
+include= -I. -I${includedir} -I${oldincludedir}
+INSTALL=@INSTALL@
+installuser=@installuser@
+
+man1dir=${mandir}/man1
+man8dir=${mandir}/man8
+docdir=${datadir}/doc/speedtouch
+
+# C compiler
+CC=@CC@
+
+# C compiler options
+THREAD_LIBS=@THREAD_LIBS@
+USE_SYSLOG=@syslog_flags@
+PUSB_SOURCE=@PUSB_SOURCE@
+
+CFLAGS=@CFLAGS@
+ST_CFLAGS=$(CWARN) $(include) $(CFLAGS)
+ST_COMPILE=@st_compile@
+
+# Linker options
+LINK_OPTS=@link_opts@
+
+LIBS=@LIBS@
+
+DEFS=$(CFLAGS)
+
+#RPM Variables
+RPM_ROOT=@RPM_ROOT@
+
+# ###############################################################
+# Makefile Rules
+# ###############################################################
+
+DOC_FILES = \
+	adsl-conf-pppd       FAQ          speedtouch.conf \
+	adsl.ppp-peersample  HDLC_BUG     pppoax-doc-en.txt \
+	speedtouch.sh        BUGS         pppoax-doc-es.txt \
+	Makefile.in          results.txt  pppoax-doc-fr.txt 
+
+DOCTOR_FILES = \
+	doctor/check-hdlc-bug.c  doctor/check-hdlc.c \
+	doctor/Makefile          doctor/speedtouch-doctor.sh
+
+MAN_FILES =  \
+	man/modem_run.8  man/pppoa2.8 man/pppoa3.8 \
+	man/speedtouch-setup.1 man/speedtouch-start.1 man/speedtouch-stop.1
+
+HOWTO_FILES = \
+	howto/SpeedTouch-HOWTO-en.html  howto/SpeedTouch-HOWTO-fr.html \
+	howto/SpeedTouch-HOWTO-de.html  howto/SpeedTouch-HOWTO-it.html \
+	howto/SpeedTouch-HOWTO-es.html  howto/SpeedTouch-HOWTO-nl.html
+
+all :
+
+install:
+	@test -d "$(man1dir)" || $(INSTALL) -c -d "$(man1dir)"
+	$(INSTALL) -m 0644 -o $(installuser) man/speedtouch-setup.1 "$(man1dir)"
+	$(INSTALL) -m 0644 -o $(installuser) man/speedtouch-start.1 "$(man1dir)"
+	$(INSTALL) -m 0644 -o $(installuser) man/speedtouch-stop.1  "$(man1dir)"
+	@test -d "$(man8dir)" || $(INSTALL) -c -d "$(man8dir)"
+	$(INSTALL) -m 0644 -o $(installuser) man/modem_run.8 "$(man8dir)"
+	$(INSTALL) -m 0644 -o $(installuser) man/pppoa2.8    "$(man8dir)"
+	$(INSTALL) -m 0644 -o $(installuser) man/pppoa3.8    "$(man8dir)"
+	@test -d "$(docdir)" || $(INSTALL) -c -d "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) adsl.ppp-peersample "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) speedtouch.sh       "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) speedtouch.conf     "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) FAQ                 "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) BUGS                "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) HDLC_BUG            "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) results.txt         "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) pppoax-doc-en.txt   "$(docdir)"
+	$(INSTALL) -m 0644 -o $(installuser) pppoax-doc-fr.txt   "$(docdir)"
+	@test -d "$(docdir)/howto" || $(INSTALL) -c -d "$(docdir)/howto"
+	$(INSTALL) -m 0644 -o $(installuser) howto/SpeedTouch-HOWTO-en.html "$(docdir)/howto"
+	$(INSTALL) -m 0644 -o $(installuser) howto/SpeedTouch-HOWTO-fr.html "$(docdir)/howto"
+	$(INSTALL) -m 0644 -o $(installuser) howto/SpeedTouch-HOWTO-de.html "$(docdir)/howto"
+	$(INSTALL) -m 0644 -o $(installuser) howto/SpeedTouch-HOWTO-it.html "$(docdir)/howto"
+
+uninstall :
+	$(RM) -rf "$(docdir)"
+	$(RM) -f "$(man1dir)/speedtouch-setup.1"
+	$(RM) -f "$(man1dir)/speedtouch-start.1"
+	$(RM) -f "$(man1dir)/speedtouch-stop.1"
+	$(RM) -f "$(man8dir)/modem_run.8"
+	$(RM) -f "$(man8dir)/pppoa2.8"
+	$(RM) -f "$(man8dir)/pppoa3.8"
+
+
+dist:
+	mkdir "$(rootdir)/speedtouch-$(VERSION)/doc-linux"
+	mkdir "$(rootdir)/speedtouch-$(VERSION)/doc-linux/doctor"
+	mkdir "$(rootdir)/speedtouch-$(VERSION)/doc-linux/howto"
+	mkdir "$(rootdir)/speedtouch-$(VERSION)/doc-linux/man"
+	cp -f $(DOC_FILES)    "$(rootdir)/speedtouch-$(VERSION)/doc-linux"
+	cp -f $(DOCTOR_FILES) "$(rootdir)/speedtouch-$(VERSION)/doc-linux/doctor"
+	cp -f $(MAN_FILES)    "$(rootdir)/speedtouch-$(VERSION)/doc-linux/man"
+	cp -f $(HOWTO_FILES)  "$(rootdir)/speedtouch-$(VERSION)/doc-linux/howto"
+
+clean:
+
+distclean:
+	$(RM) -f Makefile

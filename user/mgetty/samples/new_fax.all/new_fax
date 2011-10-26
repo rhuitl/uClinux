@@ -1,0 +1,94 @@
+#!/bin/ksh
+#
+# Written 1996 by Darko Krizic
+#
+# This is an flexible, configurable and expandable fax postprocessor for
+# mgetty from Gert Doering. See the README file for more information.
+
+# Do the settings here
+home=/usr/local/newfax			# The home directory
+config=$home/faxlist			# The configuration file
+from="Fax Subsystem <faxadmin@xplor.ipf.de>"	# From this user
+log=/var/log/faxlog			# logfile
+
+# Usually nothing to configure beyond this line
+PATH=/usr/bin:/bin:/usr/local/bin:/usr/bin/X11
+
+# A function for logging. Each line starting with date and time
+log()
+{
+	echo "`date +"%d.%m.%y %H:%M"` "$* >>$log
+}
+
+# take the fax informations and log status line
+code="$1"
+id="$2"
+pages="$3"
+shift 3
+log "fax received (id $id, $pages pages)"
+
+# include all module found
+for module in $home/*.module
+do
+	log "module `basename $module .module`"
+	. $module
+done
+
+match=0				# no section matches yet
+name=""				# no name for id yet
+cat $config | while read line	# read config line by line
+do
+	command=`echo $line | cut -d" " -f1 -s`	# extract command
+	data=`echo $line | cut -d" " -f2- -s`	# extract parameter
+	if [ "$command" = "" ]			# empty line
+	then
+		command=$line
+	fi
+	case "$command" in
+	"#"*) 					# comment - ignore
+		;;
+	"")					# end of section
+		if [ $match -ne 0 ]
+		then
+			exit 0			# section done, exit
+		fi
+		;;
+	"id")					# id of caller
+		if [ "$data" = "" ]
+		then
+			if [ $match -eq 0 ]
+			then
+				log "default section"
+				match=1
+			fi
+		fi
+		if [ -z "$name" ]
+		then
+			if [ `echo $id | grep "$data" | wc -l` -gt 0 ]
+			then
+				log "id $id matches section $data"
+				match=1
+			fi
+		fi
+		;;
+	"name")					# name of caller
+		if [ "$match" -ne 0 ]
+		then
+			if [ -z "$name" ]
+			then
+				name=$data
+				log "name of $id is $name"
+			fi
+		fi
+		;;
+	*)
+		#type -type $command >>$log
+		if [ "$match" -ne 0 ]
+		then
+			$command $* >>$log 2>&1
+		fi
+		;;
+	esac
+done
+
+exit 0

@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# sample script to automatically convert incoming faxes to pbm, uuencode
+# and gzip them, and send them to "MAILTO".
+# (FAX_NOTIFY_PROGRAM in policy.h)
+#
+# gert@greenie.muc.de
+#
+# $Log: new_fax.mail,v $
+# Revision 1.2  2000/07/16 21:18:08  gert
+# add .gz to file names, for automatic unziping
+#
+MAILTO="you@yourhost.do.main"
+MAILER=/usr/lib/sendmail
+
+PATH=$PATH:/usr/local/bin
+G3TOPBM=g32pbm
+#
+#
+HUP="$1"
+SENDER="$2"
+PAGES="$3"
+
+shift 3
+P=1
+
+while [ $P -le $PAGES ]
+do
+	FAX=$1
+	RES=`basename $FAX | sed 's/.\(.\).*/\1/'`
+
+	if [ "$RES" = "n" ]
+	then
+		STRETCH="-s"
+	else
+		STRETCH=""
+	fi
+
+	(
+	    echo "Subject: fax from $SENDER, page $P of $PAGES"
+	    echo "To: $MAILTO"
+	    echo ""
+	    $G3TOPBM $STRETCH $FAX \
+	    | gzip -9 \
+	    | uuencode `basename $FAX`.pbm.gz
+	) | $MAILER $MAILTO
+
+	shift
+	P=`expr $P + 1`
+done
+
+exit 0

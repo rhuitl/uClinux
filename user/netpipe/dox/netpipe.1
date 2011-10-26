@@ -1,0 +1,441 @@
+.\" -*- nroff -*-
+.\"
+.\" NetPIPE -- Network Protocol Independent Performance Evaluator.
+.\" Copyright 1997, 1998 Iowa State University Research Foundation, Inc.
+.\"
+.\" This program is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation.  You should have received a copy of the
+.\" GNU General Public License along with this program; if not, write to the
+.\" Free Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\" netpipe.1
+.\" Created: Mon Jun 15 1998 by Guy Helmer
+.\" Rewritten:   Jun  1 2004 by Dave Turner
+.\"
+.\" $Id: netpipe.1,v 1.3 1998/09/24 16:23:59 ghelmer Exp $
+.\"
+.TH netpipe 1 "June 1, 2004" "NetPIPE" "netpipe"
+
+.SH NAME
+NetPIPE \- 
+.IB Net work
+.IB P rotocol
+.IB I ndependent
+.IB P erformance
+.IB E valuator
+
+.SH SYNOPSIS
+.B NPtcp
+[\c
+.BI \-h \ receiver_hostname\fR\c
+]
+[\c
+.BI \-b \ TCP_buffer_sizes\fR\c
+]
+[options]
+
+.PP
+
+mpirun
+[\c
+.BI \-machinefile \ hostlist\fR\c
+]
+-np 2
+.B NPmpi
+[-a] [-S] [-z] [options]
+
+.PP
+
+mpirun
+[\c
+.BI \-machinefile \ hostlist\fR\c
+]
+-np 2
+.B NPmpi2
+[-f] [-g] [options]
+
+
+.PP
+
+.B NPpvm
+[options]
+
+See the TESTING sections below for a more complete description of
+how to run NetPIPE in each environment.
+The OPTIONS section describes the general options available for
+all modules.
+See the README file from the tar-ball at 
+http://www.scl.ameslab.gov/Projects/NetPIPE/ for documentation on
+the InfiniBand, GM, SHMEM, LAPI, and memcpy modules.
+
+.SH DESCRIPTION
+.PP
+
+.B NetPIPE
+uses a simple series of ping-pong tests over a range of message
+sizes to provide a complete measure of the performance of a network.
+It bounces messages of increasing size between two processes, whether across a 
+network or within an SMP system. 
+Message sizes are chosen at regular intervals, and with slight perturbations, 
+to provide a complete evaluation of the communication system. 
+Each data point involves many ping-pong tests to provide an accurate timing. 
+Latencies are calculated by dividing the round trip time in half for small 
+messages ( less than 64 Bytes ). 
+.PP
+The communication time for small messages is dominated by the 
+overhead in the communication layers, meaning that the transmission
+is latency bound.
+For larger messages, the communication rate becomes bandwidth limited by 
+some component in
+the communication subsystem (PCI bus, network card link, network switch).
+.PP
+These measurements can be done at the message-passing layer 
+(MPI, MPI-2, and PVM) or at the native communications layers
+that that run upon (TCP/IP, GM for Myrinet cards, InfiniBand,
+SHMEM for the Cray T3E systems, and LAPI for IBM SP systems).
+Recent work is being aimed at measuring some internal system properties
+such as the memcpy module that measures the internal memory copy rates,
+or a disk module under development that measures the performance
+to various I/O devices.
+.PP
+
+Some uses for NetPIPE include:
+.RS
+.PP
+Comparing the latency and maximum throughput of various network cards.
+.PP
+Comparing the performance between different types of networks.
+.PP
+Looking for inefficiencies in the message-passing layer by comparing it
+to the native communication layer.
+.PP
+Optimizing the message-passing layer and tune OS and driver parameters
+for optimal performance of the communication subsystem.
+
+.RE
+.PP
+
+.B NetPIPE
+is provided with many modules allowing it to interface with a wide
+variety of communication layers.
+It is fairly easy to write new interfaces for other reliable protocols
+by using the existing modules as examples.
+
+
+
+.SH TESTING TCP
+.PP
+NPtcp can now be launched in two ways, by manually starting NPtcp on
+both systems or by using a nplaunch script.  To manually start NPtcp,
+the NetPIPE receiver must be 
+started first on the remote system using the command:
+.PP
+.Ex
+NPtcp [options]
+.Ee
+.PP
+then the primary transmitter is started on the local system with the
+command
+.PP
+.Ex
+NPtcp \-h 
+.I receiver_hostname
+[options]
+.Ee
+.PP
+Any options used must be the same on both sides.
+
+The nplaunch script uses ssh to launch the remote receiver
+before starting the local transmitter.  To use rsh, simply change
+the nplaunch script.
+.PP
+.Ex
+nplaunch NPtcp -h 
+.I receiver_hostname
+[options]
+.Ee
+.PP
+The
+.BI \-b \ TCP_buffer_sizes\fR\c
+ option sets the TCP socket buffer size, which can greatly influence
+the maximum throughput on some systems.  A throughput graph that
+flattens out suddenly may be a sign of the performance being limited
+by the socket buffer sizes.
+
+
+.SH TESTING MPI and MPI-2
+.PP
+Use of the MPI interface for NetPIPE depends on the MPI implementation
+being used.  
+All will require the number of processes to be specified, usually
+with a 
+.I -np 2 
+argument.  Clusters environments may require a list of the 
+hosts being used, either during initialization of MPI (during lamboot
+for LAM-MPI) or when each job is run (using a -machinefile argument
+for MPICH).
+For LAM-MPI, for example, put the list of hosts in hostlist then boot LAM 
+and run NetPIPE using:
+.PP
+.Ex
+lamboot -v -b 
+.I hostlist
+.PP
+mpirun \-np 2 NPmpi [NetPIPE options]
+.Ee
+.PP
+
+For MPICH use a command like:
+.PP
+.Ex
+mpirun \-machinefile 
+.I hostlist 
+\-np 2 NPmpi [NetPIPE options]
+.Ee
+.PP
+
+To test the 1-sided communications of the MPI-2 standard, compile
+using:
+.PP
+.Ex
+.B make mpi2
+.Ee
+.PP
+Running as described above and MPI will use 1-sided MPI_Put()
+calls in both directions, with each receiver blocking until the
+last byte has been overwritten before bouncing the message back.
+Use the 
+.I -f
+option to force usage of a fence to block rather than an overwrite
+of the last byte.
+The 
+.I -g
+option will use MP_Get() functions to transfer the data rather than
+MP_Put().
+
+
+.SH TESTING PVM
+.PP
+Start the pvm system using:
+.PP
+.Ex
+pvm
+.Ee
+.PP
+and adding a second machine with the PVM command
+.PP
+.Ex
+add 
+.I receiver_hostname
+.Ee
+.PP
+Exit the PVM command line interface using quit, then run the PVM NetPIPE
+receiver on one system with the command:
+.PP
+.Ex
+NPpvm [options]
+.Ee
+.PP
+and run the TCP NetPIPE transmitter on the other system with the
+command:
+.PP
+.Ex
+NPpvm -h 
+.I receiver hostname
+[options]
+.Ee
+.PP
+Any options used must be the same on both sides.
+The nplaunch script may also be used with NPpvm as described above
+for NPtcp.
+
+.SH TESTING METHODOLOGY
+.PP
+.B NetPIPE
+tests network performance by sending a number of messages at each
+block size, starting from the lower bound on the message sizes.
+
+The message size is incremented until the upper bound on the message size is
+reached or the time to transmit a block exceeds one second, which ever
+occurs first.  Message sizes are chosen at regular intervals, and for
+slight perturbations from them to provide a more complete evaluation
+of the communication subsystem.
+.PP
+The 
+.B NetPIPE\c
+ output file may be graphed using a program such as
+.B gnuplot(1)\.
+The output file contains three columns: the number of bytes in the block,
+the transfer rate in bits per second, and
+the time to transfer the block (half the round-trip time).
+The first two columns are normally used to graph the throughput
+vs block size, while the third column provides the latency.
+For example, the 
+.B throughput versus block size
+graph can be created by graphing bytes versus bits per second.
+Sample
+.B gnuplot(1)
+commands for such a graph would be
+.PP
+.Ex
+set logscale x
+.Ee
+.PP
+.Ex
+plot "np.out"
+.Ee
+
+.ne 5
+.SH OPTIONS
+.TP
+.B \-a
+asynchronous mode: prepost receives (MPI, IB modules)
+.ne 3
+.TP
+.BI \-b \ \fITCP_buffer_sizes\fR
+Set the send and receive TCP buffer sizes (TCP module only).
+.ne 3
+
+.TP
+.B \-B
+Burst mode where all receives are preposted at once (MPI, IB modules).
+.ne 3
+
+.TP
+.B \-f
+Use a fence to block for completion (MPI2 module only).
+.ne 3
+
+.TP
+.B \-g
+Use MPI_Get() instead of MPI_Put() (MPI2 module only).
+.ne 3
+
+.TP
+.BI \-h \ \fIhostname\fR
+Specify the name of the receiver host to connect to (TCP, PVM, IB, GM).
+.ne 3
+
+.TP
+.B \-I
+Invalidate cache to measure performance without cache effects (mostly affects 
+IB and memcpy modules).
+.ne 3
+
+.TP
+.B \-i
+Do an integrity check instead of a performance evaluation.
+.ne 3
+
+.TP
+.BI \-l \ \fIstarting_msg_size\fR
+Specify the lower bound for the size of messages to be tested.
+.ne 3
+.TP
+
+.TP
+.BI \-n \ \fInrepeats\fR
+Set the number of repeats for each test to a constant.
+Otherwise, the number of repeats is chosen to provide an accurate
+timing for each test.  Be very careful if specifying a low number
+so that the time for the ping-pong test exceeds the timer accuracy.
+.ne 3
+
+.TP
+.BI \-O \ \fIsource_offset,dest_offset\fR
+Specify the source and destination offsets of the buffers from perfect 
+page alignment.
+.ne 3
+.TP
+
+.BI \-o \ \fIoutput_filename\fR
+Specify the output filename (default is np.out).
+.ne 3
+
+.TP
+.BI \-p \ \fIperturbation_size\fR
+NetPIPE chooses the message sizes at regular intervals, increasing them
+exponentially from the lower boundary to the upper boundary.
+At each point, it also tests perturbations of 3 bytes above and 3 bytes
+below each test point to find idiosyncrasies in the system.
+This perturbation value can be changed using the 
+.I -p
+option, or turned
+off using
+.I -p 
+.I 0
+.B .
+.ne 3
+
+.TP
+.B \-r
+This option resets the TCP sockets after every test (TCP module only).
+It is necessary for some streaming tests to get good measurements
+since the socket window size may otherwise collapse.
+.ne 3
+
+.TP
+.B \-s
+Set streaming mode where data is only transmitted in one direction. 
+.ne 3
+
+.TP
+.B \-S
+Use synchronous sends (MPI module only).
+.ne 3
+
+.TP
+.BI \-u \ \fIupper_bound\fR
+Specify the upper boundary to the size of message being tested.  
+By default, NetPIPE will stop when
+the time to transmit a block exceeds one second. 
+
+.TP
+.B \-z
+Receive messages using MPI_ANY_SOURCE (MPI module only)
+.ne 3
+
+.TP
+.B \-2
+Set bi-directional mode where both sides send and receive at the
+same time (supported by most modules).
+You may need to use 
+.I -a
+to choose asynchronous communications for MPI to avoid freeze-ups.
+For TCP, the maximum test size will be limited by the TCP
+buffer sizes.
+.ne 3
+
+.ne 3
+.SH FILES
+.TP
+.I np.out
+Default output file for
+.BR NetPIPE .
+Overridden by the
+.B \-o
+option.
+
+.SH AUTHOR
+.PP
+The original NetPIPE core plus TCP and MPI modules were written by 
+Quinn Snell, Armin Mikler, Guy Helmer, and John Gustafson.
+NetPIPE is currently being developed and maintained by Dave Turner
+with contributions from many students (Bogdan Vasiliu, Adam Oline,
+Xuehua Chen, and Brian Smith).  
+
+.PP
+Send comments/bug-reports to:
+.I
+<netpipe@scl.ameslab.gov>.
+.PP
+Additional information about
+.B NetPIPE
+can be found on the World Wide Web at
+.I http://www.scl.ameslab.gov/Projects/NetPIPE/
+
+.SH BUGS
+As of version 3.6.1, there is a bug that causes NetPIPE to segfault on 
+RedHat Enterprise systems. I will debug this as soon as I get access to a 
+few such systems.  -Dave Turner (turner@ameslab.gov)

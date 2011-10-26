@@ -1,0 +1,42 @@
+\subsection{007: why do equalizing schedulers not play well with tunnels?}
+
+\subsubsection{007: Definition of requirement }
+
+linux/net/sched/sch\_teql.c says:
+
+\begin{verbatim}
+    1. Slave devices MUST be active devices, i.e., they must raise the tbusy
+       signal and generate EOI events. If you want to equalize virtual devices
+       like tunnels, use a normal eql device.
+\end{verbatim}
+
+A normal ``eql'' device ({\tt linux/drivers/net/eql.c}) simply does a simple
+form of round-robin scheduling among devices. It can round robin among
+devices of equal weight.
+
+The teql scheduling device uses the scheduling system's back pressure (the
+{\tt dev->tbusy} flag) to give each device as much as it wishes.
+
+\subsubsection{007: response}
+
+The KLIPS1 {\tt ipsecX} devices are never busy. They therefore can not be
+equalized using this scheduler.
+
+The virtual devices could use the {\tt tbusy} mechanism. To be able to
+do this, the {\tt MAST} device will have to be given a clear amount of
+resources on a per-virtual device basis. As the limit to throughput will be
+the lesser of encryption throughput and physical device throughput, once the
+buffers are full, the virtual device can raise the {\tt tbusy} flag.
+
+For this to be useful, the paths to the remote host must be
+different. Specifically, the outer destination address must in some way be
+different. If there are simply two physical ways to get to the same
+destination address then standard load-balancing would work once the 
+{\tt MAST} devices have processed the cleartext.
+
+The use of the {\tt tbusy} feature is not considered to contribute strongly
+towards Opportunistic Encryption. The creation of the MAST device is however
+critical.
+ 
+
+

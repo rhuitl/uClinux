@@ -1,0 +1,150 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>rrdthreads</title>
+<link rev="made" href="mailto:dws@ee.ethz.ch" />
+</head>
+
+<body style="background-color: white">
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<ul>
+
+		<li><a href="#notes_for_rrd_contributors">NOTES FOR RRD CONTRIBUTORS</a></li>
+		<li><a href="#currently_implemented_thread_safe_functions">CURRENTLY IMPLEMENTED THREAD SAFE FUNCTIONS</a></li>
+	</ul>
+
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+-->
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>rrdthreads - Provisions for linking the RRD library to use in multi-threaded programs</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>Using librrd in multi-threaded programs requires some extra
+precautions, as the RRD library in its original form was not
+thread-safe at all. This document describes requirements and pitfalls
+on the way to use the multi-threaded version of librrd in your own
+programs. It also gives hints for future RRD development to keep the
+library thread-safe.</p>
+<p>Currently only some RRD operations are implemented in a thread-safe
+way. They all end in the usual ``<code>_r</code>'' suffix.</p>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>In order to use librrd in multi-threaded programs you must:</p>
+<ul>
+<li></li>
+Link with <em>librrd_th</em> instead of <em>librrd</em> (use <code>-lrrd_th</code> when
+linking)
+<p></p>
+<li></li>
+Use the ``<code>_r</code>'' functions instead of the normal API-functions
+<p></p>
+<li></li>
+Do not use any at-style time specifications. Parsing of such time
+specifications is terribly non-thread-safe.
+<p></p>
+<li></li>
+Never use non *<code>_r</code> functions unless it is explicitly documented that
+the function is tread-safe.
+<p></p>
+<li></li>
+Every thread SHOULD call <code>rrd_get_context()</code> before its first call to
+any <code>librrd_th</code> function in order to set up thread specific data. This
+is not strictly required, but it is the only way to test if memory
+allocation can be done by this function. Otherwise the program may die
+with a SIGSEGV in a low-memory situation.
+<p></p>
+<li></li>
+Always call <code>rrd_error_clear()</code> before any call to the
+library. Otherwise the call might fail due to some earlier error.
+<p></p></ul>
+<p>
+</p>
+<h2><a name="notes_for_rrd_contributors">NOTES FOR RRD CONTRIBUTORS</a></h2>
+<p>Some precautions must be followed when developing RRD from now on:</p>
+<ul>
+<li></li>
+Only use thread-safe functions in library code. Many often used libc
+functions aren't thread-safe. Take care in the following
+situations or when using the following library functions:
+<ul>
+<li></li>
+Direct calls to <code>strerror()</code> must be avoided: use <code>rrd_strerror()</code>
+instead, it provides a per-thread error message.
+<p></p>
+<li></li>
+The <code>getpw*</code>, <code>getgr*</code>, <code>gethost*</code> function families (and some more
+<code>get*</code> functions) are not thread-safe: use the *<code>_r</code> variants
+<p></p>
+<li></li>
+Time functions: <code>asctime</code>, <code>ctime</code>, <code>gmtime</code>, <code>localtime</code>: use
+*<code>_r</code> variants
+<p></p>
+<li></li>
+<code>strtok</code>: use <code>strtok_r</code>
+<p></p>
+<li></li>
+<code>tmpnam</code>: use <code>tmpnam_r</code>
+<p></p>
+<li></li>
+Many others (lookup documentation)
+<p></p></ul>
+<li></li>
+A header file named <em>rrd_is_thread_safe.h</em> is provided
+that works with the GNU C-preprocessor to ``poison'' some of the most
+common non-thread-safe functions using the <code>#pragma GCC poison</code>
+directive. Just include this header in source files you want to keep
+thread-safe.
+<p></p>
+<li></li>
+Do not introduce global variables!
+<p>If you really, really have to use a global variable you may add a new
+field to the <code>rrd_context</code> structure and modify <em>rrd_error.c</em>,
+<em>rrd_thread_safe.c</em> and <em>rrd_non_thread_safe.c</em></p>
+<p></p>
+<li></li>
+Do not use <code>getopt</code> or <code>getopt_long</code> in *<code>_r</code> (neither directly nor
+indirectly).
+<p><code>getopt</code> uses global variables and behaves badly in a multi-threaded
+application when called concurrently. Instead provide a *_r function
+taking all options as function parameters. You may provide argc and
+**argv arguments for variable length argument lists. See
+<code>rrd_update_r</code> as an example.</p>
+<p></p>
+<li></li>
+Do not use the <code>parsetime</code> function!
+<p>It uses lots of global variables. You may use it in functions not designed
+to be thread-safe, like in functions wrapping the <code>_r</code> version of some
+operation (e.g., <code>rrd_create</code>, but not in <code>rrd_create_r</code>)</p>
+<p></p></ul>
+<p>
+</p>
+<h2><a name="currently_implemented_thread_safe_functions">CURRENTLY IMPLEMENTED THREAD SAFE FUNCTIONS</a></h2>
+<p>Currently there exist thread-safe variants of <code>rrd_update</code>,
+<code>rrd_create</code>, <code>rrd_dump</code>, <code>rrd_info</code> and <code>rrd_last</code>.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<p>Peter Stamfest &lt;<a href="mailto:peter@stamfest.at">peter@stamfest.at</a>&gt;</p>
+
+</body>
+
+</html>

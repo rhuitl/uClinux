@@ -1,0 +1,254 @@
+*
+* RCSID $Id: TODO,v 1.75 2002/03/08 21:30:12 rgb Exp $
+*
+
+Bugs:
+	spooky action bug
+	2001-11-09
+011211		respect DF bit
+		ICMP rate limited
+			my system
+			by destination, most memory intensive
+			rate limit by SA
+		write FS ICMP/MTU policy
+		mess around with dst cache MSS
+	fordhr:	enforce 4k msg limit.
+	fix pfkey_update:new tdb should add to, not replace original: oe lifespan
+	implement self-documenting kernel code:
+		http://kernelbook.sourceforge.net/#kdocs
+	replace IKE bypass machinery with SPD entries.
+	implement eroute reject IMCP "communication administratively prohibited"
+	fix lifetime_byte_c len/ilen assignment
+	IPCOMP frag-in-clear?
+	pick-next-less-specific-eroute for intermediate tunnel lookup
+		for IKE passthrough.
+	sparc64:klips/net/ipsec/ipsec_tunnel.c:2106/2912:
+		only 16B copied, 32 required, see:
+		arch/sparc64/kernel/ioctl32.c:450/3806:dev_ifname32()
+	BUGS: order of spigrp options somewhat important. debug before all
+	leakage on ipsec startup?
+	xbone compatibility
+	2.0.xx problems reported with LFS1.1: MTU/fragmentation, instability.
+	0/0 - extruded subnets on 2.2
+	denker and crashing moats, NMI board from denker
+	timeout SA after configured time of non-use
+
+Features:
+	UML test bench and battery of tests
+	dhr tunnel patch
+	AES
+	SHA-256/384/512 hashes
+
+Priorities and resources:
+	- finish pfkeyv2
+	- discussions with OpenBSD and KAME
+HS:
+	- research for spd decision, spd decision
+	- sharing SAs not mandatory, but perhaps desirable?
+DHR:
+	- include community code
+	- ipv6
+RGB:
+	- minidenker - different IP address on ipsec I/F than attached I/F
+	- inbound eroute/subnet checking for DHR
+	- klips2 design
+		advanced policy routing from HS
+		netfilter
+		netgraph
+
+2.3 merge comments from dmiller:
+	non-US contribution policy big problem
+2.3 merge comments from ankuznetsov:
+	remove deprecated sklist_{insert,remove,destroy}_socket() calls
+	defconfig?
+	ditch compiler directives
+	kill $Log
+	kill BSD radix code
+2.3 merge comments from akleen:
+	modular not reason for putting in main tree
+	use the routing table for security policy
+	do transport mode early in packet creation
+	handle MTU handling more cleanly
+	violates layering
+	non-US contribution policy big problem
+	as of 2.3.xx init calls are not necessary
+		type __init function(){}
+		type __exit function(){}
+
+Features for 1.0: klips kernel
+Most	Provide more useful error messages from kernel
+Most	Sanitize klips headers for use above and below kernel/user I/F.
+Part	#defines for kernel constants ie. hash function magic numbers, etc.
+1.0	Clear all eroutes and spis when last ipsec device is ifconfiged down.
+	Per-bundle debugging.
+	Per-SA statistics via /proc/net/ipsec_spi:
+		total late/lost
+
+Features for 1.0: klips utils
+	Errors:  what is wrong, where in code, what can't do, what is fix
+	Use consistent units: ie. hex digits, bytes or bits.
+Most	Include 'ipsec' prefix in all manual utils calls in test scripts
+
+Features for 1.0: klips documentation
+	Xform to standards/doc_draft_refs mapping in source header comments
+	Create HOWTO-debug_IPSEC (troubleshooting guide)
+	Mobile-ipsec
+
+Features for 1.0: general
+1.1	Audit for info leaks
+1.1	Audit for specs
+1.1	Audit for bugs ?!?
+HS?	Make 'check' (gnu coding standard, make, make check, make install)
+	Errors: when,who,to whom,what,what can't do,what is wrong,how to fix   
+	error reporting: (1) programmer's debugging (2) user's debugging
+	GNATS DB -- HS?
+
+1.6
+	opportunistic
+	PF_KEYv2:
+		socket functions:
+			signal userspace process (use select on listening processes) (written, needs testing)
+		parse extension types:
+			ident (written, needs testing)
+			sens (written, needs testing)
+			prop (written, needs testing)
+			supported (written, needs testing)
+			x_kmprivate
+		parse message types, in kernel:
+			get (written, needs testing)
+			acquire (written, needs testing)
+			register (written, needs testing)
+			expire (written, needs testing)
+			dump
+			x_promisc
+			x_pchange
+		initiate message types, in kernel:
+			acquire (written, needs testing)
+			expire (written, needs testing)
+Most	Expire SA's on soft/hard time/seq/qty and signal user (pfkey) (written, needs testing)
+GG	Port to IPv6
+	satot() conversion for /proc spi display
+	xlen, skb->len review for bogus packets, skb->len must be larger than ip->totlen
+
+2.0:
+	Port to ipchains/netfilter (with ifdefs to virtual device paradigm)
+	Kernel interface documentation (this will change on PF_KEY2 and 2.2.xx)
+	Convert to AES algorithm I/F to be able to add algorithms.
+		http://www.seven77.demon.co.uk/aes.htm
+	Add xforms
+3rdpty		IPPCP-Deflate
+	Check for weak keys and reject (k1==k2, k2==k3) (des_is_weak_key(), des_set_odd_parity())
+	Add processing for IP options in outgoing and incoming packets
+		(rfc2402, 3.3.3.1.1.2, appendix A)
+	Add support for userspace udp/500 blasting at selected port number. (SPD)
+	Be able to use <uid>, <proto>, <sport> and <dport> in SPD.
+pt.fw	Force all incoming packets through IPSEC SPD check
+	Separate in/out/IF SPD/SADs (rfc2401-4.4)
+	Accept IP ranges (pluto or eroute?)
+	Config option to accept or reject unauthenticated ICMP traffic (rfc2401-6.)
+	Config option to copy DF bit to new tunnel (rfc2401-6.1.1, Appendix.B)
+	Dynamic Assignment of the "inside" tunnel address for the road warrior.
+		http://www.ietf.org/internet-drafts/draft-ietf-ipsec-dhcp-01.txt
+		http://www.ietf.org/internet-drafts/draft-gupta-ipsec-remote-access-01.txt
+		http://www.ietf.org/internet-drafts/draft-ietf-nat-hnat-00.txt
+		http://www.sandelman.ottawa.on.ca/SSW/ietf/draft-richardson-ipsec-traversal-cert-01.txt
+DHR?	Port to DNSSEC
+	Standardise for code portability -- standard C (ask HS)
+	L2TP?
+	LDAP?
+	SNMPv3
+
+*
+* $Log: TODO,v $
+* Revision 1.75  2002/03/08 21:30:12  rgb
+* Add note about pfkey update being able to simply change lifetimes of
+* mature SAs.
+*
+* Revision 1.74  2002/01/07 20:01:38  rgb
+* Post-1.94 review.
+*
+* Revision 1.73  2001/12/15 05:52:46  rgb
+* TODO/DONE review.
+*
+* Revision 1.72  2001/11/12 19:30:29  rgb
+* Notes from recent meeting.
+*
+* Revision 1.71  2001/08/15 08:43:10  rgb
+* Disuse timeout.
+*
+* Revision 1.70  2001/06/01 07:25:19  rgb
+* Clean up miscellaneous stuff...
+*
+* Revision 1.69  2001/05/19 02:30:00  rgb
+* Added a couple of klips utils doc bugs.
+*
+* Revision 1.68  2001/04/19 19:03:37  rgb
+* Added note to update in update rather than replace.
+*
+* Revision 1.67  2001/03/16 07:30:20  rgb
+* Add 2.4 ipcomp asm note.
+*
+* Revision 1.66  2001/02/26 20:11:12  rgb
+* Post 1.9 candidate, magic SAs and email purge updates.
+*
+* Revision 1.65  2001/01/29 22:29:46  rgb
+* Add dhr suggestion.
+*
+* Revision 1.64  2000/11/06 05:09:00  rgb
+* A few bugfixes...
+*
+* Revision 1.63  2000/09/29 19:45:57  rgb
+* Post-interop update.
+*
+* Revision 1.62  2000/09/08 19:24:08  rgb
+* Bypass frag update.
+*
+* Revision 1.61  2000/09/08 18:52:04  rgb
+* Updated pfkey status.
+*
+* Revision 1.60  2000/08/22 18:08:38  rgb
+* Post-1.6.
+*
+* Revision 1.59  2000/07/28 14:52:23  rgb
+* List sparc64 tncfg bug.
+*
+* Revision 1.58  2000/07/05 17:25:09  rgb
+* Update to reflect manpage update and remove noise from DONE.
+*
+* Revision 1.57  2000/06/21 17:07:29  rgb
+* Update for current manpage mods.
+*
+* Revision 1.56  2000/06/20 22:40:28  rgb
+* Updated for 1.4.  Re-prioritized/cleaned up.
+*
+* Revision 1.55  2000/03/16 06:10:43  rgb
+* Ottawa meeting notes.
+* 2.3 potential merge notes.
+*
+* Revision 1.54  2000/01/26 10:02:17  rgb
+* Updated for 1.3.
+*
+* Revision 1.53  1999/11/23 23:09:45  rgb
+* Updates since just after 1.1, includes more PFKEY detail.
+*
+* Revision 1.52  1999/10/16 04:21:45  rgb
+* Long-overdue update including a few pre-1.1 things, but more post-1.1
+* stuff that has been waiting to be added.
+*
+* Revision 1.51  1999/09/18 11:36:05  rgb
+* Clarify 2.2/ipchains/netfilter goals.
+*
+* Revision 1.50  1999/08/06 16:02:26  rgb
+* Add JSD's tunnel statistics wish list.
+*
+* Revision 1.49  1999/08/03 17:38:38  rgb
+* Minor cleanup.
+*
+* Revision 1.48  1999/04/29 15:28:45  rgb
+* Updates since 1.00.
+*
+* Revision 1.47  1999/04/06 04:54:23  rgb
+* Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+* patch shell fixes.
+*
+*

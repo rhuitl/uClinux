@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+MINOR=`grep VERSION_MINOR <version.h | sed -e "s/.*VERSION_MINOR *//" `
+MAJOR=`grep VERSION_MAJOR <version.h | sed -e "s/.*VERSION_MAJOR *//" `
+MEDIT=`grep <version.h VERSION_EDIT | sed -e "s/.*VERSION_EDIT *\"//" -e "s/\" *//"`
+VERSION=$(echo $MAJOR.$MINOR)
+VERSNUM=$(echo $MAJOR.$MINOR$MEDIT)
+TARBALL=lilo-$VERSNUM.src.tar.gz
+#DISTDIR=/brun/ftp/pub/linux/lilo
+pushd ..
+DISTDIR=$(pwd)
+popd
+D1=$(pwd)
+echo VERSION = $VERSION
+echo VERSNUM = $VERSNUM
+
+make spotless
+
+pushd ..
+
+D2=$(pwd)
+D3=`echo $D1 | sed -e "s~$D2/~~" `
+DIR=lilo-$VERSNUM
+if [ $D3 != $DIR ]; then mv $D3 $DIR; fi
+
+
+tar cvf - \
+  $DIR/README* $DIR/INCOMPAT $DIR/CHANGES $DIR/COPYING $DIR/COPYRIGHT \
+  $DIR/QuickInst $DIR/lilo.lsm $DIR/checkit \
+  $DIR/Makefile $DIR/*.h $DIR/*.c $DIR/*.S \
+  $DIR/mk?dist $DIR/mkrescue $DIR/keytab-lilo.pl \
+  $DIR/sample/ins64a.* $DIR/sample/logo64a.* $DIR/sample/lilo.*.conf \
+  $DIR/sample/blue.* $DIR/sample/README* \
+  $DIR/diagnose/*.c $DIR/diagnose/*.S \
+  $DIR/diagnose/*Licence $DIR/diagnose/README* $DIR/diagnose/Makefile \
+  $DIR/manPages/lilo.8 $DIR/manPages/lilo.conf.5 $DIR/manPages/mkrescue.8 \
+  $DIR/dos/README $DIR/dos/Makefile \
+  $DIR/doc/README \
+  $DIR/doc/Makefile $DIR/doc/*.tex $DIR/doc/*.fig \
+  $DIR/doc/fullpage.sty $DIR/doc/rlatex $DIR/doc/t2a.pl |
+  gzip -9 >$DIR/$TARBALL
+
+if [ $D3 != $DIR ]; then mv $DIR $D3; fi
+
+popd
+
+mv -fv $TARBALL $DISTDIR
+cp -fdvp lilo.lsm $DISTDIR/lilo-$VERSNUM.lsm
+cp -fdvp CHANGES $DISTDIR
+
+echo ""
+echo $TARBALL is in $DISTDIR
+
+

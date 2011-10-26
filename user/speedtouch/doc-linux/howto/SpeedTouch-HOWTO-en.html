@@ -1,0 +1,531 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+  <HEAD>
+    <META name="generator" content="HTML Tidy, see www.w3.org">
+    <META http-equiv="Content-Type" content=
+    "text/html; charset=iso-8859-1">
+
+    <TITLE>SpeedTouch USB HOWTO</TITLE>
+  </HEAD>
+
+  <BODY>
+    <DIV align="CENTER">
+      <H1>SpeedTouch USB HOWTO<BR>
+      using Benoit Papillault's GPL drivers</H1>
+    </DIV>
+
+    <DIV align="RIGHT">
+      <U>Authors :</U><BR>
+       Sylvain Trias <A href=
+      "mailto:bozo@nobodix.org">bozo@nobodix.org</A><BR>
+       Edouard Gomez <A href=
+      "mailto:ed.gomez@free.fr">ed.gomez@free.fr</A><BR>
+       Bernard Brandl <A href=
+      "mailto:brandl@tuxfamily.org">brandl@tuxfamily.org</A><BR>
+       Benoit Papillault <a href="mailto:benoit.papillault@free.fr">
+       benoit.papillault@free.fr</a><br>
+      <SUB><I><BR>
+      Last Modifications : May, the 12th 2004</I></SUB>
+    </DIV>
+
+    <H2>Table Of Contents</H2>
+
+    <OL type="circle">
+      <LI><A href="#intro">Introduction</A></LI>
+
+      <LI><A href="#requis">Requirements</A></LI>
+
+      <LI>
+        <A href="#install">Installation/Configuration</A> 
+
+        <OL>
+          <LI><A href="#noyau">Your kernel</A></LI>
+
+          <LI><A href="#drivers">Benoit's drivers</A></LI>
+
+          <LI><A href="#pppd">pppd</A></LI>
+        </OL>
+      </LI>
+
+      <LI><A href="#connec">Launching the connection</A></LI>
+
+      <LI><A href="#aide">Where to find (more) help ?</A></LI>
+    </OL>
+    <HR width="100%" size="2" align="Left">
+
+    <H2><A name="intro"></A>Introduction</H2>
+
+    <P>
+      This document will guide you through the installation of Benoit
+      Papillaut's GPL driver for the SpeedTouch USB and
+      SpeedTouch 330 modems made by Thomson (formerly Alcatel) on
+      GNU/Linux.
+
+    </P>
+    <HR width="100%" size="2" align="Left">
+
+    <H3><A name="requis"></A>Requirements:</H3>
+
+    <UL type="square">
+      <LI>GPL drivers</LI>
+
+      <LI>Thomson's microcode for the modem</LI>
+
+      <LI>A kernel with usb support (2.4.x kernels are a good
+      choice but 2.2.x kernels work too)</LI>
+
+      <LI>pppd</LI>
+    </UL>
+
+    <H5><U>Download GPL drivers</U></H5>
+
+    <P>Download the latest version from sourceforge project's <A
+    href=
+    "http://speedtouch.sourceforge.net">&raquo;&raquo;
+    Homepage &laquo;&laquo;</A><BR>
+    </P>
+
+    <H5><U>Download Thomson's Modem firmware</U></H5>
+
+    <P>What you need to download is the modem's microcode provided
+    with Thomson's drivers. You have two possibilities:</P>
+
+    <P>It can be found in the form of two files:</P>
+
+    <UL>
+      <LI>A mgmt.o file found in the GNU/Linux package</LI>
+
+      <LI>A alcaudsl.sys file found in the
+      Windows<SUP><SMALL>TM</SMALL></SUP> package</LI>
+    </UL>
+    <SMALL>(If your modem is already running under windows, you can
+    avoid downloading it by taking the file in
+    c:\windows\system).</SMALL> 
+
+    <ADDRESS>
+      GNU/Linux drivers on Thomson's site : <A href=
+      "http://www.speedtouchdsl.com/dvrreg_lx.htm">http://www.speedtouchdsl.com/dvrreg_lx.htm</A>
+    </ADDRESS>
+
+    <P><FONT color="red"><U>Warning:</U></FONT></P>
+
+    <P>Just download Thomson's drivers and uncompress them. Do NOT
+    install them. You only need them for the microcode (ie a piece
+    of software loaded into the modem at initialization)</P>
+
+    <H5>A note about linux kernels</H5>
+
+    <P>Benoit's drivers work very well with 2.4.x series, but it is
+    possible to make them run under 2.2.18 and highers as they use
+    USB code from 2.4.x kernels.</P>
+
+    <P>If you're not at ease with kernel compilation, don't be
+    happy worry and pray. Recent distros are likely to provide an
+    operationnal kernel (Mandrake 8.x/RH 7.x/Debian
+    Potato/Woody/Sid for example). Nevertheless, it is preferable
+    to build your own kernel for many reasons that could not be
+    explain in this document. Another good reason to do so is that
+    you can apply a patch on a kernel module, preventing a bug when
+    your connection is restarted.</P>
+
+    <P><U>As a conclusion :</U><BR>
+    </P>
+
+    <BLOCKQUOTE>
+      If you choose to build a new kernel try to pick a recent one:
+      USB support is getting better with versions.
+    </BLOCKQUOTE>
+
+    <ADDRESS>
+      Url to download Linux's kernel : <A href=
+      "http://www.kernel.org">http://www.kernel.org</A>
+    </ADDRESS>
+
+    <P><U>NB : Avoid 2.4.5 like the plague as it keeps swapping and
+    trashing all the time</U></P>
+
+    <H5>pppd version</H5>
+
+    <P>pppd should work from 2.3.11 version (this was the elder
+    version we had for testing)</P>
+    <P><U><b>NB :</b> If you have a 2.4.x Linux kernel, you <b>must</b> use a 2.4.x pppd (2.2 kernels run fine with both 2.3.x and 2.4.x pppd daemons).</U></P>
+    <HR width="100%">
+    <A name="install"></A> 
+
+    <H2>Installation/Configuration :</H2>
+
+    <P>This is a two step job:</P>
+
+    <UL>
+      <LI>Kernel configuration</LI>
+
+      <LI>pppd Configuration</LI>
+    </UL>
+    <A name="noyau"></A> 
+
+    <H3>Kernel Configuration</H3>
+
+    <P>To allow Benoit's drivers to work, your kernel has to have a
+    few options enabled. Configure it with your everyday options
+    and carefully add the following ones:<BR>
+    </P>
+
+    <H4>USB support</H4>
+    Your kernel obviously has to support USB to run Alcatel
+    Speedtouch. <BR>
+
+    <P>Depending on your USB controller (chipset on motherboard/pci
+    card), you'll have to choose between two modules: UHCI or
+    OHCI<BR>
+    Without explaining the whole thing, these are two USB
+    incompatible standards.<BR>
+    This is why you have to know which chipset is yours.<BR>
+    </P>
+
+    <P>To determine which to use :<BR>
+    <CODE># lspci -v | grep USB</CODE><BR>
+    </P>
+
+    <P>You should obtain something like :</P>
+
+    <P><CODE>usb-ohci : CMD technologies Inc|USB0670B<BR>
+     usb-uhci : USB Controller: Intel Corporation 82371AB PIIX4 USB
+    (rev 01) (prog-if 00 [UHCI])</CODE></P>
+
+    <P>If your chipset uses OHCI standard, you'll have to pick usb-ohci
+    (surprising !).<BR>
+    If, on the contrary, it uses UHCI standard you'll have to choose
+    between usb-uhci or uhci. They should work both, but in case
+    you have problems setting usb support with a module, pick the
+    other one, and pray !</P>
+
+    <H5>Options to allow usb support :</H5>
+
+    <BLOCKQUOTE>
+      <CODE><BR>
+      &lt;M&gt;/&lt;*&gt; Support for USB (CONFIG_USB)<BR>
+       &lt;*&gt; Preliminary USB device filesystem
+      (CONFIG_USB_DEVICEFS)<BR>
+       &lt;M&gt; UHCI (Intel PIIX4, VIA, ...) support
+      (CONFIG_USB_UHCI)<BR>
+       &lt;M&gt; UHCI Alternate Driver (JE) support
+      (CONFIG_USB_UHCI_ALT)<BR>
+       &lt;M&gt; OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support
+      (CONFIG_USB_OHCI)</CODE>
+    </BLOCKQUOTE>
+
+    <H4>PPP support</H4>
+    You'll need ppp support in your kernel. If needed compile these
+    parts: 
+
+    <BLOCKQUOTE>
+      <CODE><BR>
+      &lt;M&gt; PPP (point-to-point protocol) support
+      (CONFIG_PPP)<BR>
+       &lt;M&gt; PPP support for sync tty ports
+      (CONFIG_PPP_SYNC_TTY)</CODE>
+    </BLOCKQUOTE>
+
+    <H4>HDLC support</H4>
+    This part is more sensible. If you want to allow proper
+    reconnection, you'll have to patch this module. <BR>
+    Take it easy, you'll find the patch in the drivers' tarball and
+    the command line to run is simple : <BR>
+    <CODE># cd /usr/src/linux<BR>
+     # patch -p1 --dry-run &lt;
+    /path/to/drivers/n_hdlc.c.diff&nbsp; (watchout: two - before
+    dry-run ! )</CODE> 
+
+    <P>If you don't get error message, type the real command to
+    currently patch the kernel sources<BR>
+    <CODE>#patch -p1 &lt; /path/to/drivers/n_hdlc.c.diff</CODE></P>
+
+    <P><U><B>NB:</B> Kernels >= 2.4.18 include our n_hdlc patch so you have not to apply the patch anymore</U></P>
+
+    <P>You can continue, now :</P>
+
+    <BLOCKQUOTE>
+      <CODE>Character devices ---&gt;<BR>
+       [*] Non-standard serial port support<BR>
+       &lt;M&gt; HDLC line discipline support<BR>
+       [*]Unix98 PTY support</CODE>
+    </BLOCKQUOTE>
+
+    <H3>Installing the drivers</H3>
+    This installation is straightforward uncompress the
+    drivers'tarball by typing : <BR>
+    <CODE># tar xvzf speedtouch-xxx.tar.gz</CODE> 
+
+    <P>cd into the new directory and type :<BR>
+    <CODE># ./configure &amp;&amp; make</CODE></P>
+
+    <P>If everything ran fine su root and finish the install by
+    typing :<BR>
+    <CODE># make install</CODE></P>
+
+    <P><I>Greetings, the drivers should now be installed</I><BR>
+    <BR>
+    NB: check your path if you can't run modem_run, as it is copied
+    in /usr/local/sbin</P>
+
+    <H3>Creation of the PPP devices</H3>
+
+    <P>Cd into your /dev directory :<BR>
+    <CODE># cd /dev</CODE></P>
+
+    <P>Check ppp devices existence doing :<BR>
+    <CODE># ls *ppp*</CODE></P>
+
+    <P>If the <I>ls</I> command gives you an output go to the next
+    step, else create all ppp devices typing :<BR>
+    <CODE># ./MAKEDEV ppp</CODE></P>
+
+    <H3>pppd configuration</H3>
+    Check your pppd version by typing : <BR>
+    <CODE># pppd --version.</CODE> 
+
+    <P>Drivers are tested with pppd 2.4.0 and 2.4.1. They also run
+    fine with older versions, per example pppd 2.3.11 shiped with
+    the Potato Debian GNU/Linux.</P>
+
+    <P>To configure pppd, you'll have to edit 4 files.</P>
+
+    <H4>1st file :</H4>
+
+    <P>You should have an /etc/ppp/options file, edit it and keep
+    these 4 lines in it (comment all extra lines with a #)</P>
+
+    <P><CODE>------------------ /etc/ppp/options Beginning
+    -------------<BR>
+     noauth<BR>
+     usepeerdns<BR>
+     lock<BR>
+     noipdefault<BR>
+     ------------------ /etc/ppp/options End
+    ------------------</CODE></P>
+
+    <H4>2nd file</H4>
+
+    <P>Create /etc/ppp/peers/adsl : <CODE><BR>
+     # mkdir /etc/ppp/peers<BR>
+     # touch /etc/ppp/peers/adsl</CODE></P>
+
+    <P>Copy and paste what follows (without the "---" ;) )</P>
+
+    <P><CODE>-------------------/etc/ppp/peers/adsl
+    Beginning------------<BR>
+     #<BR>
+     # This file could be rename but its place is under
+    /etc/ppp/peers<BR>
+     # To connect to Internet using this configuration file<BR>
+     # pppd call adsl updetach, where "adsl" stands for the name of this
+    file<BR>
+     #<BR>
+    <BR>
+     debug<BR>
+     kdebug 1<BR>
+     noipdefault<BR>
+     defaultroute<BR>
+     pty "/usr/local/sbin/pppoa3 -m 1 -c -vpi 8 -vci 35"<BR>
+     sync<BR>
+     user "your_login_here"<BR>
+     noauth<BR>
+     noaccomp<BR>
+     nopcomp<BR>
+     noccp<BR>
+     novj<BR>
+     holdoff 4<BR>
+     persist<BR>
+     maxfail 25<BR>
+     usepeerdns<BR>
+     ------------------/etc/ppp/peers/adsl
+    EOF------------------</CODE></P>
+
+    <P>If for an unknown reason pppoa3 failed, you can still try the old pppoa2 daemon. You
+    should change the <I>pty "/usr/local/sbin/pppoa3 -m 1 -c -vpi 8 -vci
+    35"</I> line by <I>pty "/usr/local/sbin/pppoa2 -vpi 8 -vci 35"</I><BR>
+    For more details about pppoa2/3, type <B>"man pppoa3, man pppoa2"</B>.</P>
+
+    <P>Don't forget to <B>adapt the vpi and vci values</B> in the
+    line :<BR>
+    <I>pty "/usr/local/sbin/pppoa2 -vpi 8 -vci 35"</I></P>
+
+    <H5>Note about the VCI/VPI pair [ if you are hurry go to the
+    next section ;^) ] :</H5>
+    As your connection goes through ATM, 2 new parameters appear : 
+
+    <BLOCKQUOTE>
+      <UL>
+        <LI>VPI : Virtual Path ID</LI>
+
+        <LI>VCI : Virtual Circuit ID</LI>
+      </UL>
+    </BLOCKQUOTE>
+
+    <P><B>What are their function ?</B></P>
+
+    <P>That's a good question. They are used to identify your
+    <I>Virtual Path Connection (VP)</I> and your <I>Virtual Circuit
+    Connection (VC)</I>.<BR>
+    They simplify the network management, minimizing connection
+    delays. They allow cell commutation too.<BR>
+    </P>
+
+    <P>An ATM network looks like this :</P>
+<PRE>
+VC--------|----|-------------|----|--------
+VC--------| VP |             | VP |--------
+VC--------|----| Transmition |----|--------
+               |    Path     |
+VC--------|----|             |----|--------
+VC--------| VP |             | VP |--------
+VC--------|----|-------------|----|--------
+</PRE>
+
+    <H4>3rd file :</H4>
+
+    <P>2 protocols can be used by providers to identify their
+    users: CHAP or PAP.<BR>
+    Depending on your provider, edit <B>/etc/ppp/chap-secrets</B>
+    or <B>/etc/ppp/pap-secrets</B>.<BR>
+    </P>
+
+    <P>These fields look like this :</P>
+
+    <P><CODE>-------------------/etc/ppp/chap-secrets
+    Begining--------------<BR>
+     # client server secret IP addresses<BR>
+     "your_login_here" "*" "your_password_here" "*"<BR>
+     -------------------/etc/ppp/chap-secrets
+    End-------------------</CODE></P>
+
+    <P><I>If you don't know what protocol is used by your provider,
+    you can fill in both files, it won't hurt.</I></P>
+
+    <H4>4th file :</H4>
+
+    <P>Edit /etc/modules.conf (or /etc/conf.modules if your system
+    is a bit old) and add the following lines :</P>
+
+    <P><CODE>alias char-major-108&nbsp; ppp_generic<BR>
+     alias /dev/ppp ppp_generic<BR>
+     alias tty-ldisc-3 ppp_async<BR>
+     alias tty-ldisc-13 n_hdlc<BR>
+     alias tty-ldisc-14 ppp_synctty<BR>
+     alias ppp-compress-21 bsd_comp<BR>
+     alias ppp-compress-24 ppp_deflate<BR>
+     alias ppp-compress-26 ppp_deflate</CODE></P>
+
+    <P>Some entries are useless, but once again they won't hurt
+    !</P>
+    <HR width="100%">
+
+    <H3>Launching the connection</H3>
+    You'll have to : 
+
+    <UL>
+      <LI>Load modem's microcode</LI>
+
+      <LI>Start pppd</LI>
+    </UL>
+    <BR>
+    <I>NB: to launch the connection, it is almost mandatory to be
+    logged as root.</I> 
+
+    <H4>Verifications</H4>
+    Check if all modules are loaded (if you didn't compile them
+    directly into the kernel) : <CODE><BR>
+    # modprobe ppp_generic<BR>
+     # modprobe ppp_synctty<BR>
+     # modprobe n_hdlc</CODE> 
+
+    <P>Then, check that usbdevfs is mounted : <CODE><BR>
+    # modprobe usbcore<BR>
+     # mount none /proc/bus/usb -t usbdevfs<BR>
+     # modprobe usb-uhci or usb-ohci or uhci</CODE></P>
+
+    <H5>Load the firmware</H5>
+    To load the microcode into the modem, simply type : <CODE><BR>
+    # modem_run -f /path/to/mgmt.o<BR>
+     or<BR>
+     # modem_run -f /path/to/alcaudsl.sys</CODE> 
+
+    <H5>Launch pppd</H5>
+    Type (and pray) : <CODE><BR>
+    # pppd call adsl updetach</CODE> 
+
+    <P>Wait for a few seconds (20) and check if the link is up by
+    typing : <CODE><BR>
+     # ifconfig ppp0</CODE><BR>
+    </P>
+
+    <P>You should have a description of the interface.<BR>
+    If not, well it's time to look for help (and so to read the
+    next part of this howto).<BR>
+    </P>
+    <HR width="100%" size="2" align="Left">
+    <A name="aide"></A> 
+
+    <H2>Where to find (more) Help ?</H2>
+
+    <H3>The MAN pages</H3>
+    You should first look at the man pages, developers write them
+    because they can give you usefull informations :-) <BR>
+    man pppoa2, man pppoa3, man modem_run can give you the
+    information you're looking for. 
+
+    <H3>User mailing list</H3>
+    If you are searching for help from other users like you (Benoit
+    is also on this mailing list, so it's useless to send an email
+    to the list AND to him). This mailing list is for you, you can
+    discuss anything that's related to the SpeedTouch USB modem
+    (off topic are : Windows , NAT configuration, DNS setup, ...).
+    Both French and English are accepted, but not HTML. 
+
+    <P>First of all, read the <A href=
+    "http://www.mail-archive.com/speedtouch@ml.free.fr">archive</A>
+    of this mailing list before subscribing. Your problem may
+    already have a solution.<BR>
+    To subscribe to the list, send an email to <A href=
+    "mailto:speedtouch-request@ml.free.fr">speedtouch-request@ml.free.fr</A>
+    with subscribe as the subject.</P>
+
+    <H3>IRC</H3>
+    If your prefer to get a direct help or would like to discuss
+    design of the driver, there is a channel for you. It is
+    sometimes very active and sometimes it seems every one is
+    sleeping. Be aware that French &amp; English are mixed.
+    <CODE><BR>
+    Serveur : irc.freenode.net<BR>
+     Channel : #speedtouch<BR>
+    <BR>
+     Known nicknames :<BR>
+    <BR>
+     benoit : Benoit PAPILLAULT<BR>
+     francois : Fran&ccedil;ois ROGLER<BR>
+     GomGom : Edouard GOMEZ</CODE> 
+    <HR width="100%" size="2" align="Left">
+
+    <P><A href=
+    "http://benoit.papillault.free.fr/speedtouch/">Benoit
+    PAPILLAUT's Driver homepage</A></P>
+
+        <table width="100%" cellspacing="0" cellpadding="0"
+               style="margin-top: 1px; margin-bottom: 1px">
+          <tr>
+            <td align="left">
+
+<a href="http://validator.w3.org/check/referer">
+<img src="http://www.w3.org/Icons/valid-html401" border="0"
+     alt="Valid HTML 4.01!" height="31" width="88" align="middle"></a>
+
+<a href="http://jigsaw.w3.org/css-validator/check/referer">
+<img src="http://jigsaw.w3.org/css-validator/images/vcss" border="0"
+     alt="Valid CSS!" height="31" width="88" align="middle"></a>
+
+            </td>
+          </tr>
+        </table>
+
+  </BODY>
+</HTML>

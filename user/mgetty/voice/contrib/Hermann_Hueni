@@ -1,0 +1,29 @@
+Herman Hüni from Glue Software Engineering AG (hueni@glue.ch) contribution to
+vgetty voice shell interface from tcl/tk:
+
+Launcher:
+   #! /usr/bin/ksh
+   exec voice/call_control_hh.tcl <& $VOICE_INPUT >& $VOICE_OUTPUT $*
+
+Then in the tcl/Tk script:
+
+   proc vgettyPuts {aMsg} {
+       global env
+
+       puts stdout "$aMsg"
+
+       #   not very efficient to create a sub process each time :-(
+       #
+       #   kill is directly available in extended TCL.
+       #   That will nicely solve this. We leave it for now because it has
+       #   never shown to be a problem so far.
+       if {[info exists env(VOICE_PID)]} {
+	   exec kill -PIPE $env(VOICE_PID)
+       }
+   }
+
+   proc vgettyGets {} {
+       set inputData [gets stdin]
+       logTrace "/$inputData/"
+       return $inputData
+   }

@@ -1,0 +1,104 @@
+OPENGEAR KS8695P FLASH
+----------------------
+
+These instructions document how to use the OCdemon debugger (with
+ARM 20pin JTAG header) to program the flash in-circuit on KS8695P
+based boards. This is specifically tailored to the OpenGear CM4008,
+but would apply equally to other similar boards.
+
+
+0. SETTING UP DEBUGGER
+
+   Using OCdemon package, setup with appropriate .gdbinit script.
+   (Use new-wave/tools/misc/cm4008.gdb).
+
+   Firstly make sure you have the lp drivers loaded, and then load
+   the ocdemon driver:
+
+      insmod parport
+      insmod parport_pc
+      insmod lp
+      insmod -f ocdemompp
+
+   (Ignore the ocdemonpp load warnings).
+
+   Now startup the process demon, and start gdb:
+
+      OcdLibRemote -c ARM9 &
+      xscale-elf-gdb
+
+   Sometimes the debugger cannot access the CPU internals. Not sure why,
+   but it happens from time to time. If it happens exit gdb and then
+   manually reset the CPU board (jumper reset pins for example).
+
+
+1. FLASHING BOOT LOADER
+
+   Inside gdb run the following commands:
+
+      mem-init
+      flash-init
+      flash-erase 0x02000000
+      uart-load 0
+
+   Sometimes the uart-load command errors out. Don't worry about that,
+   just restart it with 'c' command.
+
+   Now cat out the boot.bin file on the serial port attached to the console.
+   It is set for 115200 baud, 8 data bits, 1 stop bit, no parity.
+
+   When completed break into gdb with CTRL-C. To check how many data bytes
+   where read (should be exact byte size of boot.bin) then do:
+
+      print $r4
+
+   Now program the boot loader into flash with:
+
+      flash-burn
+
+   This will return you to the prompt, and then do:
+
+      set $r1 = 0x02000000
+      set $r5 = 0
+      set $r6 = 0x18000
+      c
+
+   This dosn't take long, but does not return to the prompt, you need to
+   break into it (with CTRL-C) then check $r5, if it is the same as what
+   you set r6 to then you are done.
+
+   Sometimes (though not often) the serial load does not correctly down load
+   the image (hey there is no flow control implemented :-) so check that what
+   made it into flash is good:
+
+      x/32x 0x02000000
+
+   It should match a hexdump of boot.bin.
+
+
+2. FLASHING IMAGE
+
+   This provess is similar to flashing the boot loader:
+
+      mem-init
+      flash-init
+      flash-eraseall
+      uart-load 0x800000
+      c
+
+   Then on the host cat imagez.bin out the serial port. It will take a couple
+   of minutes, it is pretty big. When cat is complete break into gdb and make
+   sure size is good with 'print $r4'.
+
+   To program it from memory into flash:
+
+      flash-burn
+      set $r1 = 0x02040000
+      set $r5 = 0x800000
+      set $r6 = 0xb80000
+      c
+
+   This will take quite a few minutes. Check for completion as for boot loader
+   in section above.
+
+

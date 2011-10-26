@@ -1,0 +1,437 @@
+<!doctype linuxdoc system>
+
+<!-- $Id: ulogd.sgml 803 2005-04-18 14:21:17Z laforge $ -->
+
+<article>
+
+<title>ULOGD - the Userspace Logging Daemon</title>
+<author>Harald Welte &lt;laforge@gnumonks.org&gt</author>
+<date>Revision $Revision: 803 $, $Date: 2005-04-18 16:21:17 +0200 (Mon, 18 Apr 2005) $</date>
+
+<abstract>
+This is the documentation for <tt>ulogd</tt>, the Userspace logging daemon.
+ulogd makes use of the Linux &gt;= 2.4.x packet filter subsystem (iptables) and
+the ULOG target for iptables.
+</abstract>
+
+<toc>
+
+<sect>DESIGN
+
+<sect1>CONCEPT
+<p>
+I want to provide a flexible, almost universal logging daemon for my netfilter 
+ULOG target. It is not optimized in any way, the goal is to keep as simple as 
+possible. These are my thoughts about how the architecture which is most 
+capable of doing that:
+<p>
+<descrip>
+<tag>Interpreter lugins</tag>
+It should be possible to add plugins / runtime modules for new protocols, etc.
+For example the standard logging daemon provides source-ip, dest-ip, 
+source-port, dest-port, etc. Logging for variuos other protocols (GRE, 
+IPsec, ...) may be implemented as modules.
+
+<tag>Output plugins</tag>
+... describe how and where to put the information gained by logging plugins. 
+The easiest way is to build a line per packet and fprint it to a file. 
+Some people might want to log into a SQL database or want an output 
+conforming to the intrusion detection systems communication draft from the
+IETF.
+
+</descrip>
+
+<sect1>DETAILS
+<p>
+The major clue is providing a framework which is as flexible as possible. 
+Nobody knows what strange network protocols are out there :) Flexibility
+depends on the communication between the output of the logging plugins 
+and input of the output plugins.
+<p>
+Rusty advised me to use some kind of type-key-value triples, which is in fact
+what I implemented.
+<p>
+One issue is, of course, performance. Up to ulogd 0.3, ulogd did several
+linked list iterations and about 30 malloc() calls _per packet_. This 
+changed with the new &gt;= 0.9 revisions:
+<itemize>
+<item>Not a single dynamic allocation in the core during runtime. 
+Everything is pre-allocated at start of ulogd to provide the highest
+possible throughput.
+<item>Hash tables in addition to the linked lists. Linked lists are only
+traversed if we really want to access each element of the list.
+</itemize>
+
+<sect>INSTALLATION
+<p>
+<sect1>Linux kernel
+<p>
+First you will need a recent 2.4.x kernel.  If you have a kernel &gt;=
+2.4.18-pre8, it already has the kernel suport for ULOG (ipt_ULOG.o).
+<p>
+If you have an older kernel version (between 2.4.0 and 2.4.18-pre6), you
+can use the patch-o-matic system of netfilter/iptables, as described in
+the following section.
+
+<sect1>ipt_ULOG from netfilter/iptables patch-o-matic
+<p>
+You only need to read this chapter if you have a 2.4.x kernel &lt;=
+2.4.18-pre6.
+<p>
+In order to put the ipt_ULOG module into your kernel source,you need the latest
+iptables package, or even better: the latest CVS snapshot. A description how to
+obtain this is provided on the netfilter
+homepage <URL URL="http://www.netfilter.org/">.
+<p>
+To run patch-o-matic, just type 
+<tscreen><verb>
+make patch-o-matic
+</verb></tscreen>
+in the userspace directory of netfilter CVS.
+
+<sect1>ulogd
+<sect2>Recompiling the source
+<p>
+Download the ulogd package from <URL URL="http://ftp.netfilter.org/pub/ulogd/"> and
+untar it. 
+<p>
+If you want to build ulogd with MySQL support, type './configure --with-mysql'. You may also have to specify the path of the mysql libraries using '--with-mysql=path'. To build ulogd without MySQL support, just use './configure'.
+<p>
+To compile and install the program, call 'make install'.
+
+<sect2>Using a precompiled package
+<p>
+I also provide a SRPM, which should compile on almost any rpm-based distribution. It is available at <URL URL="http://ftp.netfilter.org/pub/ulogd/">
+<p>
+Just download the package and do the usual 'rpm --rebuild &lt;file&gt;'.
+
+<sect>Configuration
+<sect1>iptables ULOG target
+<sect2>Quick Setup
+<p>
+Just add rules using the ULOG target to your firewalling chain. A very basic
+example:
+<tscreen><verb>
+iptables -A FORWARD -j ULOG --ulog-nlgroup 32 --ulog-prefix foo 
+</verb></tscreen>
+<p>
+To increase logging performance, try to use the
+<tscreen><verb>
+--ulog-qthreshold N
+</verb></tscreen>
+option (where 1 &lt; N &lt;= 50). The number you specify is the amout of packets
+batched together in one multipart netlink message. If you set this to 20, the
+kernel schedules ulogd only once every 20 packets. All 20 packets are then 
+processed by ulogd. This reduces the number of context switches between kernel
+and userspace.
+<p>
+Of course you can combine the ULOG target with the different netfilter match
+modules.  For a more detailed description, have a look at the netfilter
+HOWTO's, available on the netfilter homepage.
+<sect2>ULOG target reference
+<p>
+<descrip>
+<tag>--ulog-nlgroup N</tag>
+The number of the netlink multicast group to which ULOG'ed packets are sent.
+You will have to use the same group number in the ULOG target and ulogd in
+order to make logging work.
+<tag>--ulog-cprange N</tag>
+Copyrange.  This works like the 'snaplen' paramter of tcpdump.  You can specify
+a number of bytes up to which the packet is copied.  If you say '40', you will
+receive the first fourty bytes of every packet. Leave it to '0'
+<tag>--ulog-qthreshold N</tag>
+Queue threshold.  If a packet is matched by the iptables rule, and already N
+packets are in the queue, the queue is flushed to userspace.  You can use this
+to implement a policy like: Use a big queue in order to gain high performance,
+but still have certain packets logged immediately to userspace.
+<tag>--ulog-prefix STRING</tag>
+A string that is associated with every packet logged by this rule.  You can use
+this option to later tell from which rule the packet was logged.
+</descrip>
+
+<sect2>ipt_ULOG module parameters
+<p>
+The ipt_ULOG kernel module has a couple of module loadtime parameters which can
+(and should) be tuned to accomodate the needs of the application:
+<descrip>
+<tag>nlbufsiz N</tag>
+Netlink buffer size. A buffer of the specified size N is allocated for every
+netlink group that is used.  Please note that due to restrictions of the kernel
+memory allocator, we cannot have a buffer size &gt; 128kBytes.  Larger buffer
+sizes increase the performance, since less kernel/userspace context switches
+are needed for the same amount of packets.  The backside of this performance
+gain is a potentially larger delay. The default value is 4096 bytes, which is
+quite small.
+<tag>flushtimeout N</tag> 
+The flushtimeout determines, after how many clock ticks (on alpha: 1ms, on
+x86 and most other platforms: 10ms time units) the buffer/queue is to be
+flushed, even if it is not full.  This can be used to have the advantage of a
+large buffer, but still a finite maximum delay introduced.  The default value
+is set to 10 seconds.
+</descrip>
+Example:
+<tscreen><verb>
+modprobe ipt_ULOG nlbufsiz=65535 flushtimeout=100
+</verb></tscreen>
+This would use a buffer size of 64k and a flushtimeout of 100 clockticks (1 second on x86).
+
+<sect1>ulogd
+<p>
+ulogd is what this is all about, so let's describe it's configuration...
+<sect2>ulogd configfile syntax reference
+<p>
+All configurable parameters of ulogd are in the configfile, typically located
+at '/etc/ulogd.conf'.
+<p>
+The following configuration parameters are available:
+<descrip>
+<tag>nlgroup</tag>
+The netlink multicast group, which ulgogd should bind to. This is the same as
+given with the '--ulog-nlgroup' option to iptables.
+<tag>logfile</tag>
+The main logfile, where ulogd reports any errors, warnings and other unexpected conditions. Apart from a regular filename, the following special values can be used; ``syslog'' to log via the unix syslog(3) mechanism.  ``stdout'' to log to stdout.
+<tag>loglevel</tag>
+This specifies, how verbose the logging to logfile is. Currently defined
+loglevels are: 1=debug information, 3=informational messages, 5=noticable
+exceptional conditions, 7=error conditions, 8=fatal errors, program abort.
+<tag>plugin</tag>
+This option is followed by a filename of a ulogd plugin, which ulogd shold load
+upon initialization. This option may appear more than once.
+<tag>rmem</tag>
+Size of the netlink socket receive memory.  You should set this to at least the
+size of the kernel buffer (nlbufsiz parameter of the ipt_ULOG module).  Please
+note that there is a maximum limit in /proc/sys/net/core/rmem_max which you
+cannot exceed by increasing the ``rmem'' parameter.  You may need to raise the
+system-wide maximum limit before.
+<tag>bufsize</tag>
+Size of the receive buffer. You should set this to at least the socket receive buffer (rmem).
+</descrip>
+<sect2>ulogd commandline option reference
+<p>
+Apart from the configfile, there are a couple of commandline options to ulogd:
+<descrip>
+<tag>-h --help</tag>
+Print a help message about the commandline options.
+<tag>-V --version</tag>
+Print version information about ulogd.
+<tag>-d --daemon</tag> 
+For off into daemon mode.  Unless you are debugging, you will want to use this
+most of the time.
+<tag>-c --configfile</tag>
+Using this commandline option, an alternate config file can be used.  This is
+important if multiple instances of ulogd are to be run on a single machine.
+</descrip>
+
+<sect>Available plugins
+<p>
+It is important to understand that ulogd without plugins does nothing.  It will receive packets, and do nothing with them.
+<p>
+There are two kinds of plugins, interpreter and output plugins.  Interpreter
+plugins parse the packet, output plugin write the interpreted information to
+some logfile/database/...
+
+<sect1>Interpreter plugins
+<p>
+ulogd comes with the following interpreter plugins:
+<sect2>ulogd_BASE.so
+<p>
+Basic interpreter plugin for nfmark, timestamp, mac address, ip header, tcp
+header, udp header, icmp header, ah/esp header... Most people will want to load
+this very important plugin.
+<sect2>ulogd_PWSNIFF.so
+<p>
+Example interpreter plugin to log plaintext passwords as used with FTP and
+POP3. Don't blame me for writing this plugin! The protocols are inherently
+insecure, and there are a lot of other tools for sniffing passwords... it's
+just an example.
+<sect2>ulogd_LOCAL.so
+<p>
+This is a 'virtual interpreter'.  It doesn't really return any information on
+the packet itself, rather the local system time and hostname.  Please note that
+the time is the time at the time of logging, not the packets receive time.
+
+<sect1>Output plugins
+<p>
+ulogd comes with the following output plugins:
+
+<sect2>ulogd_OPRINT.so
+<p>
+A very simple output module, dumping all packets in the format
+<tscreen><verb>
+===>PACKET BOUNDARY
+key=value
+key=value
+...
+===>PACKET BOUNDARY
+...
+</verb></tscreen>
+to a file.  The only useful application is debugging.
+<p>The module defines the following configuration directives:
+<descrip>
+<tag>dumpfile</tag>
+The filename where it should log to. The default is
+<tt>/var/log/ulogd.pktlog</tt>
+</descrip>
+
+<sect2>ulogd_LOGEMU.so
+<p>
+An output module which tries to emulate the old syslog-based LOG targed as far
+as possible. Logging is done to a seperate textfile instead of syslog, though.
+<p>
+The module defines the following configuration directives:
+<descrip>
+<tag>file</tag>The filename where it should log to. The default is
+<tt>/var/log/ulogd.syslogemu</tt>
+<tag>sync</tag>Set this to 1 if you want to have your logfile written
+synchronously. This may reduce performance, but makes your log-lines appear
+immediately.  The default is <tt>0</tt>
+</descrip>
+
+<sect2>ulogd_MYSQL.so
+<p>
+An output plugin for logging into a mysql database. This is only compiled if
+you have the mysql libraries installed, and the configure script was able to
+detect them. (that is: --with-mysql was specified for ./configure) <p>
+
+The plugin automagically inserts the data into the configured table; It
+connects to mysql during the startup phase of ulogd and obtains a list of the
+columns in the table. Then it tries to resolve the column names against keys of
+interpreter plugins. This way you can easly select which information you want
+to log - just by the layout of the table.  <p>
+
+If, for example, your table contains a field called 'ip_saddr', ulogd will
+resolve this against the key 'ip.saddr' and put the ip address as 32bit
+unsigned integer into the table.  <p>
+
+You may want to have a look at the file '<tt>doc/mysql.table</tt>' as an
+example table including fields to log all keys from ulogd_BASE.so. Just delete
+the fields you are not interested in, and create the table.  <p>
+
+The module defines the following configuration directives:
+<descrip>
+<tag>table</tag>
+Name of the table to which ulogd should log
+<tag>ldb</tag>
+Name of the mysql database
+<tag>host</tag>
+Name of the mysql database host
+<tag>port</tag>
+TCP port number of mysql database server
+<tag>user</tag>
+Name of the mysql user
+<tag>pass</tag>
+Password for mysql
+</descrip>
+
+<sect2>ulogd_PGSQL.so
+<p>
+An output plugin for logging into a postgresql database. This is only compiled
+if you have the mysql libraries installed, and the configure script was able to
+detect them. (that is: --with-pgsql was specified for ./configure) <p>
+
+The plugin automagically inserts the data into the configured table; It
+connects to pgsql during the startup phase of ulogd and obtains a list of the
+columns in the table. Then it tries to resolve the column names against keys of
+interpreter plugins. This way you can easly select which information you want
+to log - just by the layout of the table.  <p>
+
+If, for example, your table contains a field called 'ip_saddr', ulogd will
+resolve this against the key 'ip.saddr' and put the ip address as 32bit
+unsigned integer into the table.  <p>
+
+You may want to have a look at the file '<tt>doc/mysql.table</tt>' as an
+example table including fields to log all keys from ulogd_BASE.so. Just delete
+the fields you are not interested in, and create the table.  <p>
+
+The module defines the following configuration directives:
+<descrip>
+<tag>table</tag>
+Name of the table to which ulogd should log
+<tag>db</tag>
+Name of the database
+<tag>host</tag>
+Name of the mysql database host
+<tag>port</tag>
+TCP port number of database server
+<tag>user</tag>
+Name of the sql user
+<tag>pass</tag>
+Password for sql user
+</descrip>
+
+<sect2>ulogd_PCAP.so
+<p>
+An output plugin that can be used to generate libpcap-style packet logfiles.
+This can be useful for later analysing the packet log with tools like tcpdump
+or ethereal.
+
+The module defines the following configuration directives:
+<descrip>
+<tag>file</tag>
+The filename where it should log to.  The default is:
+<tt>/var/log/ulogd.pcap</tt>
+<tag>sync</tag>
+Set this to <tt>1</tt> if you want to have your pcap logfile written
+synchronously.  This may reduce performance, but makes your packets appear
+immediately in the file on disk.  The default is <tt>0</tt>
+</descrip>
+
+<sect2>ulogd_SQLITE3.so
+<p>
+An output plugin for logging into a SQLITE v3 database. This is only compiled
+if you have the sqlite libraries installed, and the configure script was able to
+detect them. (that is: --with-sqlite3 was specified for ./configure) <p>
+
+The plugin automagically inserts the data into the configured table; It
+opens the sqlite db during the startup phase of ulogd and obtains a list of the
+columns in the table. Then it tries to resolve the column names against keys of
+interpreter plugins. This way you can easly select which information you want
+to log - just by the layout of the table.  <p>
+
+If, for example, your table contains a field called 'ip_saddr', ulogd will
+resolve this against the key 'ip.saddr' and put the ip address as 32bit
+unsigned integer into the table.  <p>
+
+You may want to have a look at the file '<tt>doc/sqlite3.table</tt>' as an
+example table including fields to log all keys from ulogd_BASE.so. Just delete
+the fields you are not interested in, and create the table.  <p>
+
+The module defines the following configuration directives:
+<descrip>
+<tag>table</tag>
+Name of the table to which ulogd should log
+<tag>db</tag>
+Name of the database
+<tag>buffer</tag>
+Size of the sqlite buffer
+</descrip>
+</sect2>
+
+<sect2>ulogd_SYSLOG.so
+<p>
+An output plugin that really logs via syslogd. Lines will look exactly like printed with traditional LOG target.
+</p>
+<p>
+The module defines the following configuration directives:
+<descrip>
+<tag>facility</tag>
+The syslog facility (LOG_DAEMON, LOG_KERN, LOG_LOCAL0 .. LOG_LOCAL7, LOG_USER)
+<tag>level</tag>
+The syslog level (LOG_EMERG, LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG)
+</descrip>
+</sect2>
+
+<sect> QUESTIONS / COMMENTS
+<p>
+All comments / questions / ... are appreciated.
+<p>
+Just drop me a note to laforge@gnumonks.org
+<p>
+Please note also that there is now a mailinglist, ulogd@lists.gnumonks.org. 
+You can subscribe at
+<URL URL="http://lists.gnumonks.org/mailman/listinfo/ulogd/">
+<p> 
+The preferred method for reporting bugs is the netfilter bugzilla system,
+available at <URL URL="http://bugzilla.netfilter.org/">.
+
+</article>

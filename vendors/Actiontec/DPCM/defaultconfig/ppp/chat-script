@@ -1,0 +1,27 @@
+REPORT "CONNECT"
+ABORT "NO CARRIER"
+ABORT "NO DIALTONE"
+ABORT "ERROR"
+ABORT "NO ANSWER"
+ABORT "BUSY"
+TIMEOUT 60
+"" ATZ
+# AT&F: (factory init) Set all commands to the most commonly used
+# ATW2: (Extended result codes) sets modem to report CONNECT to DCE rather than DTE
+OK AT&FW2
+# ATL: Speaker volume (0-3)
+# ATM: Speaker control:
+#   0 Always off
+#   1 On during call establishment, off when receiving carrier
+#   2 Always on
+#   3 Off when receiving carrier and during dialing, on during answering
+# If you don't want to hear dialing and the initial modem noise, put
+# "OK ATL0M0" here instead
+OK ATL0M1
+# If you don't have a continous dialtone (e.g. if you're connected
+# to a PBX), uncomment the following line
+# OK ATX0
+# /etc/ppp/phone_number MUST include the "ATD" command
+OK @/etc/ppp/phone_number
+# "\c" instructs chat to NOT send a newline
+CONNECT \c

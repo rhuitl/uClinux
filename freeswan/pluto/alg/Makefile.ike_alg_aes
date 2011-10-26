@@ -1,0 +1,12 @@
+ALG:=aes
+DIR_AES:=$(LIBCRYPTO)/libaes
+ALG_DIRS := $(ALG_DIRS) $(DIR_AES)
+ALG_LIBS := $(ALG_LIBS) $(DIR_AES)/libaes.a
+ALG_SRCS := $(ALG_SRCS) ike_alg_$(ALG).c
+ALG_OBJS := $(ALG_OBJS) ike_alg_$(ALG).o
+
+$(DIR_AES)/libaes.a:
+	make -C $(DIR_AES) CFLAGS="$(CFLAGS)" libaes.a
+
+ike_alg_$(ALG).o: ike_alg_$(ALG).c
+	$(CC) -I $(LIBCRYPTO) -I$(DIR_AES) $(COPTS) $(ALLFLAGS) -c $<

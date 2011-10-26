@@ -1,0 +1,136 @@
+#!/usr/bin/perl
+
+use Fcntl;
+use POSIX qw(:termios_h);
+
+sub indent
+{
+    my($str) = @_;
+    $str =~ s/\n\s*(.)/\n  \1/g;
+    $str =~ s/^\s*//;
+    return "  $str";
+}
+
+sub init_tty
+{
+    # Initialize the tty device to a sane mode
+    my $fd = fileno(MODEM);
+    $term = POSIX::Termios->new();
+    $term->getattr($fd);
+    $term->setcc(VTIME, 0);
+    $term->setcc(VMIN, 0);
+    $term->setoflag(0);
+    $term->setlflag(0);
+    my $cflag = $term->getcflag | CLOCAL | CREAD | CS8;
+    $cflag &= ~(CSIZE | CSTOPB | PARENB);
+    $term->setcflag($cflag);
+    $term->setiflag(IGNBRK | IGNPAR);
+    $term->setattr($fd, TCSANOW);
+}
+
+sub at_cmd
+{
+    my($cmd) = @_;
+    my($rin, $n, $nf, $char, $buf);
+    syswrite(MODEM, "$cmd\r") || die "syswrite(): $!\n";
+    $rin = $buf = '';
+    $nr = 0;
+    while ($nr < 1024) {
+	vec($rin,fileno(MODEM),1) = 1;
+	last if (!select $rin, undef, undef, 1);
+	$nr += sysread(MODEM, $buf, 1024-$nr, $nr);
+    }
+    $buf =~ s/^\s*$cmd\s+//;
+    $buf =~ s/\s+OK\s+$//;
+    $buf =~ s/\s+/ /g;
+    return $buf;
+}
+
+sub checkout
+{
+    my($dev) = @_;
+    print "Checking modem at /dev/$dev:\n";
+    $set = `setserial /dev/$dev`;
+    print "  Settings: $set";
+    if (($set =~ /8250/) || ($set =~ /16450/)) {
+	print "    The detected UART is odd: maybe an IO port conflict?\n";
+    }
+    $irq = $1 if $set =~ /IRQ: (\d+)/;
+    if ($irq > 0) {
+	$pci = `/sbin/lspci -v`;
+	$proc = `grep " $irq:" /proc/interrupts`;
+	$shared_irq = ($pci =~ m/IRQ $irq\b/s) || ($proc =~ m/i82365/s);
+    }
+
+    sysopen(MODEM, "/dev/$dev", O_RDWR|O_NONBLOCK) ||
+	die "sysopen(): $!\n";
+    init_tty();
+
+    print "  Sending modem query command...\n";
+    $buf = at_cmd("ATI3");
+    if ($buf ne "") {
+	print "    ATI3 = '$buf'\n";
+	print "  The modem is operating normally.\n";
+	close(MODEM);
+    } else {
+	close(MODEM);
+	print "  Modem query timed out!\n";
+	return if ($shared_irq);
+	print "  Trying polled mode...\n";
+	system("setserial /dev/$dev irq 0");
+	sysopen(MODEM, "/dev/$dev", O_RDWR|O_NONBLOCK) ||
+	    die "sysopen(): $!\n";
+	$buf = at_cmd("ATI3");
+	if ($buf ne "") {
+	    print "    ATI3 = '$buf'\n";
+	    print "  The modem interrupt (irq $irq) has a delivery problem.\n";
+	} else {
+	    print "  The modem is not working in polled mode.\n";
+	}
+	close(MODEM);
+	system("setserial /dev/$dev irq $irq");
+    }
+}
+
+foreach $f ("/var/state/pcmcia/stab", "/var/lib/pcmcia/stab",
+	    "/var/run/stab") {
+    if (-f $f) {
+	$stab = $f; last;
+    }
+}
+if (!$stab) {
+    print "Socket status file (stab) not found!  Is PCMCIA running??\n";
+    exit 1;
+}
+
+$ns = 0;
+open(IN, $stab);
+while ($_ = <IN>) {
+    chop;
+    if (/^Socket (\d+): (.*)/) {
+	($sock,$card) = ($1,$2);
+    } else {
+	@f = split;
+	next if ($f[1] ne "serial");
+	$ns++;
+	checkout($f[4]);
+    }
+}
+close(IN);
+
+exit 0 if ($ns);
+
+print "No PCMCIA modem devices are configured.\n";
+
+open(IN, "/sbin/cardctl ident |");
+while (<IN>) {
+    $sock = $1 if (/^Socket (\d+)/);
+    if (/function: 2/) {
+	$ns++;
+	print "\nThere is a serial device in socket $sock.\n";
+    }
+}
+close(IN);
+
+$log = `dmesg | grep register_serial | tail -2`;
+print "\nKernel messages:\n", indent($log) if ($log);

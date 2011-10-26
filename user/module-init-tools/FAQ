@@ -1,0 +1,33 @@
+Frequently Asked Module User Questions
+
+Q) I get "/usr/bin/ld: cannot find -lc"
+A) You need to install a development package which contains libc.a.
+
+Q) I'm using RedHat and modules don't autoload any more.
+A) Old versions of RedHat turns module autoloading off if /proc/ksyms
+   isn't found.  Change line 337 of /etc/rc.d/rc.sysinit from:
+
+  if ! grep -iq nomodules /proc/cmdline 2>/dev/null && [ -f /proc/ksyms ]; then
+
+   to
+
+  if ! grep -iq nomodules /proc/cmdline 2>/dev/null && [ -f /proc/modules ]; then
+
+Q) Things still don't load properly.
+A) Do you have an /etc/modprobe.conf?  If not, use
+   generate-modprobe.conf to generate an /etc/modprobe.conf from your
+   old setup.
+
+Q) Sound doesn't load automatically.
+A) You need to set up an alias (or install command) for "sound-slot-0" in
+   /etc/modprobe.conf: the ALSA sound system seems to want this.
+
+Q) What is "[unsafe]" next to the module name in lsmod?
+A) It means somone used an old-style interfaces to try to control this
+   module: these are slowly being tracked down and eliminated.  You can
+   use "rmmod -f" to force removal if you configured your kernel with
+   CONFIG_MODULE_FORCE_UNLOAD set.
+
+Q) I'm having trouble inserting out-of-tree modules
+A) See kernel source tree documentation: Documentation/kbuild/modules.txt
+   

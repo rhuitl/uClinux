@@ -1,0 +1,911 @@
+## $Id: README,v 1.26 1994/08/26 08:22:48 gkim Exp $
+##
+## README for Tripwire
+##
+## Gene Kim  & Gene Spafford
+## The COAST Project
+## Department of Computer Sciences
+## Purdue University
+##
+
+##  All files in the distribution of Tripwire are Copyright 1992, 1993, 1994 
+##  by the Purdue Research Foundation of Purdue University.  All rights
+##  reserved.  Some individual files in this distribution may be covered
+##  by other copyrights, as noted in their embedded comments.
+##  
+##  Redistribution and use in source and binary forms are permitted
+##  provided that this entire copyright notice is duplicated in all such
+##  copies, and that any documentation, announcements, and other
+##  materials related to such distribution and use acknowledge that the
+##  software was developed at Purdue University, W. Lafayette, IN by
+##  Gene Kim and Eugene Spafford.  No charge, other than an "at-cost"
+##  distribution fee, may be charged for copies, derivations, or
+##  distributions of this material without the express written consent
+##  of the copyright holder.  Neither the name of the University nor the
+##  names of the authors may be used to endorse or promote products
+##  derived from this material without specific prior written
+##  permission.  THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY
+##  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE
+##  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR ANY PARTICULAR
+##  PURPOSE.
+
+    This README file serves as a quick-and-dirty primer on Tripwire.
+A PostScript formatted paper that fully describes the design and
+rationale is also included in the ./docs directory.  The design
+document is also available as a technical report (TR-CSD-93/71).  This
+document will be referenced throughout the Tripwire distribution as
+the Tripwire design document or the comprehensive Tripwire paper.
+
+    This README file contains information needed to build, test,
+and run Tripwire.  A table of contents follow:
+
+
+	    0.0.  If you were running an earlier version
+	    1.0.  Background
+	    1.1.  Goals of Tripwire
+	    2.0.  How to build Tripwire
+	    2.1.  Common Tripwire compilation problems
+	    2.2.  The siggen utility
+	    3.0.  Getting Tripwire up and running
+	    3.1.  Creating your tw.config file
+	    3.2.  A caveat about your Tripwire database
+	    3.3.  Testing Tripwire
+	    3.4.  Running Tripwire as an integrity checker
+	    3.5.  Keeping your database up-to-date
+	    3.5.1.	Running Tripwire in Interactive mode
+	    3.5.2.	Running Tripwire in Database Update mode
+	    3.6.  A quick-checking mode
+	    4.0.  Some Tripwire scaling hints for using Tripwire 
+		    in large sites
+	    4.1.  The tw.config grammar
+	    4.2.  How you might use these directives
+	    5.0.  Notes on signature routines
+	    5.1.  Performance vs. security
+	    6.0.  Signature routines
+	    6.1.  MD5
+	    6.2.  Snefru
+	    6.3.  CRC-32
+	    6.4.  CRC-16
+	    6.5.  MD4
+	    6.6.  MD2
+	    6.7.  SHA/SHS
+	    6.8.  Haval
+	    6.9.  null signature
+	    7.0.  Feedback and bug-reports
+	    8.0.  User contributions
+	    9.0.  Acknowledgements
+
+0.0.  If you were running an earlier version
+============================================
+
+    If you have been running an older version of Tripwire, please also
+read the WHATSNEW file for information on new functionalities.  
+
+    Version 1.2 of Tripwire uses an updated version of the database
+file (now version 4).  Databases used with previous versions of
+Tripwire are not compatible with this release and need to be
+regenerated.  We suggest that you do this as follows:
+   * take your system to single-user mode
+   * rerun your old version of Tripwire in verify mode using
+     your current database
+   * build and install v1.2 Tripwire
+   * build your new database using your old config file
+   * resume multi-user operation
+
+
+1.0.  Background
+================
+
+    With the advent of increasingly sophisticated and subtle
+account break-ins on Unix systems, the need for tools to aid in
+the detection of unauthorized modification of files becomes
+clear.  Tripwire is a tool that aids system administrators and
+users in monitoring a designated set of files for any changes.
+Used with system files on a regular (e.g., daily) basis, Tripwire
+can notify system administrators of corrupted or tampered files,
+so damage control measures can be taken in a timely manner.
+
+1.1.  Goals of Tripwire
+=======================
+
+    Tripwire is a file and directory integrity checker, a utility that
+compares a designated set of files and directories against information
+stored in a previously generated database.  Any differences are
+flagged and logged, including added or deleted entries.  When run
+against system files on a regular basis, any changes in critical
+system files will be spotted -- and appropriate damage control
+measures can be taken immediately.  With Tripwire, system
+administrators can conclude with a high degree of certainty that a
+given set of files remain free of unauthorized modifications if
+Tripwire reports no changes.
+
+
+2.0.  How to build Tripwire
+===========================
+
+    As of this writing, Tripwire has run successfully on (at least)
+BSD, OSF/1, Mach, Xenix, and late System V variants of Unix.  Tripwire
+was built and tested on a wide variety of Unix variants.
+
+    First of all, you should read through this entire README file
+before you modify any files or try to build the program.  This text
+describes various settings and strategies for configuration and
+operation.  Then, after you've thought about the operation of the
+system, come back to this section and follow the instructions.
+
+    The file 'Ported' contains a list of platforms and operating
+systems where Tripwire has already been successfully ported.  If you
+find your system in the list, note the system settings that were used
+to build Tripwire.
+
+    Second, look through the Makefile and make sure that the C
+compiler and all flag settings are reasonable for your configuration.
+Most of the potentially tricky system settings should be listed in the
+'Ported' file.
+
+    Next, look in the './configs' directory to find a predefined
+'conf-<os>.h' file that matches closest to your operating system.
+Note this file, because you will be inserting this filename in the
+'./include/config.h' file.  If no such file exists, pick one "near"
+your system type and modify appropriately (then mail it back to us for
+a future release).
+
+    ** Don't do anything with this file yet!  In particular, don't copy
+    ** it over the config.h file!  (Instead, keep reading...)
+
+    Now that you have chosen your operating system header file, edit
+the './include/config.h' file to tailor Tripwire to your system.
+Include the name of the predefined header file closest to your system
+at the appropriate line in config.h
+
+    Paths and names of Tripwire configuration files are also set
+in the config.h file.  Make sure you note the locations that
+Tripwire looks for its configuration and database files; change them
+for your system, as appropriate.
+
+    NOTE: We *strongly* urge you to locate the Tripwire
+configuration files on a disk that can be made read-only with a
+hardware setting.  This will prevent the files from being altered
+by an attacker.  The run-time version of Tripwire should be
+located in the same place.  If you are unable to mark a disk (or
+diskette) as read-only, you might also consider putting it on a
+remote partition of a more secure machine, and import it
+read-only.  See the design document for the rationale behind this
+note if the concept is not obvious.
+
+    Last, look in the './configs' directory again to find a tw.config
+file that matches your operating system.  These files were
+custom-tailored to match the file layouts of various vendor-supplied
+operating systems.  If no file in this subdirectory matches your
+system, choose the one that is closest in nature (e.g., BSD4.3 or
+SysV.4).  Edit this file to include additional files and directories
+you want to monitor (e.g., local bins and critical databases), to
+correct paths if you have moved things or if they are mounted from a
+remote location (check them only on the server!), and to exclude
+locally-active files from the check.  You should probably add the
+Tripwire binary itself to this file.  See the next section for further
+details.
+
+    After you have customized your tw.config file, copy it to the
+location that you specified in your config.h file.
+
+    Next, simply type 'make' at the top level.  Note that all
+Makefiles in the subdirectories are driven by the top-level Makefile.
+(i.e., typing 'make' in the ./src directory will probably not work.)
+
+    Some common problems with building and using Tripwire are
+addressed in the FAQ file: you may want to read that if you have
+difficulties.
+
+2.1.  Common Tripwire compilation problems
+==========================================
+
+    Tripwire was originally written using ANSI C.  However,
+Tripwire now compiles with K&R, too.  All of the prototypes
+remain embedded between "#ifdef __STDC__" directives.  Sadly,
+compiling under ANSI is sometimes noisier than with K&R.
+Therefore, go ahead and compile with K&R unless religion dictates
+ANSI.  (The code lints completely clean, excepting the malloc()
+and exit() return values.)
+
+    Common compilation trouble-spots are the dirent(S5)/direct(BSD) 
+funkiness and #defines that changed for POSIX compliance.
+
+    If the Tripwire test suite fails, consider trying the following:
+
+	- double check that you're including the correct conf-*.h file
+		in your ./include/config.h file.
+	- change the CFLAGS definition in the Makefile so no optimization
+		is done (i.e., remove the "-O" option).
+	- do a "make clean".
+	- try again.
+
+    If this fails, try a different C compiler (e.g., GCC).
+
+    It has been noted that newer versions of flex and bison (the GNU
+replacements for lex and yacc) do not generate code that passes all
+the test suites using the default Tripwire sources.  Calvin Page
+helped contribute replacement config.pre.l and config.pre.y files that
+correct this problem.  You'll find that using lex usually solves the
+problems that make the Tripwire test suite fail.
+
+    If you use flex and bison, make sure you use the gcc compiler to
+avoid compile-time errors.
+
+
+2.2.  The siggen utility
+==========================
+
+    The siggen utility is provided so users can get signatures of
+files without having to run Tripwire.  The syntax of siggen is
+simple.
+
+	siggen [-0123456789aqv] [ file ... ]
+
+    By default, siggen prints out all ten signatures.  However,
+the signatures can be printed selectively by specifying the
+signature number on the command line.
+
+    See the manual page for details.
+
+3.0.  Getting Tripwire up and running
+=====================================
+
+    Tripwire runs in either of four modes: Database Generation,
+Integrity Checking, Database Update, and Interactive Update mode.  In
+order to run Integrity Checking, Tripwire must have a database to
+compare against.  To do that, you must first specify the set of files
+for Tripwire to monitor.  This list is stored in 'tw.config'.
+
+3.1.  Creating your tw.config file
+==================================
+
+    Edit your 'tw.config' file, or whatever filename you defined for
+the Tripwire config file, and add all the directories that contain
+files that you want monitored.  The format of the config file is
+described in its header and in the man page.  Pay especially close
+attention to the select-flags and omit-lists, which can significantly
+reduce the amount of uninteresting output generated by Tripwire.  For
+example, you will probably want to omit files like mount tables that
+are constantly changed by the operating system.
+
+    Next, run Tripwire with 'tripwire -initialize'.  This will create
+a file called 'tw.db_[hostname]' in the directory you specified to
+hold your databases (where [hostname] will be replaced with your
+machine hostname).
+
+3.2.  A caveat about your Tripwire database
+===========================================
+
+    NOTE: Tripwire will detect changes made to files from this
+point on.  You *must* be certain that the system on which you
+generate the initial database is clean, however --- Tripwire
+cannot detect unauthorized modifications that have already been
+made.  One way to do this would be to take the machine to
+single-user mode, reinstall all system binaries, and run Tripwire
+in initialization mode before returning to multi-user operation.
+
+    This database must be moved someplace where it cannot be modified.
+Because data from Tripwire is only as trustworthy as its database,
+choose this with care.  We recommend placing all the system databases
+on a read-only disk (you need to be able to change the disk to
+writable during initialization and updates, however), or exporting it
+via read-only NFS from a "secure-server."  (This pathname is hardcoded
+into Tripwire.  Any time you change the pathname to the database
+repository, you must recompile Tripwire.  This prevents a malicious
+intruder from spoofing Tripwire into giving a false "okay" message.)
+
+    We also recommend that you make a hardcopy printout of the
+database contents right away.  In the event that you become
+suspicious of the integrity of the database, you will be able to
+manually compare information against this hardcopy.  We have yet
+to hear of a way for  "crackers" to alter an old piece of
+printout made before they penetrated the system!
+
+    You may also wish to generate a full set of signatures of the
+database, the configuration file, and the Tripwire executable using
+the "siggen" utility.  (Be certain to generate siggen's signature
+too!)  Store these on hardcopy for comparison if you need quick
+confirmation that the files involved have not changed.  However, we
+advise that you do any comparison via a version of siggen stored on
+read-only media, or encrypted when not in use.
+
+3.3.  Testing Tripwire
+======================
+
+    Tripwire includes a script-driven test suite that checks the
+top-level build directory against the distribution package.  
+
+    In the ./tests directory, there is a Tripwire database of the
+entire Tripwire source distribution and a tw.config file.  The
+test script automatically converts the pathnames in these
+Tripwire files to match those of your system.  After converting
+the files, it then runs Tripwire in Integrity Checking mode.
+
+    To run the test, simply type 'make test' at the top level.
+This will invoke the script, and if all goes well, the output of
+Tripwire matches the expected values that the script provides.
+
+    In addition to checking all the files in the Tripwire
+distribution, a number of signature and functional tests are run to
+ensure the correct operation of the compiled program.
+
+
+3.4.  Running Tripwire as an integrity checker
+==============================================
+
+    Once you have your database set up, you can run Tripwire
+in Integrity Checking mode by 'tripwire'.  
+
+3.5.  Keeping your database up-to-date
+======================================
+
+    A common setup for running Tripwire would mail the system
+administrator any output that it generates.  However, some files on
+your system may change during normal operation, and this necessitates
+update of the Tripwire database.
+
+    There are now two ways to update your Tripwire database.  The first
+method is interactive, where Tripwire prompts the user whether each changed
+entry should be updated to reflect the current state of the file, while the
+second method is a command-line driven mode where specific files/entries
+are specified at run-time.
+
+3.5.1.  Running Tripwire in Interactive mode
+============================================
+
+    Running Tripwire in Interactive mode is similar to the Integrity
+Checking mode.  However, when a file or directory is encountered that has
+been added, deleted, or changed from what was recorded in the database, 
+Tripwire asks the user whether the database entry should be updated.
+
+    For example, if Tripwire were run in Interactive mode and a file's
+timestamps changed, Tripwire would print out what it expected the file 
+to look like, what it actually found, and then prompt the user whether
+the file should be updated:
+
+	/homes/genek/research/tw/src/preen.c
+	      st_mtime: Wed May  5 15:30:37 1993      Wed May  5 15:24:09 1993      
+	      st_ctime: Wed May  5 15:30:37 1993      Wed May  5 15:24:09 1993      
+	---> File: '/homes/genek/research/tw/src/preen.c
+	---> Update entry?  [YN(y)nh?] y
+
+    You could answer yes or no, where a capital 'Y' or 'N' tells Tripwire
+use your answer for the rest of the files.  (The 'h' and '?' choices give
+you help and descriptions of the various inode fields.)
+
+    While this mode may be the most convenient way of keeping your database
+up-to-date, it requires that the user be "at the keyboard."  A more
+conventional command-line driven interface exists, and is described next.
+
+3.5.2.  Running Tripwire in Database Update mode 
+================================================
+
+    Tripwire supports incremental updates of its database on a
+per-file/directory or tw.config entry basis.  Tripwire stores
+information in the database so it can associate any file in the
+database with the tw.config entry that generated it when the
+database was created.
+
+    Therefore, if a single file has changed, you can:
+
+	tripwire -update /etc/newly.installed.file
+
+    Or, if an entire set of files that made up an entry in
+the tw.config file changed, you can:
+
+	tripwire -update /usr/local/bin/Local_Package_Dir
+
+    In either case, Tripwire regenerates the database entries
+for every specified file.  A backup of the old database is
+created in the ./databases directory.
+
+    Note that Tripwire can now handle arbitrary numbers of
+arguments in Database Update mode.  This was added in version 1.0.1.
+
+    The script ``twdb_check.pl'' was added in version 1.2 as an
+interim mechanism to ensure database consistency.  Namely, when new
+entries are added to the tw.config file, database entries may no
+longer be associated with the proper entry number.  The twdb_check.pl
+script analyzes the database, and remaps each database entry with its
+proper tw.config entry.
+
+    The twdb_check functionality will be put into the Tripwire
+program in a future release.
+
+3.6.  A quick-checking mode
+===========================
+
+    Tripwire allows you to selectively skip certain signatures at
+run-time through a command-line option.  For example, if you wish
+to run Tripwire on an hourly basis, even performing only MD5
+checks might be computationally prohibitive.  For this
+application, checking only the CRC32 signature might be
+desirable.  To do this, assuming that only MD5, Snefru, and CRC32
+were used when the database was initialized, you would type:
+
+	tripwire -i 1 -i 2
+
+   This tells tripwire to ignore signature 1 and signature 2.
+Furthermore, for daily Tripwire runs, you could specify using
+only MD5 and CRC32.  Finally, for weekly runs, you could run
+Tripwire with all three signatures.
+
+   To find added or deleted files, with no signature checking, use:
+
+	tripwire -i all
+
+
+4.0.  Some Tripwire scaling hints for using Tripwire in large sites
+===================================================================
+
+    The tw.config.5 manual page describes in detail the syntax
+supported by the tw.config file.  Tripwire includes features that
+offer similar functionality to the C-preprocessor, and offer other
+directives that assist in the use of Tripwire at sites consisting of
+hundreds of workstations with local disk.
+
+4.1.  The tw.config grammar
+===========================
+
+    These commands are briefly described below:
+
+	@@define VAR VALUE
+	@@undef VAR
+
+	@@ifhost HOSTNAME
+	@@ifnhost HOSTNAME
+	@@ifdef VAR
+	@@ifndef VAR
+	@@else
+	@@endif
+
+	@@include FILENAME
+
+    Furthermore, the tw.config grammar also supports logical
+expressions.  For example, you could have something like this
+in your tw.config file:
+
+	@@ifhost spam.cc.purdue.edu || weiner.cc.purdue.edu
+	...entries...
+	@@endif
+
+    Besides the obvious cpp-like functionality, you can use
+@@define to create strings that are interpreted at run-time.
+For example:
+
+	@@ifhost mentor.cc.purdue.edu
+	@@ define TEMPLATE_S	+pinug-cas0123456789
+	@@else
+	@@ define TEMPLATE_S	+pinug012-cas3456789
+	@@endif
+
+	/etc/tw.loginfo		@@TEMPLATE_S
+
+4.2.  How you might use these directives
+========================================
+
+    Because Tripwire allows run-time interpretation of the
+tw.config file, it becomes possible for many different hosts to
+share the same tw.config file.  This allows the maintenance of
+Tripwire configuration files to still be manageable in a large,
+heterogeneous environment.  Although each host must still have
+different database file, this has few consequences except for
+disk space.
+
+5.0.  Notes on signature routines
+=================================
+
+    The RSA Data Security, Inc. MD5, MD4, and MD2 Message Digesting
+Algorithm, Snefru (the Xerox Secure Hash Function), SHA (the Secure
+Hash Algorithm), and Haval code have been changed to eliminate
+big-endian and little-endian run-time specific routines.  These
+changes have been sent back to the authors, but we are not aware of
+any buy-backs yet.  Until then, there will remain some differences
+between the code in this package and their respective virgin
+distributions.
+
+5.1.  Performance vs. security
+==============================
+
+    Normally, only one checksum per file would be enough to
+detect changes.  For purposes of speed, an easy to calculate
+checksum would be preferred.  However, most easy-to-calculate
+signatures are also easy to defeat if a determined attacker
+wished to do so (see the chart in the design document to see how
+easy this is to do with random comparisons).
+
+    Tripwire includes six very difficult-to-forge signature
+algorithms, as well as two more conventional CRC routines.  Using the
+default setup of recording two signatures (MD5 and Snefru) for each
+database entry gives very, very strong assurance that a file has not
+been tampered with.  For tampering to have succeeded, the attacker
+would have had to have changed the file and added appropriate padding
+characters to recreate *both* checksums without also altering the size
+of the file.  To do this at random might not even be possible with the
+MD5 and Snefru checksums used.  Those two algorithms have not been
+exhaustively analyzed, but both are known to be strong message
+authentication codes.
+
+    This added assurance is at a heavy price, however.  The two
+algorithms, and Snefru in particular, are expensive to calculate.  To
+run the MD5 and Snefru algorithms against every file is likely to be
+overkill for almost all systems (unless you have cpu cycles to
+spare!).  Both checksums should be run over only the most critical
+files...like the Tripwire database and program, and perhaps each
+setuid and setgid file on your system.  All other files can be checked
+with MD5 (or Haval) alone for much faster operation and a high level
+of assurance. The task of altering a file and recreating the original
+MD5 checksum is also very difficult, and it is unlikely that any but
+the most determined, sophisticated, and well-equipped attacker would
+be able to do it in finite time.
+
+    To decrease the execution run-times of Tripwire, consider
+modifying your tripwire.config entries to ignore the Snefru
+(signature 2) attribute on files that do not need such stringent
+monitoring.  This will skip the computationally-expensive Snefru
+signature collection entirely.  Balancing this equation of
+security vs.  speed is a decision best made by the administrator,
+most closely tailored to his/her site needs.
+
+    For the extremely paranoid, Tripwire includes the MD2, MD4, SHA,
+and Haval signature algorithms, as well as the 16 and 32-bit CRC
+algorithms in its arsenal.  Be forewarned, however, that MD2 is an
+order of magnitude slower than even Snefru, and probably guarantees no
+greater integrity checking.  We include all these routines, however,
+so you can pick what you feel to be most appropriate for your site.
+
+    You may wish to add other routines as checksum/signature
+generators.  For instance, if you have a fast DES implementation
+(including chip-based generation), you might wish to encrypt the file
+using CBC mode and some fixed key, saving the final 128 bits of output
+as the signature.  The configuration file routines have several
+signature flags that are currently bound to a null function, so there
+is room for this expansion if you wish.
+
+    Clearly, with eight different signature algorithms at your
+disposal, Tripwire offers considerable flexibility in ensuring
+data security.  Tripwire makes maintaining a trivial CRC
+database equally easy to administer and check as a full (but
+perhaps less practical) eight-signature database.
+
+    The following section describes each of the eight signature
+algorithms.
+
+6.0.  Signature routines
+========================
+
+    Tripwire ships with eight signature routines.  This section
+briefly describes each signature routine.  This is by no means an
+authoratative list, but it does attempt to give some background
+on each of the signature routines provided:
+
+    MD5, Snefru, MD4, MD2, SHA, and Haval are all examples of
+message-digest algorithms (also known as one-way hash functions,
+fingerprinting routines, message authentication codes, or manipulation
+detection codes).  They employ cryptographic techniques to ensure that
+any small change in the input stream results in immediate and widely
+diverging output.  This way, even a small change in the input results
+in large change in the output.  Therefore, any unauthorized,
+malicious, or accidental change will be evident.  Furthermore, because
+these algorithms use a 128-bit or larger signature, using a
+brute-force attack to introduce a deliberate change in the file while
+trying to keep the same signature becomes a computationally infeasible
+task.
+
+    The CRC algorithms, on the other hand, use simple polynomial
+division to generate the checksums.  While this technique is very
+fast, the mathematics of this technique is well-understood.
+Additionally, since the signature space is so small (usually 16
+or 32 bits), a brute-force search for a CRC collision is well
+within the capabilities of most workstations.  There are
+currently several programs in the public domain that can, for any
+given input file, provide a different output file with the same
+CRC signature in 30 seconds or less.
+
+    All observed timing measures provided for the signature
+routines were performed on a Sequent Symmetry with ten 16 Mhz
+80386 processors.  The numbers provided are simply an informal
+gauge of throughput, rather than any authoritative metric.
+
+6.1.  MD5
+=========
+
+    MD5 is the RSA Data Security Inc. Message-Digest Algorithm, a
+proposed data authentication standard.  The Internet Draft
+submission can be found as Internet Working Draft RFC 1321,
+available via anonymous FTP from NIC.DDN.MIL or from RSA.COM as
+~/pub/md5.doc.
+
+    MD5 attempts to address potential security risks found in the
+speedier, but less secure MD4, also by RSA Data Security Inc.
+MD5 was designed as a more conservative algorithm that backs
+"away from the edge" in terms of risks from successful
+cryptanalytic attack.
+
+    MD5 generates a 128-bit signature, and uses four rounds to
+ensure pseudo-random output.  Observed throughput is about 70
+Kbytes/second.
+
+    Currently, MD5 is considered by many to be a
+state-of-the-art signature algorithm.
+
+6.2.  Snefru
+============
+
+    Snefru, the Xerox Secure Hash Function, was developed by
+Ralph Merkle at Xerox PARC.  As an incentive to find a Snefru
+crack, there is a $1000 cash prize promised to anyone who can
+find two sets of input that map to the same signature.
+
+    This reward has remained unclaimed since April 1990, when the
+2-pass version of Snefru was broken by Eli Biham, a Ph.D. student
+of Adi Shamir.  Currently, Ralph Merkle recommends using only the
+4-pass version of Snefru, if not the 8-pass version.  The Snefru
+README states, "Further study of the security of Snefru is
+required before production use is advisable."
+
+    As shipped with Tripwire, Snefru is configured to run in
+4-passes.  Version 2.5 is the latest version available, and is
+the version included with Tripwire.
+
+    Snefru is slower than MD5, but is recommended as a backup for
+MD5 as a primary signature.  As configured, Snefru runs at about
+31 Kbytes/second.
+
+    Snefru can be obtained via anonymous FTP from arisia.xerox.com 
+in directory /pub/hash.
+
+6.3.  CRC-32
+============
+
+    Cyclic Redundancy Checks have been the long been the de facto
+error detection algorithm standard.  These algorithms are fast,
+robust, and provides reliable detection of errors associated with
+data transmission.  It has been shown that CRC-32 has a minimum
+distance of 5 for block lengths of less than 4K.  However, this
+decreases as the size of the blocks increases.
+
+    Therefore, using CRC-32 on long files is certainly a
+misapplication of this signature algorithm.  However, CRC-32 is
+provided as a fast and speedy alternative to the slower
+message-digest algorithms.
+
+    The version of CRC-32 included with Tripwire was written by 
+Gary S. Brown.
+
+    This CRC-32 implementation runs at about 111 Kbytes/second.
+
+6.4.  CRC-16
+============
+
+    CRC-16 is the predecessor to CRC-32, using only 16 bits to
+store to the remainder of the data and the generator polynomial.
+CRC-16 is typically at the link level, usually done in hardware
+to detect transmission errors.
+
+    This CRC-16 implementation runs at abut 131 Kbytes/second.
+
+
+6.5.  MD4
+=========
+
+    MD4, the RSA Data Security Inc. Message-Digest Algorithm, is
+the predecessor to MD5 described above.  It was also submitted as
+a standard data authentication algorithm, and is described in the
+Internet Working Draft 1320.
+
+    The MD4 algorithm was designed to exploit 32-bit RISC
+architectures to maximize throughput.  On a Sun SparcStation,
+throughput rates of over 1.4 Mbytes/second are achieved.
+
+    MD4 can be obtained via anonymous FTP from RSA.COM in ~/pub.
+
+    On a Sequent, MD4 throughput is about 332 Kbytes/second.
+
+
+6.6.  MD2
+==========
+
+    The RSA Data Security, Inc. MD2 Message-Digest Algorithm was
+created as part of the Privacy Enhanced Mail package -- a package
+designed to authenticate and increase the security of electronic
+mail.  Like the other algorithms by RSA Data Security, Inc
+presented here, MD2 generates a 128-bit signature.
+
+    The MD2 algorithm is quite slow.  On a 16 Mhz 80386, expect
+only 3 Kbytes/second.  It is not clear that using this slower
+algorithm instead of MD5 brings any comparative advantage.
+
+    The license for MD2 specifically states its use is exclusive
+to the Privancy Enhanced Mail package.  Provisions have been made
+with RSA Data Security, Inc. for its inclusion and use in
+Tripwire in its present form.  Note that MD2 is not in the
+public domain.
+
+
+6.7.  SHA/SHS
+=============
+
+    SHS is the NIST Digital Signature Standard, called the Secure Hash
+Standard.  It is described in NIST FIPS 180.  We refer to it as the
+SHA, or Secure Hash Algorithm, because we are using a non-certified
+implementation and we cannot claim standards conformance.
+
+    SHA is about one-half as fast as MD5.  It has been noted that SHS
+appears to be largely based on MD4 with several key enhancements, not
+all implemented in MD5.  The mid-1994 correction to the algorithm at
+the behest of NSA (reflected in the default version compiled into 
+Tripwire; see sigs/sha/sha.h) raises some questions about the overall
+strength of both SHA and MD4 in the minds of some cryptographers.
+
+
+6.8.  Haval
+===========
+
+    Haval was written by Yuliang Zheng at the University of
+Wollongong, and is described in Y. Zheng, J. Pieprzyk and J. Seberry:
+``HAVAL --- a one-way hashing algorithm with variable length of
+output'', Advances in Cryptology --- AUSCRYPT'92, Lecture Notes in
+Computer Science, Springer-Verlag, 1993.
+
+    Haval is shipped with Tripwire configured similarly to the other
+signature algorithms: 128 bit signature using four passes.  Configured
+this way, Haval throughput is approximately 100K/sec.  (30% faster
+than MD5.)
+
+
+6.9.  (null)
+============
+
+    Well, sig_null_get() is not really a signature algorithm.
+Instead, it is a place holder for unused slots in the signature
+array.  It will always return a single character, ``0''.
+
+
+7.0.  Feedback and bug-reports
+==============================
+
+    Please send any bug-reports, questions, feedback, or any comments
+to (tripwire-request@cs.purdue.edu).  One or both Genes will try to
+answer questions as expeditiously as possible.
+
+
+8.0.  User contributions and experiences
+========================================
+
+    The ./contrib directory contains several programs contributed
+by users during the beta-test period.  Each program is accompanied 
+by a README file written by the program author.
+
+    Both Genes are willing to serve as clearinghouses for utilities
+that augment the Tripwire package.  If you have something that you
+would like included in the Tripwire package, please contact either
+Gene Kim or Gene Spafford at the email addresses listed in the
+previous section.
+
+8.1.  Reports on subverting Tripwire
+====================================
+
+    In early 1994, an "underground" hacker newsletter described how
+Tripwire database updates can be done by an intruder to prevent
+subsequent integrity checking runs from detecting tampered files.
+This attack was already documented in this README file, as well as in
+our design document.  However, we use the appearance of this report to
+underscore the necessity to secure your database using physical
+means.  (Mounting a file system read-only on the client side is less
+secure than exporting the file system read-only on the server side,
+both of which is far less secure than placing the database on some
+physical read-only media.)
+
+    The afforementioned report also documents that Tripwire databases
+are usually stored in "/usr/adm/tcheck."  If you wish to conceal
+Tripwire operation on your machine, you may want to use less
+predictable locations for Tripwire files.  
+
+    To the best of our knowledge, no site has been compromised where
+Tripwire was installed according to our recommendations without
+Tripwire reporting the attack.
+
+
+9.0  Acknowledgements
+=====================
+
+    Dan Farmer, formerly of Sun Microsystems, Inc., for providing
+answers to questions of taste, and providing some impetus to finish
+this project during the summer of 1992.
+
+    Shabbir Safdar for actually running early versions of
+Tripwire that popped up on an hourly basis.  We also thank him
+for trying this on a few of the more exotic architectures around
+Purdue.  
+
+    Steve Weeber of Lawrence Livermore National Laboratory for
+insight into what sort of tools the Dept. of Energy has developed
+for in-house use, and comparisons of their functionality with
+Tripwire. 
+
+    Ralph Merkle of Xerox PARC for information on the Snefru
+one-way hash function. 
+
+    One of the directory printing routine in utils.c comes from
+the COPS package.  It was from crc_check.c by Jon Zeeff.
+
+    Eugene Zaustinsky for helping GeneK finally get all the
+signature routines right.  It took three iterations and two
+patches, but things are finally kosher.  This provided
+motivation for a more rigorous signature test suite, beyond just
+checking the signatures against the distribution build.
+
+    Sam Gassel, Edward DeHart, Drew Gonczi, Rik Farrow, Jim Napier,
+Drew Jolliffe, John Rouillard, Alain Brossard, Eric Bergren, Patrick
+Sullivan, Nora Hermida, Juergen Schmidt, Debbie Pomerance, Michael
+Hines, Tim Ramsey, Georges Tomazi, Mitchell Marks, Philip Cox, Kevin
+Dupre', Chris Kern, and Eugene Zaustinsky helped in getting the
+Tripwire v1.1 release in shape for our December 1993 release.
+
+    The 125 helpful beta testers that stuck with us during the
+six-week testing period.  They put up with bugs, ever-changing
+interfaces and database file formats, and in one case, a flurry
+of conflicting patches in a thirty-minute period while GeneK and
+Spaf took turns saying, "Uh, oh."
+
+    Tripwire v1.2 benefitted from the advice from many people.
+Asokan, Casper H.S.  Dik, Paul Hilchey, Tom Orban Cal Page, Paul
+Szabo, and Eugene Zaustinsky all contributed code that we added to the
+release.  (We list their contributions in the WHATSNEW file.)  In
+addition, we thank the following people.
+
+	Eric Berg, Eric M. Boehm, Lothar Butsch, John Crosswhite,
+	Jason Downs, Peter Evans, Jon Freivald, Kevin Johnson,
+	Lothar Kaul, Terry Kennedy, Chris Kern, Paul Madden, Fred
+	Marchand, Mitchell Marks, Jim Moreno, Tom Orban, Lorraine
+	Padour, Calvin Page, Tom Painter, Roger Peyton, Peter
+	Phillips, Keith W. Rickert, Jim Roche, D Seddon, Paul
+	Szabo, Gene C Van Nostern, John Wiegley, Robert Wilhite,
+	Alain Williams, Eugene Zaustinsky,
+
+    We appreciate the heroic effort of the Tripwire beta testers who
+suggested functional additions to Tripwire, found and hunted down
+bugs, and refined Tripwire beyond the authors' expectations.  Special
+thanks go to:
+
+    Walker Aumann, Lance R. Bailey, Michael Barnett, David Barr,
+    Greg Black, Adrian P. van Bloois, J. Dean Brock, Kurt
+    Cockrum, John Cristy, Jim Duncan, David S. Goldberg,
+    Johannes Gronvall, Tom Gutnick, Michaela Harlander, Andreas
+    Haug, Bill Henderson, Jim Hendrick, Norman Hill, Paul Joslin,
+    Poul-Henning Kamp, Leslie Kordas, Simon Leinen, Philip Yzarn
+    de Louraille, Stephen Mahler, Fletcher Mattox, Ken McDonell,
+    Wes Morgan, Phil Moyer, Dan O'Neill, Joe Polcari, Phillip
+    Porch, Brad Powell, W. Purvis, Daniel Ray, Dean Rich, Bill
+    Romine, John P. Rouillard, Rich Salz, Christopher Samuel,
+    Pete Shipley., David W. Smith, Harlan Stenn, Margarita
+    Suarez, John G. Sutton, Tim Tessin, John Wagner, David
+    Wiseman, Irving Wolfe, Stephen M. Youndt
+
+    Extra kudos go to Ken McDonnell and Rich Salz for "raising
+the bar" of code quality through their wonderfully meticulous and
+insightful code-reviews during the beta-test period.
+
+    E. Clinton Arbaugh provided extremely helpful advice and bug
+reports for the third patch release.  He contributed greatly towards
+refinement in v1.0.4.
+
+    GeneK and Spaf want to apologize in advance to anyone who sent us
+patches, comments or configuration info and whose name doesn't appear
+(but should).  Please write to us and so we can correct the situation!
+
+
+
+Gene & Gene 
+Kim  & Spafford
+
+November 2, 1992
+(gkim@cs.purdue.edu)
+(spaf@cs.purdue.edu)
+
+Last updated 
+July 17, 1994
+
+

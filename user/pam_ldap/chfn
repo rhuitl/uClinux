@@ -1,0 +1,125 @@
+#!/usr/bin/perl
+# chfn implementation for LDAP
+# Copyright (C) 2000 Tom Lear <tom@trap.mtview.ca.us>
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the     
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software   
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
+# read login.defs
+open(CONF,"/etc/login.defs") or die "$!\n";
+while(<CONF>) {
+  next if(m/^\s*($|#)/);
+  $CHFN_RESTRICT=$1 if(m/^\s*CHFN_RESTRICT\s+(.*?)\s*$/);
+}
+close(CONF);
+$CHFN_RESTRICT='rwh' if($CHFN_RESTRICT eq 'yes');
+$CHFN_RESTRICT='frwh' if($CHFN_RESTRICT eq 'no');
+
+$CHFN_RESTRICT='frwho' if($<==0);
+
+while($ARGV[0]=~m/^-([frwho])$/) {
+  shift;
+  my $let=$1;
+  $new{$let}=shift;
+  die "You can't change that field.\n" if($CHFN_RESTRICT!~m/$let/);
+}
+
+$user=$ARGV[0];
+if($user eq '') {
+  $user=(getpwuid($<))[0];
+} else {
+  die "You can't change that user.\n" if($< and $<!=getpwnam($user));
+}
+
+# use pam_ldap's config file since this script is ldap specific and
+# is a work around for a deficiency in pam
+$CONF{'pam_login_attribute'}='uid';
+open(CONF,"/etc/ldap.conf") or die "$!\n";
+while(<CONF>) {
+  next if(m/^\s*($|#)/);
+  m/^\s*(\S+)\s+(.*?)\s*$/;
+  $CONF{$1}=$2;
+}
+close(CONF);
+open(CONF,"/etc/ldap.secret") and chomp($CONF{'rootbindpw'}=<CONF>);
+close(CONF);
+
+%FIELDS=(
+  'f' =>        'Full Name',
+  'r' =>        'Room Number',
+  'w' =>        'Work Phone',
+  'h' =>        'Home Phone',
+  'o' =>        'Other',
+);
+
+use Net::LDAP;
+
+$ldap=Net::LDAP->new($CONF{'host'});
+
+if($< or $CONF{'rootbinddn'} eq '') {
+  $ENV{'PATH'}='';
+  system "/bin/stty -echo";
+  print 'Password:';
+  chomp($password = <STDIN>);
+  print "\n";
+  system "/bin/stty echo";
+  %bindargs=('dn'         => "$CONF{pam_login_attribute}=$user,ou=People,$CONF{base}",
+             'password'   => $password,
+  );
+} else {
+  %bindargs=('dn'         => $CONF{'rootbinddn'},
+             'password'   => $CONF{'rootbindpw'},
+  );
+}
+$bindargs{'version'}=$CONF{'ldap_version'}?$CONF{'ldap_version'}:2;
+
+$ldap->bind(%bindargs) or die "unable to bind to ldap server: $@";
+
+# get the current values
+@gecos=split(',',(getpwnam($user))[6]);
+
+# get the new entries if neccesary
+if(!defined %new) {
+  print "Enter the new value, or press return for the default\n";
+  @fields=('f','r','w','h');
+  push(@fields, 'o') if($<==0);
+  foreach(@fields) {
+    if($CHFN_RESTRICT=~m/$_/) {
+      print "\t$FIELDS{$_} [$gecos[$i]]: ";
+      chomp($new{$_}=<STDIN>);
+      $new{$_}=$gecos[$i] if($new{$_} eq '');
+    } else {
+      print "\t$FIELDS{$_}: $gecos[$i]\n";
+    }
+    $i++;
+  }
+}
+
+# check the entries validity
+$i=0;
+foreach('f','r','w','h','o') {
+  die "invalid entry: \"$new{$_}\"\n" if($new{$_}!~m/^[ -~]*$/ or $new{$_}=~m/[:,=]/);
+  $gecos[$i]=$new{$_} if(defined $new{$_});
+  $i++;
+}
+
+# change the gecos field
+$gecos[3].='';
+$ret=$ldap->modify("$CONF{pam_login_attribute}=$user,ou=People,$CONF{base}",
+        replace => {'gecos' => join(',',@gecos)});
+if($ret->code) {
+  printf STDERR ("failed: %s\n",$ret->error);
+}
+

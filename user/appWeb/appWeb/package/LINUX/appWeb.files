@@ -1,0 +1,79 @@
+#
+#	appWeb.files - Copy appWeb files for the binary install
+#
+#	Copyright (c) Mbedthis LLC, 2003-2004. All Rights Reserved.
+#
+
+#	NOTE: Usage: cpmod src dest [perm] [owner.group]
+
+SrcD=${BLD_TOP}/bin
+DestD=${BLD_SBIN_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/appWeb ${DestD}/${BLD_PRODUCT} 755
+
+#
+#	Daemon start / stop scripts
+#
+SrcD=${BLD_TOP}/appWeb/package/LINUX
+if [ "${BLD_ROOT_PREFIX}" = "/" ]
+then
+	DestD=/etc/rc.d
+else
+	DestD=${BLD_ROOT_PREFIX}/etc/rc.d
+fi
+
+mkdir -p ${DestD}
+cpmod ${SrcD}/appWeb.init ${DestD}/init.d/${BLD_PRODUCT} 755
+patchFile ${DestD}/init.d/${BLD_PRODUCT}
+chmod 755 ${DestD}/init.d/${BLD_PRODUCT}
+
+for i in 5
+do
+	rm -f ${DestD}/rc${i}.d/S81${BLD_PRODUCT}
+	mkdir -p ${DestD}/rc${i}.d
+	ln -s ${DestD}/init.d/${BLD_PRODUCT} ${DestD}/rc${i}.d/S81${BLD_PRODUCT}
+done
+for i in 0 1 2 3 4 6
+do
+	rm -f ${DestD}/rc${i}.d/K15${BLD_PRODUCT}
+	mkdir -p ${DestD}/rc${i}.d
+	ln -s ${DestD}/init.d/${BLD_PRODUCT} ${DestD}/rc${i}.d/K15${BLD_PRODUCT}
+done
+
+#
+#	Necessary empty directory
+#
+DestD=${BLD_PREFIX}/logs
+mkdir -p ${DestD}
+if [ "$SKIP_PERMS" = 0 ]
+then
+	chmod 700 ${DestD}
+	chown root.root ${DestD}
+fi
+
+SrcD=${BLD_TOP}/appWeb/web
+DestD=${BLD_WEB_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/index.html ${DestD}
+
+SrcD=${BLD_TOP}/appWeb
+DestD=${BLD_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/mime.types
+
+if [ "$BLD_FEATURE_PHP4_MODULE" = 1 -o "$BLD_FEATURE_PHP5_MODULE" = 1 ]
+then
+	cpmod ${SrcD}/php.ini
+fi
+if [ "$BLD_FEATURE_SSL_MODULE" = 1 ]
+then
+	cpmod ${SrcD}/server.key.pem
+	cpmod ${SrcD}/server.crt
+fi
+
+if [ "$BLD_CLEAN_INSTALL" = 1 ]
+then
+	cpmod ${SrcD}/install.conf ${DestD}/appWeb.conf
+else
+	cpmod ${SrcD}/install.conf ${DestD}/new.conf
+fi

@@ -1,0 +1,260 @@
+*
+* RCSID $Id: DONE,v 1.23 2001/12/15 05:52:45 rgb Exp $
+*
+
+Bugs as of 1.93:
+	send ICMP on by default
+
+Bugs as of 1.92:
+	detach, but don't down ipsec virtual device if attached physical
+		device disappears
+	fix tncfg output after attached physical I/F disappears.
+
+010226	add hold machinery to store the last packet sent to the hold eroute
+		and re-inject it once the hold is deleted. (eroute entry or
+		separate table?)
+
+Bugs as of 0.90:
+	auto AH+ESP transport mode oops?
+	ipcomp: fix i[56]86 ASM code 2.4 makefile issues
+	kill single-letter options from klips utils manpages.
+	add --label to klips utils manpages
+	ah tunnel -- 3 esp packets kills the sg
+	single spi ungroup fails
+	elucidate the meaning of 'tdb' in all error message references
+	change AH replay window option to default to 64: NOT!
+	explain need for ipfwadm command in the modes.html masq eg.
+	review command order in modes.html for security/packet loss
+	better kernel error messages for eroute commands
+	check for missing 0x, 0t or 0s on the front of keys for spi command
+	atodata now accepts '0c' along with '0x' and '0s': check calling code
+	0t key format for esp3des transforms
+	Check all klips_debug output for \n
+	spi --ah needs testing
+	bundled AH+ESP crashes older/slower machines
+	ReExamine /proc/net/ipsec_* with 'less' (1pg) vs 'cat' (ok).
+	Default none manual replay bug
+	spi --add/--del memory leak
+	Short-circuit udp/500 for pluto to talk unencumbered. ASK LIST
+    clean up rh5.2 klips compile warnings
+	'cannot record stats' on packets from valid I/F. (intermittant)
+	hard-coded hard_header_len
+Fixed	ping -s 8000 reboots system!!!
+	"kmalloc called nonatomically from interrupt 0x0000000e"
+
+Features for 1.0: klips kernel
+	Interop with other IPSEC implementations (verify with others)
+OpenBSD		ESP-3DES-HMAC-MD5-96
+OpenBSD		ESP-DES-HMAC-MD5-96
+OpenBSD		AH-HMAC-MD5-96
+OpenBSD		AH-HMAC-SHA1-96
+	Free all memory used for tdb table and eroute tree when unloading
+	Symbolic proc_net # instead of hardwiring
+Fixed	Examine /proc/net/ipsec_* for limits.  Currently, it corrupts the
+		system if more than 3k is printed out.
+	Add /proc/net/ipsec_spinew
+    Add /proc/net/ipsec_versions/transforms/config
+	Move code to /usr/src/linux/net/ipsec with symlinks back to
+		freeswan install directory.
+	Yank out i/r stuff
+	Experimental option in kernel config
+	Check for IPIP protocol enabled and either complain, or load it if need.
+	Static link the klips module into the kernel
+	klips_debug prefix on all printk's
+	Dropped packet reporting
+		count total
+		count replay errors
+		count bad auth
+		count bad padding
+		count bad algo
+	add protocol to SA selector
+	add a '--replace' or '--delany' option to eroute (and --quiet?)
+	Print out protocol in /proc/net/ipsec_* SAs
+    Short-circuit udp/500 for pluto to talk unencumbered.
+    Change /proc/net/ipsec_spi* to output 'Decrypt' for inbound SAs
+	Set kernel config defaults for virgin kernel. see arch/*/defconfig
+	Switch pointer printing to %p for 64-bit compatability.
+	Sort out routing issues (tunnel -->forward/findroute?, missing route?)
+	Do kernel-based inbound SA detection.
+
+Features for 1.0: klips utils
+	Separate auth and encryption keys in esp{3,}des-hmacmd5{96,} (option?)
+	Yank out i/r stuff
+	Pluto/kernel.c mods for adding routes and tncfg's (check and add)
+	Fix manual keying split key bug
+	spi key size error checking
+	Install manpages in the right place.
+	Implement standard gnu command format long option names
+		spi
+		eroute
+		tncfg
+		klipsdebug
+		spigrp
+	Add error checking for valid input (ip's) to utils
+	Add host/net name lookup and netmask bits to utils
+		spi
+		eroute
+		spigrp
+	Notify user why insufficient perms for non-root (getenv)
+	Utils with useful parse errors (rather than spamming large usage txt)
+		spi
+		eroute
+		tncfg
+		klipsdebug
+		spigrp
+	Eliminate invocations of perror()
+	Let utils get keys from files to avoid ps exposure from command line
+	Use 0x for hex in command line parsing and provide for other radices
+	Clear eroute tncfg and spi tables in one command
+	Open: Protocol driver not attached -- elaborate!
+	add protocol to SA selector
+	add a '--replace' or '--delany' option to eroute (and --quiet?)
+	Check error codes from resolver fns.
+	Add SA reference to spi usage errors.
+	--label field to replace the program name on error output.
+	Enable klips manual utils to use monolithic SA specifier.
+		spi
+		eroute
+		spigrp
+
+Features for 1.0: klips documentation
+	Html trans/tun, algos, static/insmod/kerneld setup support
+    Prominently mark obsolete xforms (truth in labelling)
+    Add xform usage examples
+    Add FILES and EXAMPLES sections to manpages
+    klips/test/README
+    intro to rgb_setup.txt
+        Xform to standards/doc_draft_refs mapping in:
+            manpages
+            kernel config help
+    Update Configure.help
+	mention tcpdump in some prominent place as a check tool. (HS)
+	modes.html theory comments
+	Clarify extruded section of modes.html (ie. no masquerading)
+
+Features for 1.0: general
+	Add function to get ipsec driver and utils version from userland
+	Provide facility to dump system state (HS)
+	Split patches into a sub-directory
+	Define standard notation for SAs (HS)
+	Utils return values from kernel:  real error codes (0 for ok)
+
+1.1:
+	Fragment after processing iff(DF && (effective PMTU is too small)) (rfc2401-6.1.2.2)
+	2.2.xx support, still virtual device based.
+
+1.2:
+	Add {start,up,remain}{times,bytes,pkts} to /proc/net/ipsec_spi
+	Per-SA statistics via /proc/net/ipsec_spi:
+		in/out-bound packets/bytes/errors
+		time of last packet
+		max(cur_rx_seq#-prev_rx_seq#-1,0)
+	PF_KEYv2:
+		socket functions:
+			sendmsg
+			recvmsg
+			upmsg
+		parse extension types:
+			SA
+			lifetime
+			address
+			key
+			spirange
+			address_{flow,mask}{src,dst}
+			x_satype2
+			x_sa2
+			x_dst2
+		parse message types:
+			getspi
+			update
+			add
+			delete
+			flush
+			x_grpsa (will be obsolete...)
+			x_addflow
+			x_delflow
+	Create user library from common user-space code (pfkey,...)
+		pfkey_v2_parse
+		pfkey_v2_build
+
+1.4 bugs
+	ipsec_rcv.c: esp/ah len incorrect parameter used
+	blow hole on udp/500 only when src=local
+	- UDP/500 packets must only go in the clear if they are being sent
+	  through an interface whose IP address matches the source address.
+	- disable/delete netlink
+
+1.5
+	/proc/net/ipsec_* documentation in ipsec_*.5 manpages
+
+1.6
+	Passthrough packets must be sent with frag in mind.
+	update ipsec.8, manual.8, klips/utils/*.[58] for /proc/net/{ipsec_*,pf_key}
+
+1.7
+	pfkey_acquire() oops fixed.
+	Oops if IPCOMP not config in KLIPS but negotiated by pluto.
+	Passthrough packets must be sent with frag in mind.
+
+1.9
+	Add magic saids for pass, drop, reject, trap, hold
+
+Features for 2.0:
+	Investigate PMTU (rfc2401-4.4.2, 6.1.2)
+	Mark incoming packets as from ipsec0 for accounting and validation
+	Provide more help in debugging key input errors
+	Include protocol (esp or ah) in SA selection
+	Add xforms
+		ESP-DES-HMAC-SHA1-96
+		ESP-3DES-HMAC-SHA1-96
+		ESP-NULL-HMAC-MD5-96
+		ESP-NULL-HMAC-SHA1-96
+		ESP-DES
+		ESP-3DES
+	Make IV truly optional for spi command (need kernel cryptorandom source)
+		/dev/{,u}random|drivers/char/random.c:random_read()
+	Unify esp and ah routines to one of each, calling cipher and
+		authentication sub-routines as needed
+	Have kernel config automatically configure IPIP with IPSEC?
+
+*
+* $Log: DONE,v $
+* Revision 1.23  2001/12/15 05:52:45  rgb
+* TODO/DONE review.
+*
+* Revision 1.22  2001/06/01 07:25:19  rgb
+* Clean up miscellaneous stuff...
+*
+* Revision 1.21  2001/02/26 20:11:12  rgb
+* Post 1.9 candidate, magic SAs and email purge updates.
+*
+* Revision 1.20  2000/11/06 05:09:00  rgb
+* A few bugfixes...
+*
+* Revision 1.19  2000/09/08 19:24:08  rgb
+* Bypass frag update.
+*
+* Revision 1.18  2000/07/05 17:25:09  rgb
+* Update to reflect manpage update and remove noise from DONE.
+*
+* Revision 1.17  2000/06/20 22:39:10  rgb
+* Updated for 1.4.
+*
+* Revision 1.16  2000/01/26 10:02:17  rgb
+* Updated for 1.3.
+*
+* Revision 1.15  1999/11/23 23:09:45  rgb
+* Updates since just after 1.1, includes more PFKEY detail.
+*
+* Revision 1.14  1999/10/16 04:21:45  rgb
+* Long-overdue update including a few pre-1.1 things, but more post-1.1
+* stuff that has been waiting to be added.
+*
+* Revision 1.13  1999/04/29 15:28:33  rgb
+* Updates since 1.00.
+*
+* Revision 1.12  1999/04/06 04:54:22  rgb
+* Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+* patch shell fixes.
+*
+*

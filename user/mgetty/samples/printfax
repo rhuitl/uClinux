@@ -1,0 +1,35 @@
+#!/bin/sh
+#
+# printfax <filenames>
+#
+# print a standard "g3" file (in high resolution).
+# Needs: the pbmplus package, and the pbmtodot utility with my patches (to
+#        be able to print 360x180 dpi)
+#
+for file
+do
+    # 
+    # the resolution is encoded in the name of the fax: "fn*" vs. "ff*"
+    #
+    if expr "`basename $file`" : "fn" >/dev/null
+    then
+	# normal resolution
+	yscale=1.84
+    else
+	# fine resolution
+	yscale=0.92
+    fi
+#
+# Modify this for your needs 
+# (Don't forget to adapt the scaling - fax resolution is 204x196 dpi)
+#
+# Sample for PostScript-printers:
+    g32pbm $file |pnmtops -noturn | lp -o ps
+#
+# Sample for a HP laserjet, using GhostScript
+#    g32pbm $file |pnmtops -noturn |gs -sDEVICE=laserjet -sOutputFile="|lp" -
+#
+# Sample for an Epson LQ 24 pin printer
+#    cat $file | g32pbm | pnmscale -xscale 1.76 -yscale $yscale | pgmtopbm | pbmtodot -360x180| lp -o stty=-opost -
+
+done

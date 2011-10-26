@@ -1,0 +1,1056 @@
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html">
+  <title>Quick FreeS/WAN installation and configuration</title>
+  <meta name="keywords"
+  content="Linux, IPsec, VPN, security, FreeSWAN, installation, quickstart">
+  <!--
+
+  Written by Sandy Harris for the Linux FreeS/WAN project
+  Freely distributable under the GNU General Public License
+
+  More information at www.freeswan.org
+  Feedback to users@lists.freeswan.org
+
+  CVS information:
+  RCS ID:          $Id: quickstart.html,v 1.22 2002/03/25 19:10:04 sandy Exp $
+  Last changed:    $Date: 2002/03/25 19:10:04 $
+  Revision number: $Revision: 1.22 $
+
+  CVS revision numbers do not correspond to FreeS/WAN release numbers.
+  -->
+</head>
+
+<body>
+<h1><a name="quick_guide">FreeS/WAN quick start guide</a></h1>
+
+<p>This is a quick guide to</p>
+<ul>
+  <li><a href="#easy.install">getting FreeS/WAN installed</a> from a
+    distribution CD or RPMs</li>
+  <li><a href="#enable">enabling FreeS/WAN</a></li>
+  <li><a href="#gen_rsa">generating RSA public keys</a> for your system</li>
+</ul>
+
+<p>and then setting up some common configurations:</p>
+<ul>
+  <li><a href="#opp.setup">opportunistic encryption</a>
+    <ul>
+      <li>a system which can initiate all the encryption it needs</li>
+      <li>a system which also accepts incoming requests for secure
+      connections</li>
+      <li>a gateway providing services for a number of clients</li>
+    </ul>
+  </li>
+  <li><a href="#roadies">"road warrior" remote access</a> to a network
+    <ul>
+      <li>"road warrior" machine setup</li>
+      <li>network gateway setup</li>
+    </ul>
+  </li>
+  <li><a href="#gate.VPN">network-to-network VPN</a></li>
+</ul>
+
+<p>This should cover everything you need to set up</p>
+<ul>
+  <li>a laptop machine</li>
+  <li>a standalone home PC</li>
+  <li>a home office firewall/gateway</li>
+  <li>a simple gateway for a small company or branch office</li>
+</ul>
+
+<p>More complex requirements are covered elsewhere:</p>
+<ul>
+  <li><a href="install.html">installing from source</a></li>
+  <li><a href="adv_config.html">advanced configuration</a></li>
+  <li><a href="interop.html">interoperation</a> with other IPsec
+    implementations</li>
+</ul>
+
+<p>However, <strong>please read this quick start section first</strong>,
+before tackling the others.</p>
+
+<h2><a name="easy.install">Easy installation</a></h2>
+
+<p>There are two easy ways to install FreeS/WAN:</p>
+<ul>
+  <li>Some Linux distributions, <a href="intro.html#distwith">listed in the
+    introduction</a>, ship with FreeS/WAN included.
+    <p>If you are using one of them, just include FreeS/WAN in the choices
+    you make during installation, or add it to your configuration later using
+    the distribution's tools.</p>
+  </li>
+  <li>RPM (Redhat Package Manager) packages built for your distribution may
+    be available for download. If they are, then the installation is quite
+    simple.
+    <p>Sources for RPM packages of FreeS/WAN are:</p>
+    <ul>
+      <li><a href="http://rpms.steamballoon.com/freeswan/">Steamballoon</a>,
+        the helpful folks who developed the RPM tools in our distribution</li>
+      <li><a href="ftp://ftp.xs4all.nl/pub/crypto/freeswan">FreeS/WAN FTP
+        site</a> (At time of writing, no RPMs are there yet.)</li>
+      <li>one of the FreeS/WAN <a href="intro.html#sites">mirrors</a> listed
+        in the introduction (not yet)</li>
+    </ul>
+    <p>Note that:</p>
+    <ul>
+      <li><strong>you should not trust RPMs from a source you do not
+        know</strong></li>
+      <li>you should <strong>run <var>rpm --checksig</var> before trusting
+        any RPM</strong>. Checking the public key signature gives you
+        assurance that the RPM you install was not changed after they signed
+        it.</li>
+      <li>the <strong>RPMs must exactly match your system</strong>. For
+        example, an RPM built for Redhat 7.1 should not be used on 7.2.</li>
+      <li>the <strong>kernel RPM must be correct for your hardware</strong>.
+        For example, a kernel compiled for an AMD Athlon will not run
+        correctly on an Intel-based system.</li>
+    </ul>
+    <p>You need to download at least two RPMs:</p>
+    <ul>
+      <li>FreeS/WAN utilities</li>
+      <li>a kernel that includes FreeS/WAN code</li>
+    </ul>
+    The FreeS/WAN version number in the two should match.
+    <p>You do not need the kernel header and kernel source RPMs to install
+    FreeS/WAN, but <a
+    href="http://www.edwards.af.mil/history/docs_html/tidbits/murphy's_law.html">Murphy's
+    Law</a> suggests you should download them so that the kernel source and
+    headers on your system match the kernel actually in use.</p>
+    <p>Once you have them, install the RPMs with <var>rpm -i</var> commands.
+    You will need to be root to install the kernel.</p>
+  </li>
+</ul>
+
+<p>If your distribution does not include FreeS/WAN and no RPMs are available,
+see our <a href="install.html">installation from source</a> document.</p>
+
+<h2><a name="enable">Enabling FreeS/WAN</a><a></a></h2>
+
+<p>Once you have FreeS/WAN on the system, ensure that it is enabled:</p>
+<dl>
+  <dt>Set your boot loader to get the system booting with the new kernel.</dt>
+    <dd>On many systems, you do this by editing lilo.conf(5) and running
+      lilo(8). See the <a
+      href="http://www.linuxdoc.org/HOWTO/mini/LILO.html">LILO
+    mini-HowTo</a>.</dd>
+    <dd>On other systems, you might use grub(8). See the <a
+      href="http://www.gnu.org/software/grub/">GRUB homepage</a>.</dd>
+  <dt>Enable ipsec in your boot scripts.</dt>
+    <dd>Typically, this is done with chkconfig(8). If this is unfamiliar
+      territory, see the <a
+      href="http://www.linuxdoc.org/HOWTO/From-PowerUp-To-Bash-Prompt-HOWTO.html">Power-up
+      to Bash Prompt</a> HowTo.
+      <p>Our script is installed as <var>/etc/rc.d/init.d/ipsec</var> and
+      chkconfig(8)creates links to it in the <var>/etc/rc.d/rc[1-6].d
+      </var>directories.</p>
+    </dd>
+</dl>
+
+<h2><a name="testinstall">Testing to see if install succeeded</a></h2>
+
+<p>To check that you have a sucessful install, you can reboot and check (by
+watching messages during boot or by looking at them later with dmesg(8))
+that:</p>
+<ul>
+  <li>the kernel reports the right version. If not, you are likely still
+    running your old kernel. Check your lilo.conf(5) file and the
+    installation directory (defined in the kernel make file, often /boot but
+    the default is /), then rerun lilo(8).</li>
+  <li>KLIPS initialisation messages appear</li>
+  <li>Pluto reports that it is starting</li>
+</ul>
+
+<p>You can also try the commands:</p>
+<ul>
+  <li><var>ipsec --version</var>, to test whether /usr/local/bin is in your
+    path so you can use IPsec administration commands</li>
+  <li><var>ipsec whack --status</var>, using <a
+    href="manpage.d/ipsec_whack.8.html">ipsec_whack(8)</a> to ask Pluto for
+    status information</li>
+</ul>
+
+<p>Of course any status information at this point should be uninteresting
+since you have not yet configured connections.</p>
+
+<p>That's it. FreeS/WAN is installed.</p>
+
+<h2><a name="gen_rsa">Creating an RSA key</a></h2>
+
+<p>The next step is to generate an <a href="glossary.html#RSA">RSA</a> key
+for your machine. These keys are used for machine-to-machine <a
+href="glossary.html#authentication">authentication</a> in IPsec negotiations.
+Any system which will be the endpoint of an IPsec tunnel must have one.</p>
+
+<p>RSA is a <a href="glossary.html#public">public key</a> cryptographic
+technique. Keys are created as matched pairs. Each pair includes:</p>
+<ul>
+  <li>a <strong>public key</strong> which need not be kept secure. Everyone
+    you plan to communicate with must be able to get a copy of this. It does
+    not matter if an enemy gets it as well.</li>
+  <li>a <strong>private key</strong> which must be kept secure. No-one but
+    you should have access to it.</li>
+</ul>
+
+<p>For FreeS/WAN, both keys for your system are in the <a
+href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a> file.
+<strong>Maintaining security of this file is essential</strong> since it
+holds your private key.</p>
+
+<p>To generate your key pair, give these commands as root:</p>
+<pre>        ipsec newhostkey --output /etc/ipsec.secrets
+        chmod 600 /etc/ipsec.secrets</pre>
+
+<p>Key generation may take some time, even on a fast system. Also, it needs a
+lot of <a href="glossary.html#random">random numbers</a> so you may need to
+switch consoles and do something like typing a lot of text or running
+<nobr><var>du / &gt; /dev/null</var></nobr>. These give <var>random(4)</var>
+some inputs to work with.</p>
+
+<p>The RSA keys we generate are suitable <strong>only</strong> for
+authentication, not for encryption. IPsec uses them only for authentication.
+See our <a href="ipsec.html">IPsec</a> section for details.</p>
+
+<h2><a name="opp.setup">Setting up opportunistic encryption</a></h2>
+
+<p><a href="glossary.html#carpediem">Opportunistic encryption</a> makes some
+aspects of the setup and administration of IPsec easier.</p>
+
+<p>For opportunistic encryption, <strong>you do not need to communicate with
+the administrator of a site before establishing secure communications to that
+site</strong>. In particular, you do not have to send them your keys or
+collect and authenticate theirs. All you have to do is set up your end
+correctly and from there on, everything is automatic.</p>
+
+<p>One of the major goals of the FreeS/WAN project is to get opportunistic
+encryption widely enough deployed that a "FAX effect" comes into play.
+Neither a FAX machine nor opportunistic encryption is of much value if there
+are only a few installed, but both become much more useful as the installed
+base increases.</p>
+
+<p>Widespread deployment of opportunistic encryption appears to be our best
+hope for making the Internet more secure. See discussion in our <a
+href="intro.html#opp.intro">introduction</a>.</p>
+
+<h3><a name="opp.client">Initiate-only opportunistic encryption</a></h3>
+
+<p>In this section, we treat the simplest case of opportunistic
+encryption:</p>
+<ul>
+  <li>there will be <strong>no incoming connection requests</strong>; you can
+    initiate all the IPsec connections you ever need</li>
+  <li><strong>only one machine is visible</strong> on your end of the
+    connection (though there may be a hidden <a
+    href="glossary.html#NAT.gloss">NAT</a> network behind it.)</li>
+  <li>for IPsec purposes, that one IP address is both the gateway and the
+    client subnet</li>
+</ul>
+
+<p>This would apply to a standalone machine, or to a home gateway with some
+invisible <a href="glossary.html#NAT.gloss">NAT</a> clients.</p>
+
+<p>Given the above conditions, you can set up opportunistic encryption
+without having access to the <a href="glossary.html#reverse">DNS reverse
+map</a> for your machine. The following sections cover situations where one
+or more of the above restrictions do not apply.</p>
+
+<p>There are two steps:</p>
+<ul>
+  <li>set your system up for opportunistic encryption</li>
+  <li>put your public key in <a href="glossary.html#DNS">DNS</a></li>
+</ul>
+
+<p>Once this is done, your system will automatically encrypt whenever it
+can.</p>
+
+<h4><a name="config.opp.client">ipsec.conf(5) for initiate-only
+opportunism</a></h4>
+
+<p>The <a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file for this
+setup is:</p>
+<pre># general IPsec setup
+config setup
+        # Use the default interface
+        interfaces=%defaultroute
+        # Use auto= parameters in conn descriptions to control startup actions.
+        plutoload=%search
+        plutostart=%search
+
+# defaults for subsequent connection descriptions
+conn %default
+        # How to authenticate gateways
+        authby=rsasig
+        # default is
+        # load connection description into Pluto's database
+        # so it can respond if another gatway initiates
+        # individual connection descriptions may override this
+        auto=add
+
+# description for opportunistic connections
+conn me-to-anyone
+        also=our_stuff             # our system details, stored below
+        right=%opportunistic       # anyone we can authenticate
+        rightrsasigkey=%dns        # look up their key in DNS
+        auto=route                 # set up for opportunistic
+        rekey=no                   # let unused connections die
+
+# description of our system
+# included in other connection descriptions via also= lines
+# must come after the lines that use it
+conn our_stuff
+        # all connections should use our default route
+        # also controls the source address on IPsec packets
+        left=%defaultroute
+        # our identity for IPsec negotiations
+        # must match what is in DNS and ipsec.secrets(5)
+        leftid=@xy.example.com</pre>
+
+<p>The last line above is the only one that you need to edit for your system.
+All the rest is identical for any standalone machine doing opportunistic
+encryption.</p>
+
+<p>The @ sign in the <var>leftid=</var> line indicates that this machine
+should not attempt to look up that name. Others will, to get our public key,
+but we don't need to..</p>
+
+<p>There is no need to provide any keys in this file. Your private key is in
+<a href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a> and, for
+opportunistic encryption, the public keys for remote gateways are all looked
+up in DNS.</p>
+
+<p>Also note that the <var>left</var> and <var>right</var> designations here
+are arbitrary. You could reverse them above with no problems.</p>
+
+<h4><a name="dns.txt.client">Initiate-only DNS key</a></h4>
+
+<p>You need to put your system's RSA public key in a <a
+href="glossary.html#DNS">DNS</a> record so that systems you communicate with
+can find it.</p>
+
+<h5>Find a helpful DNS administrator</h5>
+
+<p>You need the co-operation of a DNS administrator somewhere for this, to
+place a KEY record so that you can use a name in some domain he or she
+controls. This need not be either the domain you get your IP address from or
+a domain that points to your system.</p>
+
+<p>For example, a reverse lookup on the IP address for a home gateway might
+give 123.adsl.kalamazoo.example.net, and a forward lookup for
+example.dyndns.org might point to that gateway. You could use either of these
+names as your ID for IPsec purposes, if the admins at either example.net or
+dyndns.org co-operate.</p>
+
+<p>If not, you can use any domain whose DNS administrator is willing to help
+out. You do not need an A record (address record, associating your chosen
+name with an address) in that domain, only a KEY record.</p>
+
+<h5>Generate a KEY record</h5>
+
+<p>You can generate a DNS KEY record containing your system's public key with
+the command:</p>
+<pre>     ipsec showhostkey</pre>
+The result should look like this (with the key data trimmed down for clarity):
+<pre>  ; RSA 2048 bits   xy.example.com   Sat Apr 15 13:53:22 2000
+  xy.example.com.   IN   KEY   0x4200 4 1 AQOF8tZ2...+buFuFn/</pre>
+
+<p>The name here is taken from <a
+href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a>. If it is not what
+you want, edit that file to correct it, then run <var>ipsec showhostkey</var>
+again.</p>
+
+<p>The name must also match what you used for <var>leftid=</var> in <a
+href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a>.</p>
+
+<p>Give this record to the DNS administrator, for insertion into the zone
+file of the domain.</p>
+
+<h4><a name="firewall.standalone">Firewalling for a standalone system</a></h4>
+
+<p>Firewall rules on a standalone system doing IPsec -- opportunistic, "road
+warrior" remote access, or both -- can be very simple.</p>
+
+<p>The first step is to allow IPsec packets (IKE on UDP port 500 plus ESP,
+protocol 50) in and out of your gateway. A script to set up iptables(8) rules
+for this is:</p>
+<pre># edit this line to match the interface you use as default route
+# ppp0 is correct for many modem, DSL or cable connections
+# but perhaps not for you
+world=ppp0
+#
+# allow IPsec
+#
+# IKE negotiations
+iptables -A INPUT  -p udp -i $world --sport 500 --dport 500 -j ACCEPT
+iptables -A OUTPUT -p udp -o $world --sport 500 --dport 500 -j ACCEPT
+# ESP encrypton and authentication
+iptables -A INPUT  -p 50 -i $world -j ACCEPT
+iptables -A OUTPUT -p 50 -o $world -j ACCEPT</pre>
+
+<p>Optionally, you could restrict this, allowing these packets only to and
+from a list of known gateways.</p>
+
+<p>A second firewalling step -- access controls built into the IPsec
+protocols -- is automatically applied:</p>
+<dl>
+  <dt><a href="glossary.html#Pluto">Pluto</a> -- the FreeS/WAN keying daemon
+  -- deals with the IKE packets.</dt>
+    <dd>Pluto authenticates its partners during the IKE negotiation, and
+      drops negotiation if authentication fails.</dd>
+  <dt><a href="glossary.html#KLIPS">KLIPS</a> -- the FreeS/WAN kernel
+  component -- handles the ESP packets.</dt>
+    <dd><dl>
+        <dt>KLIPS drops outgoing packets</dt>
+          <dd>if they are routed to IPsec, but no tunnel has been negotiated
+            for them</dd>
+        <dt>KLIPS drops incoming unencrypted packets</dt>
+          <dd>if source and destination addresses match a tunnel; the packets
+            should have been encrypted</dd>
+        <dt>KLIPS drops incoming encrypted packets</dt>
+          <dd>if source and destination address do not match the negotiated
+            parameters of the tunnel that delivers them</dd>
+          <dd>if packet-level authentication fails</dd>
+      </dl>
+    </dd>
+</dl>
+
+<p>These errors are logged. See our <a
+href="trouble.html">troubleshooting</a> document for details.</p>
+
+<p>Optionally, you can add a third step using whatever additional firewall
+rules are required for your situation. These rules can recognise packets
+emerging from IPsec. They are marked as arriving on an interface such as
+<var>ipsec0</var>, rather than <var>eth0</var>, <var>ppp0</var> or whatever.
+For example, in an iptables(8) rule set, you would use:</p>
+<dl>
+  <dt><var>-i ipsec+</var></dt>
+    <dd>to specify packets arriving on any ipsec device</dd>
+  <dt><var>-o ipsec+</var></dt>
+    <dd>to specify packets leaving via any ipsec device</dd>
+</dl>
+
+<p>It is therefore straightforward to apply whatever additional filtering you
+like to these packets.</p>
+
+<h4>Testing opportunistic connections</h4>
+
+<p>To check that opportunistic encryption is working, point a browser to
+<var><a href="http://oetest.freeswan.org">oetest.freeswan.org</a></var>, a
+host we have set up to do opportunistic encryption for testing. A link there
+will tell you whether or not you have an encrypted connection.</p>
+
+<p>If using a browser is inconvenient, take these steps:</p>
+<ul>
+  <li>ping <var>oetest.freeswan.org</var></li>
+  <li>ping some site that does not yet have opportunistic encryption</li>
+  <li>run <var>ipsec look</var></li>
+</ul>
+
+<p>You should see a tunnel to the opportunistic host.</p>
+
+<p>When FreeS/WAN cannot set up an opportunistic connection, and no explicit
+tunnel has been configured, its default is to allow the traffic through in
+the clear. For the non-opportunistic host, you should see a %pass eroute
+(IPsec route), the FreeS/WAN mechanism that implements that default.</p>
+
+<h3><a name="opp.incoming">Accepting incoming requests for opportunistic
+encryption</a></h3>
+
+<p>If you need to let others inititiate encrypted connections to your system
+-- for example, if you run services on your machine and want remote clients
+to be able to access them securely -- then you need to do a bit more.</p>
+
+<p>There are two steps in the setup.</p>
+<ul>
+  <li>setting up <a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a></li>
+  <li>setting up the DNS entries to support it</li>
+</ul>
+
+<p>Both need to be a little different than in the initiate-only case.</p>
+
+<p>For incoming connections, you are not the initiator so you cannot use the
+first message to tell the other end the identity you wish to use. You must be
+able to handle having the other end identify you by IP address. In many
+cases, that will be all the remote gateway knows.</p>
+
+<h4><a name="incoming.opp.conf">ipsec.conf(5) to accept incoming
+opportunistic</a></h4>
+
+<p>Only one change is need in the <a
+href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file. You use an IP
+address instead of a name as your identity. For example, with the address
+1.2.3.4, the section describing your system becomes:</p>
+<pre># description of our system
+# included in other connection descriptions via also= lines
+# must come after the lines that use it
+conn our_stuff
+        # all connections should use our default route
+        # also controls the source address on IPsec packets
+        left=%defaultroute
+        # our identity for IPsec negotiations
+        # must match what is in DNS and ipsec.secrets(5)
+        leftid=1.2.3.4</pre>
+
+<p>You must make a matching change in <a
+href="manpage.d/ipsec.secrets.5.html">ipsec.secrets(5)</a>, so that the
+identifier for your secret key is also "1.2.3.4".</p>
+
+<h4><a name="incoming.opp.dns">DNS for incoming opportunistic
+connections</a></h4>
+
+<p>To accept incoming connections, you need to put a KEY record in the DNS <a
+href="glossary.html#reverse">reverse map</a> for your gateway. The initiator
+will not always know your gateway's name. It must be possible to look up the
+key knowing only the IP address.</p>
+
+<p>The record you need looks like this:</p>
+<pre>  ; RSA 2048 bits   gateway.example.com   Sat Apr 15 13:53:22 2000
+  4.3.2.1.in-addr.arpa.   IN   KEY   0x4200 4 1 AQOF8tZ2...+buFuFn/</pre>
+
+<p>Generate a record with <nobr><var>ipsec showhostkey</var></nobr>, and then
+edit it to insert the IP address.</p>
+
+<p>As always, IP addresses in the reverse map are written backwards. In the
+above example, the gateway IP address is 1.2.3.4.</p>
+
+<h4><a name="incoming.opp.firewall">Firewalling incoming opportunistic
+connections</a></h4>
+
+<p>The basic firewalling for IPsec does not change when you support incoming
+connections as well as connections you initiate. You must still allow IKE
+(UDP port 500) and ESP (protocol 50) packets to and from your machine, as in
+the rules given <a href="#firewall.standalone">above</a>.</p>
+
+<p>However, there are additional security concerns when you allow incoming
+opportunistic connections. This creates an additional path to your machine,
+so you need to check your rules to see that this does not provide a means for
+EvilDoers to bypass protections you have set up on other paths.</p>
+
+<p>In particular, look at any rules you have that depend on interfaces, rules
+using <var>-i ppp+</var>, <var>-o eth1</var> or similar expressions. You may
+need analogous rules for your <var>ipsec</var> interfaces.</p>
+
+<h3><a name="opp.gate">An opportunistic gateway</a></h3>
+
+<p>Next we expand from a standalone system (which protects only its own
+traffic) to a gateway (which protects traffic for other systems).</p>
+
+<p>There is one special case in which gateway configuration is quite simple
+-- if all the machines behind the gateway are hidden from the Internet. We
+describe that first, then go on to describe gateways for visible clients.</p>
+
+<h4><a name="simple.NAT">NAT for hidden clients</a></h4>
+
+<p>If your gateway uses <a href="glossary.html#NAT.gloss">NAT</a> to allow
+machines to access the Internet without having their own <a
+href="glossary.html">routable</a> IP addresses, then from the point of view
+of anyone else on the Internet:</p>
+<ul>
+  <li>the systems behind the gateway are completely hidden</li>
+  <li>only one machine with one IP address is visible</li>
+  <li>the gateway appears to be a standalone system</li>
+</ul>
+
+<p>For purposes of IPsec across the Internet, your gateway can be treated as
+a standalone machine. Consequently,</p>
+<ul>
+  <li>your <strong>ipsec.conf(5) file needs no changes</strong> to support
+    the NAT. It can be identical to what you would use on a standalone system
+    -- either initiate-only or with incoming connection support -- as shown
+    above.</li>
+  <li>the firewall rules for your Internet interface can be identical to
+    those for a standalone system, as above</li>
+  <li>the only thing you must change are the firewall rules that control
+    forwarding to the NAT network</li>
+</ul>
+
+<p>For a more detailed discussion of NAT, see our <a
+href="background.html#nat.background">background</a> section.</p>
+
+<h4><a name="gate.real">Gateway for visible clients</a></h4>
+
+<p>Many gateways will need to support client systems which have routable
+addresses and are visible to the Internet. This involves:</p>
+<ul>
+  <li>adding a connection description in <a
+    href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a></li>
+  <li>adding a DNS record for each client, pointing to the gateway</li>
+</ul>
+
+<h4><a name="gate.opp.conf">ipsec.conf(5) for an opportunistic
+gateway</a></h4>
+
+<p>You need only make a few additions to in the ipsec.conf(5) file:</p>
+<ul>
+  <li>keep the connection description for the gateway itself</li>
+  <li>add another one for its clients</li>
+  <li>in that connection, specify the clients in a <var>leftsubnet=</var>
+  line</li>
+</ul>
+
+<p>The additions to the ipsec.conf(5) file might be:</p>
+<pre># opportunistic connections for client systems
+# our gateway will build opportunistic tunnels on behalf of any
+# machine in the specified subnet
+conn subnet-to-anyone
+        also=gate_stuff             # our system details, stored below
+        also=public_subnet          # subnet description, below
+        auto=route                  # set up for opportunistic
+        right=%opportunistic        # anyone we can authenticate via DNS
+        rekey=no                    # let unused connections die
+
+# description of the subnet this gateway encrypts for
+# numbers used here are arbitrary, just for example
+conn public_subnet
+       leftsubnet=42.42.42.0/24 </pre>
+
+<p>There is one small thing to be careful of here. An <var>also=</var> line
+must appear in the file before the conn it references, so the first section
+above must appear before <var>conn gate_stuff</var>.</p>
+
+<h5>Supporting additional subnets</h5>
+
+<p>If required, a gateway can easily provide this service for more than one
+subnet. You just add a connection description and a subnet description for
+each. For example, leaving everything else above unchanged, you could add
+these sections:</p>
+<pre># opportunistic connections for additional systems
+conn second-to-anyone
+        also=gate_stuff             # our system details, stored below
+        also=second_subnet          # subnet description, below
+        right=%opportunistic        # anyone we can authenticate via DNS
+        rekey=no                    # let unused connections die
+
+# description of a second subnet this gateway encrypts for
+# numbers used here are arbitrary, just for example
+conn second_subnet
+       leftsubnet=101.102.103.0/24 </pre>
+
+<p>again, you need a little care so that <var>also=</var> lines always come
+before the sections they reference.</p>
+
+<p>The subnets used in these descriptions need not correspond to physical
+subnets. This is discussed in more detail in our <a
+href="adv_config.html">advanced configuration</a> document.</p>
+
+<h4><a name="gate.opp.dns">DNS entries for an opportunistic gateway</a></h4>
+
+<p>We assume you already have a KEY record in the <a
+href="glossary.html#reverse">reverse map</a> so your gateway can accept
+incoming connections as described <a href="#incoming.opp.dns">above</a>.</p>
+
+<p>For the gateway to provide an opportunistic encryption service for other
+systems, it must be possible for the initiator of an IPsec connection to:</p>
+<ul>
+  <li>discover the gateway's address, knowing only the endpoint that packets
+    are bound for</li>
+  <li>verify that the gateway is authorised to encrypt for that endpoint</li>
+</ul>
+
+<p>This is done by adding a TXT record to the reverse map for the endpoint.
+The record (with key shortened) looks like this:</p>
+<pre>        ; RSA 2048 bits  gateway.example.com   Sat Apr 15 13:53:22 2000
+        IN TXT  "X-IPsec-Server(10)=1.2.3.4 AQOF8tZ2...+buFuFn/"</pre>
+
+<p>This record must be generated on the gateway so it can get the key from <a
+href="ipsec.secrets.5.html">ipsec.secrets(5)</a>. The command is:</p>
+<pre>     ipsec showhostkey --txt 1.2.3.4</pre>
+
+<p>You must supply the gateway IP address on the command line.</p>
+
+<p>One of these records is required in the reverse map for each system using
+this gateway for opportunistic IPsec. You insert it in the reverse map part
+of the zone file right after the line for that system's IP address, so part
+of the file might look like this:</p>
+<pre>      1.42.42.42.in-addr.arpa. IN PTR arthur.example.com 
+        ; RSA 2048 bits  gateway.example.com   Sat Apr 15 13:53:22 2000
+        IN TXT  "X-IPsec-Server(10)=1.2.3.4 AQOF8tZ2...+buFuFn/"
+      2.42.42.42.in-addr.arpa. IN PTR ford.example.com 
+        ; RSA 2048 bits  gateway.example.com   Sat Apr 15 13:53:22 2000
+        IN TXT  "X-IPsec-Server(10)=1.2.3.4 AQOF8tZ2...+buFuFn/"
+      3.42.42.42.in-addr.arpa. IN PTR trillian.example.com 
+        ; RSA 2048 bits  gateway.example.com   Sat Apr 15 13:53:22 2000
+        IN TXT  "X-IPsec-Server(10)=1.2.3.4 AQOF8tZ2...+buFuFn/"</pre>
+
+<p>You need one TXT record per client, but the TXT records can all be
+identical.</p>
+
+<h4>Firewalling for gateways</h4>
+
+<p>On a gateway, the IPsec-related firewall rules applied for input and
+output on the Internet side are exactly as shown above. A gateway exchanges
+exactly the same things -- UDP 500 packets and IPsec packets -- with other
+gateways that a standalone system does, so it can use exactly the same
+firewall rules as a standalone system would.</p>
+
+<p>However, on a gateway there are additional things to do:</p>
+<ul>
+  <li>you have other interfaces and need rules for them</li>
+  <li>packets emerging from ipsec processing must be correctly forwarded</li>
+</ul>
+
+<p>You need additional rules to handle these things. For example, adding some
+rules to the set shown above we get:</p>
+<pre># edit this line to match the interface you use as default route
+# ppp0 is correct for many modem, DSL or cable connections
+# but perhaps not for you
+world=ppp0
+#
+# edit these lines to describe your internal subnet and interface
+localnet=42.42.42.0/24
+internal=eth1
+#
+# allow IPsec
+#
+# IKE negotiations
+iptables -A INPUT  -p udp -i $world --sport 500 --dport 500 -j ACCEPT
+iptables -A OUTPUT -p udp -o $world --sport 500 --dport 500 -j ACCEPT
+# ESP encrypton and authentication
+iptables -A INPUT  -p 50 -i $world -j ACCEPT
+iptables -A OUTPUT -p 50 -o $world -j ACCEPT
+#
+# packet forwarding for an IPsec gateway
+# simplest possible rules
+$ forward everything, with no attempt to filter
+#
+# handle packets emerging from IPsec
+# ipsec+ means any of ipsec0, ipsec1, ...
+iptables -A FORWARD -d $localnet -i ipsec+ -j ACCEPT
+# simple rule for outbound packets
+# let local net send anything
+# IPsec will encrypt some of it
+iptables -A FORWARD -s $localnet -i $internal -j ACCEPT </pre>
+
+<p>On a production gateway, you would no doubt need tighter rules than the
+above. For details, see:</p>
+<ul>
+  <li><a href="http://www.netfilter.org/documentation/">netfilter
+    documentation</a></li>
+  <li>books such as:
+    <ul>
+      <li>Cheswick and Bellovin, <a
+        href="biblio.html#firewall.book">Firewalls and Internet
+      Security</a></li>
+      <li>Zeigler <a href="biblio.html#Zeigler">Linux Firewalls</a>,</li>
+    </ul>
+  </li>
+  <li><a href="firewall.html">our firewalls document</a></li>
+  <li><a href="web.html#firewall.web">our firewall links</a></li>
+</ul>
+
+<h2><a name="roadies">"Road Warrior" remote access</a></h2>
+
+<p>A common requirement is for pre-configured connections between a specfic
+network and some set of remote machines. For example, an office network will
+often need to provide remote access services for:</p>
+<ul>
+  <li>employees' or contractors' home offices (standalone machine or firewall
+    plus client machines)</li>
+  <li>travelling employees</li>
+</ul>
+
+<p>We refer to the remote machines as "Road Warriors". For purposes of IPsec,
+anyone with a <a href="glossary.html#dynamic">dynamic IP address</a> is a
+road warrior.</p>
+
+<p>Of course, if both the warrior and the gateway at the office are set up
+for opportunistic encryption, then you may not need the pre-configured
+connection. Here we assume that you do need it. For example:</p>
+<ul>
+  <li>a corporate security policy might require explicitly-configured
+    connections for some applications</li>
+  <li>either end might be using a product which does not yet support
+    opportunistic encryption</li>
+</ul>
+
+<p>This section has three sub-sections:</p>
+<ul>
+  <li>exchanging the information required to build explicitly configured
+    connections</li>
+  <li>setup on the "Road Warrior" end</li>
+  <li>setup on the gateway end</li>
+</ul>
+
+<p>On either end, the opportunistic setup is unaffected by this. You leave it
+in place so both systems can continue to do opportunistic encryption with
+everyone but each other.</p>
+
+<h3><a name="info.ex">Information exchange</a></h3>
+
+<p>To set up an explicitly configured connection, you need some information
+about the system on the other end.</p>
+
+<p>Connection descriptions use <var>left </var>and <var>right</var> to
+designate the two ends. We adopt the convention that, from the gateway's
+point of view left=local and right=remote.</p>
+
+<p>The gateway administrator needs to know some things about each Road
+Warrior:</p>
+<ul>
+  <li>the system's public key</li>
+  <li>the ID that system uses in IPsec negotiation</li>
+</ul>
+
+<p>To get this information, in a format suitable for insertion directly into
+the gateway's <a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file,
+issue this command on the Warrior machine:</p>
+<pre>        ipsec showhostkey --right</pre>
+
+<p>The output should look like this (with the key shortened for easy
+reading):</p>
+<pre>        rightid=@xy.example.com
+        rightrsasigkey=0s1LgR7/oUM...</pre>
+
+<p>The Road Warrior needs to know:</p>
+<ul>
+  <li>the gateway's public key</li>
+  <li>the ID the gateway uses in IPsec negotiation</li>
+</ul>
+
+<p>which can be generated by running <var>ipsec showhostkey --left</var> on
+the gateway. Each Warrior must also know:</p>
+<ul>
+  <li>the IP address of the gateway</li>
+  <li>the subnet to which an IPsec tunnel provides access</li>
+</ul>
+
+<p>This information should be provided in a convenient format, ready for
+insertion in the Warrior's <a
+href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file. For example:</p>
+<pre>        left=1.2.3.4
+        leftsubnet=42.42.42.0/24
+        leftid=@gateway.example.com
+        leftrsasigkey=0s1LgR7/oUM...</pre>
+
+<p>The gateway administrator typically needs to generate this only once. The
+same file can be given to all Warriors.</p>
+
+<p>Of course it is also possible to provide different versions (in
+particular, access to differnet subnets) to different groups of Warriors. See
+our <a href="adv_config.html">advanced configuration</a> document.</p>
+
+<h3><a name="rw.client">Setup on the Road Warrior machine</a></h3>
+
+<p>To set up a Road Warrior machine, we start from the opportunistic
+imitiator setup shown <a href="#opp.client">above</a>.</p>
+
+<p>We need to add a connection description for the pre-configured tunnel.
+Since we want to be right in that description, we reverse the opportunistic
+description so we are right there too.</p>
+
+<h4>Connection description for a pre-configured tunnel</h4>
+
+<p>We insert the new connection description before the <var>conn
+our_stuff</var> section, so that it can use an <var>also=</var> line
+referring to that section.</p>
+<pre># description for opportunistic connections
+# reversed from previous example
+conn me-to-anyone
+        also=our_stuff             # our system details, stored below
+        left=%opportunistic        # anyone we can authenticate
+        leftrsasigkey=%dns         # look up their key in DNS
+        auto=route                 # set up for opportunistic
+        rekey=no                   # let unused connections die
+
+# pre-configured link to office network
+# added for this example
+conn us-to-office
+        also=our_stuff             # our system details, stored below
+        #
+        # information obtained from office system admin
+        # goes to the right of the = signs in these lines
+        # values shown here are just for example
+        # 
+        left=1.2.3.4                # gateway IP address
+        lefttsubnet=42.42.42.0/24   # the office network
+        leftid=@gateway.example.com
+        # real keys are much longer than shown here
+        leftrsasigkey=0s1LgR7/oUM...
+
+# description of our system
+# included in other connection descriptions via also= lines
+# must come after the lines that use it
+# reversed from previous example
+conn our_stuff
+        # all connections should use our default route
+        # also controls the source address on IPsec packets
+        right=%defaultroute
+        # our identity for IPsec negotiations
+        # must match what is in DNS and ipsec.secrets(5)
+        righttid=@xy.example.com</pre>
+
+<p>Everything else remains as it was when we had only opportunistic
+connections.</p>
+
+<p>We could easily add more connections as required, perhaps one each for his
+office, her office, the kid's school, ... The file would grow longer, but
+nothing already in the file would need to change.</p>
+
+<h3><a name="gate.road">Road Warrior support on an office gateway</a></h3>
+
+<p>Adding road warrior support so people can connect remotely to your office
+network is straightforward.</p>
+
+<p>We start from the opportunistic gateway setup shown <a
+href="#opp.gate">above</a>.</p>
+
+<h4>Putting connection descriptions in separate files</h4>
+
+<p>You could put a complete connection description for each Warrior in your
+<a href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a> file, but this makes
+for a rather unmanageable file if you have many Warriors.</p>
+
+<p>Instead, we suggest you give each warrior its own file, choosing some
+directory and naming convention that suits your system and style.</p>
+
+<p>For this example, we use the directory <var>/etc/ipsec.road</var> and use
+filenames based on IPsec ID, so the Warrior using ID
+<var>xy.example.com</var> gets a file named <var>xy.conf</var>.</p>
+
+<p>Using such files, you need add only one line to <a
+href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a>. With our naming
+convention, the line is:</p>
+<pre>      include /etc/ipsec.road/*.conf</pre>
+
+<p>FreeS/WAN will then read all those files and behave as if they were part
+of the ipsec.conf(5) file.</p>
+
+<p>This needs to come before the <var>conn gate_stuff</var> section, so that
+the Warriors' connection descriptions can use <var>also=gate_stuff</var>. A
+convenient place for the line is right after the <var>conn %default</var>
+section.</p>
+
+<p>Each of the Road Warrior files then contains a connection description for
+that Warrior. For example:</p>
+<pre># connection description for Road Warrior "xy"
+conn gate-xy
+        # use the gateway description in ipsec.conf(5)
+        also=gate_stuff
+        # allow connection attempt from any address
+        # attempt fails if caller cannot authenticate
+        right=%any
+        # authentication information
+        rightid=@xy.example.com
+        rightrsasigkey=0s1LgR7/oUM...</pre>
+
+<p>With this technique, it becomes fairly simple to administer a gateway that
+supports many Road Warriors. For example:</p>
+
+<p>To add a new user, simply add a suitable file.</p>
+
+<p>To disable an account -- for example if a key is compromised -- first
+remove the file, then take any existing connection down with:</p>
+<pre>        ipsec auto --down <var>connection</var></pre>
+and delete it from Pluto's internal database with:
+<pre>        ipsec auto --delete <var>connection</var></pre>
+
+<p>If you have many users, it would be worthwhile to write scripts to
+automate such tasks.</p>
+
+<h2><a name="net2net">Network-to-network VPN</a></h2>
+
+<p>Often it is useful to have explicitly configured IPsec tunnels between
+different offices of an organisation, or between organisations that have
+joint projects.</p>
+
+<p>Of course, if both offices are set up for opportunistic encryption and the
+security policies in place allow you to use that, explicitly configured
+tunnels become unnecessary. However, this will not always be the case.</p>
+
+<h3><a name="gate.VPN">Gateway setup for net-to-net</a></h3>
+
+<p>Adding up a network-to-network tunnel does not require any change to the
+opportunistic or Road warrior parts of your <a
+href="manpage.d/ipsec.conf.5.html">ipsec.conf(5)</a>. You can keep those
+parts exactly as shown above.</p>
+
+<p>Of course, a network-to-network tunnel requires its own connection
+description, so you have to add that. There are two ways to do this.</p>
+<dl>
+  <dt>identical connection description on the two ends</dt>
+    <dd>needs to specify more detail so the machine can figure out which end
+      it is on</dd>
+  <dt>slightly different descriptions on the two ends</dt>
+    <dd>needs less detail, but you need to manage two descriptions</dd>
+</dl>
+
+<p>Choose whichever is more convenient to administer in your environment.</p>
+
+<h4>A connection description that works on either end</h4>
+
+<p>Here is a network-to-network tunnel description from our <a
+href="example">examples</a> file:</p>
+<pre># sample tunnel
+# The network here looks like:
+#   leftsubnet====left----leftnexthop......rightnexthop----right====rightsubnet
+# If left and right are on the same Ethernet, omit leftnexthop and rightnexthop.
+conn sample
+        # left security gateway (public-network address)
+        left=10.0.0.1
+        # next hop to reach right
+        leftnexthop=10.44.55.66
+        # subnet behind left (omit if there is no subnet)
+        leftsubnet=172.16.0.0/24
+        # right s.g., subnet behind it, and next hop to reach left
+        right=10.12.12.1
+        rightnexthop=10.88.77.66
+        rightsubnet=192.168.0.0/24
+        auto=start</pre>
+
+<p>If you give an explicit IP address for <var>left</var> (and
+<var>left</var> and <var>right</var> are not directly connected), then you
+<strong>must</strong> specify <var>leftnexthop</var> (the router which
+<var>left</var> sends packets to in order to get them delivered to
+<var>right</var>). Similarly, you may need to specify <var>rightnexthop</var>
+(vice versa).</p>
+
+<p>The <var>*nexthop</var> parameters are needed because of an unfortunate
+interaction between FreeS/WAN and the kernel routing code. They will be
+eliminated in a future release, but perhaps not soon. We know they should go,
+but getting them out is not a simple problem.</p>
+
+<p>This description can be generated on either machine and simply inserted in
+the ipsec.conf(5) file on the other. No change is required or desired.</p>
+
+<h4>Using slightly different descriptions</h4>
+
+<p>Provided both machines do IPsec over the interface that is their default
+route to the Internet (a common case, but by no means the only one) you can
+simplify the description somewhat.</p>
+
+<p>When using <var>left=%defaultroute</var>, you do not need to specify
+<var>leftnexthop</var>. <var>left</var> does not need to know
+<var>rightnexthop</var> either, so on <var>left</var> the connection
+description can be:</p>
+<pre>conn sample
+        # left security gateway (public-network address)
+        left=%defaultroute
+        # subnet behind left (omit if there is no subnet)
+        leftsubnet=172.16.0.0/24
+        # right s.g., subnet behind it
+        right=10.12.12.1
+        rightsubnet=192.168.0.0/24
+        auto=start</pre>
+
+<p>On <var>right</var> it is:</p>
+<pre>conn sample
+        # left security gateway (public-network address)
+        left=10.0.0.1
+        # subnet behind left (omit if there is no subnet)
+        leftsubnet=172.16.0.0/24
+        # right s.g., subnet behind it
+        right=%defaultroute
+        rightsubnet=192.168.0.0/24
+        auto=start</pre>
+
+<h2>What next?</h2>
+
+<p>At this point, we have covered setup for opportunistic encryption and for
+simple cases of Road warrior and VPN connections. You have several choices
+for what to look at next:</p>
+<ul>
+  <li>more <a href="adv_config.html">advanced configuration</a></li>
+  <li><a href="firewall.html">FreeS/WAN and firewalls</a></li>
+  <li>more detail on the <a href="ipsec.html">IPsec protocols</a></li>
+</ul>
+</body>
+</html>

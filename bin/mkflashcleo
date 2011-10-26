@@ -1,0 +1,110 @@
+#!/bin/bash
+##############################################################################
+
+#
+#	mkflash -- construct an entire CLEOPATRA 1 flash image.
+#
+#	(C) Copyright 1999-2001, Roman Wagner (rw@feith.de)
+#
+
+##############################################################################
+
+#
+#	The starting MAC address... 00-D0-CF-XX-XX-XX
+#	This strings is in octal below, ugh...
+#	If setting up 2 ethernet devices then set MAC1 as well.
+#
+MAC0="\000\320\317\000\001\040"
+MAC1="\000\320\317\000\001\041"
+
+#
+#	Define the files to use.
+#
+FLASH=images/flash.bin
+BOOT=boot/boot.bin
+IMAGE=images/imagez.bin
+
+##############################################################################
+
+usage()
+{
+	echo "usage: mkflashcleo boot-file name mem"
+	exit 1
+}
+
+##############################################################################
+
+#
+#	Check for any args...
+#
+if [ $# -ne 3 ]
+then
+	usage
+fi
+
+BOOT=$1
+echo
+echo "Flash config:" $2 $3
+echo
+
+#
+#	All boards get 2 MAC addresses at first.
+#
+DUALETHER=1
+
+#
+#	Boot loader first.
+#
+cat $BOOT > $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 16384 - $SIZE`
+echo "BOOT: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	Command line args next.
+#
+echo -e "CONSOLE=/dev/ttyS0\000\c" >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 24576 - $SIZE`
+echo "ARGS: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	MAC address next.
+#
+echo -e "$MAC0\c" >> $FLASH
+[ "$DUALETHER" = 1 ] && echo -e "$MAC1\c" >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 65536 - $SIZE`
+echo "MAC:  flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	Leave space for the file system.
+#
+SIZE=65536
+PAD=0
+echo "CFS:  flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$SIZE >> $FLASH 2> /dev/null
+
+#
+#	Linux and file-system image.
+#
+cat $IMAGE >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 1966080 - $SIZE`
+#####PAD=`expr 1048576 - $SIZE`
+echo "IMG:  flash size=$SIZE padding=$PAD"
+#dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+#
+#	application config
+#
+#SIZE=131072
+#PAD=0
+#echo "ACFS:  flash size=$SIZE padding=$PAD"
+#dd if=/dev/zero count=1 bs=$SIZE >> $FLASH 2> /dev/null
+
+cp $FLASH /tftpboot
+exit 0

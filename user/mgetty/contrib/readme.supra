@@ -1,0 +1,87 @@
+From sashimi.wwa.com!pshrink!veck Sat Jul  9 21:16:51 1994
+Return-Path: <pshrink!veck@sashimi.wwa.com>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0qMhtI-0002wYC@greenie.muc.de>; Sat, 9 Jul 94 21:16 MEST
+Received: from newton.Space.NET ([194.45.12.1]) by colin.muc.de with SMTP id <135943(2)>; Sat, 9 Jul 1994 21:19:20 +0200
+Received: from sashimi.wwa.com ([198.49.174.1]) by newton.Space.NET with SMTP id <375029-3>; Sat, 9 Jul 1994 21:14:39 +0200
+Received: from pshrink by sashimi.wwa.com with uucp
+	(Smail3.1.28.1 #8) id m0qMhtQ-000bmFC; Sat, 9 Jul 94 14:16 CDT
+Date:	Sat, 9 Jul 1994 11:55:12 +0200
+From:	"Steven King [Really!]" <veck@pshrink.chi.il.us>
+Subject: Re: MGETTY: Can't do RTS/CTS?
+To:	Gert Doering <gert@greenie.muc.de>
+In-Reply-To: <m0qJqal-0000xLC@greenie.muc.de>
+Message-ID: <Pine.3.89.9407091043.A91-0100000@pshrink.chi.il.us>
+MIME-Version: 1.0
+Content-Type: TEXT/PLAIN; charset=US-ASCII
+Status: RO
+
+On Fri, 1 Jul 1994, Gert Doering wrote:
+> Should do. I'm using it with a ZyXEL and H/W flow control, and it works.
+
+I found my problem with mgetty not playing nicely with my Supra.  Turned 
+out to be a Supra problem.  (Oooh, big surprise there!)  Here's the 
+synopsis I posted to comp.os.linux.help.  Since there *is* a work-around 
+possible in mgetty, I figured you might want to consider it for future 
+releases.
+
+Thanks for your help!  (And your excellent program!)
+
+
+Newsgroups: comp.os.linux.help
+From: veck@pshrink.chi.il.us (Steven King [Really!])
+Subject: Re: MGETTY: Can't do RTS/CTS?
+Message-ID: <1994Jul9.154954.547@pshrink.chi.il.us>
+Date: Sat, 9 Jul 1994 15:49:54 GMT
+
+veck@pshrink.chi.il.us publicly declared:
+>Well, one problem.  I just discovered that mgetty doesn't enable RTS/CTS
+>handshaking properly.  This is most noticable when a low-speed modem dials
+>in to my Supra 14k4 modem.  I do an "ls -l" and the whole thing is sent to
+>the Supra at 38400 bps.  Unfortunately, the Supra is only spooling out to
+>the remote modem at 2400 bps, and the text gets very garbled. 
+
+I found the problem.  You're gonna love it.
+
+First, after mgetty initted the modem, I connected with kermit and checked
+the settings. AT&V showed me that RTS/CTS was turned off, despite the fact
+that it's turned on in the non-volatile RAM and I set mgetty's init string
+to just "ATZ" to load the stored settings.  So I cranked up mgetty's
+debugging level to the point where I could see everything it sent to the
+modem.  No obvious problems.  It sent the "ATZ" then a bunch of fax 
+commands.  Howinthehell did flow control get nuked?
+
+I connected with kermit again and started issuing the commands one by 
+one, just as mgetty did.  In between I checked the settings to see where 
+I lost flow control.
+
+    ATQ0V1H0       Hard-coded into mgetty to make sure it can talk
+                       to the modem, no problems here
+    ATZ            Okay, &K3 is set, we have flow control
+    AT+FCLASS=0    Bingo!  A side effect is that this turns off flow
+                       control, as shown by AT&V reporting &K0.
+
+So, apparently Supra modems (both my 14k4 and my 28k8 models have this 
+behavior) turn flow control *OFF* as a side-effect of "AT+FCLASS=0".  
+Supra probably thinks this is a feature of some sort.  Who know what evil 
+lurks in the hearts of firmware programmers?
+
+The fix was too easy.  Now that I knew where flow control was being 
+disabled, it was simply a matter of hacking a line into mgetty to 
+re-enable it.  Thanks to Gert's fine programming this simply meant adding 
+a single line to mgetty.c.  After line 65, add
+
+     65                             "AT+FDCC=1,5,0,2,0,0,0", "OK",
+>>>> 66                             "AT&K3", "OK",
+
+as the last fax init string.  A simple fix, but hard-coded for Supra 
+modems.  If your modem isn't a Supra this may not be the proper command.  
+(But if your modem isn't a Supra you probably don't have this problem, eh?)
+
+-- 
+----------------------------------------<Steven King, veck@pshrink.chi.il.us>--
+"What if there were no beer?"
+Yep, that's about the only time I'd order a Zima, all right.
+
+
+

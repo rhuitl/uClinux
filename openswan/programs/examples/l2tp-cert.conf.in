@@ -1,0 +1,58 @@
+conn l2tp-X.509
+	#
+	# Configuration for one user with any type of IPsec/L2TP client
+	# including the updated Windows 2000/XP (MS KB Q818043), but
+	# excluding the non-updated Windows 2000/XP.
+	#
+	#
+	# Use a certificate. Disable Perfect Forward Secrecy.
+	#
+	authby=rsasig
+	pfs=no
+	auto=add
+	# we cannot rekey for %any, let client rekey
+	rekey=no
+	# Apple iOS doesn't send delete notify so we need dead peer detection
+	# to detect vanishing clients
+	dpddelay=10
+	dpdtimeout=90
+	dpdaction=clear
+	# Set ikelifetime and keylife to same defaults windows has
+	ikelifetime=8h
+	keylife=1h
+	# l2tp-over-ipsec is transport mode
+	# See http://bugs.xelerance.com/view.php?id=466
+	type=transport
+	#
+	left=YourServerIP
+	leftid=%fromcert
+	leftrsasigkey=%cert
+	leftcert=/etc/ipsec.d/certs/YourGatewayCertHere.pem
+	leftprotoport=17/1701
+	#
+	# The remote user.
+	#
+	right=%any
+	rightca=%same
+	rightrsasigkey=%cert
+	# Using the magic port of "%any" means "any one single port". This is
+	# a work around required for Apple OSX clients that use a randomly
+	# high port.
+	rightprotoport=17/%any
+	rightsubnet=vhost:%priv,%no
+
+# Normally, KLIPS drops all plaintext traffic from IP's it has a crypted
+# connection with. With L2TP clients behind NAT, that's not really what
+# you want. The connection below allows both l2tp/ipsec and plaintext
+# connections from behind the same NAT router. 
+# The l2tpd use a leftprotoport, so they are more specific and will be used
+# first. Then, packets for the host on different ports and protocols (eg ssh)
+# will match this passthrough conn.
+conn passthrough-for-non-l2tp
+        type=passthrough
+        left=YourServerIP
+        leftnexthop=YourGwIP
+        right=0.0.0.0
+        rightsubnet=0.0.0.0/0
+        auto=route
+

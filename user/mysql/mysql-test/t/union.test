@@ -1,0 +1,226 @@
+#
+# Test of unions
+#
+
+drop table if exists t1,t2,t3,t4,t5,t6;
+CREATE TABLE t1 (a int not null, b char (10) not null);
+insert into t1 values(1,'a'),(2,'b'),(3,'c'),(3,'c');
+CREATE TABLE t2 (a int not null, b char (10) not null);
+insert into t2 values (3,'c'),(4,'d'),(5,'f'),(6,'e');
+
+select a,b from t1 union select a,b from t2;
+select a,b from t1 union all select a,b from t2;
+select a,b from t1 union all select a,b from t2 order by b;
+select a,b from t1 union all select a,b from t2 union select 7,'g';
+select 0,'#' union select a,b from t1 union all select a,b from t2 union select 7,'gg';
+select a,b from t1 union select a,b from t1;
+select 't1',b,count(*) from t1 group by b UNION select 't2',b,count(*) from t2 group by b;
+
+# Test alternate syntax for unions 
+(select a,b from t1 limit 2)  union all (select a,b from t2 order by a) limit 4;
+(select a,b from t1 limit 2)  union all (select a,b from t2 order by a limit 1);
+(select a,b from t1 limit 2)  union all (select a,b from t2 order by a limit 1) order by b desc;
+explain (select a,b from t1 limit 2)  union all (select a,b from t2 order by a limit 1) order by b desc;
+(select sql_calc_found_rows  a,b from t1 limit 2)  union all (select a,b from t2 order by a) limit 2;
+select found_rows();
+select sql_calc_found_rows  a,b from t1  union all select a,b from t2 limit 2;
+select found_rows();
+
+#
+# Test some error conditions with UNION
+#
+
+explain select a,b from t1 union all select a,b from t2;
+
+--error  1054
+explain select xx from t1 union select 1;
+explain select a,b from t1 union select 1;
+explain select 1 union select a,b from t1 union select 1;
+explain select a,b from t1 union select 1 limit 0;
+
+--error 1221
+select a,b from t1 into outfile 'skr' union select a,b from t2;
+
+--error 1221
+select a,b from t1 order by a union select a,b from t2;
+
+--error 1221
+insert into t3 select a from t1 order by a union select a from t2;
+
+--error 1222
+create table t3 select a,b from t1 union select a from t2;
+
+--error 1222
+select a,b from t1 union select a from t2;
+
+--error 1222
+select * from t1 union select a from t2;
+
+--error 1222
+select a from t1 union select * from t2;
+
+--error 1234
+select * from t1 union select SQL_BUFFER_RESULT * from t2;
+
+# Test CREATE, INSERT and REPLACE
+create table t3 select a,b from t1 union all select a,b from t2;
+insert into t3 select a,b from t1 union all select a,b from t2;
+replace into t3 select a,b as c from t1 union all select a,b from t2;
+
+drop table t1,t2,t3;
+
+#
+# Test bug reported by joc@presence-pc.com
+#
+
+CREATE TABLE t1 (
+  `pseudo` char(35) NOT NULL default '',
+  `pseudo1` char(35) NOT NULL default '',
+  `same` tinyint(1) unsigned NOT NULL default '1',
+  PRIMARY KEY  (`pseudo1`),
+  KEY `pseudo` (`pseudo`)
+) TYPE=MyISAM;
+INSERT INTO t1 (pseudo,pseudo1,same) VALUES ('joce', 'testtt', 1),('joce', 'tsestset', 1),('dekad', 'joce', 1);
+SELECT pseudo FROM t1 WHERE pseudo1='joce' UNION SELECT pseudo FROM t1 WHERE pseudo='joce';
+SELECT pseudo1 FROM t1 WHERE pseudo1='joce' UNION SELECT pseudo1 FROM t1 WHERE pseudo='joce';
+SELECT * FROM t1 WHERE pseudo1='joce' UNION SELECT * FROM t1 WHERE pseudo='joce' order by pseudo desc,pseudo1 desc;
+SELECT pseudo1 FROM t1 WHERE pseudo='joce' UNION SELECT pseudo FROM t1 WHERE pseudo1='joce';
+SELECT pseudo1 FROM t1 WHERE pseudo='joce' UNION ALL SELECT pseudo FROM t1 WHERE pseudo1='joce';
+SELECT pseudo1 FROM t1 WHERE pseudo='joce' UNION SELECT 1;
+drop table t1;
+drop table if exists t1,t2;
+create table t1 (a int);
+create table t2 (a int);
+insert into t1 values (1),(2),(3),(4),(5);
+insert into t2 values (11),(12),(13),(14),(15);
+(select * from t1 limit 2) union (select * from t2 limit 3) limit 4;
+(select * from t1 limit 2) union (select * from t2 limit 3);
+(select * from t1 limit 2) union (select * from t2 limit 20,3);
+set SQL_SELECT_LIMIT=2;
+(select * from t1 limit 1) union (select * from t2 limit 3);
+set SQL_SELECT_LIMIT=DEFAULT;
+drop table t1,t2;
+
+#
+# Test error with left join
+#
+
+CREATE TABLE t1 (
+  cid smallint(5) unsigned NOT NULL default '0',
+  cv varchar(250) NOT NULL default '',
+  PRIMARY KEY  (cid),
+  UNIQUE KEY cv (cv)
+) ;
+INSERT INTO t1 VALUES (8,'dummy');
+CREATE TABLE t2 (
+  cid bigint(20) unsigned NOT NULL auto_increment,
+  cap varchar(255) NOT NULL default '',
+  PRIMARY KEY  (cid),
+  KEY cap (cap)
+) ;
+CREATE TABLE t3 (
+  gid bigint(20) unsigned NOT NULL auto_increment,
+  gn varchar(255) NOT NULL default '',
+  must tinyint(4) default NULL,
+  PRIMARY KEY  (gid),
+  KEY gn (gn)
+) ;
+INSERT INTO t3 VALUES (1,'V1',NULL);
+CREATE TABLE t4 (
+  uid bigint(20) unsigned NOT NULL default '0',
+  gid bigint(20) unsigned default NULL,
+  rid bigint(20) unsigned default NULL,
+  cid bigint(20) unsigned default NULL,
+  UNIQUE KEY m (uid,gid,rid,cid),
+  KEY uid (uid),
+  KEY rid (rid),
+  KEY cid (cid),
+  KEY container (gid,rid,cid)
+) ;
+INSERT INTO t4 VALUES (1,1,NULL,NULL);
+CREATE TABLE t5 (
+  rid bigint(20) unsigned NOT NULL auto_increment,
+  rl varchar(255) NOT NULL default '',
+  PRIMARY KEY  (rid),
+  KEY rl (rl)
+) ;
+CREATE TABLE t6 (
+  uid bigint(20) unsigned NOT NULL auto_increment,
+  un varchar(250) NOT NULL default '',
+  uc smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (uid),
+  UNIQUE KEY nc (un,uc),
+  KEY un (un)
+) ;
+INSERT INTO t6 VALUES (1,'test',8);
+
+SELECT t4.uid, t5.rl, t3.gn as g1, t4.cid, t4.gid as gg FROM t3, t6, t1, t4 left join t5 on t5.rid = t4.rid left join t2 on t2.cid = t4.cid WHERE t3.gid=t4.gid AND t6.uid = t4.uid AND t6.uc  = t1.cid AND t1.cv = "dummy" AND t6.un = "test";
+SELECT t4.uid, t5.rl, t3.gn as g1, t4.cid, t4.gid as gg FROM t3, t6, t1, t4 left join t5 on t5.rid = t4.rid left join t2 on t2.cid = t4.cid WHERE t3.gid=t4.gid AND t6.uid = t4.uid AND t3.must IS NOT NULL AND t6.uc  = t1.cid AND t1.cv = "dummy" AND t6.un = "test";
+(SELECT t4.uid, t5.rl, t3.gn as g1, t4.cid, t4.gid as gg FROM t3, t6, t1, t4 left join t5 on t5.rid = t4.rid left join t2 on t2.cid = t4.cid WHERE t3.gid=t4.gid AND t6.uid = t4.uid AND t3.must IS NOT NULL AND t6.uc  = t1.cid AND t1.cv = "dummy" AND t6.un = "test") UNION (SELECT t4.uid, t5.rl, t3.gn as g1, t4.cid, t4.gid as gg FROM t3, t6, t1, t4 left join t5 on t5.rid = t4.rid left join t2 on t2.cid = t4.cid WHERE t3.gid=t4.gid AND t6.uid = t4.uid AND t6.uc  = t1.cid AND t1.cv = "dummy" AND t6.un = "test");
+
+drop table t1,t2,t3,t4,t5,t6;
+CREATE TABLE t1 (a int not null, b char (10) not null);
+insert into t1 values(1,'a'),(2,'b'),(3,'c'),(3,'c');
+CREATE TABLE t2 (a int not null, b char (10) not null);
+insert into t2 values (3,'c'),(4,'d'),(5,'f'),(6,'e');
+create table t3 select a,b from t1 union select a,b from t2;
+create table t4 (select a,b from t1) union (select a,b from t2) limit 2;
+insert into  t4 select a,b from t1 union select a,b from t2;
+insert into  t3 (select a,b from t1) union (select a,b from t2) limit 2;
+select * from t3;
+select * from t4;
+drop table t1,t2,t3,t4;
+
+#
+# Test of SQL_CALC_FOUND_ROW handling
+#
+create table t1 (a int);
+insert into t1 values (1),(2),(3);
+create table t2 (a int);
+insert into t2 values (3),(4),(5);
+
+# Test global limits
+(SELECT SQL_CALC_FOUND_ROWS * FROM t1) UNION all (SELECT * FROM t2) LIMIT 1;
+select found_rows();
+(SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 1) UNION all (SELECT * FROM t2) LIMIT 2;
+select found_rows();
+
+# Test cases where found_rows() should return number of returned rows
+(SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 1) UNION all (SELECT * FROM t2);
+select found_rows();
+(SELECT SQL_CALC_FOUND_ROWS * FROM t1) UNION all (SELECT * FROM t2 LIMIT 1);
+select found_rows();
+(SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 1) UNION SELECT * FROM t2 LIMIT 1;
+select found_rows();
+
+# In these case found_rows() should work
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 1 UNION all SELECT * FROM t2 LIMIT 2;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 UNION all SELECT * FROM t2 LIMIT 2;
+select found_rows();
+
+# The following examples will not be exact
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 UNION SELECT * FROM t2 LIMIT 2;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 UNION SELECT * FROM t2 LIMIT 100;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 100 UNION SELECT * FROM t2;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 1 UNION SELECT * FROM t2;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 LIMIT 1 UNION SELECT * FROM t2 LIMIT 2;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 UNION SELECT * FROM t2 LIMIT 2,2;
+select found_rows();
+SELECT SQL_CALC_FOUND_ROWS * FROM t1 limit 2,2 UNION SELECT * FROM t2;
+select found_rows();
+
+# Test some limits with ORDER BY
+SELECT * FROM t1 UNION SELECT * FROM t2 ORDER BY a desc LIMIT 1;
+(SELECT * FROM t1 ORDER by a) UNION ALL (SELECT * FROM t2 ORDER BY a) ORDER BY A desc LIMIT 4;
+
+# Wrong usage
+--error 1234
+(SELECT * FROM t1) UNION all (SELECT SQL_CALC_FOUND_ROWS * FROM t2) LIMIT 1;
+
+drop table t1,t2;

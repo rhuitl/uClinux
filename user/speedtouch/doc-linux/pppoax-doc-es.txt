@@ -1,0 +1,188 @@
+------------------------------------------------------------------------------
+                       Documentación serie Pppoa
+------------------------------------------------------------------------------
+
+SUMARIO
+
+* DESCRIPCION GENERAL PARA LA SERIE PPPOA2/2M/3
+
+* DESCRIPCION PARA LA SERIE PPPOA2
+  ** Recorrido a travez de una ejecución pppoa2
+  ** Manejo de errores fatales de Lectura/Escritura
+  ** Manejo de señales
+  ** Diferencias entre pppoa2 y pppoa2m (y nacimiento de pppoa3)
+
+* DESCRIPCION DE PPPOA3
+  ** Diferencias entre pppoa2 y pppoa3
+  ** Recorrido a travez de una ejecución pppoa3
+  ** Manejo de señales
+
+
+------------------------------------------------------------------------------
+
+* DESCRIPCION GENERAL PARA LA SERIE PPPOA2/2M/3
+
+
+  Los proveedores Adsl normalmente usan PPP sobre ATM. En Linux y BSD, la capa
+PPP se maneja directamente por el kernel a travez de ppp(d). 
+Desafortunadamente ppp(d) no sabe nada sobre USB o ATM. Asi que no es posible
+simplemente usar ppp(d) para comunicarse con el modem (y por consiguiente su
+proveedor).
+
+  La serie pppoax resuelve este problema al proveer un enlace entre ppp(d) y
+el modem a travez de la option pty del demonio ppp(d).
+
+Aqui hay un gráfico simple demostrando la actuación de ppoax.
+
+__________            __________                 _______
+|        |<-----------|        |<-------------- /  ° °  \
+| ppp(d) |     pty    | pppoax |   bus USB     |  Modem  | linea ADSL<---->ISP
+|________|----------->|________|--------------> \\     //   //
+          paquetes ppp    ^       celdas atm      \   /____//
+                          |                        \_______/
+                          |
+                  encapsula/expande
+               datos en cuadros aal5 y 
+              luego envia/recibe celdas
+                 ATM a travez de USB                
+
+* DESCRIPCION PARA LA SERIE PPPOA2
+
+  La primera solución que encontramos para manejar los flujos de E/S fue
+escribir una peza de código que separaba (forking) en dos partes al momento
+de ejecución, una parte para leer desde USB, y la otra para escribir alli.
+
+  ** Recorrido a travez de una ejecución pppoa2
+
+   1 - pppoa2 comienza y duplica sus descriptores estándard de archivo:
+       0 (stdin) y 1 (stdout)
+   2 - apertura de la bitácora (log)
+   3 - duplicación de los descriptores de la bitácora en 0, 1, 2
+
+   Desde ese punto, ya nada mas se muestra en consola, toda la salida printf
+   va a la bitácora
+
+   4 - La disciplina de linea N_HDLC se configura en los descriptores usados
+       para comunicarse con ppp(d)
+   5 - busqueda del modem USB
+   6 - Peticiones de acceso para las puntas 0x07 (lectura) y 0x87 (escritura)
+   7 - Instalación de manejador de señal para manejar señales posiblemente
+       enviadas por ppp(d) (o incluso el usuario)
+   8 - bifurcación (fork)
+      +Hijo va hacia un bucle infinito, haciendo siempre lo mismo:
+       leer datos enviados por ppp(d), encapsular aal5, dividir en celdas atm,
+       enviar esas celdas al modem
+      +Padre se mantiene corriendo
+   9 - Padre va hacia un bucle infinito y;
+       Recibe paquetes atm desde modem, une cuadros aal5, envia esos paquetes
+       a ppp(d)
+
+  ** Manejo de errores fatales de Lectura/Escritura
+
+    En un mundo perfecto, una vez se inicie pppoa, este correria sin fallas
+  'ad vitam eternam' ("para siempre" en latin). Pero la vida es cruel y los
+  errores pueden ocurrir. Aqui está la reacción de pppoa2 cuando alguna 
+  injusticia ocurre ;-)
+
+    El proceso padre o hijo deja el bucle y envia la señal TERM al otro.
+  Entonces luego liberamos los dispositivos USB y asi sucesivamente, de la
+  mejor manera posible. Luego salimos tan limpiamente como podamos de ambos
+  procesos. Teoricamente ambos procesos se mueren.
+
+  ** Manejo de señales
+
+    pppoa2 solo atrapa SIGHUP en ambiente BSD y SIGTERM en Linux.
+  Esto es debido al hecho de que ppp(d) usa esas señales para anunciar
+  cierre de pty a su esclavo.
+    Si una señal es recibida por uno de los dos procesos se le envia al otro
+  en su turno
+
+  ** Diferencias entre pppoa2 y pppoa2m
+
+     pppoa2 es funcional pero su diseño no ofrece ninguna posibilidad de
+  facil actualización o nueva funcionalidad. El código no es lo
+  suficientemente modular y cualquier cosa pequeña que necesitase cambiarse
+  forzaba una reescritura masiva de código. pppoa fue reescrito de forma que
+  permitiera la creación de pequeñas librerias para crc, atm, aa15 en un lado
+  y pppoa usandolas por el otro. Desafortunadamente el diseño de pppoa2 fue
+  tan pobre que ninguna parte de el pudo ser facilmente re-usada.
+
+    La nueva version de pppoa, pppoa3, fue rediseñada desde la raiz. Se
+  escribireron las librerias pero el código principal de pppoa3 era
+  defectuoso. Asi que retro portamos el código nuevo a pppoa2 que era
+  funcional y bastante probado. Entonces obtuvimos pppoa2m, un pppoa2 unido a
+  pppoa3.
+
+  En pocas palabras:
+
+  pppoa2m = (pppoa2) - (código sucio) + (nuevas librerias aal5/atm/crc)
+
+    pppoa2m es mejor que pppoa2 porque aprovecha las caracteristicas de la
+  nueva libreria y tambien algunas cosas de pppoa3 (sistema de bitácora, por
+  ejemplo).
+
+PD: pppoa2m es mejor elección que pppoa2
+
+------------------------------------------------------------------------------
+
+* DESCRIPCION DE PPPOA3
+
+  Deberia ser suficientemente obvio para cualquiera con un coeficiente
+intelectual positivo que pppoa3 es el sucesor de pppoa3. Toma ventaja del
+nuevo diseño. Algunas variantes de BSD no soportan hilos (threading)
+directamente, asi que mantuvimos ambas la serie pppoa2 y la nueva serie
+pppoa3. (Linux puede correr todas ellas).
+
+  Una vez mas, pppoa2m es mejor que pppoa2
+
+  ** Diferencias entre pppoa2 y pppoa3
+
+    1 - pppoa3 usa hilos (threads) en lugar de bifurcación (forking) para
+        permitir operaciones de lectura/escritura simultanea. Esto provee:
+        + Menor latencia al cambiar entre lectura y escritura
+        + Consumo disminuido de memoria
+        + Mejor control sobre fijación de tiempo ( granularidad mas fina )
+        + Manejo de señales mejorado
+    2 - Todo el código ha sido modularizado 
+    3 - Mejor manejo de ATM y AAL5 (añadido CRC, nuevas revisiones)
+    4 - Nuevo sistema de bitácora que permite entradas a syslogd
+
+  ** Recorrido a travez de una ejecución pppoa3
+
+    Hilo principal
+
+    1 - Inicio de programa 
+    2 - Configuración de disciplina N_HDLC
+    3 - Inicialización de atributos de hilo
+    4 - Inicialización USB (detección y petición de puntas 0x07 y 0x87)
+    5 - Instalación de manejador de señales
+    6 - Creación de hilo E/S
+    7 - Espera de un semáforo
+    8 - Ocurrió el semáforo, esto puede significar 3 cosas:
+        + Error fatal de lectura
+        + Error fatal de escritura
+        + Señal atrapada por el manejador de señales
+    9 - Limpieza de recursos, aborto de hilos  -> salida
+
+
+    Hilo de E/S (creado en el paso 5 del hilo principal)
+
+ 
+    1 - Validación de aborto
+    2 - Bloqueo de señales (para que solo el hilo principal las maneje)
+    3 - Bucle de lectura/escritura infinito: encapsulación/expansión aal5,
+        creación/lectura celdas atm
+    4 - Si un error ocurre, entregamos el semáforo para que el hilo principal
+        todavia funcione
+    5 - salida de hilo
+
+PS: El sistema de bitácora no se inicia hasta que se envie un mensaje a
+    mediante de la función de reporte. Por eso la creación de bitácora no
+    aparece en este resumen.
+
+  ** Manejo de señales
+
+  Las señales son manejadas solo por el hilo principal. Cuando se atrapa una
+señal, el manejador de señales transmite el semáforo de error para despertar
+al hilo principal. La atomicidad por la transmisión de semáforo garantiza que
+el programa se terminará a nivel del hilo principal.

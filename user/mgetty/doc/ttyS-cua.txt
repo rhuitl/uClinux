@@ -1,0 +1,66 @@
+From greenie.muc.de!owner-mgetty Thu May 23 00:16:22 1996
+Return-Path: <greenie.muc.de!owner-mgetty>
+Received: from greenie.muc.de by mobile.greenie.muc.de with uucp
+	(Smail3.1.28.1 #1) id m0uMMCY-0000Zsa; Thu, 23 May 96 00:16 MET DST
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0uMHyb-0007gfa@greenie.muc.de>; Wed, 22 May 96 19:45 MEST
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0uMHyZ-0007hca@greenie.muc.de>; Wed, 22 May 96 19:45 MEST
+Received: from ns.crynwr.com ([192.203.178.14]) by vogon.muc.de with SMTP id <93273-1>; Wed, 22 May 1996 19:44:55 +0200
+Received: (qmail-queue invoked by uid 501); 22 May 1996 17:44:02 GMT
+Resent-Date: Wed, 22 May 1996 19:44:02 +0200
+Resent-Message-ID: <19960522174402.17176.qmail@ns.crynwr.com>
+Resent-From: nelson@crynwr.com
+Resent-To: mgetty@muc.de
+Message-Id: <9605131751.AA13288@dcl.MIT.EDU>
+In-Reply-To: Tony Nugent's message of Mon, 13 May 1996 07:57:09 +1000,
+	<199605122157.HAA03287@sctnugen.ppp.gu.edu.au>
+Address: 1 Amherst St., Cambridge, MA 02139
+Phone: (617) 253-8091
+Precedence: bulk
+From: "Theodore Y. Ts'o" <tytso@mit.edu>
+To: Tony Nugent <tonyn@sctnugen.ppp.gu.edu.au>
+Cc: linux-net@vger.rutgers.edu, linux-ppp@vger.rutgers.edu
+Subject: Re: /dev/cua? Vs /dev/ttyS? (was: Re: co-existance of pppd and mgetty ?)
+Date: Mon, 13 May 1996 19:51:04 +0200
+Status: ROr
+
+   Date: 	Mon, 13 May 1996 07:57:09 +1000
+   From: Tony Nugent <tonyn@sctnugen.ppp.gu.edu.au>
+
+   Can someone kindly explain the difference between the /dev/cua? and
+   /dev/ttyS? devices?
+
+/dev/ttySxx devices are fully POSIX-compliant TTY devices.  If you are
+only going to be using one set of tty devices, you should be using
+/dev/ttySxx. 
+
+/dev/cuaXX devices are different from /dev/ttySXX in two ways --- first
+of all, they will allow you to open the device even if CLOCAL is not set
+and the O_NONBLOCK flag was not given to the open device.  This allows
+programs that don't use the POSIX-mondated interface for opening
+/dev/ttySxx devices to be able to use /dev/cuaXX to make outgoing phone
+calls on their modem (cu stands for "callout", and is taken from SunOS).
+
+The second way in which /dev/cuaXX differs from /dev/ttySXX is that if
+they are used, they will trigger a simplistic kernel-based locking
+scheme:  If /dev/ttySXX is opened by one or more processes, then an
+attempt to open /dev/cuaXX will return EAGAIN.  If /dev/cuaXX is opened
+by one or more processes, then an attempt to open /dev/ttySXX will
+result the open blocking until /dev/cuaXX is closed, and the carrier
+detect line goes high.
+
+While this will allow for simple lockouts between a user using a modem
+for callout and a getty listening on the line for logins, it doesn't
+work if you need to arbitrate between multiple programs wanting to do
+dialout --- for example, users wanting to do dialout and UUCP.
+
+I originally implemented the cuaXX/ttySXX lockout mechanism back before
+FSSTND established a standard convention for the use of tty lock files.
+Now that it's there, people should use the tty lock files and not try
+using /dev/cuaXX.  The only reason why /dev/cuaXX hasn't disappeared yet
+is for backwards compatibility reasons.
+
+						- Ted
+
+

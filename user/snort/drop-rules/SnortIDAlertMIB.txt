@@ -1,0 +1,996 @@
+   SNORT-ID-ALERT-MIB DEFINITIONS ::= BEGIN
+    IMPORTS
+      MODULE-IDENTITY,  Integer32, 
+      OBJECT-TYPE, NOTIFICATION-TYPE
+                 FROM SNMPv2-SMI
+      NOTIFICATION-GROUP
+                 FROM SNMPv2-CONF
+      MacAddress, TEXTUAL-CONVENTION     
+                 FROM SNMPv2-TC
+      MODULE-COMPLIANCE, OBJECT-GROUP
+                 FROM SNMPv2-CONF
+      SnmpAdminString
+                 FROM SNMP-FRAMEWORK-MIB
+      InetAddressType, InetAddress
+                 FROM INET-ADDRESS-MIB
+      InterfaceIndex
+                 FROM IF-MIB 
+   -- URLString
+   --            FROM NETWORK-SERVICES-MIB
+      snortExp
+                 FROM SNORT-COMMON-MIB;
+
+   snortIDSAlertMIB MODULE-IDENTITY
+       LAST-UPDATED "200205020000Z"        --   2nd May     2002
+       ORGANIZATION "Snort.org"
+       CONTACT-INFO
+      "                      Glenn Mansfield Keeni
+                     Postal: Cyber Solutions Inc.
+                             6-6-3, Minami Yoshinari
+                             Aoba-ku, Sendai, Japan 989-3204.
+                        Tel: +81-22-303-4012
+                        Fax: +81-22-303-4015
+                     E-mail: glenn@cysols.com
+
+                             Martin Roesch
+                             6550 Bonnie Brae Dr.
+                             Eldersburg, MD 21784
+                             US
+
+                        Tel: +1-410-549-7810
+                     E-mail: roesch@sourcefire.com
+
+       Support Group E-mail: mibsupport@cysols.com"
+
+       DESCRIPTION
+               " The MIB for snort Alert Messages."
+   -- Revision History
+       REVISION     "200205020000Z"          --  2nd May      2002
+       DESCRIPTION  "
+                     Added the following MOs
+                           sidaSensorHashAlgorithm
+                           sidaAlertProto
+                           sidaAlertRuleID
+                           sidaAlertRuleRevision
+                           sidaAlertPacketPrint
+                     Deprecated 
+                           sidaAlertGeneric
+                           sidaAlertScanStatus
+                     Added the following Alerts
+                           sidaAlertGeneric-2
+                           sidaAlertScanStatus-2
+                     Added descriptions defining the value
+                     will indicate that the true value of 
+                     an MO is not known, not available or 
+                     not applicable.
+                    "
+
+       REVISION     "200201160000Z"          -- 16th January  2002
+       DESCRIPTION  "
+                     Added the following Textual Conventions
+                           SidaInetAddrList,
+                           SidaPortList
+                     Added the following objects
+                           sidaAlertSrcAddressList,     
+                           sidaAlertDstAddressList,     
+                           sidaAlertSrcPortList,      
+                           sidaAlertDstPortList,      
+                           sidaAlertScanDuration,    
+                           sidaAlertScannedHosts,   
+                           sidaAlertTCPScanCount,  
+                           sidaAlertUDPScanCount, 
+                           sidaAlertScanType,        
+                           sidaAlertEventStatus,    
+                           sidaAlertEventPriority,    
+                           sidaAlertSrcMacAddress,  
+                           sidaAlertDstMacAddress.
+                     Fixed several typos 
+                    "
+       REVISION     "200111250000Z"          -- 25th November 2001
+       DESCRIPTION  "Added sidaAlertImpact object. 
+                     Fixed a few typos
+                    "
+       REVISION     "200107250000Z"          -- 25th July     2001  
+       DESCRIPTION  "The initial version, released with snort-1.8.1.
+                    "
+            ::= { snortExp 1 }     
+                                      
+   -- textual conventions for lists of addresses and lists of ports
+    SidaInetAddrList ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "This data type is used to model a list of IP addresses.
+            The format will be as follows-
+                [Type:]FromIP[-ToIP]] [[Type]:FromIP[-ToIP]] .......]
+            It is essentially a set of zero or more IP address ranges 
+            separated by a space character.
+            Each IP addres range is preceded by a Address type indecator
+            which is '4' or '6'. By default the address type is 4.
+            4 indicates that the address range pertains to the IPv4 
+            address domain. 6 indicates that the address range pertains 
+            to the IPv6 range.
+           "
+        SYNTAX  OCTET STRING (SIZE (0..1024))
+
+    SidaPortList ::= TEXTUAL-CONVENTION
+        STATUS  current
+        DESCRIPTION
+           "This data type is used to model a list of ports 
+            The format will be as follows-
+                FromPort[-ToPort] [FromPort[-ToPort] .......]
+            It is essentially a set of zero or more port number ranges
+            separated by a space character.
+           "
+        SYNTAX  OCTET STRING (SIZE (0..1024))
+
+   --  sidaSensors: The Table of Sensors. Each row represents a Snort Sensor.
+   --  sidaSensorID is the key to the table. 
+
+    sidaSensorTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF SidaSensorEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+          " Each row of this table contains information
+            about an alert indexed by sidaSensorID.
+          "
+        ::= { snortIDSAlertMIB 1 }
+
+--
+--  The sensor static objects
+--
+    sidaSensorEntry OBJECT-TYPE
+        SYNTAX  SidaSensorEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+          " Entry containing information pertaining to
+            a snort sensor."
+        INDEX { sidaSensorID }
+        ::= { sidaSensorTable 1 }
+
+    SidaSensorEntry ::= SEQUENCE {
+        sidaSensorID 
+                   Integer32,
+        sidaSensorDescription 
+                   SnmpAdminString,
+        sidaSensorVersion   
+                   SnmpAdminString,
+        sidaSensorLocation 
+                   SnmpAdminString,
+        sidaSensorAddressType 
+                   InetAddressType,
+        sidaSensorAddress 
+                   InetAddress,
+        sidaSensorInterfaceIndex
+                   InterfaceIndex,
+        sidaSensorManufacturer   
+                   SnmpAdminString,
+        sidaSensorProductName   
+                   SnmpAdminString,
+        sidaSensorProductID 
+                   OBJECT IDENTIFIER,
+        sidaSensorHashAlgorithm   
+                   Integer32
+   }
+
+    sidaSensorID OBJECT-TYPE
+        SYNTAX  Integer32 ( 1..2147483647)
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+          " An identifier to uniquely identify the Analyzer
+            in the domain. This object must be present.
+          "
+        ::= { sidaSensorEntry 1 }
+
+    sidaSensorDescription OBJECT-TYPE
+        SYNTAX  SnmpAdminString
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+          " A short description of the Sensor.
+          "
+        ::= { sidaSensorEntry 2 }
+
+    sidaSensorVersion   OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The version number of the sensor that detected the event.
+          "
+        ::= { sidaSensorEntry 3}
+
+    sidaSensorLocation OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The location of the sensor that detected the event.
+          "
+        ::= { sidaSensorEntry 4}
+
+    sidaSensorAddressType OBJECT-TYPE
+        SYNTAX InetAddressType
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "The type of the address which follows.
+           If the sensor address is not available or
+           unknown then the value is unknown(0).
+          "
+        ::= { sidaSensorEntry 5}
+
+    sidaSensorAddress OBJECT-TYPE
+        SYNTAX InetAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "The network address of the sensor. 
+           If the sensor address is not available or
+           unknown then the value is a zero length string.
+          "
+        ::= { sidaSensorEntry 6}
+
+    sidaSensorInterfaceIndex OBJECT-TYPE
+        SYNTAX InterfaceIndex 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The ifIndex of the interface on which the event was
+            detected  by the sensor.
+          "
+        ::= {sidaSensorEntry 7}
+
+    sidaSensorManufacturer   OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The Manufacturer of the sensor that detected the event.
+          "
+        ::= { sidaSensorEntry 8}
+
+    sidaSensorProductName   OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The name of the product that detected the event."
+        ::= { sidaSensorEntry 9}
+
+    sidaSensorProductID OBJECT-TYPE
+        SYNTAX  OBJECT IDENTIFIER
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+          "A reference to MIB definitions specific to the
+           analyzer generating the message.  If this information
+           is not present, its value should be set to the OBJECT
+           IDENTIFIER { 0 0 }, which is a syntatically valid
+           object identifier.
+          "
+        ::= { sidaSensorEntry 10 }
+
+   sidaSensorHashAlgorithm OBJECT-TYPE
+        SYNTAX INTEGER {
+               other      (1),
+               md5        (2),
+               sha1       (3),
+               ripeMd160  (4)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The hash algorithm used to compute the hash value part 
+            in sidaAlertPacketPrint.
+          "
+        ::= { sidaSensorEntry 11}
+
+   --  sidaAlerts: The Table of Alerts. Each row represents an Alert.
+   --  sidaAlertID is the key to the table. The size of this table will be
+   --  implementation dependent - some implementors may choose to keep
+   --  a maximum of one messages in this table.
+
+    sidaAlertTable OBJECT-TYPE
+        SYNTAX  SEQUENCE OF SidaAlertEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+          " Each row of this table contains information
+            about an alert indexed by sidaSensorID and sidaAlertID.
+          "
+        ::= { snortIDSAlertMIB 2 }
+
+    sidaAlertEntry OBJECT-TYPE
+        SYNTAX  SidaAlertEntry
+        MAX-ACCESS  not-accessible
+        STATUS  current
+        DESCRIPTION
+          " Entry containing information pertaining to
+            an alert.
+          "
+        INDEX { sidaSensorID, sidaAlertID}
+        ::= { sidaAlertTable 1 }
+
+    SidaAlertEntry ::= SEQUENCE {
+       sidaAlertID
+                 Integer32,
+       sidaAlertTimeStamp
+                 SnmpAdminString,
+       sidaAlertActionsTaken
+                 BITS,
+       sidaAlertMsg
+                 SnmpAdminString,
+       sidaAlertMoreInfo
+                 SnmpAdminString,
+       sidaAlertSrcAddressType
+                 InetAddressType,
+       sidaAlertSrcAddress
+                 InetAddress,
+       sidaAlertDstAddressType
+                 InetAddressType,
+       sidaAlertDstAddress
+                 InetAddress,
+       sidaAlertSrcPort
+                 Integer32,
+       sidaAlertDstPort
+                 Integer32,
+       sidaAlertStartTime
+                 SnmpAdminString,
+       sidaAlertOccurrences
+                 Counter32,
+       sidaAlertImpact
+                 Integer32, 
+       sidaAlertSrcAddressList
+                 SidaInetAddrList,
+       sidaAlertDstAddressList
+                 SidaInetAddrList,
+       sidaAlertSrcPortList
+                 SidaPortList,
+       sidaAlertDstPortList
+                 SidaPortList,
+       sidaAlertScanDuration
+                 Counter32,
+       sidaAlertScannedHosts
+                 Counter32,
+       sidaAlertTCPScanCount
+                 Counter32,
+       sidaAlertUDPScanCount
+                 Counter32,
+       sidaAlertScanType
+                 Integer32,
+       sidaAlertEventStatus
+                 Integer32,
+       sidaAlertEventPriority
+                 Integer32,
+       sidaAlertSrcMacAddress
+                 MacAddress,
+       sidaAlertDstMacAddress
+                 MacAddress,
+       sidaAlertProto
+                 SnmpAdminString,
+       sidaAlertRuleID
+                 Integer32,
+       sidaAlertRuleRevision
+                 Integer32,
+       sidaAlertPacketPrint
+                 SnmpAdminString
+    }
+
+    sidaAlertID OBJECT-TYPE
+        SYNTAX Integer32 ( 1..2147483647)
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The AlertID uniquely identifies each alert generated
+            by the sensor.
+          "
+        ::= {sidaAlertEntry 1}
+
+    sidaAlertTimeStamp OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " An NTP style timestamp of the local time when this alert 
+            was generated. It will be of the format 991372237.668158 .
+          "
+        ::= { sidaAlertEntry 2}
+
+    -- the actions will probably be a comma separated list of action
+    -- codes or a pointer to another MIB table from which the actions
+    -- may be fetched.
+    --
+
+    sidaAlertActionsTaken OBJECT-TYPE
+        SYNTAX BITS {
+               none                       (0),
+               logged                     (1),
+               alerted                    (2),
+               blocked                    (3),
+               tagged                     (4),
+               tcpRstToSender            (16),
+               tcpRstToReceiver          (18),
+               tcpRstToSenderAndReceiver (19),
+               icmpNetUnreachToSender    (20),
+               icmpHostUnreachToSender   (21),
+               icmpPortUnreachToSender   (22),
+               icmpAllUnreachToSender    (23)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The actions taken on the alert raised. Note multiple 
+            actions may be taken.
+          " 
+        ::= { sidaAlertEntry 3}
+
+    -- SnmpAdminString length is 255 characters max. It contains
+    -- information represented using the ISO/IEC IS 10646-1 character
+    -- set, encoded using the UTF-8 transformation format to facilitate
+    -- internationalization.
+
+    sidaAlertMsg OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " the message associated with the rule that triggered
+            the alert. Conventionally, the name of the attack.
+            If there is no message this will be a zero length 
+            string.
+          "
+        ::= { sidaAlertEntry 4}
+
+    sidaAlertMoreInfo OBJECT-TYPE
+        SYNTAX  SnmpAdminString   
+        MAX-ACCESS  read-only
+        STATUS  current
+        DESCRIPTION
+          "A reference to more information specific to this
+           alert message. This is likely to be a list of one or
+           more URLs or references. If there is no reference 
+           available this will be a zero length string.
+          "
+        ::= { sidaAlertEntry 5}
+
+    sidaAlertSrcAddressType OBJECT-TYPE
+        SYNTAX InetAddressType
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "The type of the Internet address that was the attack 
+           source. This field will be unknown(0) if the attack 
+           source address is unknown, not available or, not 
+           applicable.
+          "
+        ::= { sidaAlertEntry 6}
+
+    sidaAlertSrcAddress OBJECT-TYPE
+        SYNTAX InetAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The Internet address of the entity from which the 
+            attack originated, if known. This will be a zero
+            length string if the attack source address is 
+            unknown, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 7}
+
+    sidaAlertDstAddressType OBJECT-TYPE
+        SYNTAX InetAddressType
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          "The type of the Internet address that was the attack 
+           target. This field will be unknown(0) if the attack
+           target address is unknown, not available or, not
+           applicable.
+          "
+        ::= { sidaAlertEntry 8}
+
+    sidaAlertDstAddress OBJECT-TYPE
+        SYNTAX InetAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The Internet address of the entity to which the attack
+            was destined, if known. This will be a zero length 
+            string if the attack source address is unknown, not 
+            available or, not applicable. 
+          "
+        ::= { sidaAlertEntry 9}
+
+    sidaAlertSrcPort OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The port number from where the attack has originated.
+            The value will be -1 if the attack source port number
+            is not known, not available or, not applicable. 
+          "
+        ::= { sidaAlertEntry 10}
+
+    sidaAlertDstPort OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The port number to which the attack is destined 
+            The value will be -1 if the attack target port number
+            is not known, not available or, not applicable. 
+          "
+        ::= { sidaAlertEntry 11}
+
+    sidaAlertStartTime OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The local date and time when the event causing this alert
+            was first detected. If the time is not known, not available
+            or, not applicable this will be a zero length string.
+          "
+        ::= { sidaAlertEntry 12}
+
+    sidaAlertOccurrences OBJECT-TYPE
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The number of occurrences of the event that is being
+            reported in the alert.
+            If the number of occurrences is not known, not available
+            or, not applicable, this will have a value of -1.
+          "
+        ::= { sidaAlertEntry 13}
+
+   sidaAlertImpact OBJECT-TYPE
+        SYNTAX INTEGER{
+               unknown                       (1),
+               badUnknown                    (2),
+               notSuspicious                 (3),
+               attemptedAdmin                (4),
+               successfulAdmin               (5),
+               attemptedDos                  (6),
+               successfulDos                 (7),
+               attemptedRecon                (8),
+               successfulReconLimited        (9),
+               successfulReconLargescale     (10),
+               attemptedUser                 (11),
+               successfulUser                (12)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The evaluated impact of the events leading to the
+            alert.
+          " 
+        ::= { sidaAlertEntry 14}
+
+    sidaAlertSrcAddressList OBJECT-TYPE
+        SYNTAX SidaInetAddrList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The list of source addresses pertaining to this alert.
+            This will be a null list (zero length string) if the 
+            list of source addresses are not known, not available
+            or, not applicable.
+          " 
+        ::= { sidaAlertEntry 15}
+
+    sidaAlertDstAddressList OBJECT-TYPE
+        SYNTAX SidaInetAddrList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The list of destination addresses pertaining to this alert.
+            This will be a null list (zero length string) if the 
+            list of destination addresses are not known, not available
+            or, not applicable.
+          " 
+        ::= { sidaAlertEntry 16}
+
+    sidaAlertSrcPortList OBJECT-TYPE
+        SYNTAX SidaPortList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The list of source port numbers pertaining to this alert.
+            This will be a null list (zero length string) if the 
+            list of source ports is not known, not available
+            or, not applicable.
+          " 
+        ::= { sidaAlertEntry 17}
+
+    sidaAlertDstPortList OBJECT-TYPE
+        SYNTAX SidaPortList
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The list of destination port numbers pertaining to this 
+            alert. This will be a null list (zero length string) if 
+            the list of destination ports is not known, not available
+            or, not applicable.
+          " 
+        ::= { sidaAlertEntry 18}
+
+    sidaAlertScanDuration OBJECT-TYPE
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The duration of the scan being reported in the alert.
+            This will have a value of -1 if the scan duration
+            is not known, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 19}
+
+    sidaAlertScannedHosts OBJECT-TYPE
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The number of hosts scanned by the event reported in the 
+            alert. This will have a value of -1 if the number 
+            of scanned hosts is not known, not available or, not 
+            applicable.
+          "
+        ::= { sidaAlertEntry 20}
+
+    sidaAlertTCPScanCount  OBJECT-TYPE
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The number of TCP scans seen in  the event reported in the 
+            alert. This will have a value of -1 if the number of TCP 
+            scans is not known, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 21}
+
+    sidaAlertUDPScanCount  OBJECT-TYPE
+        SYNTAX Counter32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The number of UDP scans seen in  the event reported in the 
+            alert. This will have a value of -1 if the number
+            of UDP scans  is not known, not available or, not
+            applicable.
+          "
+        ::= { sidaAlertEntry 22}
+
+    sidaAlertScanType  OBJECT-TYPE
+        SYNTAX INTEGER {
+               unknown (0),
+               other   (1),
+               stealth (2)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The type of the scan Stealth or otherwise 
+            reported in the alert.
+          "
+        ::= { sidaAlertEntry 23}
+
+    sidaAlertEventStatus OBJECT-TYPE
+        SYNTAX INTEGER {
+               unknown    (1),
+               start      (2),
+               inProgress (3),
+               end        (4)
+        }
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The status of the event being reported in the alert.
+            The alert may report the start or end of an event. 
+            It may also provide intermediate inProgress reports 
+            on an event.
+          "
+        ::= { sidaAlertEntry 24}
+
+   sidaAlertEventPriority OBJECT-TYPE
+        SYNTAX Integer32 
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The priority of the event being reported in the alert.
+            This will have a value of -1 if the priority is not
+            known, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 25}
+
+   sidaAlertSrcMacAddress OBJECT-TYPE
+        SYNTAX MacAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The 802 MAC address seen in source address part of the 
+            datagram carrying packet which has caused this alert.
+            This will be a string of all zeroes if the source MAC 
+            address is not known, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 26}
+
+   sidaAlertDstMacAddress OBJECT-TYPE
+        SYNTAX MacAddress
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The 802 MAC address seen in destination address part of the 
+            datagram carrying packet which has caused this alert.
+            This will be a string of all zeros if the destination MAC
+            address is not known, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 27}
+
+   sidaAlertProto OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The name corresponding to the protocol number seen in the 
+            header of the offending packet/datagram. In case the protocol 
+            number could not be interpreted the name is given as 
+            PROTONNN where NNN is the 3-digit zero-padded protocol number.
+            This will be a zero length string if the protocol number is
+            not known, not available or, not applicable.
+          "
+        ::= { sidaAlertEntry 28}
+
+   sidaAlertRuleID OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The ID of the snort rule that triggered the event.
+            For Snort this corresponds to the Sid. When unknown
+            not available or, not applicable the value will be -1.
+          "
+        ::= { sidaAlertEntry 29}
+
+   sidaAlertRuleRevision OBJECT-TYPE
+        SYNTAX Integer32
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The revision number ofthe rule that triggerred the event.
+            For Snort this corresponds to the Rev. When unknown
+            not available or, not applicable this value will be -1.
+          "
+        ::= { sidaAlertEntry 30}
+
+   sidaAlertPacketPrint OBJECT-TYPE
+        SYNTAX SnmpAdminString
+        MAX-ACCESS read-only
+        STATUS current
+        DESCRIPTION
+          " The print of the invariant part of the packet that 
+            triggered the event. The hashing algorithm is specified
+            in sidaSensorHashAlgorithm.
+            The print has the following format
+                <The hash value generated by sidaSensorHashAlgorithm> ':'
+                <The length of the packet that was hashed>            ':'
+                <The TTL of the packet>                        
+                 NULL string termination character 
+            The hash value is represented in hexadecimal notation.
+          "
+        ::= { sidaAlertEntry 31}
+
+   sidaAlertTypes   OBJECT IDENTIFIER ::= { snortIDSAlertMIB 3 }
+   sidaAlertGeneric NOTIFICATION-TYPE
+       OBJECTS { sidaSensorVersion, 
+                 sidaSensorAddressType,     sidaSensorAddress,  
+                 sidaAlertTimeStamp,        sidaAlertActionsTaken,
+                 sidaAlertMsg,
+                 sidaAlertMoreInfo,         sidaAlertSrcAddressType, 
+                 sidaAlertSrcAddress,       sidaAlertDstAddressType,
+                 sidaAlertDstAddress,       sidaAlertSrcPort,
+                 sidaAlertDstPort,          sidaAlertImpact,
+                 sidaAlertEventPriority,    sidaAlertSrcMacAddress,
+                 sidaAlertDstMacAddress }
+       STATUS  deprecated
+       DESCRIPTION
+               "The Sida Alert Generic Trap is sent whenever an 
+                event is detected by snort (rules) and no specific 
+                Alert is found applicable.
+               "
+       ::= { sidaAlertTypes 1 }
+
+   sidaAlertScanStatus NOTIFICATION-TYPE
+       OBJECTS { sidaSensorVersion,
+                 sidaSensorAddressType,     sidaSensorAddress,
+                 sidaAlertTimeStamp,        sidaAlertActionsTaken,
+                 sidaAlertMsg,              sidaAlertSrcAddressType,
+                 sidaAlertSrcAddress,       sidaAlertDstAddressList,
+                 sidaAlertSrcPort,          sidaAlertDstPortList,
+                 sidaAlertScanDuration,     sidaAlertScannedHosts,
+                 sidaAlertTCPScanCount,     sidaAlertUDPScanCount,
+                 sidaAlertScanType,         sidaAlertEventStatus, 
+                 sidaAlertEventPriority,    sidaAlertSrcMacAddress,
+                 sidaAlertDstMacAddress }
+       STATUS  current
+       DESCRIPTION
+               "The Sida Alert Generic Trap is sent whenever an
+                event is detected by snort (rules) and no specific
+                Alert is found applicable.
+               "
+       ::= { sidaAlertTypes 2 }
+
+   sidaAlertGeneric-2 NOTIFICATION-TYPE
+       OBJECTS { 
+       -- 
+       -- The following objects MUST be present and in this order!
+       -- 
+                 sidaAlertTimeStamp,
+                 sidaAlertMsg,
+                 sidaAlertImpact
+       -- 
+       -- The following objects MAY be present !
+       -- 
+       --        sidaSensorID,
+       --        sidaAlertID,
+       --    The following field is not serviced now
+       --        sidaAlertActionsTaken,
+       --    The above     field is not serviced now
+       --        sidaAlertMoreInfo, 
+       --        sidaAlertIPProto,      
+       --        sidaSensorAddressType,     sidaSensorAddress,
+       --        sidaAlertSrcAddressType,   sidaAlertSrcAddress,
+       --        sidaAlertDstAddressType,   sidaAlertDstAddress,
+       --        sidaAlertSrcPort,          
+       --        sidaAlertDstPort,          
+       --        sidaAlertEventPriority, 
+       --        sidaAlertSrcMacAddress, 
+       --        sidaAlertDstMacAddress, 
+       --        sidaAlertProto
+       --        sidaAlertRuleID
+       --        sidaAlertRuleRevision
+       --        sidaAlertPacketPrint
+       }
+       STATUS  current
+       DESCRIPTION
+               "The Sida Alert Generic Trap II is sent whenever an
+                event is detected by snort (rules) and no specific
+                Alert is found applicable."
+       ::= { sidaAlertTypes 3 }
+
+   sidaAlertScanStatus-2 NOTIFICATION-TYPE
+       OBJECTS { 
+       --
+       -- The following objects MUST be present and in this order!
+       --
+                 sidaAlertTimeStamp,
+                 sidaAlertMsg,
+                 sidaAlertImpact,
+                 sidaAlertScanType,         
+                 sidaAlertEventStatus
+       --
+       -- The following objects MAY be present !
+       --
+       --        sidaSensorID,
+       --        sidaAlertID,
+       --    The following field is not serviced now
+       --        sidaAlertActionsTaken,
+       --    The above     field is not serviced now
+       --        sidaAlertMoreInfo,
+       --        sidaSensorAddressType,     sidaSensorAddress,
+       --        sidaAlertSrcAddressType,   sidaAlertSrcAddress,
+       --        sidaAlertDstAddressType,   sidaAlertDstAddress,
+       --        sidaAlertSrcPort,
+       --        sidaAlertDstPort,
+       --        sidaAlertEventPriority,
+
+       --        sidaAlertDstAddressList,
+       --        sidaAlertDstPortList,
+       --        sidaAlertScanDuration,     sidaAlertScannedHosts,
+       --        sidaAlertTCPScanCount,     sidaAlertUDPScanCount,
+       --        sidaAlertSrcMacAddress,
+       --        sidaAlertDstMacAddress.
+       --        sidaAlertProto
+       --        sidaAlertRuleID
+       --        sidaAlertRuleRevision
+       --        sidaAlertPacketPrint
+                 }
+       STATUS  deprecated
+       DESCRIPTION
+               "The Sida Alert Scan Status II reports that a scan 
+                is detected, in progress or terminated.
+                The sidaScanEventStatus MO indicates the status of the 
+                scan - whether the start of a scan is detected, 
+                a scan is in progress or, a detected scan has 
+                terminated. The periodicity of the scan in progress
+                alerts is implementation dependent.
+               "
+       ::= { sidaAlertTypes 4 }
+
+
+
+    -- Conformance information
+    sidaConformance OBJECT IDENTIFIER ::= { snortIDSAlertMIB 4 }
+
+    sidaGroups      OBJECT IDENTIFIER ::= { sidaConformance 1 }
+    sidaCompliances OBJECT IDENTIFIER ::= { sidaConformance 2 }
+    -- Compliance statements
+    sidaAlertCompliance MODULE-COMPLIANCE
+        STATUS  current
+        DESCRIPTION
+                "The compliance statement for SNMP entities
+                 which implement the
+                            SNORT-INTRUSION-DETECTION-ALERT-MIB.
+                "
+        MODULE  -- this module
+            MANDATORY-GROUPS { sidaAlertGroup , sidaNotificationGroup }
+        ::= { sidaCompliances 1 }
+    -- Units of conformance
+    sidaAlertGroup    OBJECT-GROUP
+        OBJECTS {
+                    sidaSensorID,
+                    sidaSensorDescription,
+                    sidaSensorVersion,
+                    sidaSensorLocation,
+                    sidaSensorAddressType,
+                    sidaSensorAddress,
+                    sidaSensorInterfaceIndex,
+                    sidaSensorManufacturer,
+                    sidaSensorProductName,
+                    sidaSensorProductID,
+                    sidaSensorHashAlgorithm,
+                    sidaAlertID,
+                    sidaAlertTimeStamp,
+                    sidaAlertActionsTaken,
+                    sidaAlertMsg,
+                    sidaAlertMoreInfo,
+                    sidaAlertSrcAddressType,
+                    sidaAlertSrcAddress,
+                    sidaAlertDstAddressType,
+                    sidaAlertDstAddress,
+                    sidaAlertSrcPort,
+                    sidaAlertDstPort,
+                    sidaAlertStartTime,
+                    sidaAlertOccurrences,
+                    sidaAlertImpact,
+                    sidaAlertSrcAddressList,
+                    sidaAlertDstAddressList,
+                    sidaAlertSrcPortList,
+                    sidaAlertDstPortList,
+                    sidaAlertScanDuration,
+                    sidaAlertScannedHosts,
+                    sidaAlertTCPScanCount,
+                    sidaAlertUDPScanCount,
+                    sidaAlertScanType,
+                    sidaAlertEventStatus,
+                    sidaAlertEventPriority,
+                    sidaAlertSrcMacAddress,
+                    sidaAlertDstMacAddress,
+                    sidaAlertProto,          
+                    sidaAlertRuleID,
+                    sidaAlertRuleRevision,
+                    sidaAlertPacketPrint
+       }
+        STATUS  current
+        DESCRIPTION
+                " A collection of objects for generation and dispatch of
+                  alerts pertaining to intrusions detected.
+                "
+        ::= { sidaGroups 1 }
+
+        sidaNotificationGroup    NOTIFICATION-GROUP
+           NOTIFICATIONS { 
+                        -- sidaAlertGeneric,   sidaAlertScanStatus,
+                           sidaAlertGeneric-2, sidaAlertScanStatus-2 }
+           STATUS  current
+           DESCRIPTION
+               " A collection of notifications for intrusions detection.
+               "
+           ::= { sidaGroups 2 }
+
+   END

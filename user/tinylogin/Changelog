@@ -1,0 +1,107 @@
+0.80
+
+	* Drop permissions when run setuid root (except when run as passwd 
+	    or su).
+	* A large update so you can now select from the Makefile whether or not
+	    to use the system's passwd and group functions.  Since most systems
+	    use GNU libc, this can save you from having to install the
+	    /etc/nsswitch.conf configuration file and the required libnss_*
+	    libraries.  Now, by default, tinylogin will directly use the
+	    /etc/password and /etc/group (and I will get fewer emails asking
+	    about how glibc NSS works :-).  Enabling this adds just 1.5k to the
+	    binary size (which is a _lot_ less then glibc NSS costs).
+	* 'make install' now creates relative symlinks, and added a new
+	    'make install-hardlinks' target to (tada) install hardlinks.
+	* Added a 'tinylogin --install' option, allowing tinylogin to
+	    install all of its own symlinks (or hardlinks).
+	* Updated all the usage information.
+	* Build system brought into sync with latest from busybox
+	* Added support for md5 and sha1 crypted passwords, thanks to
+	    kilian.klimek@okay.net
+	* Added vlock implementation by spoon <spoon@ix.netcom.com>
+	* Added a patch from David Vrabel to use fcntl for file locking,
+	    making the code smaller and making it work on jffs.
+	* Renamed "tinylogin.def.h" to "Config.h".
+	* Renamed "internal.h" to "tinylogin.h"
+        * Fixed addgroup; it now does not add the new group if the name
+	  is already in use.  Also made the usage statement accurate.
+	* login now exits after three failed attempts
+	
+	-Erik Andersen,  26 December 2000
+
+0.79
+
+	* Libc5 support.  You still need to edit the Makefile though...
+	* Reworked Makefile to do bring it back into sync with the way 
+	    BusyBox does things.
+
+	-Erik Andersen, <Never actually released>
+
+
+0.78
+            - login.c and myname.c don't rely on utmp functions;
+ 	      they now use ttyname() and getpwuid() rather than getlogin().
+            - fixed some possible buffer overrun problems.
+	    - su'ing to another from the root user no longer requests a password.
+	    - fixed or commented (somethimes schizophrenic) return values in:
+	        addgroup.c, adduser.c, deluser.c, getty.c, login.c
+	        obscure.c, passwd.c, shadow.c
+	      They should now conform with the normal convention
+ 	        (0=success, 1 or NULL=failure);
+              (addgroup now returns 0 on success)
+	    - Correctly handle non-standard crypt() functions from overrunning
+	      buffers.
+	    - The code used sleep() to delay after a wrong password without
+	      checking the time (sleep is interruptable.)  It now checks.
+
+	-Everett Robinson
+
+	* Several more changes from Pavel Roskin <proski@gnu.org>
+	    - It's now possable to disable `passwd' but use `adduser'. 
+	    - When changing terminal permissions, ignore all errors (such as
+		those emitted from a read-only root filesystem...) 
+	    - Checking /etc/securetty can now be disabled.
+	    - When TLG_FEATURE_SHADOWPASSWDS, code that should not be comiled
+		is not properly not compiled in.
+	    - Adjusted getty's debugging code to make it more useful.
+
+	-Erik Andersen, 21 June 2000
+
+
+0.77
+	* Added debug messages to see what uid and euid _really_ are
+	* Removed annoying fprintf(stderr, "\n") from tinylogin.c
+	* adduser makes home dir
+	* adduser invokes passwd_main()
+	* Made aesthetic improvements to login message in login.c
+	* Fixed a potential namespace aliasing problem in tinylogin.mkll
+	* Fixed a bug in addgroup that would let one add the same
+	  group more than once.
+	* su implemented by making login_main() schizophrenic.
+	  So far it supports only the -p (preserve env) option.
+	* The lowest uid/gid adduser will allocate is now 100.
+	* Cosmetic fix to getty from Pavel Roskin <proski@gnu.org>
+
+	-Erik Andersen
+	
+0.76
+	* Added prelinary adduser, deluser, addgroup, and delgroup 
+	    implementations.  They're all usable, but a bit rough.
+	    -beppu  -- John Beppu <beppu@lineo.com>
+	* adduser and addgroup are a bit cleaner and they
+	  support shadow (and gshadow), now.
+
+	-Erik Andrsen, 10 January 2000
+
+0.75
+	* First release by me.  I'm taking over maintaining tinylogin
+	    from Dave Cinege of the Linux Router Project, who
+	    took it over from Sean Bastille <hightide@ginch.org>,
+	    who based his work on the shadow utils suite.
+	* Build system replaced with the build system from BusyBox
+	* Modularized (same style as BusyBox) allowing individual apps
+	    to be turned on or off.
+	* Code reorganized, cleaned, and adjusted.
+
+	-Erik Andrsen, 19 December 1999
+

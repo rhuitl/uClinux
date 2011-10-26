@@ -1,0 +1,252 @@
+<!doctype refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN" [
+  <!ENTITY debian  "<productname>Debian GNU/Linux</productname>">
+  <!ENTITY docbook "<productname>DocBook</productname>">
+  <!ENTITY sgml    "<abbrev>SGML</abbrev>">
+]>
+
+<!-- Stolen from manual page for docbook-to-man, DocBook source file
+     (C) 1999 W. Borgert debacle@debian.org
+
+     $Id: docbook-to-man.sgml,v 1.8 2002/04/27 15:28:02 debacle Exp $ -->
+
+<refentry>
+  <refentryinfo>
+    <address>
+      <email>rusty@rustcorp.com.au</email>
+    </address>
+    <author>
+      <firstname>Rusty</firstname>
+      <surname>Russell</surname>
+    </author>
+    <date>2005-06-01</date>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>modprobe.d</refentrytitle>
+    <manvolnum>5</manvolnum>
+    <refentrytitle>modprobe.conf</refentrytitle>
+    <manvolnum>5</manvolnum>
+  </refmeta>
+  <refnamediv>
+    <refname>modprobe.conf</refname><refname>modprobe.d</refname> <refpurpose>Configuration file/directory for modprobe</refpurpose>
+  </refnamediv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+
+    <para>Because the <command>modprobe</command> command can add or
+      remove extra more than one module, due to module dependencies,
+      we need a method of specifying what options are to be used with
+      those modules.  <filename>/etc/modprobe.conf</filename> (or, if that does not exist, all files under the <filename>/etc/modprobe.d</filename> directory) specifies
+      those options, as required.  It can also be used to create
+      convenient aliases: alternate names for a module.  Finally, it
+      can override the normal <command>modprobe</command> behavior
+      altogether, for those with very special requirements (such as
+      inserting more than one module).
+    </para>
+    <para>
+      Note that module and alias names (like other module names) can
+      have - or _ in them: both are interchangable throughout all the
+      module commands.
+    </para>
+    <para>
+      The format of <filename>modprobe.conf</filename> and files under <filename>modprobe.d</filename> is simple: one
+      command per line, with blank lines and lines starting with #
+      ignored (useful for adding comments).  A \ at the end of a line
+      causes it to continue on the next line, which makes the file a
+      bit neater.
+    </para>
+    <para>
+      The syntax is a simplification of <filename>modules.conf</filename>, used in 2.4 kernels and earlier.
+    </para>
+  </refsect1>
+  <refsect1>
+    <title>COMMANDS</title>
+    <variablelist>
+      <varlistentry>
+        <term>alias <replaceable>wildcard</replaceable> <replaceable>modulename</replaceable>
+        </term>
+	<listitem>
+	  <para>
+	    This allows you to give alternate names for a module.  For
+	    example: "alias my-mod really_long_modulename"
+	    means you can use "modprobe my-mod" instead of "modprobe
+	    really_long_modulename".  You can also use shell-style
+	    wildcards, so "alias my-mod* really_long_modulename"
+	    means that "modprobe my-mod-something" has the same
+	    effect.  You can't have aliases to other aliases (that
+	    way lies madness), but aliases can have options, which
+	    will be added to any other options.
+	  </para>
+	  <para>
+	    Note that modules can also contain their own aliases,
+	    which you can see using <command>modinfo</command>.  These
+	    aliases are used as a last resort (ie. if there is no real
+	    module, <command>install</command>,
+	    <command>remove</command>, or <command>alias</command>
+	    command in the configuration).
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>options <replaceable>modulename</replaceable> <replaceable>option...</replaceable>
+        </term>
+	<listitem>
+	  <para>
+	    This command allows you to add options to the module
+	    <replaceable>modulename</replaceable> (which might be an
+	    alias) every time it is inserted into the kernel: whether
+	    directly (using <command>modprobe</command> 
+	    <replaceable>modulename</replaceable>, or because the
+	    module being inserted depends on this module.
+	  </para>
+	  <para>
+	    All options are added together: they can come from an
+	    <command>option</command> for the module itself, for an
+	    alias, and on the command line.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>install <replaceable>modulename</replaceable> <replaceable>command...</replaceable>
+        </term>
+	<listitem>
+	  <para>
+	    This is the most powerful primitive in
+	    <filename>modprobe.conf</filename>: it tells
+	    <command>modprobe</command> to run your command instead of
+	    inserting the module in the kernel as normal.  The command
+	    can be any shell command: this allows you to do any kind
+	    of complex processing you might wish.  For example, if the
+	    module "fred" worked better with the module "barney"
+	    already installed (but it didn't depend on it, so
+	    <command>modprobe</command> won't automatically load it),
+	    you could say "install fred /sbin/modprobe barney;
+	    /sbin/modprobe --ignore-install fred", which would do what
+	    you wanted.  Note the <option>--ignore-install</option>,
+	    which stops the second <command>modprobe</command> from
+	    re-running the same <command>install</command> command.
+	    See also <command>remove</command> below.
+	  </para>
+	  <para>
+	    You can also use <command>install</command> to make up
+	    modules which don't otherwise exist.  For example:
+	    "install probe-ethernet /sbin/modprobe e100 ||
+	    /sbin/modprobe eepro100", which will try first the e100
+	    driver, then the eepro100 driver, when you do "modprobe
+	    probe-ethernet".
+	  </para>
+	  <para>
+	    If you use the string "$CMDLINE_OPTS" in the command, it
+	    will be replaced by any options specified on the modprobe
+	    command line.  This can be useful because users expect
+	    "modprobe fred opt=1" to pass the "opt=1" arg to the
+	    module, even if there's an install command in the
+	    configuration file.  So our above example becomes "install
+	    fred /sbin/modprobe barney; /sbin/modprobe
+	    --ignore-install fred $CMDLINE_OPTS"
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>remove <replaceable>modulename</replaceable> <replaceable>command...</replaceable>
+        </term>
+	<listitem>
+	  <para>
+	    This is similar to the <command>install</command> command
+	    above, except it is invoked when "modprobe -r" is run.
+	    The removal counterparts to the two examples above would
+	    be: "remove fred /sbin/modprobe -r --ignore-remove fred &&
+	    /sbin/modprobe -r barney", and "remove probe-ethernet
+	    /sbin/modprobe -r eepro100 || /sbin/modprobe -r e100".
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>include <replaceable>filename</replaceable>
+        </term>
+	<listitem>
+	  <para>
+	    Using this command, you can include other configuration
+	    files, or whole directories, which is occasionally useful.  Note that aliases in
+	    the included file will override aliases previously
+	    declared in the current file.
+	  </para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>blacklist <replaceable>modulename</replaceable>
+        </term>
+	<listitem>
+	  <para>
+	    Modules can contain their own aliases: usually these are
+	    aliases describing the devices they support, such as
+	    "pci:123...".  These "internal" aliases can be overridden
+	    by normal "alias" keywords, but there are cases where two
+	    or more modules both support the same devices, or a module
+	    invalidly claims to support a device: the
+	    <command>blacklist</command> keyword indicates that all of
+	    that particular module's internal aliases are to be ignored.
+	  </para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>Backwards Compatibility</title>
+
+    <para>
+      There is a <command>generate_modprobe.conf</command> program
+      which should do a reasonable job of generating
+      <filename>modprobe.conf</filename> from your current (2.4 or
+      2.2) modules setup.
+    </para>
+    <para>
+      Although the syntax is similar to the older
+      <filename>/etc/modules.conf</filename>, there are many features
+      missing.  There are two reasons for this: firstly, install and
+      remove commands can do just about anything, and secondly, the
+      module-init-tools modprobe is designed to be simple enough that
+      it can be easily replaced.
+    </para>
+    <para>
+      With the complexity of actual module insertion reduced to three
+      system calls (open, read, init_module), and the
+      <filename>modules.dep</filename> file being simple and open,
+      producing a more powerful modprobe variant can be done
+      independently if there is a need.
+    </para>
+  </refsect1>
+  <refsect1>
+    <title>COPYRIGHT</title>
+    <para>
+      This manual page Copyright 2004, Rusty Russell, IBM Corporation.
+    </para>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+
+    <para><citerefentry>
+	<refentrytitle>modprobe</refentrytitle><manvolnum>8</manvolnum>
+      </citerefentry>,
+      <citerefentry>
+	<refentrytitle>modules.dep</refentrytitle><manvolnum>5</manvolnum>
+      </citerefentry>
+    </para>
+  </refsect1>
+</refentry>
+
+<!-- Keep this comment at the end of the file
+Local variables:
+mode: sgml
+sgml-omittag:t
+sgml-shorttag:t
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:2
+sgml-indent-data:t
+sgml-parent-document:nil
+sgml-default-dtd-file:nil
+sgml-exposed-tags:nil
+sgml-local-catalogs:nil
+sgml-local-ecat-files:nil
+End:
+-->

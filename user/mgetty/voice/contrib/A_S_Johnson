@@ -1,0 +1,56 @@
+
+As I think there is a better way to implement this, namely through
+a shell script, this was not integrated into vgetty.
+
+------------------------------------------------------------------------
+
+Date: Wed, 14 Jul 1999 21:39:02 +0000 (UTC)
+From: "A.S.Johnson" <asj@tgfslp.freeserve.co.uk>
+X-Sender: asj@tgfslp.mil.nexus
+To: schaefer@alphanet.ch
+Subject: unified diff
+Message-ID: <Pine.LNX.4.04.9907142129070.11307-100000@tgfslp.mil.nexus>
+MIME-Version: 1.0
+Content-Type: TEXT/PLAIN; charset=US-ASCII
+
+
+Marc,
+
+Below is a unified diff of answer.c for vgetty, I use it so different
+people get a different voicemail message played to them.  It is a crued
+way of doing it, but simple.
+
+Best Wishes,
+
+Thank you for vgetty,
+
+Andrew
+PS I am using a USR Flex 56K
+
+
+--- answer.c	Wed Jul 14 21:27:30 1999
++++ /usr/local/src/mgetty-1.1.20/voice/vgetty/answer.c	Mon Jul 12 21:25:44 1999
+@@ -219,12 +219,22 @@
+      char message_file_name[VOICE_BUF_LEN];
+      FILE *list;
+ 
++lprintf(L_JUNK, "%s: caller %s\n", program_name, CallerId);
++
+      strcpy(message_file_name, cvd.backup_message.d.p);
+      make_path(message_dir, cvd.voice_dir.d.p, cvd.message_dir.d.p);
++make_path(list_file_name, message_dir, CallerId);
++lprintf(L_JUNK, "%s: opening list file %s", program_name, list_file_name);
++list = fopen(list_file_name, "r");
++
++if (list == NULL)
++   {
++
+      make_path(list_file_name, message_dir, cvd.message_list.d.p);
+      lprintf(L_JUNK, "%s: opening list file %s", program_name,
+       list_file_name);
+      list = fopen(list_file_name, "r");
++    }
+ 
+      if (list != NULL)
+           {
+

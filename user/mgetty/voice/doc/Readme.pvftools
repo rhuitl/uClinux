@@ -1,0 +1,139 @@
+                                by Daniel Doering, Munich, Germany, Jan 1999
+                                daniel@greenie.muc.de 
+
+This file is supposed to give a short overview of the pvftools that come
+with the mgetty/vgetty package. As to details, I did not write any of them,
+but I am just a stupid user who asked something like "why doesn't anyone write
+a short howto on how to use these tools?".... 
+
+they are neccessary to convert modem-recorded messages which are saved to
+disk as rmd (raw modem data) files to one of the more common sound data
+formats like Microsoft (wav), Sun Audio (au), ???? (lin), Creative Voice
+File (voc), as well as going the other way to create rmd messages for vgetty
+from existing wav/au/lin/voc files. 
+
+Similiar to the pnm tools (netpbm) for the conversion and manipulation of
+image data the pvf tools use pvf (portable voice format) as a common link so
+that all conversions go to pvf and from pvf to other formats.
+
+The programs for this are: 
+
+autopvf - pvftoau    	from and to au
+wavtopvf - pvftowav 	from and to wav
+lintopvf - pvftolin 	from and to lin
+voctopvf - pvftovoc 	from and to voc
+basictopvf - pvftobasic    from and basic (??? used for?)
+rmdtopvf - pvftormd 	from and to different flavours of raw modem data. 
+
+all these tool can either be called in pipe mode
+
+> cat infile.wav | wavtopvf > outfile.pvf
+   
+or with two filenames : 
+
+> wavtopvf infile.wav outfile.pvf 
+
+the common options are:
+
+        -h     print a help message 
+        -a     output pvf ascii format
+        -b     output pvf binary format (default)
+        -8     output 8 bit samples
+        -16    output 16 bit samples
+        -32    output 32 bit samples (default)
+
+Usually there is no need for any of them. (and it seems that not all of them
+work properly) 
+
+rmdtopvf needs two more pices of information: The type of modem you use as
+the rmd is modem-specific and the desired compression rate. "compression
+rate" in this case means 2, 3 or 4 bit per sample, so a rate of 4 produces
+*larger* rmd files than 3 or 2 - but a better sound quality. 
+To find out what is available type 
+
+> pvftormd -L
+
+pvftormd experimental test release 0.9.1 / 17Nov98
+
+supported raw modem data formats:
+
+ - Elsa        2, 3 and 4 bit Rockwell ADPCM
+ - ISDN4Linux  2, 3 and 4 bit ZyXEL ADPCM
+ - MT_2834     4 bit IMA ADPCM
+ - Rockwell    2, 3 and 4 bit Rockwell ADPCM
+ - US_Robotics 1 and 4 (GSM and G.721 ADPCM)
+ - ZyXEL_1496  2, 3 and 4 bit ZyXEL ADPCM
+ - ZyXEL_2864  2, 3 and 4 bit ZyXEL ADPCM
+
+example:
+        pvftormd Rockwell 4 infile.pvf outfile.rmd
+
+pvftormd is case sensitive concerning the modem type. (I don't see why it
+should, but it is....)
+
+Another peculiarity of the rmd format is that most modems only support fixed
+sampling rates like 9600 samples per second for the ZyXEL U-1496 series or
+7200 sps for the Elsa Microlink. But don't worry, pvftormd will tell you: 
+
+> pvftormd Elsa 4 ernie.pvf ernie.rmd 
+pvftormd: Unsupported sample speed (44100)
+pvftormd: The Elsa Microlink only supports 7200 samples per second
+
+which means as much as the input is 44.1 kHz (sampling rate of cd audio
+data) and the modem supports only 7.2 kHz.
+As pvftormd cannot correct the sampling rate itself you have to call
+pvfspeed to do the job, either in pipe mode or with infile/outfile:
+
+pvfspeed -s 7200 ernie.pvf ernie_7200.pvf 
+
+so the whole command line to generate a message that can be played on my
+ZyXEL modem looks like this:
+
+cat my_msg.wav | wavtopvf | pvfspeed -s 9600 | pvftormd ZyXEL_1496 3 > my_msg.rmd
+
+"reed my_msg.wav, convert to pvf, correct sampling rate, convert to 3-bit
+ZyXEL rmd" 
+
+To play recorded messages on your sound card (if you have one :-) 
+
+rmdtopvf rec_msg.rmd | pvftowav | play
+
+
+NOTE: 
+*************
+As far as I have found the pvfspeed program cannot correctly handle stereo
+input and will produce slowed-down mono output without giving an error
+message.
+*************
+ 
+To bypass this bug, you just have to convert your original input file to
+mono beforehand, using whatever you like. 
+(there is a command line tool called "sox" which is freely at ... where???
+sunsite mirrors?) 
+
+
+the other pvf/rmd programs that come with vgetty are:
+
+pvffile, rmdfile 	display file inforation (type, sampling speed and
+			depth [bits per sample])
+
+pvfcut 		cut a pvffile to the length needed  
+                (e.g <pvfcut -H 5> cuts five seconds off the beginning)               
+pvfecho  	add an echo effect to your file
+pvffft    	i have no idea what to use this for....      ???
+pvffilter	noise filter
+		(cut a certain frequency range out of the signal)
+pvfmix		merge two pvffiles of the same sampling rate 
+                (see pvfmix -h for details)
+pvfnoise        generate white noise signal (for testing purposes i suppose) 
+pvfamp 		change the volume of your sound file
+pvfreverse 	play it backwards.... 
+                possibly usefull if you then reduce the volume with pvfamp
+                and (pvf)mix it to the message on your answering machine to 
+                plant posthypnotic commands in the brain of anyone who
+                calls you.
+pvfsine 	generate a sine note (beep) of given frequency. 
+vm  		use the modem for a lot of things - playing rmd on the modem
+                speaker, recording messages from the attached phone, etc. 
+                see vm -h for what vm can do for you.  
+

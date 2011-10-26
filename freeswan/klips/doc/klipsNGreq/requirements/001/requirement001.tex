@@ -1,0 +1,42 @@
+\subsection{001: changeable gw wild-side addresses on-the-fly}
+
+\subsubsection{001: Definition of requirement}
+
+Some systems use DHCP or IPCP (PPP) to get an address assigned. DHCP in
+particular has a clear lease time, and at the end of the lease, a different
+IP address may be assigned. 
+
+The requirement is for \freeswan\ to interact with address assignment
+facilities, adjust lifetime parameters appropriately, and to transparently 
+change systems with the address change.
+
+\subsubsection{001: response}
+
+The movement away from a layered device model means that KLIPS should not
+interfere with this process. Most of the issues should be on the key
+management side (\pluto\ ).
+
+The specific requirements for pluto are that it is willing to listen to
+the routing socket so that it can learn about new interfaces, and about
+routes. If there is no route to the remote IKE daemon, then there is no point 
+in attempting to initiate.
+
+Further, consider the case where our wild-side address {\em changes}.  
+We need a hook so that pluto is notified so that it can notify all the
+affected peers. 
+
+The peers need to change the outer-header destination address on all packets
+destined for us.  And in the general case, this requires rekeying the affected tunnels.  
+(Future specification may in fact make this unnecessary, but pre-existing
+peers will continue to exist)
+
+The specific requirements for the startup script are that the default
+route (or any routes for that matter) need not exist to permit the ``conn'' to
+be configured.
+
+See also requirement 4.
+
+This requirement is useful for Opportunistic Encryption.
+
+
+

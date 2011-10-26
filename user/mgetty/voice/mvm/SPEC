@@ -1,0 +1,113 @@
+From schaefer Mon May 27 16:37:27 1996 remote from alphanet
+Return-Path: <schaefer>
+Received: by mips.alphanet.ch (Smail3.1.28.1 #5)
+     id m0uO3QE-000751C; Mon, 27 May 96 16:37 MET DST
+Message-Id: <m0uO3QE-000751C@mips.alphanet.ch>
+From: schaefer@alphanet.ch (Marc SCHAEFER)
+Subject: voicemail (fwd)
+To: schaefer@alphanet.ch (Marc SCHAEFER)
+Date: Mon, 27 May 1996 16:37:25 +0200 (MET DST)
+X-Mailer: ELM [version 2.4 PL0]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=US-ASCII
+Content-Length: 2880
+Status: OR
+
+GOALS: ability to make and update the system from the telephone (so menu names,
+       areas, and so on, can be internally named as numbers)
+       ability to share power
+
+A tree-like system with the following:
+
+owner   gives the user ID owner of the current branch
+welcome file containing the sound file name to play on entry
+        of the directory
+
+(the keys have a name like key_x, to prevent collision with
+ number of subdirs)
+
+1       selection 1
+2       selection 2
+3
+4
+5
+6
+7
+
+9       selection 9, usually operator functions
+0       selection 0, usually goodbye
+
+hash    #, usually leave message to current branch operator
+star    *, return to previous menu, or replay current if main.
+
+All the 1-8, 9, 0 #, * can be fully re-defined. They contain the following
+data:
+   access_level command arg
+
+acces_level:
+   0  unidentified user
+   1  identified voicemail user (new user)
+   10 identified, recognized user
+   100 any subbranch operator
+   500 current branch operator
+   1000 general operator
+
+command: (some have built-in restricted access)
+(generic)
+   00=goodbye
+   01=play  (one arg: file name, relative to current dir or
+             /usr/spool/voice/messages, without .., will usually be a simple number)
+(menu)
+   10=goto_menu (one arg: menu number, which is a directory name infact,
+                 of one digit)
+   11=goto_main (and forget about the menu stack)
+   12=back_menu
+   13=select_language (arg: language or number)
+(private)
+   20=private_mail_to_branch_operator
+   21=private_mail_to_operator
+   22=private_mail (one arg: mailbox id, without it asks for it)
+   23=read_private_messages
+(areas)
+   30=read_public_message
+   31=record_public_message (without arg, current area is taken, else asked)
+   32=goto_area (arg: number)
+   33=select_area
+(user)
+   40=create_account
+   41=identify
+   42=update_your_account
+(suboperator)
+   40=update_menu (updates the current leaf menu)  (COLLISION HERE)
+(operator)
+   50=update_user
+
+Needs to be maintained:
+   - user ID
+   - user level
+   - current area
+   - current menu (and the stack of menus)
+
+There is the tree of menus, the directory of areas, the directory of
+users, and the messages directory. There are also standard messages
+for built-in functions (like select_area, private_mail, update_menuetc)
+
+The update menu would have the following structure:
+
+   1 add a new item
+   2 remove an item
+   3 update welcome message
+   4 update owner (operator restricted)
+   9 kills the menu and go to previous menu
+   * leave update and return to menu
+
+Creating an item of type goto_menu initializes a standard submenu with
+the correct owner. We then say *, select the submenu, and say 9 again.
+
+The submenu 9 is by default a update menu goto and is only modifiable
+on the data file directly.
+
+Languages are implemented as follows: the default language is an
+empty string. The others are file.language_name. (or number)
+
+

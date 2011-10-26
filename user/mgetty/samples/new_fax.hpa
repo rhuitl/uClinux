@@ -1,0 +1,105 @@
+#!/bin/sh
+# From:	"H. Peter Anvin" <hpa@ahab.eecs.nwu.edu>
+# To:	gert@greenie.muc.de (Gert Doering)
+#
+# [...] If you are interested, here is my fax_new script... it is
+# pretty carefully developed.
+# 
+# Note that I use *this* to send mail rather than the mgetty facility.
+# The reason is that if my modem doesn't connect, it tells mgetty FAX,
+# followed by some error condition, with the result saying a fax of 0
+# pages was received from (anonymous user).  This way I am shielding the
+# users from that, plus re-format the message a little nicer.  I have
+# another script which they can use to access the archive of compressed,
+# received fax pages:
+
+#!/bin/sh
+#
+# *** Fax received script
+# *** Arguments: <result-code> <sender-id> <pages> <pg1> <pg2> <pg3>
+#
+
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/bin/X11
+PRINTER=vilnius
+FAXLOG=/var/spool/fax/inlog
+LOGOWN=root.fax
+LOGMOD=640
+DATE=`date '+%a, %d %b %Y %T %Z'`
+
+if [ $1 = 0 ]; then
+  STATUS='The fax reception was successful.'
+else
+  STATUS="The fax reception was *not* successful (error $1)."
+fi
+
+ARCHIVE=`echo $4 | sed -e 's|^.*/\([^/]*\)\.[0-9]*$|\1|'`
+FROM=`echo $2 | sed -e 's/ *" *//g'`
+
+if [ $3 -gt 0 ]; then
+/usr/lib/sendmail faxnotice <<EOF
+From: nobody (Fax Subsystem)
+To: faxnotice
+Subject: Fax received from $FROM
+Date: $DATE
+
+A fax was received:
+
+   Date:          $DATE
+   From:          $FROM
+   Pages:         $3
+   Archive name:  $ARCHIVE
+
+$STATUS
+
+Regards, your fax/modem subsystem.
+EOF
+fi
+
+cat >> $FAXLOG <<EOF
+Fax received: $DATE
+    From:     $FROM
+    Pages:    $3
+    Status:   $1
+    Filename: $4 (first page)
+
+EOF
+chown $LOGOWN $FAXLOG
+chmod $LOGMOD $FAXLOG
+
+#
+# Note: mgetty names 204x98 dpi pages with filenames starting with "fn"
+#       and 204x196 dpi pages with filenames starting with "ff".  Use
+#       the filename as an indicator of the wanted aspect ratio
+#
+#	In order to get nice output on our LaserJet 4 we're cheating
+#	and approximate 204x98 by 200x100 and 204x196 by 200x200.
+#
+#	The -xadj parameter to pbmtolj is a hack to pbmtolj since on
+#	our printer it would always shift the page too far to the
+#	right on the page, with the result that the right edge of the
+#	fax would be cut off.  A small hack to insert the PCL "adjust
+#	page" code into the pbmtolj output took care of that.
+#
+
+shift 3
+for page; do
+  if echo $page | grep -s '/fn[^/]*$' ; then
+#    Normal resolution
+     g32pbm < $page | pnmscale -yscale 2 2>/dev/null | pgmtopbm | \
+	pbmtolj -resolution 200 -xadj -180 | lpr -P${PRINTER}
+  else
+#    Fine resolution
+     g32pbm < $page | \
+	pbmtolj -resolution 200 -xadj -180 | lpr -P${PRINTER}
+  fi
+  gzip -9 $page
+done
+exit 0
+
+
+-- 
+INTERNET: hpa@nwu.edu               FINGER/TALK: hpa@ahab.eecs.nwu.edu
+IBM MAIL: I0050052 at IBMMAIL       HAM RADIO:   N9ITP or SM4TKN
+FIDONET:  1:115/511 or 1:115/512    STORMNET:    181:294/101
+Congratulations, President Nelson Mandela of the new South Africa!
+

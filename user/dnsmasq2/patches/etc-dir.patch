@@ -1,0 +1,37 @@
+Date: 2006/11/11 02:46:13
+#11908
+
+Read hosts/resolv.conf/dnsmasq.conf from ETC_DIR instead of /etc.
+
+Index: dnsmasq2/src/config.h
+===================================================================
+--- dnsmasq2.orig/src/config.h	2009-03-12 14:32:43.000000000 +1000
++++ dnsmasq2/src/config.h	2009-03-13 15:10:40.000000000 +1000
+@@ -30,13 +30,12 @@
+ #define DECLINE_BACKOFF 600 /* disable DECLINEd static addresses for this long */
+ #define DHCP_PACKET_MAX 16384 /* hard limit on DHCP packet size */
+ #define SMALLDNAME 40 /* most domain names are smaller than this */
+-#define HOSTSFILE "/etc/hosts"
+-#define ETHERSFILE "/etc/ethers"
+-#ifdef __uClinux__
+-#  define RESOLVFILE "/etc/config/resolv.conf"
+-#else
+-#  define RESOLVFILE "/etc/resolv.conf"
++#ifndef ETC_DIR
++#define ETC_DIR "/etc"
+ #endif
++#define HOSTSFILE ETC_DIR "/hosts"
++#define ETHERSFILE ETC_DIR "/ethers"
++#define RESOLVFILE ETC_DIR "/resolv.conf"
+ #define RUNFILE "/var/run/dnsmasq.pid"
+ #if defined(__FreeBSD__) || defined (__OpenBSD__) || defined(__DragonFly__)
+ #   define LEASEFILE "/var/db/dnsmasq.leases"
+@@ -48,7 +47,7 @@
+ #if defined(__FreeBSD__)
+ #   define CONFFILE "/usr/local/etc/dnsmasq.conf"
+ #else
+-#   define CONFFILE "/etc/dnsmasq.conf"
++#   define CONFFILE ETC_DIR "/dnsmasq.conf"
+ #endif
+ #define DEFLEASE 3600 /* default lease time, 1 hour */
+ #define CHUSER "nobody"

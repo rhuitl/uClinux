@@ -1,0 +1,64 @@
+Faxmanager                        (C) Copyright Klaus Lichtenwalder, 1995
+
+
+What you can do with it:
+The Faxmanager displays the list of incoming and outgoing faxes. The
+incoming faxes are sorted newest on top, the outgoing faxes on
+modification of their top-level directory, newest ones on top.
+
+The received faxes list shows date and time of arrival, size, fax id
+(if any), receiving devices and page number. There is a mechanism to
+translate the fax id of the sender to a clear text message. You can
+have a global alias table and a user-specific. The format is
+
+	fax-sender-id (tabs or spaces) Alias
+
+(Alias may contain spaces). The name of the system wide alias table is
+/usr/local/lib/fax-aliases, the per-user alias table is
+$HOME/.rec_fax_alias. If a fax-id (spelling by mgetty) matches the
+alias, this alias is copied into the list.
+
+The send fax list contains the state (suspended, active, done),
+receiving fax number, the verbose_to in parentheses, the user id, the
+number of pages, the earliest possible sending time (if any) and the
+last line of the status sendfax returns.
+
+The global commands are view, print and delete. 
+
+Commands for the received faxes are save, which lets you move or copy a fax
+into another directory. You must have read(/write) permission out of the
+received fax directory (and for the destination too, of course).
+
+The send fax list allows you to switch state from sent or suspended to
+active or from active to suspended.
+With change number you may change the addressee's fax number.
+Change time let's you change/add/delete the sending time.
+
+And then there's still the Quit command.
+
+Implementation Details:
+
+Interface language can be either German or English. You can set this
+by changing the Variable $DEUTSCH to 1 for German and 0 for English.
+
+The location of incoming faxes is the default location
+/usr/spool/fax/incoming, the outgoing faxes are located in
+/usr/spool/fax/outgoing, in the default F<##>.###/ hierarchy.
+
+Every 5 minutes the outgoing dir is reread to check for new faxes and
+to catch the possibly changed state of the other faxes (sent or
+suspended). 
+
+Options
+
+The incoming dir gets stat-ed every minute to check for new faxes. If
+the directory has changed M-TIME, a fax notifier gets popped up (wrongly
+so if you removed a fax, but who cares :) to advertise for the new
+fax(es). If you don't want this behaviour, use the
+	-A
+option.
+
+-l force long listing
+-s force short listing
+-E don't export selected entries to the SELECTION.
+

@@ -1,0 +1,32 @@
+
+Cryptimage README
+-----------------
+
+Generate RSA keys for use with cryptimage using:
+
+  openssl genrsa -out xxx.pem 8000
+
+(This generates a 8000bit key length).
+You can see the fine details of the key you generated using:
+
+  openssl rsa -in xxx.pem -text -noout
+
+Now you simply run cryptimage using this key to produce a
+signed image:
+
+  cryptimage -k xxx.pem -f image.bin
+
+Use the '-v' option so you get the cryptimage details.
+The image.bin file is signed in place.
+
+On the target you need to flash the public key in place.
+Generate the public key from you RSA private key, xxx.pem,
+using:
+
+  openssl rsa -in xxx.pem -pubout > xxx.pub
+
+To put this public key into flash on the target use the flashkey
+tool:
+
+  flashkey -k xxx.pub
+

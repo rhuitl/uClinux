@@ -1,0 +1,240 @@
+#
+# /etc/siproxd.conf - siproxd configuration file
+#
+# !! This is a sample file, adapt it to your needs before using it !!
+#
+# !! Strings MUST NOT contain spaces !!
+#
+
+######################################################################
+# The interface names of INBOUND and OUTBOUND interface.
+#
+#    If siproxd is not running on the host doing the masquerading
+#    but on a host within the private network segment, "in front" of
+#    the masquerading router: define if_inbound and if_outbound to
+#    point to the same interface (the inbound interface). In *addition*
+#    define 'host_outbound' to hold your external (public) IP address
+#    or a hostname that resolves to that address (use a dyndns address for
+#    example).
+#
+if_inbound  = eth0
+if_outbound = ppp0
+# uncomment the following line ONLY IF YOU KNOW WHAT YOU ARE DOING!
+# READ THE FAQ FIRST!
+#host_outbound = 1.2.3.4
+
+######################################################################
+# Access control.
+#    Access lists in the form: IP/mask (ex. 10.0.0.1/24)
+#    Multiple entries may be separated by commas NO SPACES ARE ALLOWED!!
+#    Empty list means 'does not apply' - no filtering is done then.
+#    For *allow* lists this means: always allow, for *deny* lists that
+#    this means never deny.
+#
+#    hosts_allow_reg: defines nets from which we accept registrations
+#                     Registrations are *ONLY* allowed from INBOUND!
+#    hosts_allow_sip: defines nets from which we accept SIP traffic
+#    hosts_deny_sip:  defines nets from which we deny SIP traffic
+#
+#    - The deny list takes precedence over the allow lists.
+#    - The allow_reg list also implies allowance for sip.
+#
+#    Example for usage:
+#      local private net -> allow_reg list
+#      external nets (from which we accept incoming calls) -> allow_sip
+#
+#hosts_allow_reg = 192.168.1.8/24
+#hosts_allow_sip = 123.45.0.0/16,123.46.0.0/16
+#hosts_deny_sip  = 10.0.0.0/8,11.0.0.0/8
+
+
+######################################################################
+# Port to listen for incoming SIP messages.
+#    5060 is usually the correct choice - don't change this unless you
+#    know what you're doing
+#
+sip_listen_port = 5060
+
+
+######################################################################
+# Shall we daemonize?
+#
+daemonize = 1
+
+######################################################################
+# What shall I log to syslog?
+#   0 - DEBUGs, INFOs, WARNINGs and ERRORs
+#   1 - INFOs, WARNINGs and ERRORs (this is the default)
+#   2 - WARNINGs and ERRORs
+#   3 - only ERRORs
+#   4 - absolutely nothing (be careful - you will have no way to
+#                           see what siproxd is doing - or NOT doing)
+silence_log = 1
+
+######################################################################
+# Shall I log call establishment to syslog?
+#
+log_calls = 1
+
+######################################################################
+# Secure Enviroment settings:
+#   user:	uid/gid to switch to after startup
+#   chrootjail:	path to chroot to (chroot jail)
+user = nobody
+#chrootjail = /var/lib/siproxd/
+
+######################################################################
+# Registration file:
+#   Where to store the current registrations.
+#   An empty value means we do not save registrations. Make sure that
+#   the specified directory path does exist!
+registration_file = /var/lib/siproxd/siproxd_registrations
+
+######################################################################
+# Automatically save current registrations every 'n' seconds
+#
+autosave_registrations = 300
+
+######################################################################
+# PID file:
+#   Where to create the PID file.
+#   This file holds the PID of the main thread of siproxd.
+pid_file = /var/run/siproxd/siproxd.pid
+
+######################################################################
+# global switch to control the RTP proxy behaviour
+#       0 - RTP proxy disabled
+#       1 - RTP proxy (UDP relay of siproxd)
+#
+# Note: IPCHAINS and IPTABLES(netfilter) support is no longer present!
+#    
+rtp_proxy_enable = 1
+
+######################################################################
+# Port range to allocate listen ports from for incoming RTP traffic
+#    This should be a range that is not blocked by the firewall
+#
+rtp_port_low  = 7070
+rtp_port_high = 7079
+
+######################################################################
+# Timeout for RTP streams
+#    after this number of seconds, an RTP stream is considered dead
+#    and proxying for it will be stopped.
+#    Be aware that this timeout also applies to streams that are
+#    in HOLD.
+#
+rtp_timeout = 300
+
+######################################################################
+# DSCP value for sent RTP packets
+#    The Differentiated Service Code Point is a selector for
+#    router's per-hop behaviours.
+#    RFC2598 defined a "expedited forwarding" service. This service
+#    is designed to allow ISPs to offer a service with attributes
+#    similar to a "leased line". This service offers the ULTIMATE IN LOW
+#    LOSS, LOW LATENCY AND LOW JITTER by ensuring that there is always
+#    sufficent room in output queues for the contracted expedited forwarding
+#    traffic.
+#    The Expedited Forwarding service has a DSCP of 46.
+#    Putting a 0 here means that siproxd does NOT set the DSCP field.
+#    Siproxd must be started as root for this to work.
+#
+rtp_dscp = 46
+
+######################################################################
+# Default Expiration timeout for Registrations
+#    If a REGISTER request does not contain an Expires header
+#    or expires= parameter in the Contact header, this number of
+#    seconds will be used - and reported back to the UA in the answer.
+#
+default_expires = 600
+
+######################################################################
+# Proxy authentication
+#    If proxy_auth_realm is defined (a string), clients will be forced
+#    to authenticate themselfes at the proxy (for registration only).
+#    To disable Authentication, simply comment out this line.
+#
+#proxy_auth_realm = Authentication_Realm
+#
+# the (global) password to use (will be the same for all local clients)
+#
+#proxy_auth_passwd = password
+#
+# OR use individual per user passwords stored in a file
+#
+#proxy_auth_pwfile = /etc/siproxd_passwd.cfg
+#
+# 'proxy_auth_pwfile' has precedence over 'proxy_auth_passwd'
+
+######################################################################
+# Debug level... (setting to -1 will enable everything)
+#
+#  DBCLASS_BABBLE  0x00000001	   // babble (like entering/leaving func)
+#  DBCLASS_NET     0x00000002	   // network
+#  DBCLASS_SIP     0x00000004	   // SIP manipulations
+#  DBCLASS_REG     0x00000008	   // Client registration
+#  DBCLASS_NOSPEC  0x00000010	   // non specified class
+#  DBCLASS_PROXY   0x00000020	   // proxy
+#  DBCLASS_DNS     0x00000040	   // DNS stuff
+#  DBCLASS_NETTRAF 0x00000080	   // network traffic
+#  DBCLASS_CONFIG  0x00000100	   // configuration
+#  DBCLASS_RTP     0x00000200      // RTP proxy
+#  DBCLASS_ACCESS  0x00000400      // Access list evaluation
+#  DBCLASS_AUTH    0x00000800      // Authentication
+#
+debug_level =      0x00000000
+
+######################################################################
+# TCP debug port
+#
+# You may connect to this port from a remote machine and
+# receive the debug output. This allows bettwer creation of
+# odebug output on embedded systems that do not have enough
+# memory for large disk files.
+# Port number 0 means this feature is disabled.
+#
+debug_port = 0
+
+######################################################################
+# Mask feature (experimental)
+#
+# Some UAs will always use the host/ip they register with as
+# host part in the registration record (which will be the inbound
+# ip address / hostname of the proxy) and can not be told to use a
+# different host part in the registration record (like sipphone, FWD,
+# iptel, ...)
+# This Mask feature allows to force such a UA to be masqueraded to
+# use different host.
+# -> Siemens SIP Phones seem to need this feature.
+#
+# Unles you really KNOW that you need this, don't enable it.
+#
+# mask_host=<inbound_ip/hostname>
+# masked_host=<hostname_to_be_masqueraded_as>
+#
+# mask_host=10.0.1.1			-- inbound IP address of proxy
+# masked_host=my.public.host		-- outbound hostname proxy
+
+######################################################################
+# Outbound proxy
+#
+# Siproxd itself can be told to send all traffic to another
+# outbound proxy.
+# You can use this feature to 'chain' multiple siproxd proxies
+# if you have several masquerading firewalls to cross.
+#
+# outbound_proxy_host = my.outboundproxy.org
+# outbound_proxy_port = 5060
+
+######################################################################
+# Outbound proxy (Provider specific)
+#
+# Outbound proxies can be specified on a per-domain base.
+# This allows to use an outbound proxy needed for ProviderA
+# and none (or another) for ProviderB.
+#
+#outbound_domain_name = freenet.de
+#outbound_domain_host = proxy.for.domain.freende.de
+#outbound_domain_port = 5060

@@ -1,0 +1,453 @@
+#!/bin/bash
+#
+#	makePackage - Create Installation Packages for AppWeb
+#
+# 	This script creates ....
+#
+#	${BLD_PRODUCT}-{version}-{build}-OS-i386.rpm.tar.gz 	# Containing:
+#		install
+#		remove
+#		README.TXT
+#		${BLD_PRODUCT}-{version}-{build}-{OS}-i386.rpm
+#		${BLD_PRODUCT}-doc-{version}-{build}.rpm
+#
+#	${BLD_PRODUCT}-{version}-{build}-OS-i386.self.tar.gz	# Containing:
+#		install
+#		remove
+#		README.TXT
+#		${BLD_PRODUCT}-{version}-{build}-${OS}-i386.tar.gz	
+#		${BLD_PRODUCT}-doc-{version}-{build}.tar.gz
+#
+#	${BLD_PRODUCT}-src-{version}-{build}.rpm
+#	${BLD_PRODUCT}-src-{version}-{build}.tar.gz
+#
+################################################################################
+#
+#	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+#	The latest version of this code is available at http://www.mbedthis.com
+#
+#	This software is open source; you can redistribute it and/or modify it 
+#	under the terms of the GNU General Public License as published by the 
+#	Free Software Foundation; either version 2 of the License, or (at your 
+#	option) any later version.
+#
+#	This program is distributed WITHOUT ANY WARRANTY; without even the 
+#	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#	See the GNU General Public License for more details at:
+#	http://www.mbedthis.com/downloads/gplLicense.html
+#	
+#	This General Public License does NOT permit incorporating this software 
+#	into proprietary programs. If you are unable to comply with the GPL, a 
+#	commercial license for this software and support services are available
+#	from Mbedthis Software at http://www.mbedthis.com
+#
+################################################################################
+
+PACKS=${*-"release binary dev doc samples source"}
+
+. ${BLD_TOP}/config.sh
+
+home=`pwd`
+PKG_DIR=${home}/pkgtmp			# Top level distribution / packaging directory
+RPM_DIR=${PKG_DIR}/RPM			# RPM packaging area
+DEFAULT_PERM=644				# Default permisions
+BLD_DATE=`date '+%c'`
+BLD_VNAME=${BLD_PRODUCT}-${BLD_VERSION}
+
+if [ -x ${BLD_TOOLS_DIR}/bldout ]
+then BLDOUT=bldout
+else BLDOUT=cat
+fi
+
+cd ${BLD_TOP} ; ABS_BLD_TOP=`pwd` ; cd -
+
+#
+#	Save the as-installed prefix values. We bend them to force cpmod to copy
+#	into our local package area. PatchFile needs the original values.
+#
+INS_BLD_PREFIX=${BLD_PREFIX}
+INS_BLD_ROOT_PREFIX=${BLD_ROOT_PREFIX}
+INS_BLD_INC_PREFIX=${BLD_INC_PREFIX}
+INS_BLD_LIB_PREFIX=${BLD_LIB_PREFIX}
+INS_BLD_SBIN_PREFIX=${BLD_SBIN_PREFIX}
+INS_BLD_WEB_PREFIX=${BLD_WEB_PREFIX}
+INS_BLD_DOC_PREFIX=${BLD_DOC_PREFIX}
+INS_BLD_SRC_PREFIX=${BLD_SRC_PREFIX}
+
+################################################################################
+#
+# Copy and set permissions. Usage: cpmod src dest perm owner.group
+#
+
+cpmod() {
+	target="${2-$DestD}"
+	perm=${3-$DEFAULT_PERM}
+	owner=${4-root.root}
+
+	dir="${target%/*}"
+	if [ ! -z ${dir} ]
+	then
+		mkdir -p "${dir}"
+		chown ${owner} "${dir}"
+		chmod 755 ${dir}
+	fi
+
+	if [ ! -f "$1" ]
+	then
+		echo "Can't access $1"
+		exit 255
+	fi
+
+	cp -pf "$1" "$target"
+#	echo "      cp -pf $1 $target" | $BLDOUT
+	if [ $? != 0 ] 
+	then
+		echo "# Can't copy: cp -pf $1 $target"
+		exit 2
+	fi
+	if [ -d "$target" ] 
+	then
+		file=`basename "$1"`
+		chmod $perm "$target/$file"
+		chown $owner "$target/$file"
+	else
+		chmod $perm "$target"
+		chown $owner "$target"
+	fi
+}
+
+################################################################################
+#
+#	Copy packages
+#
+
+copyPackage() {
+
+	while read f
+	do
+		f=`eval echo ${f}`
+		echo "    #     Installing ${f} ..."
+		. ${f}
+	done < ${1}
+}
+
+################################################################################
+#
+#	Patch the !!BLD_XXX!! keywords. Usage: patchFile files ...
+#
+patchFile() {
+
+	#
+	#	Restore prefixes while patching. Files require the "as-installed"
+	#	values.
+	#
+	BLD_PREFIX=${INS_BLD_PREFIX}
+	BLD_ROOT_PREFIX=${INS_BLD_ROOT_PREFIX}
+	BLD_INC_PREFIX=${INS_BLD_INC_PREFIX}
+	BLD_LIB_PREFIX=${INS_BLD_LIB_PREFIX}
+	BLD_SBIN_PREFIX=${INS_BLD_SBIN_PREFIX}
+	BLD_WEB_PREFIX=${INS_BLD_WEB_PREFIX}
+	BLD_DOC_PREFIX=${INS_BLD_DOC_PREFIX}
+	BLD_SRC_PREFIX=${INS_BLD_DOC_PREFIX}
+
+	for f in $*
+	do
+		cp $f .pbldtmp
+		sed -e < .pbldtmp "s/!!BLD_CPU!!/${BLD_CPU}/g; s/!!BLD_OSVER!!/${BLD_OSVER}/g; s/!!BLD_OS!!/${BLD_OS}/g; s/!!BLD_TYPE!!/${BLD_TYPE}/g; s/!!BLD_NUMBER!!/${BLD_NUMBER}/g; s/!!BLD_COMPANY!!/${BLD_COMPANY}/g; s/!!BLD_PRODUCT!!/${BLD_PRODUCT}/g; s/!!BLD_VERSION!!/${BLD_VERSION}/g; s/!!BLD_NAME!!/${BLD_NAME}/g; s/!!BLD_DATE!!/${BLD_DATE}/g; s^!!BLD_PREFIX!!^${BLD_PREFIX}^g; s^!!BLD_DOC_PREFIX!!^${BLD_DOC_PREFIX}^g; s^!!BLD_INC_PREFIX!!^${BLD_INC_PREFIX}^g; s^!!BLD_LIB_PREFIX!!^${BLD_LIB_PREFIX}^g; s^!!BLD_SBIN_PREFIX!!^${BLD_SBIN_PREFIX}^g; s^!!BLD_SRC_PREFIX!!^${BLD_SRC_PREFIX}^g; s^!!BLD_WEB_PREFIX!!^${BLD_WEB_PREFIX}^g; " >$f
+	done
+	rm -f .pbldtmp
+
+	#
+	#	Rebend the prefixes
+	#
+	setupPrefixes
+}
+
+
+################################################################################
+#
+#	Set the installation prefixes
+#
+
+setupPrefixes() {
+
+	#
+	#	Update binary prefixes
+	#
+	BLD_PREFIX=${PKG_DIR}/binDist${BLD_PREFIX}
+	BLD_INC_PREFIX=${PKG_DIR}/binDist${BLD_INC_PREFIX}
+	BLD_LIB_PREFIX=${PKG_DIR}/binDist${BLD_LIB_PREFIX}
+	BLD_SBIN_PREFIX=${PKG_DIR}/binDist${BLD_SBIN_PREFIX}
+	BLD_WEB_PREFIX=${PKG_DIR}/binDist${BLD_WEB_PREFIX}
+
+	if [ "$BLD_ROOT_PREFIX" = "/" ]
+	then
+		BLD_ROOT_PREFIX=${PKG_DIR}/binDist
+	else
+		BLD_ROOT_PREFIX=${PKG_DIR}/binDist${BLD_ROOT_PREFIX}
+	fi
+
+	#
+	#	Update documentation prefix
+	#
+	BLD_DOC_PREFIX=${PKG_DIR}/docDist/${BLD_VNAME}
+
+	#
+	#	Update source prefix
+	#
+	BLD_SRC_PREFIX=${PKG_DIR}/srcDist/${BLD_VNAME}
+
+}
+
+################################################################################
+
+setup() {
+
+	setupPrefixes
+
+	echo -e "\n    #\n    # Clean the image area ...\n    #"
+	echo "    rm -fr ${BLD_TOP}/images/${BLD_PRODUCT}/${BLD_PRODUCT}-*"
+	rm -fr ${BLD_TOP}/images/${BLD_PRODUCT}/${BLD_PRODUCT}-*
+	rm -fr ${BLD_TOP}/images/${BLD_PRODUCT}/md5-${BLD_PRODUCT}-*
+
+	echo -e "\n    #\n    # Prepare packaging area ...\n    #"
+	echo "    rm -fr ${PKG_DIR}"
+	rm -fr ${PKG_DIR}
+	mkdir -p ${PKG_DIR}
+	mkdir -p $RPM_DIR $RPM_DIR/SOURCES $RPM_DIR/SPECS $RPM_DIR/BUILD
+	mkdir -p $RPM_DIR/RPMS $RPM_DIR/RPMS/i386 $RPM_DIR/SRPMS
+	echo
+}
+
+################################################################################
+
+set -e
+echo -e "\n    #"
+echo "    # Building \"${BLD_NAME} ${BLD_VERSION} Build ${BLD_NUMBER}\""
+env | grep BLD_ | sort | sed -e 's/^/    #     /'
+
+setup
+
+#
+#	Copy packs
+#
+for pack in $PACKS
+do
+	f=${BLD_TOP}/${BLD_PRODUCT}/package/${pack}.pack
+	echo -e "    #\n    # Copy package ${f} ..."
+	if [ -f ${f} ]
+	then
+		copyPackage ${f}
+	else
+		echo "Can't find pack list ${f}"
+	fi
+done
+
+#
+#	Run configure on the package
+#
+cd ${BLD_SRC_PREFIX}
+./configure --quiet --without-php4 --without-php5 --without-openssl
+rm -f conf/config.args conf/config.cache
+cd ${home}
+
+####
+#
+#	The tar wrapper images include the tar balls, install/remove scripts and
+#	the README.TXT
+#
+cp install.sh $PKG_DIR/install
+cp remove.sh $PKG_DIR/remove
+cp ${BLD_TOP}/doc/${BLD_PRODUCT}/release/README.TXT $PKG_DIR/README.TXT
+patchFile $PKG_DIR/install
+patchFile $PKG_DIR/remove
+patchFile $PKG_DIR/README.TXT
+
+RPM_SPEC_FILE=$RPM_DIR/SPECS/${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}.spec
+cp rpm.spec $RPM_SPEC_FILE
+mkdir -p ${BLD_SRC_PREFIX}/${BLD_PRODUCT}
+cp rpm.spec ${BLD_SRC_PREFIX}/${BLD_PRODUCT}/${BLD_PRODUCT}.spec
+
+patchFile $RPM_SPEC_FILE
+patchFile ${BLD_SRC_PREFIX}/${BLD_PRODUCT}/${BLD_PRODUCT}.spec
+
+####
+#
+# Create pristine tar images for binary and source distributions. The RPM 
+# package created below uses these and customers can install from them directly
+# if they don't use RPM.
+#
+echo -en "\n    #\n    # "
+echo -e "Create pristine tar image for the binary distribution ...\n    #"
+BIN_TAR=${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}-${BLD_OS}-${BLD_CPU}.tar
+rm -f ${PKG_DIR}/${BIN_TAR} ${PKG_DIR}/${BIN_TAR}.gz
+cd ${PKG_DIR}/binDist
+find . -type f -print >${BLD_PREFIX}/fileList.txt
+find . -type l -print >>${BLD_PREFIX}/fileList.txt
+chgrp root ${BLD_PREFIX}/fileList.txt
+
+echo "    tar -cf ${BIN_TAR} ."
+tar -cf ${PKG_DIR}/${BIN_TAR} .
+gzip ${PKG_DIR}/${BIN_TAR}
+BIN_TAR=${BIN_TAR}.gz
+cd ${home}
+
+echo -en "\n    #\n    # "
+echo -e "Create pristine tar and zip images for the src distribution ...\n    #"
+SRC_TAR=${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.tar
+SRC_ZIP=${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.zip
+rm -f ${PKG_DIR}/${SRC_TAR} ${PKG_DIR}/${SRC_TAR}.gz ${PKG_DIR}/${SRC_ZIP}
+cd ${PKG_DIR}/srcDist
+find ${BLD_VNAME} -type f -print >${BLD_SRC_PREFIX}/fileList.txt
+find ${BLD_VNAME} -type l -print >>${BLD_SRC_PREFIX}/fileList.txt
+chgrp root ${BLD_SRC_PREFIX}/fileList.txt
+
+echo "    tar -cf ${SRC_TAR} ${BLD_VNAME}"
+tar -cf ${PKG_DIR}/${SRC_TAR} ${BLD_VNAME}
+gzip ${PKG_DIR}/${SRC_TAR}
+SRC_TAR=${SRC_TAR}.gz
+
+echo "    cat fileList.txt | zip -q ${SRC_ZIP} -@"
+cat ${BLD_SRC_PREFIX}/fileList.txt | zip -q ${PKG_DIR}/${SRC_ZIP} -@
+cd ${home}
+
+echo -ne "\n    #\n    # "
+echo -e "Create pristine tar image for the doc distribution ...\n    #"
+DOC_TAR=${BLD_PRODUCT}-doc-${BLD_VERSION}-${BLD_NUMBER}.tar
+rm -f ${PKG_DIR}/${DOC_TAR} ${PKG_DIR}/${DOC_TAR}.gz
+cd ${PKG_DIR}/docDist
+find ${BLD_VNAME} -type f -print >${BLD_DOC_PREFIX}/fileList.txt
+find ${BLD_VNAME} -type l -print >>${BLD_DOC_PREFIX}/fileList.txt
+echo "    tar -cf ${DOC_TAR} ${BLD_VNAME}"
+tar -cf ${PKG_DIR}/${DOC_TAR} ${BLD_VNAME}
+gzip ${PKG_DIR}/${DOC_TAR}
+DOC_TAR=${DOC_TAR}.gz
+cd ${home}
+
+####
+#
+# Create RPM file lists 
+#
+cd ${PKG_DIR}/binDist
+echo '%defattr(-,root,root)' >$RPM_DIR/SPECS/binFiles.txt
+find . -type d -print | sed -e 's!\.!!' | grep ${BLD_PRODUCT} |
+	sed -e "s!^!%dir !" >>$RPM_DIR/SPECS/binFiles.txt
+find . -type f -print | sed -e "s/.//" |
+	sed 's/.*/"&"/' >>$RPM_DIR/SPECS/binFiles.txt
+cd ${home}
+
+#
+#	Put ${BLD_VNAME} at the start of all file paths. That way extraction
+#	will by default have that as a prefix
+#
+cd ${PKG_DIR}/srcDist/${BLD_VNAME}
+echo '%defattr(-,root,root)' >$RPM_DIR/SPECS/srcFiles.txt
+find . -type d -print | sed -e "s!.!%dir \"${INS_BLD_SRC_PREFIX}!" |
+	sed 's/.*/&\"/' >>$RPM_DIR/SPECS/srcFiles.txt
+find . -type f -print | sed -e "s!.!${INS_BLD_SRC_PREFIX}!" |
+	sed 's/.*/"&"/' >>$RPM_DIR/SPECS/srcFiles.txt
+cd ${home}
+
+cd ${PKG_DIR}/docDist/${BLD_VNAME}
+echo '%defattr(-,root,root)' >$RPM_DIR/SPECS/docFiles.txt
+find . -type d -print | sed -e "s!.!%dir \"${INS_BLD_DOC_PREFIX}!" |
+	sed 's/.*/&\"/' >>$RPM_DIR/SPECS/docFiles.txt
+find . -type f -print | sed -e "s!.!${INS_BLD_DOC_PREFIX}!" |
+	sed 's/.*/"&"/' >>$RPM_DIR/SPECS/docFiles.txt
+cd ${home}
+
+####
+#
+# Let RPM know that we are doing a package into a local root directory to avoid
+# contaminating the build system
+#
+echo -e "\n    #\n    # Create the RPM package ...\n    #"
+cd $RPM_DIR/SPECS
+cpmod ${PKG_DIR}/${BIN_TAR} $RPM_DIR/SOURCES 444
+cpmod ${PKG_DIR}/${SRC_TAR} $RPM_DIR/SOURCES 444
+cpmod ${PKG_DIR}/${DOC_TAR} $RPM_DIR/SOURCES 444
+echo "%_topdir $RPM_DIR" > ~/.rpmmacros
+echo "    rpmbuild -ba `basename ${RPM_SPEC_FILE}`"
+set +e
+rpmbuild -ba ${RPM_SPEC_FILE} >${home}/rpm.log 2>&1
+if [ $? != 0 ] 
+then
+	echo "RPM build failed "
+	cat ${home}/rpm.log
+else 
+#	rm -f ${home}/rpm.log
+	:
+fi
+cd ${home}
+
+####
+
+echo -ne "\n    #\n    # "
+echo -e "Create tar image containing binary and doc RPMS ...\n    #"
+cd ${PKG_DIR}
+mkdir -p ${ABS_BLD_TOP}/images/${BLD_PRODUCT}
+RPM_TAR=${ABS_BLD_TOP}/images/${BLD_PRODUCT}/${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}-${BLD_OS}-${BLD_CPU}.rpm.tar
+rm -f ${RPM_TAR} ${RPM_TAR}.gz 
+mv RPM/RPMS/i386/${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}.${BLD_CPU}.rpm ${PKG_DIR}/${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}-${BLD_OS}-${BLD_CPU}.rpm
+mv RPM/RPMS/i386/${BLD_PRODUCT}-doc-${BLD_VERSION}-${BLD_NUMBER}.${BLD_CPU}.rpm ${PKG_DIR}/${BLD_PRODUCT}-doc-${BLD_VERSION}-${BLD_NUMBER}.rpm
+
+#	This will tar the binary and doc RPMs only
+echo "    tar -cf `basename ${RPM_TAR}` install remove README.TXT *.rpm"
+tar -cf ${RPM_TAR} install remove README.TXT *.rpm
+gzip ${RPM_TAR}
+
+#	Now move the source RPM
+SRC_RPM=${ABS_BLD_TOP}/images/${BLD_PRODUCT}/${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.rpm
+rm -f ${SRC_RPM} ${SRC_RPM}.gz
+mv RPM/RPMS/i386/${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.${BLD_CPU}.rpm ${SRC_RPM}
+gzip ${SRC_RPM}
+cd ${home}
+
+####
+
+echo -ne "\n    #\n    # "
+echo -e "Create tar image using binary doc tar balls ...\n    #"
+cd ${PKG_DIR}
+ENV_TAR=${ABS_BLD_TOP}/images/${BLD_PRODUCT}/${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}-${BLD_OS}-${BLD_CPU}.self.tar
+rm -f ${ENV_TAR} ${ENV_TAR}.gz
+
+echo "    tar -cf `basename ${ENV_TAR}` install remove README.TXT ..."
+tar -cf ${ENV_TAR} install remove README.TXT ${BIN_TAR} ${DOC_TAR}
+gzip ${ENV_TAR}
+
+#
+#	Copy src tar and zip source to images directory (RPM done above)
+#
+mv ${SRC_TAR} ${ABS_BLD_TOP}/images/${BLD_PRODUCT}
+mv ${SRC_ZIP} ${ABS_BLD_TOP}/images/${BLD_PRODUCT}
+cd ${home}
+
+####
+echo -e "\n    #\n    # Computing checksums ...\n    #"
+cd ${BLD_TOP}/images/${BLD_PRODUCT}
+md5sum `basename ${RPM_TAR}.gz` >md5-${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}-${BLD_OS}-${BLD_CPU}.rpm.txt
+md5sum `basename ${ENV_TAR}.gz` >md5-${BLD_PRODUCT}-${BLD_VERSION}-${BLD_NUMBER}-${BLD_OS}-${BLD_CPU}.self.txt
+md5sum `basename ${SRC_RPM}.gz` >md5-${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.rpm.txt
+md5sum `basename ${SRC_TAR}` >md5-${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.tar.txt
+md5sum `basename ${SRC_ZIP}` >md5-${BLD_PRODUCT}-src-${BLD_VERSION}-${BLD_NUMBER}.zip.txt
+chown mob md5* ${BLD_PRODUCT}*
+cd ${home}
+
+echo -e "\n    #\n    # Done \n    #"
+
+####
+#
+# Cleanup
+#
+#rm -rf ${PKG_DIR}
+
+
+##
+##  Local variables:
+##  tab-width: 4
+##  c-basic-offset: 4
+##  End:
+##  vim:tw=78
+##  vim600: sw=4 ts=4 fdm=marker
+##  vim<600: sw=4 ts=4
+##

@@ -1,0 +1,979 @@
+#!@SHELL@
+#
+# faxspool - sample script how to spool fax input data to a spool
+#            directory, creating jobs to be run by faxrunq
+#
+# sccsid: $Id: faxspool.in,v 4.31 2005/02/24 16:28:26 gert Exp $ (c) Gert Doering
+#
+# syntax: faxspool [flags] <phone-number> <job(s)>
+#
+# <job(s)> may be any number of files. The file type has to be guessed -
+# for now, the following file extensions are recognized:
+#
+#   .ps  -> PostScript
+#   .t   -> plain ascii text
+#   .dvi -> TeX device independent output file (use dvips, then like .ps)
+#   .pbm -> PortableBitMap (use pbm2g3)
+#   .pgm -> PortableGrayMap (use pgmtopbm | pbm2g3)
+#   .ppm -> PortablePixMap (use ppmtopgm | pgmtopbm | pbm2g3)
+#   .g3  -> raw G3 fax data
+#   .lj  -> HP Laserjet PCL4 (use hp2pbm)
+#   .xwd -> xwindow-dump (by xwd program, use xwdtopnm)
+#
+# ChangeLog:
+#  3.6.93: use dvips instead of dvialw now (GD)
+# 15.9.93: use g3cat to concatenate header and page (GD)
+#  3.10.93: use "hp2hig3" for hp-pcl4-files (cl)
+# 19.10.93: phone directories (caz)
+# $Log: faxspool.in,v $
+# Revision 4.31  2005/02/24 16:28:26  gert
+# fix whole user/USER mess
+#   - drop $USER.  $user is only used for fax header substitution now.
+#   - mail (-f) is in $mail_to
+#   - only forced user name (-u/$force_user) is put into $JOB.q
+#
+# Revision 4.30  2004/11/14 13:14:08  gert
+# change test -x to -r for $HOME/.make.coverpg (mode r-- = no coverpage)
+#
+# Revision 4.29  2004/11/13 22:35:54  gert
+# test for $HOME/.make.coverpg with "-x"
+# if spooling from stdin ("-"), don't test for "size > 0" (-s) - breaks stuff
+#
+# Revision 4.28  2004/07/17 10:17:49  gert
+# per-user coverpg and faxheader files (Andreas Barth)
+#
+# Revision 4.27  2004/02/05 17:39:44  gert
+# call "(umask 077 ; mkdir)" in a sub-shell: saves the need to save/restore umask
+#
+# Revision 4.26  2003/10/09 12:40:16  gert
+# refuse empty (0 bytes) input files
+#
+# Revision 4.25  2003/06/28 20:44:04  gert
+# reset umask after creating temp directory
+#
+# Revision 4.24  2003/04/09 21:05:14  gert
+# fix case of "faxing without header" (-h -) - wasn't copying G3 files
+#
+# Revision 4.23  2003/01/21 13:27:12  gert
+# abort if input file names contain whitespace or quote characters
+#
+# Revision 4.22  2002/11/23 15:14:57  gert
+# revert 4.14 -> 4.15 change: faxqueue_done is now back in $FAX_SPOOL_OUT
+# (new permission concept, faxrunq/faxrunqd no longer running as root)
+#
+# Revision 4.21  2002/11/19 10:08:39  gert
+# do not check + mkdir $FAX_SPOOL_OUT/ anymore (faxq-helper does this)
+# do not write to $FAX_SPOOL_OUT/<subdir> directly anymore - create G3 files
+# in $TMP/<subdir>/, use faxq-helper to copy them to fax queue.
+# same applies to .source-files/$b - copy via faxq-helper
+#
+# Revision 4.20  2002/11/17 22:06:18  gert
+# FAX_ALLOW + FAX_DENY moved to fax-helper
+#
+# Revision 4.19  2002/11/16 22:21:36  gert
+# initial adaptions for faxq-helper
+#
+# Revision 4.18  2000/10/11 10:06:41  gert
+# fix combination of "copy_sorce" and "faxspool.rules" (command line destroyed)
+#
+# Revision 4.17  2000/08/06 18:06:21  gert
+# make wording of success message clearer for -t <hh:mm> case
+#
+# Revision 4.16  2000/08/06 18:02:13  gert
+# support PDF input files (via acroread)
+#
+# Revision 4.15  2000/08/06 14:28:37  gert
+# go from using $fax_spool_out/.last_run to VARRUNDIR/faxqueue_done
+#
+# Revision 4.14  2000/07/18 20:18:44  gert
+# allow W and w in phone number
+#
+# Revision 4.13  1999/06/29 13:19:45  gert
+# rename faxspool.filter to faxspool.rules - 14-char limit!
+#
+# Revision 4.12  1999/05/27 14:49:09  gert
+# lookup file extention in "faxspool.filter" if built-in list doesn't find it
+#
+# Revision 4.11  1999/05/27 13:48:55  gert
+# implement handling of external conversion programs (input to G3)
+#
+
+FAX_SPOOL=@FAX_SPOOL@
+FAX_SPOOL_OUT=@FAX_SPOOL_OUT@
+FAX_SEQ=$FAX_SPOOL_OUT/.Sequence
+FAX_SEQ_LOCKDIR=$FAX_SPOOL_OUT/locks
+FAX_SEQ_LOCK=$FAX_SEQ_LOCKDIR/LCK..seq
+LAST_RUN=@FAX_SPOOL_OUT@/faxqueue_done
+
+# helper program for privileged queue access
+FAXQ_HELPER=@LIBDIR@/faxq-helper
+
+# fax phone directories - format: <alias> <fax phone number>
+GLOBAL_PHONE_DIR=@CONFDIR@/faxaliases
+PRIVATE_PHONE_DIR=$HOME/.faxnrs
+
+# you have to adapt this to your local system!
+#
+# this is the file with the fax header - @T@ / @P@ / @M@ / @U@ stand for
+# telephone / page number / maximum page number / user name, respectively
+FAX_HEADER=@CONFDIR@/faxheader
+#
+# for creating the fax page header, pbmtext is used, and this specifies
+# the font file to use (fine/normal res.)
+PBMFONT_HEADER_F=@LIBDIR@/cour25.pbm
+PBMFONT_HEADER_N=@LIBDIR@/cour25n.pbm
+#
+# if you want to use pbmtext for converting ASCII texts, use these fonts:
+PBMFONT_BODY_F=@LIBDIR@/cour25.pbm
+PBMFONT_BODY_N=@LIBDIR@/cour25n.pbm
+
+#
+# this file overrides internal conversion functions
+FS_FILTER=@CONFDIR@/faxspool.rules
+
+#
+# these are the drivers used in Ghostscript - choose dfaxhig/low or faxg3
+#GS_DRIVER_HI="-sDEVICE=dfaxhigh"
+#GS_DRIVER_LO="-sDEVICE=dfaxlow"
+GS_DRIVER_HI="-sDEVICE=faxg3 -r204x196"
+GS_DRIVER_LO="-sDEVICE=faxg3 -r204x98"
+
+#
+# program that will generate fax coverpage (see "man coverpg")
+#
+MAKE_COVER_PG=@LIBDIR@/make.coverpg
+
+#
+# local fax number (will be overriden by "sendfax.config" if set there!)
+#
+FAX_STATION_ID="@FAX_STATION_ID@"
+
+#
+# echo program that will accept escapes (bash: "echo -e", sun: /usr/5bin/echo)
+#
+echo="@ECHO@"
+
+AWK=@AWK@
+
+#
+# make sure that pbm2g3 and newslock can be found
+#
+PATH=@BINDIR@:$PATH
+
+#### end of configuration section
+
+# change coverpage/header defaults to per-user files, if $HOME exists
+if [ -d "$HOME" ]; then
+  if [ -r $HOME/.make.coverpg ]; then
+    MAKE_COVER_PG=$HOME/.make.coverpg
+  fi
+  if [ -r $HOME/.faxheader ]; then
+    FAX_HEADER=$HOME/.faxheader
+  fi
+fi
+
+#
+#### shell functions for conversions
+#
+
+# naming scheme: fs_cvt_$type()
+# converts a $type file ($1) to g3 file(s), named $2.$i, where "i"
+# should be the page number. Can be omitted if $1 has only one page.
+# $3 can be a flag argument, "-n" for normal resolution
+
+#
+# convert portable bitmap (not scaled) - see pbm(5), pbm2g3(1)
+#
+fs_cvt_pbm()
+{
+    pbm2g3 $1 >$2.001
+}
+
+#
+# convert portable greymap (not scaled) - see pgm(5)
+#
+fs_cvt_pgm()
+{
+    pgmtopbm $1 | pbm2g3 >$2.001
+}
+
+#
+# convert portable pixmap (no scaling) - see ppm(5)
+#
+fs_cvt_ppm()
+{
+    ppmtopgm $1 | pgmtopbm | pbm2g3 >$2.001
+}
+
+#
+# "convert" G3 file
+# actually, it's just copied, but I want the interface to be the same
+# later on, one could do page resizing, resolution changing, ... here
+#
+fs_cvt_g3()
+{
+    g3cat $1 >$2.001
+}
+
+#
+# convert a X11 xwd file - scaled to fill the whole page width
+# since we do not know whether it's colour or grey or what, we have
+# to do *all* the conversions *all* the time - ugly. FIXME.
+#
+
+fs_cvt_xwd()
+{
+    REDUCE="cat"
+    test X$3 = X-n && REDUCE="pnmscale -yscale 0.5"
+
+    xwdtopnm $1 |\
+	pnmscale -xysize 1728 2000 |\
+	$REDUCE |\
+	ppmtopgm |\
+	pgmtopbm |\
+	pbm2g3 >$2.001
+}
+
+#
+# convert a CompuServe GIF file, also properly scaled
+# problem: a GIF file can contain multiple images - FIXME
+#
+
+fs_cvt_gif()
+{
+    REDUCE="cat"
+    test X$3 = X-n && REDUCE="pnmscale -yscale 0.5"
+
+    giftoppm $1 |\
+	pnmscale -xysize 1728 2000 |\
+	$REDUCE |\
+	ppmtopgm |\
+	pgmtopbm |\
+	pbm2g3 >$2.001
+}
+
+#
+# convert TIFF file
+# problem1: conversion always via ppm, pgm
+# problem2: multipage TIFFs
+#
+fs_cvt_tif()
+{
+    REDUCE="cat"
+    test X$3 = X-n && REDUCE="pnmscale -yscale 0.5"
+
+    tifftopnm $1 |\
+	pnmscale -xysize 1728 2000 |\
+	$REDUCE |\
+	ppmtopgm |\
+	pgmtopbm |\
+	pbm2g3 >$2.001
+}
+
+#
+# convert HP laserjet input files
+# needs Chris Lewis' hp2pbm package (ftp.uunet.ca)
+#
+fs_cvt_lj()
+{
+    if [ X$3 = X-n ]
+    then
+        hp2log3 -r$2 <$1
+    else
+        hp2hig3 -r$2 <$1
+    fi
+}
+
+#
+# convert postscript data
+# needs GNU GhostScript installed. 
+# For driver selection, see definition of GS_DRIVER_{HI,LO} above.
+#
+fs_cvt_ps()
+{
+    driver="$GS_DRIVER_HI"
+    test X$3 = X-n && driver="$GS_DRIVER_LO"
+
+    cat $1 |
+	gs $driver -sOutputFile=$2%03d -dNOPAUSE -q -dSAFER -
+}
+       
+#
+# convert ASCII text files
+# go via GhostScript and gslp.ps
+# (could also used hp2hig3 or nenscript -> gs or pbmtext)
+#
+fs_cvt_ascii()
+{
+#####
+# via Ghostscript:
+
+    driver="$GS_DRIVER_HI"
+    test X$3 = X-n && driver="$GS_DRIVER_LO"
+
+    gs $driver -sOutputFile=$2%03d -dNOPAUSE \
+			-- gslp.ps -fCourier-Bold10 -B $1
+
+#####
+# via hp2pbm:
+# (convert "LF" to "CR+LF" via awk)
+
+#    pgm=hp2hig3
+#    test X$3 = X-n && pgm=hp2log3
+#
+#    $AWK '{ printf "%s\r\n", $0 }' $1 | $pgm -r$2
+
+#####
+# via pbmtext (not really recommended):
+# use the "pgx" program in contrib/ to split pages
+
+## Select appropriate font
+#    font=$PBMFONT_BODY_F
+#    test X$3 = X-n && font=$PBMFONT_BODY_N
+# Determine how many pages text will be split in to.  Uses default pagelen.
+#    nr=`pgx < $1`
+# Convert each page into a separate G3 file.  Uses default pagelen (60).
+#    page=1
+#    while [ $page -le $nr ]; do
+#	pgx $page < $1 | pbmtext -font $font | pbm2g3 >$2.$page
+#	page=`expr $page + 1`
+#    done
+}
+
+#
+# convert TeX DVI files
+# needs GhostScript and dvips installed.
+# alternatively, one could use dvialw.
+#
+fs_cvt_dvi()
+{
+    if [ X$3 = X-n ]
+    then 
+	driver="$GS_DRIVER_LO" ; dvipscfg="-P dfaxlo"
+    else
+	driver="$GS_DRIVER_HI" ; dvipscfg="-P dfaxhigh"
+    fi
+
+# if you do not have the dfaxlo(w)/dfaxhigh dvips modes configured, 
+# remove "$dvipscfg" from the dvips command line below [or configure them!]
+
+    dvips $dvipscfg $1 -o \
+        !"gs $driver -sOutputFile=$2%03d -dNOPAUSE -dSAFER -q -"
+
+# for those that only have the old "dvialw":
+#
+#	dvialw <$file |
+#	    gs $driver -sOutputFile=$2%03d -dNOPAUSE -dSAFER -q -
+
+# for those that have dvi2ps and not dvips:
+#
+#	dvi2ps -r -q $q |
+#	    gs $driver -sOutputFile=$2%03d -dNOPAUSE -dSAFER -q -
+
+}
+
+#
+# convert pdf data
+# needs GNU GhostScript and Adobe acroread installed.
+# For driver selection, see definition of GS_DRIVER_{HI,LO} above.
+#
+# contributed by mfvm@gmx.de (Michael Fischer v. Mollard)
+#
+fs_cvt_pdf()
+{
+    driver="$GS_DRIVER_HI"
+    test X$3 = X-n && driver="$GS_DRIVER_LO"
+
+    cat $1 |
+	acroread -toPostScript |
+	gs $driver -sOutputFile=$2%03d -dNOPAUSE -q -dSAFER -
+}
+
+
+	
+#
+#### "main" function
+#
+
+#
+# setup defaults / get values
+#
+
+# user name (for fax header only! auth is done by faxq-helper via getuid())
+##########
+if user=`logname 2>/dev/null`
+then :
+else
+    id=`id`
+    user=`expr "$id" : "[^( ]*(\([^)]*\)"`
+fi
+test -z "$user" && user=$LOGNAME
+test -z "$user" && user=$USER
+test -z "$user" && user="nobody"
+
+# fax ID (from sendfax.config)
+##########
+eval ` $AWK '$1=="fax-id" { printf "FAX_STATION_ID=\"%s", $2; \
+			    for(i=3;i<=NF;i++) printf " %s", $i; print "\""; }
+             $1=="port"   { exit }' @CONFDIR@/sendfax.config 2>/dev/null`
+
+# everything else is initialized empty
+##########
+force_user=""
+mail_to=""
+poll_req=""
+verbose_to=""
+normal_res=""
+TIME=""
+copy_source=""
+job_priority=""
+
+#
+# get command line arguments (overriding some of the values above)
+##########
+#
+usage="Usage: $0 [options] [faxphone] [page data]
+Options:
+\t-p\t\tpoll request
+\t-n\t\tnormal resolution
+\t-C <pgm>\tset cover page program (\"-\" for none)
+\t-D <dest>\tset verbose destination name
+\t-F <full name>\tset full name of sender
+\t-h <file>\ttext file for page header
+\t-f <email>\tset address for status mail
+\t-P <n>\t\tset job priority (1=lowest, 9=highest)
+\t-c\t\tcopy source files
+\t-t <hh:mm>\tset earliest possible send time
+\t-t <hh:mm-hh:mm> set time range for sending fax
+\t-A <txt>\tspecify free-form accounting information
+\t-q\t\tshut up"
+
+while :
+do
+    case "$1" in
+# enable polling
+	-p) poll_req=true ; shift
+            ;;
+# use normal resolution (as opposed to fine resolution)
+        -n) normal_res="-n" ; shift
+            ;;
+# set cover page program to use
+	-C) case "$2" in
+	    '') $echo "$usage" >&2 ; exit 2 ;;
+	    "-") MAKE_COVER_PG="" ;;
+	    /*) MAKE_COVER_PG="$2" ;;
+	    *) MAKE_COVER_PG=`pwd`/"$2" ;;
+	    esac
+	    shift ; shift
+	    ;;
+# set verbose destination address
+        -D) case "$2" in
+	    '') $echo "$usage" >&2 ; exit 2 ;;
+            esac
+            verbose_to="$2"
+	    shift ; shift
+	    ;;
+# set verbose origination address ("fullname")
+        -F) case "$2" in
+	    '') $echo "$usage" >&2 ; exit 2 ;;
+            esac
+            FULLNAME="$2"
+	    shift ; shift
+	    ;;
+# set job priority (1=lowest, 9=highest)
+        -P) case "$2" in
+	    [1-9]) ;;
+	    *) $echo "$usage" >&2 ; exit 2 ;;
+            esac
+            job_priority="$2"
+	    shift ; shift
+	    ;;
+# set page header text file
+	-h) case "$2" in
+	    '') $echo "$usage" >&2 ; exit 2 ;;
+	    '-') FAX_HEADER="" ;;
+	    /*) FAX_HEADER="$2" ;;
+	    *) FAX_HEADER=`pwd`/"$2" ;;
+	    esac
+	    test ! -z "$FAX_HEADER" && \
+	      if [ ! -f "$FAX_HEADER" ] ; then
+		$echo "$0: no such fax header file: '$2'" >&2
+		exit 2;
+	    fi
+	    shift ; shift
+	    ;;
+# set e-mail return address
+	-f) case "$2" in
+	    '') $echo "$usage" >&2 ; exit 2 ;;
+            esac
+	    mail_to="$2"
+	    shift ; shift
+	    ;;
+# force user name (faxq-helper will verify "trusted" users)
+	-u) case "$2" in
+	    '') $echo "$usage" >&2 ; exit 2 ;;
+            esac
+	    force_user="$2"
+	    shift ; shift
+	    ;;
+# set first time to send fax
+	-t) if expr "$2" : "[0-2][0-9]:[0-9][0-9]$" >/dev/null
+	    then
+		h=`expr "$2" : "\(..\)"`
+		m=`expr "$2" : "..:\(..\)"`
+		if [ "$h" -gt 23 -o "$m" -gt 60 ]
+		then
+		    $echo "Invalid time specified: $h:$m" >&2; exit 2
+		fi
+		TIME="$h$m"
+	    else
+		$echo "Time must be in <hh:mm> format." >&2; exit 2
+	    fi
+	    shift ; shift
+	    ;;
+# set accounting handle (just a string that will be logged)
+       -A) case "$2" in
+           '') $echo "$usage" >&2 ; exit 2 ;;
+	   esac
+           ACCT_HANDLE="$2" ; shift ; shift
+	   ;;
+# shut up
+       -q) exec >/dev/null ; shift
+           ;;
+# copy source file (for "some action" when transmission fails)
+       -c) copy_source=TRUE; shift
+	   ;;
+# unknown options
+       -*) $echo "unknown option: $1" >&2
+           $echo "$usage" >&2
+	   exit 1
+	   ;;
+# anything else: leave loop	
+	*) break
+    esac
+done
+
+#
+# if not yet set, get full name from /etc/passwd (name only)
+#
+if [ -z "$FULLNAME" ]
+then
+    FULLNAME=`grep "^$user:" /etc/passwd | cut -f5 -d: | cut -f1 -d,`
+fi
+
+#
+# check syntax
+#
+
+if [ $# -eq 0 ] ; then
+    $echo "$0: phone number missing" >&2
+    $echo "$usage" >&2
+    exit 3
+fi
+
+phone=$1 ; shift
+if expr "$phone" : "[-0-9TtPpWw,;]*$" >/dev/null ; then :
+else
+    alias="$phone"
+    phone=""
+    awkpgm='$1 == "'"$alias"'" { printf "phone=\"%s\"; vto=\"", $2;
+                                 for ( i=3; i<=NF-1; i++ ) printf "%s ",$i;
+				 printf "%s\"\n", $i; exit }'
+    if [ -r $PRIVATE_PHONE_DIR ]
+    then
+	eval `$AWK "$awkpgm" $PRIVATE_PHONE_DIR`
+    fi
+    if [ -z "$phone" -a -r $GLOBAL_PHONE_DIR ]
+    then
+	eval `$AWK "$awkpgm" $GLOBAL_PHONE_DIR`
+    fi
+    if [ -z "$phone" ]
+    then
+	$echo "$0:\nNon-numeric characters in phone number and" >&2
+	$echo "'$alias' not found in fax directories\n$usage" >&2
+	exit 4
+    fi
+
+    [ -z "$verbose_to" ] && verbose_to="$vto"
+    [ -z "$verbose_to" ] && verbose_to="$alias"
+
+    $echo "sending fax to '$verbose_to' using phone number '$phone'..."
+fi
+
+#
+# check, if all the file names are "clean", that the files exist & are readable
+#
+
+for file
+do
+    if [ `echo "$file" | tr -d ' \011\012\015\047\140"' ` != "$file" ]
+    then
+	$echo "$0: invalid characters in file name '$file'!" >&2 ; exit 5
+    fi
+    if [ ! -r $file -a x$file != x- ]
+    then
+	$echo "$0: cannot open '$file'!" >&2 ; exit 5
+    fi
+    if [ ! -s $file -a x$file != x- ]
+    then
+	$echo "$0: input file '$file' is empty (0 bytes)!" >&2 ; exit 5
+    fi
+done
+
+#
+# if no file specified on command line, use stdin
+# (only if not polling and no cover page)
+#
+
+if [ $# -eq 0 -a -z "$poll_req" -a -z "$MAKE_COVER_PG" ]
+then
+    # if stdin is connected to a tty, notify user
+    #
+    tty -s && \
+	$echo "spooling text from standard input. End typing with ^D" >&2
+    set -- -
+fi
+
+
+#
+# get unique directory name, using faxq-helper
+#
+new_seq=`$FAXQ_HELPER new`
+
+if [ -z "$new_seq" ] ; then
+    $echo "can't create new job directory, give up" >&2 ; exit 6
+fi
+
+#
+# mkdir a directory in $TMP (or /tmp), convert input to G3 in there
+#
+spooldir=${TMP:-/tmp}/$new_seq.$$.`date +%S`
+
+if ( umask 077 ; mkdir $spooldir ) ; then
+    $echo "spooling to $spooldir (->$new_seq)..."
+else
+    $echo "ERROR: can't create work dir '$spooldir', giving up" >&2 ; exit 6
+fi
+
+#
+# process all input files
+#
+input_data="$*"
+F_NO=0001
+
+for file
+do
+#
+# if filename is "-", use stdin
+#
+    if [ x$file = x- ]
+    then
+	$echo "spooling $file (stdin)..."
+	trap "rm /tmp/faxsp.$$" 0
+        cat - >/tmp/faxsp.$$
+	file=/tmp/faxsp.$$
+    else
+	$echo "spooling $file..."
+    fi
+
+    format=""
+
+#
+# try to determine file type by extention (won't work for print spooler!)
+#
+    case $file in
+	*.g3)	format="g3" ;;
+	*.ps)	format="ps" ;;
+	*.pdf)	format="pdf" ;;
+	*alw)	format="ps" ;;
+	*.dvi)	format="dvi";;
+	*.pbm)	format="pbm";;
+	*.pgm)	format="pgm";;
+	*.ppm)	format="ppm";;
+	*.t)	format="ascii";;
+	*.txt)	format="ascii";;
+	*.asc)	format="ascii";;
+	*.lj)   format="lj" ;;
+	*.pcl)  format="lj" ;;
+	*.xwd)	format="xwd";;
+	*.gif)	format="gif";;
+	*.tif)	format="tif";;
+	*.tiff)	format="tif";;
+    esac
+
+# if we don't know the file type now, let's look for some more
+# extentions in the filter configuration file
+    if [ -z "$format" -a -f $FS_FILTER ]
+    then
+	format=`$AWK ' BEGIN { f="'"$file"'"; sub( /^.*\./, "", f ); }
+                   $1 == "SUFFIX" && $2 == "."f { print $3; exit }' $FS_FILTER`
+    fi
+
+# if we don't know the file type now, let's try something more esoteric
+
+    if [ -z "$format" ]
+    then
+#
+# ask "file"
+# (extend /etc/magic if necessary!)
+#
+	case "`LANG=C file $file | cut -d':' -f2- `" in
+	    *"nglish text"*)	format="ascii" ;;
+	    *"ascii text"*)	format="ascii" ;;
+	    *"ASCII text"*)	format="ascii" ;;
+	    *"ews text"*)	format="ascii" ;;
+	    *"ail text"*)	format="ascii" ;;
+	    *"commands text"*)	format="ascii" ;;
+	    *"c program text"*)	format="ascii" ;;
+	    *"script text"*)	format="ascii" ;;
+	    *PBM*)		format="pbm" ;;
+	    *PGM*)		format="pgm" ;;
+	    *PPM*)		format="ppm" ;;
+	    *GIF*)		format="gif" ;;
+	    *Digifax*)	format="g3" ;;
+	    *DVI*)	format="dvi" ;;
+	    *PCL*)	format="lj" ;;
+	    *postscript*)	format="ps" ;;
+	    *PostScript*)	format="ps" ;;
+	    *TIF*)		format="tif" ;;
+	esac
+
+# if file told us, it's an ascii text, or if we still don't know, try
+# looking at the first few bytes (do not use "head", it may break on
+# binary data)
+
+	if [ -z "$format" -o "$format" = "ascii" ]
+	then
+	    case "`dd if=$file bs=1 count=4 2>/dev/null`" in
+		%!*)            format="ps" ;;
+		%PDF)           format="pdf" ;;
+		P1*|P4*)	format="pbm" ;;
+		P2*|P5*)	format="pgm" ;;
+		P3*|P6*)	format="ppm" ;;
+		GIF*)		format="gif" ;;	# hmmm.
+	    	II*)		format="tif" ;;
+		MM*)		format="tif" ;;
+	    esac
+	fi
+#
+# detect dvi by directly looking at bytes 16...25
+#
+	if [ -z "$format" ]
+	then
+	    if [ "`dd if=$file bs=1 skip=16 count=11 2>/dev/null`" \
+	         = "TeX output " ]
+	    then
+	        format="dvi"
+	    fi
+	fi
+    fi
+
+#
+# ok, now we should *really* know what the file type is.
+#
+    if [ -z "$format" ] ; then
+	$echo "$file: cannot determine file format (extend source)" >&2
+#
+# if stdin is a tty, ask the user for the file type
+#
+        if tty -s
+	then
+	    $echo "$file: please enter type: " >&2
+	    read format
+	else
+	    exit 7
+	fi
+    fi
+
+    $echo "$file is format: $format"
+
+    target=$spooldir/i-$F_NO-
+
+    # get & use external filter command (if set)
+    filter=`$AWK '$1 == "FILTER" && $2 == "'"$format$normal_res"'" \
+		    { $1=""; $2=""; print; exit; }' $FS_FILTER 2>/dev/null`
+	
+    if [ -n "$filter" ] 
+    then
+	$echo "calling external filter:\n$filter\n";
+	set -- $file $target $normal_res
+	eval "$filter"
+    else
+	case $format in
+	    ps | ascii | pbm | pgm | ppm |\
+	    g3 | dvi   | lj  | xwd | gif | tif | pdf) 
+		    fs_cvt_$format $file $target $normal_res
+		    ;;    
+	    *) $echo "$0: no internal filter for format '$format!' found" >&2 
+               exit 8 ;;
+	esac 
+    fi
+
+    if [ $? -ne 0 ] 
+    then
+	$echo "\n$0: error spooling \"$file\" - aborting!" >&2 ; exit 8
+    fi
+
+    # next temporary file number (using awk 'cause expr can't do "%04d"!)
+    F_NO=`echo $F_NO | $AWK '{ printf "%04d", $1 + 1 }' -`
+done
+
+#
+# copy source files over (if requested)
+#
+if [ ! -z "$copy_source" ] ; then
+    $echo "\nCopy source files (for printing, if faxing fails)..."
+    for file in $input_data
+    do
+	b=`basename $file`
+	$FAXQ_HELPER input $new_seq .source-files/$b <$file
+    done
+fi
+
+#
+# OK, all files are in the target directory now...
+#
+# Now let's create the work file
+#
+
+job=$spooldir/JOB
+
+#
+# conversion complete. Post-process G3 files
+#
+
+pages=`ls $spooldir | sed '/^\./d'`
+#
+# get list / number of pages
+#
+cd $spooldir
+
+nr=0
+maxnr=`echo $pages | wc -w | tr -d " "`
+
+#
+# generate cover page
+#
+# dispose arguments (-C "pgm args")
+PGM=`expr "$MAKE_COVER_PG" : "\([^ 	]*\)"`
+#
+if [ ! -z "$PGM" ] 
+  then
+  if [ -x "$PGM" ]
+  then
+    $echo "\nGenerating cover page..."
+    export normal_res
+
+    maxnr=`expr $maxnr + 1`
+    $MAKE_COVER_PG $maxnr "$FAX_STATION_ID" "$FULLNAME" \
+	"$phone" "$verbose_to" "`date +%D`" "`date +%T`" >cover.g3
+    if [ -s cover.g3 ]
+    then
+	pages="cover.g3 $pages"
+    else
+	$echo "generating cover page failed!" >&2
+	maxnr=`expr $maxnr - 1`
+    fi
+  fi
+fi
+
+#	
+# concatenate header with pages (optionally) and copy over to spool dir
+#
+if [ -n "$FAX_HEADER" ]
+then
+    $echo "\nPutting Header lines on top of pages..."
+
+    hdrfont=$PBMFONT_HEADER_F
+    test -z "$normal_res" || hdrfont=$PBMFONT_HEADER_N
+fi
+
+finalpg=""
+for f in $pages
+do
+    nr=`expr $nr + 1`
+
+    if [ -n "$FAX_HEADER" ]
+    then
+	cat $FAX_HEADER | sed -e "s;@T@;$phone;g" -e "s;@P@;$nr;g" \
+			      -e "s;@M@;$maxnr;g" -e "s;@U@;$user;g" \
+			      -e "s;@N@;$FULLNAME;g" \
+			      -e "s;@D@;$verbose_to;g" \
+			      -e "s;@ID@;$FAX_STATION_ID;g" \
+			      -e "s;@DATE@;`date`;g" \
+	| pbmtext -font $hdrfont | pbm2g3 \
+	| g3cat - $f | \
+	$FAXQ_HELPER input $new_seq f$nr.g3 \
+	&& rm $f
+    else
+	g3cat $f | \
+	$FAXQ_HELPER input $new_seq f$nr.g3 \
+	&& rm $f
+    fi
+    finalpg="$finalpg f$nr.g3"
+done
+
+if [ -z "$finalpg" -a -z "$poll_req" ]
+then
+    $echo "\nnothing to do (no cover page, no data)." >&2
+    cd $FAX_SPOOL_OUT
+    rmdir $spooldir
+    exit 52
+fi
+
+#
+# final step: create JOB file
+#
+$echo "phone $phone" >$job.q
+
+[ -z "$force_user" ] || \
+    $echo "user $force_user" >>$job.q
+
+[ -z "$mail_to" ] || \
+    $echo "mail $mail_to" >>$job.q
+
+$echo "input $input_data" >>$job.q
+$echo "pages " $finalpg >>$job.q
+
+[ -z "$verbose_to" ] || \
+    $echo "verbose_to $verbose_to" >>$job.q
+
+[ -z "$poll_req" ] || \
+    $echo "poll" >>$job.q
+
+[ -z "$normal_res" ] || \
+    $echo "normal_res" >>$job.q
+
+[ -z "$job_priority" ] || \
+    $echo "priority $job_priority" >>$job.q
+
+[ -z "$TIME" ] || \
+    $echo "time $TIME" >>$job.q
+
+[ -z "$ACCT_HANDLE" ] || \
+    $echo "acct_handle $ACCT_HANDLE" >>$job.q
+
+$FAXQ_HELPER activate $new_seq < $job.q || exit 99
+
+# clean up
+rm $job.q
+cd ..
+rmdir $spooldir
+
+if [ -z "`find $LAST_RUN -ctime -1 -print 2>/dev/null`" ]
+then
+    cat <<HERE
+
+Fax queued successfully.
+
+WARNING: faxrunq hasn't been run in the last 24 hours.
+         Faxes only get sent out when faxrunq runs! Contact Fax administrator.
+
+HERE
+else
+    if  [ -z "$TIME" ] ; then
+	$echo "\nFax queued successfully. Will be sent at next \`\`faxrunq'' run.\n"
+    else
+	$echo "\nFax queued successfully. Will be sent at first \`\`faxrunq'' run\nafter the specified send time '$TIME' has been reached\n."
+    fi
+fi

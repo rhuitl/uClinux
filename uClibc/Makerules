@@ -1,0 +1,290 @@
+#
+# Licensed under LGPL v2.1, see the file COPYING.LIB in this tarball for details.
+#
+
+.SUFFIXES: .c .S .o .os .oS .so .a .s .i
+
+# order is important, the stripping uses STRIP_FLAGS for lib-so, but not for lib-a
+ifeq ($(HAVE_SHARED),y)
+.LIBPATTERNS: "lib%.so"
+libs: $(lib-so-y) $(lib-a-y)
+$(lib-so-y): $(interp)
+else
+.LIBPATTERNS: "lib%.a"
+ifeq ($(UCLIBC_FORMAT_SHARED_FLAT),y)
+libs: $(lib-gdb-y)
+endif
+libs: $(lib-a-y)
+endif
+objs: all_objs
+
+shared_objs =  $(ldso-y) $(libc-y:.o=.os) $(libc-shared-y) $(libc-nonshared-y) $(libdl-so-y)
+shared_objs += $(libcrypt-so-y) $(libintl-so-y) $(libm-so-y) $(libnsl-so-y) $(libpthread-so-y) $(libpthread-nonshared-y)
+shared_objs += $(libthread_db-so-y) $(libresolv-so-y) $(librt-so-y) $(libutil-so-y)
+ar_objs =  $(libc-y) $(libc-static-y) $(libdl-a-y) $(libcrypt-a-y) $(libintl-a-y) $(libm-a-y) $(libnsl-a-y)
+ar_objs += $(libpthread-a-y) $(libthread_db-a-y) $(libresolv-a-y) $(librt-a-y) $(libutil-a-y)
+ifeq ($(DOPIC),y)
+ar_objs := $(ar_objs:.o=.os)
+endif
+
+ifeq ($(HAVE_SHARED),y)
+all_objs: $(sort $(shared_objs) $(ar_objs))
+else
+all_objs: $(ar_objs)
+endif
+$(shared_objs) $(ar_objs): | $(sub_headers) $(headers_dep)
+
+headers-y: $(headers-y)
+	@true
+
+MAKEFLAGS += --no-print-directory
+SHELL_SET_X := set +x
+ifneq ($(findstring s,$(MAKEFLAGS)),)
+export MAKE_IS_SILENT := y
+SECHO := -@false
+DISP := sil
+Q := @
+else
+export MAKE_IS_SILENT := n
+SECHO := @echo
+ifneq ($(V)$(VERBOSE),)
+SHELL_SET_X := set -x
+DISP := ver
+Q := 
+else
+DISP := pur
+Q := @
+endif
+endif
+
+show_objs = $(subst ../,,$@)
+
+pur_disp_compile.c = echo "  "CC $(show_objs)
+pur_disp_compile.S = echo "  "AS $(show_objs)
+pur_disp_compile.m = $(pur_disp_compile.c)
+pur_disp_compile-m = echo "  "CC-m $(show_objs)
+pur_disp_strip     = echo "  "STRIP $(STRIP_FLAGS) $@
+pur_disp_t_strip   = echo "  "STRIP $(STRIP_FLAGS) $@
+pur_disp_ar        = echo "  "AR $(ARFLAGS) $@
+pur_disp_ld        = echo "  "LD $(1)
+
+sil_disp_compile.c = true
+sil_disp_compile.S = true
+sil_disp_compile.m = true
+sil_disp_compile-m = true
+sil_disp_strip     = true
+sil_disp_t_strip   = true
+sil_disp_ar        = true
+sil_disp_ld        = true
+
+ver_disp_compile.c = echo $(cmd_compile.c)
+ver_disp_compile.S = echo $(cmd_compile.S)
+ver_disp_compile.m = echo $(cmd_compile.m)
+ver_disp_compile-m = echo $(cmd_compile-m)
+ver_disp_strip     = echo $(cmd_strip)
+ver_disp_t_strip   = echo $(cmd_t_strip)
+ver_disp_ar        = echo $(cmd_ar)
+ver_disp_ld        = 
+
+disp_compile.c = $($(DISP)_disp_compile.c)
+disp_compile.S = $($(DISP)_disp_compile.S)
+disp_compile.m = $($(DISP)_disp_compile.m)
+disp_compile-m = $($(DISP)_disp_compile-m)
+disp_strip     = $($(DISP)_disp_strip)
+disp_t_strip   = $($(DISP)_disp_t_strip)
+disp_ar        = $($(DISP)_disp_ar)
+disp_ld        = $($(DISP)_disp_ld)
+
+cmd_compile.c = $(CC) -c $< -o $@ $(CFLAGS) $(ARCH_CFLAGS) $(CFLAGS-$(suffix $@)) $(filter-out $(CFLAGS-OMIT-$(notdir $<)),$(CFLAGS-$(notdir $(^D)))) $(CFLAGS-$(subst $(top_srcdir),,$(dir $<))) $(CFLAGS-$(notdir $<)) $(CFLAGS-$(notdir $@))
+cmd_compile.S = $(cmd_compile.c) -D__ASSEMBLER__ $(ASFLAGS) $(ARCH_ASFLAGS) $(ASFLAGS-$(suffix $@)) $(ASFLAGS-$(notdir $<)) $(ASFLAGS-$(notdir $@))
+cmd_compile.m = $(cmd_compile.c) -DL_$(patsubst %$(suffix $(notdir $@)),%,$(notdir $@))
+cmd_compile-m = $(CC) $^ -c -o $@ $(CFLAGS) $(ARCH_CFLAGS) $(CFLAGS-$(suffix $@)) $(CFLAGS-$(notdir $(@D))) $(CFLAGS-$(notdir $@))
+cmd_strip     = $(STRIPTOOL) $(STRIP_FLAGS) $^
+cmd_t_strip   = $(STRIPTOOL) $(STRIP_FLAGS) $@
+cmd_ar        = $(AR) $(ARFLAGS) $@ $^
+
+compile.c = @$(disp_compile.c) ; $(cmd_compile.c)
+compile.i = $(cmd_compile.c:-c=-E -dD)
+compile.s = $(cmd_compile.c:-c=-S)
+compile.S = @$(disp_compile.S) ; $(cmd_compile.S)
+compile.m = @$(disp_compile.m) ; $(cmd_compile.m)
+compile-m = @$(disp_compile-m) ; $(cmd_compile-m)
+do_strip  = @$(disp_strip)     ; $(cmd_strip)
+do_t_strip= @$(disp_t_strip)   ; $(cmd_t_strip)
+do_ar     = @$(disp_ar)        ; $(cmd_ar)
+
+define compile.u
+	@$(disp_compile.c)
+	$(Q)$(CC) $^ $(DEPS-$(notdir $@)) -o $@ $(CFLAGS) $(CFLAGS-$(notdir $(^D))) $(CFLAGS-$(notdir $@))
+	@$(disp_strip)
+	$(Q)$(STRIPTOOL) $(STRIP_FLAGS) $@
+endef
+hcompile.u = $(HOSTCC) $^ $(DEPS-$(notdir $@)) -o $@ $(BUILD_LDFLAGS) $(BUILD_LDFLAGS-$(notdir $(^D))) $(BUILD_LDFLAGS-$(notdir $@)) $(BUILD_CFLAGS) $(BUILD_CFLAGS-$(notdir $(^D))) $(BUILD_CFLAGS-$(notdir $@))
+hcompile.o = $(HOSTCC) $^ $(DEPS-$(notdir $@)) -c -o $@ $(BUILD_CFLAGS) $(BUILD_CFLAGS-$(notdir $(^D))) $(BUILD_CFLAGS-$(notdir $@))
+
+define link.so
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@ $@.$(2) $(dir $@)$(1)
+	@$(disp_ld)
+	$(Q)$(LD) $(LDFLAGS-$(notdir $@)) -soname=$(notdir $@).$(2) \
+		-o $(dir $@)$(1) $(START_FILE-$(notdir $@)) \
+		--whole-archive $(firstword $^) --no-whole-archive \
+		$(LIBS-$(notdir $@)) $(LIBGCC) $(END_FILE-$(notdir $@))
+	$(Q)$(LN) -sf $(1) $@.$(2)
+	$(Q)$(LN) -sf $(1) $@
+endef
+
+# CRT files needed by link-flat.so
+LINK_FLAT_CRTS := $(top_builddir)lib/Scrt1.o $(top_builddir)lib/crti.o \
+	$(top_builddir)lib/crtn.o
+
+# Create a shared flat library from the archive named by the first dependency.
+# $@ names the shared library's .gdb file, not the flat file itself.
+# (This is because the .gdb suffix makes the ELF file more distinctive
+# than the suffixless flat file.)
+#
+# Argument 1 is the shared library file -- i.e. $(@:.gdb=) -- and argument 2
+# is the shared library identifier.  If it wasn't for $(disp_ld), we could
+# avoid passing $(@:.gdb=) as an argument and use $(@:.gdb=) instead of $(1).
+define link-flat.so
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $(1) $@
+	@$(disp_ld)
+	$(Q)$(LD) $(LDFLAGS-$(notdir $@)) -o $(1) \
+		-elf2flt -shared-lib-id $(2) $(top_builddir)lib/Scrt1.o \
+		$(top_builddir)/lib/crti.o --whole-archive $(firstword $^) \
+		--no-whole-archive $(LIBS-$(notdir $@)) $(LIBGCC) \
+		$(top_builddir)/lib/crtn.o
+endef
+
+define linkm.so
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@ $@.$(2) $(dir $@)$(1)
+	@$(disp_ld)
+	$(Q)$(LD) $(LDFLAGS-$(notdir $@)) -soname=$(notdir $@).$(2) \
+		-o $(dir $@)$(1) $(START_FILE-$(notdir $@)) $^ \
+		$(LIBS-$(notdir $@)) $(LIBGCC) $(END_FILE-$(notdir $@))
+	$(Q)$(LN) -sf $(1) $@.$(2)
+	$(Q)$(LN) -sf $(1) $@
+endef
+
+CFLAGS-.os+=$(PICFLAG)
+CFLAGS-.oS+=$(PICFLAG) -DSHARED
+
+%.o:  %.c ; $(compile.c)
+%.os: %.c ; $(compile.c)
+%.oS: %.c ; $(compile.c)
+%.o:  %.S ; $(compile.S)
+%.os: %.S ; $(compile.S)
+%.oS: %.S ; $(compile.S)
+%.o:  %.s ; $(compile.S)
+%.os: %.s ; $(compile.S)
+%.oS: %.s ; $(compile.S)
+%.i:  %.c ; $(compile.i)
+%.i:  %.S ; $(compile.i)
+%.s:  %.c ; $(compile.s)
+%.s:  %.S ; $(compile.s)
+
+$(top_builddir)lib/interp.c: | $(sub_headers)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)echo "/* Force shared libraries to know about the correct library loader */" > $@
+	$(Q)echo "#include <features.h>" >> $@
+	$(Q)echo "const char __dl_ldso__[] __attribute__ ((section " \
+		"(\".interp\"))) =\""$(SHARED_LIB_LOADER_PREFIX)/$(UCLIBC_LDSO)"\";" >> $@
+
+$(interp): $(top_builddir)lib/interp.c
+	$(compile.c)
+	$(Q)$(STRIPTOOL) -x -R .note -R .comment $@
+
+$(ldso): all_objs
+	@cd $(top_builddir); $(MAKE) lib/$(patsubst %.$(MAJOR_VERSION),%,$(notdir $@))
+
+$(libc): all_objs
+	@cd $(top_builddir); $(MAKE) lib/$(patsubst %.$(MAJOR_VERSION),%,$(notdir $@))
+
+$(headers_dep):
+	$(Q)cd $(top_builddir); $(MAKE) headers
+
+CRT := crt1
+
+ifeq ($(HAVE_SHARED)$(UCLIBC_FORMAT_SHARED_FLAT),y)
+CRTS=$(top_builddir)lib/$(CRT).o $(top_builddir)lib/S$(CRT).o
+else
+CRTS=$(top_builddir)lib/$(CRT).o
+endif
+
+ASFLAGS-$(CRT).o := -DL_$(CRT)
+ASFLAGS-S$(CRT).o := $(PIEFLAG) -DL_S$(CRT)
+$(CRTS): $(top_srcdir)libc/sysdeps/linux/$(TARGET_ARCH)/$(CRT).S
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(compile.S)
+	$(Q)$(STRIPTOOL) -x -R .note -R .comment $@
+
+ifeq ($(UCLIBC_CTOR_DTOR),y)
+CTOR_TARGETS=$(top_builddir)lib/crti.o $(top_builddir)lib/crtn.o
+else
+CTOR_TARGETS:=
+endif
+
+ifneq ($(wildcard $(top_srcdir)libc/sysdeps/linux/$(TARGET_ARCH)/initfini.c),)
+CFLAGS-initfini.s := -S -g0 $(PICFLAG) -fno-inline-functions -finhibit-size-directive
+$(top_builddir)lib/initfini.s: $(top_srcdir)libc/sysdeps/linux/$(TARGET_ARCH)/initfini.c
+	$(compile.c)
+
+$(top_builddir)lib/defs.h: $(top_builddir)lib/initfini.s
+	$(Q)sed -n -e '/@TESTS_BEGIN/,/@TESTS_END/p' $< | \
+		gawk -f $(top_srcdir)extra/scripts/defs.awk > $@.tmp
+	$(Q)mv $@.tmp $@
+
+$(top_builddir)lib/crti.S: $(top_builddir)lib/initfini.s $(top_builddir)lib/defs.h
+	$(Q)sed -n -e '1,/@HEADER_ENDS/p' \
+	       -e '/@_.*_PROLOG_BEGINS/,/@_.*_PROLOG_ENDS/p' \
+	       -e '/@TRAILER_BEGINS/,$$p' $< > $@
+
+$(top_builddir)lib/crtn.S: $(top_builddir)lib/initfini.s
+	$(Q)sed -n -e '1,/@HEADER_ENDS/p' \
+	       -e '/@_.*_EPILOG_BEGINS/,/@_.*_EPILOG_ENDS/p' \
+	       -e '/@TRAILER_BEGINS/,$$p' $< > $@
+
+$(CTOR_TARGETS): $(top_builddir)lib/%.o : $(top_builddir)lib/%.S
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(compile.S) $(PICFLAG) $(SSP_DISABLE_FLAGS)
+else
+$(CTOR_TARGETS): $(top_builddir)lib/%.o : $(top_srcdir)libc/sysdeps/linux/$(TARGET_ARCH)/%.S
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(compile.S) $(PICFLAG) $(SSP_DISABLE_FLAGS)
+endif
+
+#ifeq ($(TARGET_ARCH),nios)
+#CRTS_COMPAT := $(top_builddir)lib/crt0.o
+#$(CRTS_COMPAT):
+#	ln -fs crt1.o $(top_builddir)lib/crt0.o
+#else
+CRTS_COMPAT :=
+#endif
+
+$(crt-y): $(CRTS) $(CTOR_TARGETS) $(CRTS_COMPAT)
+$(CRTS) $(CTOR_TARGETS) $(CRTS_COMPAT): | headers
+
+$(top_builddir)lib/$(NONSHARED_LIBNAME): $(libc-nonshared-y)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+$(top_builddir)lib/libpthread_nonshared.a: $(libpthread-nonshared-y)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+.PHONY: dummy create
+clean: objclean-y headers_clean-y
+
+objclean-y: $(objclean-y)
+headers_clean-y: $(headers_clean-y)
+
+.PHONY: \
+	all check clean distclean test \
+	config dist menuconfig oldconfig release \
+	subdirs utils

@@ -1,0 +1,34 @@
+Date: 2008/01/12 03:10:10
+#13275
+
+Keep track of the modify time for the dhcpd.leases file and update the DNS
+cache if it changes.  Only needed because we modified dhcp-isc to
+truncate the leases file rather than creating a new one.
+
+Index: dnsmasq2/src/isc.c
+===================================================================
+--- dnsmasq2.orig/src/isc.c	2009-03-11 14:00:25.000000000 +1000
++++ dnsmasq2/src/isc.c	2009-03-11 15:35:05.000000000 +1000
+@@ -33,6 +33,7 @@ struct isc_lease {
+ static struct isc_lease *leases = NULL;
+ static off_t lease_file_size = (off_t)0;
+ static ino_t lease_file_inode = (ino_t)0;
++static time_t lease_file_mtime = (time_t)0;
+ static int logged_lease = 0;
+ 
+ static int next_token (char *token, int buffsize, FILE * fp)
+@@ -82,11 +83,13 @@ void load_dhcp(time_t now)
+   logged_lease = 0;
+   
+   if ((statbuf.st_size <= lease_file_size) &&
+-      (statbuf.st_ino == lease_file_inode))
++      (statbuf.st_ino == lease_file_inode) &&
++      (statbuf.st_mtime == lease_file_mtime))
+     return;
+   
+   lease_file_size = statbuf.st_size;
+   lease_file_inode = statbuf.st_ino;
++  lease_file_mtime = statbuf.st_mtime;
+   
+   if (!(fp = fopen (daemon->lease_file, "r")))
+     {

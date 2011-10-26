@@ -1,0 +1,146 @@
+#!/bin/sh
+###########################################################################
+#                                                                         #
+# Faxfilter für MS-Windows und lpd und mgetty-paket                       #
+#                                                                         #
+# Author     : Wundrig Roland <roland@cygnus.muc.de>                      #
+#                                                                         #
+# Änderungen : 26.08.1995 Programm erstellt                               #
+#                                                                         #
+###########################################################################
+#
+# Ablauf :
+#
+# MS-Windows(LPT3) -> xfs-client -> pcnfsd -> lpd -> faxfilter -> faxspool
+#
+###########################################################################
+#
+# Installation :
+#
+# MS-Windows	LPT3 als Postscriptdrucker
+# XFS		LPT3 als faxlp konfigurieren
+#
+# printcap um folgenden Eintrag erweitern
+#
+#faxlp:lp=/dev/null:sd=/usr/spool/lpd:if=/usr/lib/faxfilter/faxfilter:sh:sf:mx#0
+#
+# Die Datei "faxspool.in" vom mgetty Paket so erweitern das die uid=bin
+# auch den -u switch verwenden darf. Anschließend mgetty/vgetty neu
+# installieren.
+#
+# z.B.
+# set user name for authorization purposes (only allowed for ``trusted'' users
+#	    if [ "$user" = "root" -o "$user" = "fax" -o \
+#	         "$user" = "lp" -o "$user" = "daemon" -o "$user" = "bin" ]
+#
+# Dieses Script in das neu zu erstellende Verzeichnis /usr/lib/faxfilter
+# unter dem Name faxfilter kopieren.
+#
+# Wenn der Ghostscript die Meldung "this name is not defined in dictionary"
+# bringt, dann fehlen dem Ghostscript ein paar Schriften.
+#
+# Wichtig beim Ghostscript die Schriften gsfonts1 und gsfonts2 installieren !
+#
+# Ich habe gehört das es mit Win95 Probleme geben kann, man kann die
+# Telefonnummer nicht aus dem PS-File extrahieren. Würde mich interessieren
+# ob man das bestätigen oder dementieren kann.
+#
+###########################################################################
+#
+# Funktion :
+#
+# Die Faxnummer muß irgendwo im Windowsdruck vorkommen und
+# zwar in folgenden Format.
+#
+# z.B. Fax-Nr : 089-1234-233
+#
+# Der Text "Fax-Nr" darf beliebig groß und klein geschrieben werden.
+# Der Doppelpunkt muß vorhanden sein, aber das eine Blank davor und danach
+# darf weggelassen werden. Die Faxnummer muß nummierisch sein, es dürfen
+# beliebig viele Bindestriche zur Auflockerung verwendet werden.
+# Die Faxnummer wird auch auf dem Fax ausgegeben.
+#
+# Serienfaxe aus Windows gehen nur dann wenn die Zeitspanne zwischen
+# den Faxen so groß ist, daß der XFS den Spool bei jedem Fax startet.
+# Probiert hab ich das noch nicht.
+#
+###########################################################################
+
+MAILER="/bin/mailx"
+PATH="$PATH:/usr/X11/bin"
+FAXFILE=/tmp/tmp_faxlp.$$
+Username=""
+Hostname=""
+
+umask 027
+
+#
+# Parameter auswerten
+#
+
+while :
+do
+    case "$1" in
+# Username merken
+        -n) Username="$2"
+	    shift ; shift
+	    ;;
+# Hostname merken
+        -h) Hostname="$2"
+	    shift ; shift
+	    ;;
+# sonstige Parameter ignoieren
+       -*)  shift
+            ;;
+# sonst Schleife beenden
+	*) break
+    esac
+done
+
+#
+# Wenn kein Username dann Postmaster als Mailadresse verwenden
+#
+
+if [ "$Username" = "nobody" ];
+   then
+    Mailname="postmaster"
+   else
+    Mailname=$Username
+fi
+
+#
+# Fax in Datei abspeichern
+#
+
+cat > $FAXFILE
+
+#
+# Telefonnummer aus der Faxdatei herausfischen
+#
+
+TELEFON=`awk '{ IGNORECASE=1 } /FAX-Nr ?: ?[0-9-]*/ \
+         {  gsub(/-/,""); \
+            anfang=match($0,/ ?: ?/); \
+            anfang=anfang+match(substr($0,anfang),/[0-9]/)-1; \
+            ende=match(substr($0,anfang),/[^0-9]/)-1; \
+            printf ("%s",substr($0,anfang,ende)) \
+         }' $FAXFILE`
+
+#
+# Wenn Telefonnummer bekannt dann Fax versenden
+#
+
+if [ "$TELEFON" = "" ];
+   then
+    echo "Telefon Nummer nicht erkannt !" | \
+    $MAILER -s "Problem mit Faxversand" $Mailname
+    rm $FAXFILE
+   else
+    faxspool -u $Username -f $Username $TELEFON $FAXFILE 2>&1 | \
+    $MAILER -s "Faxversand gestartet" $Mailname
+    rm $FAXFILE
+fi
+
+exit 0
+
+###########################################################################

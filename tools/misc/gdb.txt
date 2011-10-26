@@ -1,0 +1,275 @@
+
+Debugging with gdb
+------------------
+
+
+Gdb is a great way to debug uClinux/ColdFire. Here is some simple gdb
+usage instructions from Chris Johns <ccj@acm.org>.
+
+
+-----------------------------------------------------------------------------
+
+The driver currently uses the P&E BDM interface. For the driver and gdb
+patch you can get the archive from:
+
+ 
+ftp://skatter.usask.ca/pub/eric/BDM-Linux-gdb/gdb-4.17-bdm-990115.tar.gz
+  http://www.calm.hw.ac.uk/davidf/coldfire/gdb-4.17-bdm-990115.tar.gz
+
+Unpack with a command like :
+
+  $ cd somewhere; tar zxf gdb-4.17-bdm-990115.tar.gz
+
+Then look at the README file contained in the archive. This has the
+detailed steps you need to follow. Comments and corrects are welcome.
+
+Compile the driver, and library module and install. You will need to run
+the MAKEDEV script in the `local_scripts' directory as root to create
+the device nodes in the /dev directory.
+
+Compile the test program and run it. The command line argument in the
+release is not quite correct. Try :
+
+  ./chk /dev/bdmcf0
+
+If your BDM module is not connected to parallel port 0 you need to use a
+different number at the end of the device filename. If you get failures
+try :
+
+ ./chk -d /dev/bdmcf0
+
+On RedHat this should place debug info into `/var/log/messages' and the
+console. The chk program only raises the driver debug level to 1. It can
+go higher for more info. High numbers can get quite verbose so watch
+out. Send me any info or questions if you have problems.
+
+The chk test covers most critical areas in the driver.
+
+Patch gdb then build and install.
+
+The driver is a kernel module and currently only supports 2.0.x kernels.
+The driver breaks on 2.2.x kernels. I have not received any 2.2.x
+patches. They are welcome.
+
+To test gdb, start it with :
+
+  $ m68k-bdm-coff-gdb
+  GNU gdb 4.17
+  Copyright 1998 Free Software Foundation, Inc.
+  GDB is free software, covered by the GNU General Public License, and
+you are
+  welcome to change it and/or distribute copies of it under certain
+conditions.
+  Type "show copying" to see the conditions.
+  There is absolutely no warranty for GDB.  Type "show warranty" for
+details.
+  This GDB was configured as "--host=i686-pc-linux-gnulibc1
+--target=m68k-bdm-coff".
+  (gdb) 
+
+Once you have the gdb prompt, connect to the target with the gdb command
+:
+
+  (gdb) target bdm /dev/bdmcf0
+  Remote bdm connected to /dev/bdmcf0
+
+Again change the last number to be the parallel port you are connected
+to.
+
+The driver and gdb patch also supports the cpu32 core as found in the
+68360. You connect using another device, eg /dev/bdmcpu320.
+
+Your target will have been reset and halted. You can now look at the
+ROM. To dump the vector table try :
+
+  (gdb) x /12w 0
+  0x0:    0x000071c8      0xffe00400      0xffe00518      0xffe00518
+  0x10:   0xffe00518      0xffe00518      0xffe00518      0xffe00518
+  0x20:   0xffe00518      0xffe00518      0xffe00518      0xffe00518
+
+This is from my 5206 eval board. GDB has no stack history at this point
+so dumping all the registers will fail. You can select a frame then gdb
+will dump the registers.
+
+  (gdb) p /x $pc
+  $4 = 0xffe0c860
+  (gdb) info reg
+  No selected frame.
+  (gdb) select-frame 0
+  (gdb) info reg
+  d0             0x0      0
+  d1             0x0      0
+  d2             0xfb9e6ec2       -73503038
+  d3             0xbd85fe43       -1115292093
+  d4             0x0      0
+  d5             0xbd3931fd       -1120325123
+  d6             0xbf3a28d0       -1086707504
+  d7             0x0      0
+  a0             0x30000000       0x30000000
+  a1             0xffe08391       0xffe08391
+  a2             0x9b1b2fd3       0x9b1b2fd3
+  a3             0x33ef6c49       0x33ef6c49
+  a4             0x7fea5983       0x7fea5983
+  a5             0x2fabcbcf       0x2fabcbcf
+  fp             0x70fc   0x70fc
+  sp             0x70fc   0x70fc
+  ps             0x2704   0x2704
+  pc             0xffe0c860       0xffe0c860
+  vbr            0x3fc    0x3fc
+  cacr           0x0      0x0
+  acr0           0x300f6000       0x300f6000
+  acr1           0x300f6000       0x300f6000
+  rambar         0x20000000       0x20000000
+  mbar           0x10000000       0x10000000
+  csr            0x1000000        0x1000000
+  aatr           0x5      0x5
+  tdr            0x0      0x0
+  pbr            0x0      0x0
+  pbmr           0x0      0x0
+  abhr           0x0      0x0
+  ablr           0x0      0x0
+  dbr            0x0      0x0
+
+Notice MBAR is not set. This could be confusing if are expecting to look
+at devices connected to chip selects. The dbug monitor ROM has not run
+so no coldfire resources have been setup.
+
+The Coldfire has a nice feature for BDM reset debugging. If you do not
+change the program counter with a command such as:
+
+  (gdb) set $pc=start
+
+or
+
+  (gdb) set $pc=0xdeaddead
+
+The coldfire core will perform the normal stack pointer and reset vector
+fetch. For the sbc5206 eval board I am connected to, to step the dbug
+boot code do :
+
+  (gdb) display /i $pc
+  1: x/i $pc  0xffe0c860: moveb %a0@(21),%d0
+  (gdb) si
+  0xffe00404 in ?? ()
+  1: x/i $pc  0xffe00404: movel #-2097152,%d0
+  (gdb) 
+  0xffe0040a in ?? ()
+  1: x/i $pc  0xffe0040a: moveal %d0,%sp
+  (gdb) 
+  0xffe0040c in ?? ()
+  1: x/i $pc  0xffe0040c: movec %sp,%vbr
+  (gdb) 
+  0xffe00410 in ?? ()
+  1: x/i $pc  0xffe00410: movel #16777216,%d0
+  (gdb) 
+  0xffe00416 in ?? ()
+  1: x/i $pc  0xffe00416: movec %d0,%cacr
+  (gdb) 
+
+You might notice GDB repeats the last command entered if you just hit
+enter.
+
+When you run gdb connected to an embedded target like this the `run'
+command is not used. The `target' command connects you to an existing
+"process". The run command when used on a native system such as Linux
+creates the "process" to be debugged. Your embedded target is an
+existing "process" so no need to use the run command. You just step or
+continue.
+
+Now to running some code you have compiled with the -g option. The
+driver has an example gdb init script. Look in `gdbScripts/5206.gdb'. I
+usually copy this script to the directory where the coff file to be
+debugged sits and rename it to `.gdbinit'. I am working on a boot rom
+for the sbc5206 eval board. All I added to the end of the file in the
+driver archive is :
+
+  dir ../../../kernel/boot/net
+  dir ../../../kernel/boot/net/drivers/clock
+  dir ../../../kernel/boot/net/drivers/net
+  dir ../../../kernel/boot/net/loaders
+  dir ../../../kernel/boot/support
+  dir ../../../arch/m68k/5206/boot
+
+  target bdm /dev/bdmcf0
+  addresses
+  setup-cs
+  setup-dram
+
+  load
+
+  set print pretty
+  set print asm-demangle
+
+I then run :
+
+  $ m68k-bdm-coff-gdb sbc5206.coff 
+  GNU gdb 4.17
+  Copyright 1998 Free Software Foundation, Inc.
+  GDB is free software, covered by the GNU General Public License, and
+you are
+  welcome to change it and/or distribute copies of it under certain
+conditions.
+  Type "show copying" to see the conditions.
+  There is absolutely no warranty for GDB.  Type "show warranty" for
+details.
+  This GDB was configured as "--host=i686-pc-linux-gnulibc1
+--target=m68k-bdm-coff"...
+  (gdb) si 
+  0x404 in start ()
+  (gdb) x /20i $pc
+  0x404 <start+4>:        lea 0x0 <V___ISSP>,%sp
+  0x40a <start+10>:       movec %sp,%vbr
+  0x40e <start+14>:       movel #536870913,%d0
+  0x414 <start+20>:       movec %d0,3076
+  0x418 <start+24>:       moveal #536871420,%sp
+  0x41e <start+30>:       nop
+  0x420 <start+32>:       nop
+  0x422 <start+34>:       moveal #536870912,%a0
+  0x428 <start+40>:       moveq #51,%d0
+  0x42a <start+42>:       moveq #0,%d1
+  0x42c <start+44>:       moveb %d0,%a0@
+  0x42e <start+46>:       moveb %a0@,%d1
+  0x430 <start+48>:       cmpl %d1,%d0
+  0x432 <start+50>:       bnew 0x518 <_stop_cf>
+  0x436 <start+54>:       notl %d0
+  0x438 <start+56>:       andil #255,%d0
+  0x43e <start+62>:       moveb %d0,%a0@
+  0x440 <start+64>:       moveb %a0@,%d1
+  0x442 <start+66>:       cmpl %d1,%d0
+  0x444 <start+68>:       bnew 0x518 <_stop_cf>
+  (gdb) b boot_cpu
+  Breakpoint 1 at 0x522: file cpuboot.c, line 63.
+  (gdb) c
+  Continuing.
+
+  Breakpoint 1, boot_cpu () at cpuboot.c:63
+  63        CF_DISABLE_AND_INVALIDATE_CACHE();
+  (gdb) l
+  58        UINT32 i;
+  59      #endif
+  60        
+  61        /* disable and invalidate the instruction cache */
+  62
+  63        CF_DISABLE_AND_INVALIDATE_CACHE();
+  64        
+  65        /* program the system protection register */
+  66        
+  67        CF_SIM_WRITE_SYPCR(CF5206_BASE,
+  (gdb) 
+
+What happens here is the .gdbinit script programs the MBAR, chip selects
+and enables the DRAM. DRAM is at 0. My linker command file places
+`.text', '.data', and '.bss' one after each other at address 0. The
+first part of the text seciton is the vector table. This how-ever is
+moving away from gdb to the other tools and this mail is long enough at
+it is.
+
+-- 
+ Chris Johns  Networks, Plessey Asia Pacfic Pty. Ltd.
+  mailto:ccj@acm.org    mailto:cjohns@plessey.com.au
+
+________________________________________________________________________
+ColdFire Discussion List
+See: <http://www.WildRice.com/ColdFire/>
+
+-----------------------------------------------------------------------------

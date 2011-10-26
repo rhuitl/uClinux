@@ -1,0 +1,131 @@
+Hi,
+
+here are a few mails explaining how to get mgetty+sendfax to work on
+the 3B1 machines (with the mail addresses of people who got it to work).
+
+A few words on my own:
+
+- the 3B1 cannot do more than 1920 bps - so #define FAX_SEND_BAUD and 
+  DEFAULT_PORTSPEED to B19200
+
+- maybe it's necessary to remove the lines in sendfax.c where CLOCAL
+  gets cleared (around line 446):
+    -------
+    /* by now, the modem should have raised DCD, so remove CLOCAL flag */
+    fax_termio.c_cflag &= ~CLOCAL;
+    ioctl(...)
+    -------
+
+gert
+------------------------------------------------
+To:	<gert@greenie.muc.de>
+Subject: Re: mgetty-sendfax
+Message-Id: <9307190917.AA02797@gladys.UUCP>
+Date:	Mon, 19 Jul 1993 18:17:14 +0200
+From:	gladys!dalton@PacBell.COM (David Dalton)
+
+Greetings, Gert...
+
+Thanks for answering my message about mgetty-sendfax.
+
+You asked where I found the socket code for my AT&T 3B1. This machine
+is well-supported by hackers (it's almost a cult), and there is an
+archive at
+
+	cheops.cis.ohio-state.edu
+
+The socket code lives in: pub/att7300/kernel/uipc.tar.Z
+
+The socket emulation seems reliable, but it did not include all the
+header files needed to compile mgetty-sendfax.  Several calls brought
+trouble: timeval, fd_set, and bzero. I did have the necessary objects,
+but I had to scrounge to find some header files. I pieced together what
+I needed from the uipc source code and from include files at crl.com,
+where I have an account.
+[...]
+Regards,
+
+David Dalton    dalton@gladys.uucp      pacbell!gladys!dalton
+--------------------------------------------------------------------------------
+From:	"Glenn E. Thobe" <thobe@getunx.info.com>
+To:	gert@greenie.muc.de
+Subject: mgetty+sendfax 3b1 patches, Part 1 of 2
+
+========================= begin 3b1 instructions =================
+	    Installing and using mgetty+sendfax on the
+		    AT&T pc7300/unixpc/3b1
+
+mgetty+sendfax won't compile on a 3b1 with only the stock development 
+system, you need a few extras:
+
+The socket library with select is kernel/uipc.tar.Z at either
+osu-cis (archive.cis.ohio-state.edu: pub/att7300) or uunet
+(ftp.uu.net: systems/att7300).  This is essentially the same as what
+comes with the 3b1 distribution of MGR, which is what I used.  Those
+who have ethernet or starlan, may prefer to use the libraries that
+come with them (this hasn't been tried).
+
+The PBMPLUS sources and patches are in the 1991 comp.sources.misc.  
+You can get supposedly get the fully patched sources in compressed
+tar form from one of:
+
+    export.lcs.mit.edu:contrib/pbmplus<date>.tar.Z
+    ftp.ee.lbl.edu:pbmplus<date>.tar.Z
+
+where <date> is probably "05dec91".  The 3b1 archives (osu-cis and uunet) have 
+binaries for a much older version of PBMPLUS.
+
+I compiled with GCC 2.4.5 (binaries from ftp.cs.caltech.edu:
+pub/3b1).
+
+My header files in /usr/include and /usr/include/sys are no longer
+stock as I consider it more productive to bring the headers up to
+date than to modify application software to compile with outdated
+headers.  Comp.sources.3b1 has ported BSD headers (bsd-incl) and
+more-or-less ansified headers (ansihdr) which may prove helpful, at
+least as a guide, to those who wish to follow this road.
+
+You must add -D_3B1_ to your CFLAGS definition in the Makefile.  
+
+mgetty+sendfax depend on other utilities to compose the g3 format
+fax image for transmission or to convert the received g3 format
+image to something that can be viewed on the screen or printed.
+
+For composing, you can use pbmtext and the modified pbmtog3.  For
+more flexibility use LaTeX and either dvips or dvialw (or any other
+combination of utilites you like) to produce PostScript, and use
+ghostscript (get 3b1 binaries from ftp.cs.caltech.edu) to produce g3.
+
+For viewing, you may use g3topbm and either pbmto3b1 for stock TAM
+windows (get it from uunet or osu-cis) or mview for MGR (get
+mgrabscr from comp.sources.3b1).  Mview has a minor bug which
+means you must read the PBM image from a file.
+
+WARNING, reading beyond this point may endanger your sanity!
+
+The 3b1's limited VM means that g3topbm will bomb on full size pages, 
+so I ported Sam Leffler's TIFF library and built fax2tiff and do 
+the following:
+
+fax2tiff -M incoming_fax.g3; tifftopnm fax.tiff | pbmtowhatever
+
+Unfortunately you can't build the g3 part of the TIFF library on the
+3b1 without some machinations because there is not enough VM to compile 
+g3states.h.  My answer to this was to modify mkg3state.c to output the 
+state tables in the form of a gas (GNU assembler) source file, which 
+assembles easily, and an abbreviated g3states.h which references the
+state tables as "extern".  The assembled state tables go into libtiff.a.
+If you don't want to fool with TIFF, you can probably rewrite g3topbm
+so it doesn't overflow VM.
+
+I also modified pbmtoepson (for Epson FX and related 9-pin printers) to 
+produce the highest possible resolution of 240 dpi x 216 dpi and to 
+economize on VM.
+
+I am working on a way to make my results (TIFF and pbmtoepson) and 
+available.
+
+-Glenn Thobe <thobe@getunx.info.com>
+Thu Sep 16 15:07:57 PDT 1993
+========================= end 3b1 instructions ===================
+

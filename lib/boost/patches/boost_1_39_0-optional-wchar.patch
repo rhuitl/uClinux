@@ -1,0 +1,66 @@
+--- a/libs/filesystem/build/Jamfile.v2
++++ b/libs/filesystem/build/Jamfile.v2
+@@ -16,7 +16,11 @@ project boost/filesystem
+     ;
+ 
+ SOURCES =
+-    operations path portability utf8_codecvt_facet ;
++    operations path portability ;
++if ! [ modules.peek : NO_WCHAR ]
++{
++    SOURCES += utf8_codecvt_facet ;
++}
+ 
+ lib boost_filesystem
+     :
+@@ -29,4 +33,4 @@ lib boost_filesystem
+     :
+     ;
+ 
+-boost-install boost_filesystem ;
+\ No newline at end of file
++boost-install boost_filesystem ;
+--- a/libs/program_options/build/Jamfile.v2
++++ b/libs/program_options/build/Jamfile.v2
+@@ -6,9 +6,12 @@ project boost/program_options
+ 
+ SOURCES =
+     cmdline config_file options_description parsers variables_map 
+-    value_semantic positional_options utf8_codecvt_facet
+-    convert winmain
++    value_semantic positional_options winmain
+     ;
++if ! [ modules.peek : NO_WCHAR ]
++{
++    SOURCES += utf8_codecvt_facet convert ;
++}
+ 
+ lib boost_program_options
+     :
+@@ -17,4 +20,4 @@ lib boost_program_options
+     <link>shared:<define>BOOST_PROGRAM_OPTIONS_DYN_LINK=1 # tell source we're building dll's
+     ;
+ 
+-boost-install boost_program_options ;
+\ No newline at end of file
++boost-install boost_program_options ;
+--- a/libs/serialization/build/Jamfile.v2
++++ b/libs/serialization/build/Jamfile.v2
+@@ -100,6 +100,10 @@ lib boost_serialization
+     <link>shared:<define>BOOST_SERIALIZATION_DYN_LINK=1
+     ;
+ 
++boost-install boost_serialization ;
++
++if ! [ modules.peek : NO_WCHAR ]
++{
+ lib boost_wserialization 
+     : $(WSOURCES).cpp boost_serialization 
+     :     
+@@ -107,4 +111,5 @@ lib boost_wserialization
+     <link>shared:<define>BOOST_SERIALIZATION_DYN_LINK=1
+     ;
+ 
+-boost-install boost_serialization boost_wserialization ;
++boost-install boost_wserialization ;
++}

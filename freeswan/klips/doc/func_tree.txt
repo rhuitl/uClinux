@@ -1,0 +1,72 @@
+*
+* RCSID $Id: func_tree.txt,v 1.2 1999/04/06 04:54:23 rgb Exp $
+*
+
+init_module()
+	ipsec_init()
+		proc_reg(ipsec_rt)
+			proc_net_inode_operations()
+			ipsec_rt_get_info()
+		proc_reg(ipsec_spi)
+			proc_net_inode_operations()
+			ipsec_spi_get_info()
+		netlink_attach(ipsec_callback)
+			ipsec_makeroute()
+				rd_key()
+				rj_addroute()
+			ipsec_breakroute()
+			ipsec_findroute()
+			gettdb()
+			puttdb()
+			tdbinit()
+		ipsec_radijinit()
+			rj_init()
+				rj_inithead()
+					rj_newpair()
+			rj_inithead()
+		inet_add_protocol(ah_protocol)
+			ah_rcv()
+		inet_add_protocol(esp_protocol)
+			esp_rcv()
+	ipsec_tunnel_init_module()
+		register_netdev(&dev_ipsec)
+			ipsec_tunnel_probe()
+				ipsec_tunnel_init(dev); 
+					dev->open               = ipsec_tunnel_open;
+					dev->stop               = ipsec_tunnel_close;
+					dev->hard_start_xmit    = ipsec_tunnel_start_xmit;
+						ipsec_tunnel_do_xmit()
+					dev->get_stats	         = ipsec_tunnel_get_stats;
+					dev->hard_header        = ipsec_tunnel_hard_header;
+					dev->rebuild_header     = ipsec_tunnel_rebuild_header;
+					dev->set_mac_address    = ipsec_tunnel_set_mac_address;
+					dev->do_ioctl           = ipsec_tunnel_ioctl;
+						ipsec_tunnel_attach()
+							ipsec_tunnel_hard_header
+							ipsec_tunnel_rebuild_header
+							ipsec_tunnel_set_mac_address
+							ipsec_tunnel_cache_bind
+							ipsec_tunnel_cache_update
+						*** ipsec_tunnel_detach()
+					dev->header_cache_bind 	= ipsec_tunnel_cache_bind;
+					dev->header_cache_update= ipsec_tunnel_cache_update;
+
+cleanup_module()
+	ipsec_cleanup()
+		proc_unregister(&proc_net, 4243)
+		proc_unregister(&proc_net, 4242)
+		netlink_detach(NETLINK_IPSEC)
+		inet_del_protocol(&ah_protocol)
+		inet_del_protocol(&esp_protocol)
+		*** ipsec_radij_cleanup()
+	ipsec_tunnel_cleanup_module(void)
+		unregister_netdev(&dev_ipsec);
+		kfree_s(dev_ipsec.priv,sizeof(struct enet_statistics));
+
+*
+* $Log: func_tree.txt,v $
+* Revision 1.2  1999/04/06 04:54:23  rgb
+* Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+* patch shell fixes.
+*
+*

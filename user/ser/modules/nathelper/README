@@ -1,0 +1,368 @@
+
+nathelper Module
+
+Maxim Sobolev
+
+   PortaOne
+
+Edited by
+
+Maxim Sobolev
+
+   Copyright © 2003 Porta Software Ltd.
+     _________________________________________________________
+
+   Table of Contents
+   1. User's Guide
+
+        1.1. Overview
+        1.2. Dependencies
+
+              1.2.1. SER Modules
+              1.2.2. External Libraries or Applications
+
+        1.3. Exported Parameters
+
+              1.3.1. natping_interval (integer)
+              1.3.2. ping_nated_only (integer)
+              1.3.3. rtpproxy_sock (string)
+              1.3.4. rtpproxy_disable (integer)
+              1.3.5. rtpproxy_disable_tout (integer)
+              1.3.6. rtpproxy_retr (integer)
+              1.3.7. rtpproxy_tout (integer)
+              1.3.8. received_avp (integer)
+              1.3.9. force_socket (string)
+
+        1.4. Exported Functions
+
+              1.4.1. fix_nated_contact()
+              1.4.2. fix_nated_sdp(mode)
+              1.4.3. force_rtp_proxy()
+              1.4.4. add_rcv_param()
+              1.4.5. fix_nated_register()
+              1.4.6. force_rtp_proxy([options [, new_ip]])
+              1.4.7. nat_uac_test(mode)
+
+   2. Developer's Guide
+   3. Frequently Asked Questions
+
+   List of Examples
+   1-1. Set natping_interval parameter
+   1-2. Set ping_nated_only parameter
+   1-3. Set received_avp parameter
+   1-4. fix_nated_contact usage
+   1-5. fix_nated_sdp usage
+   1-6. force_rtp_proxy usage
+   1-7. add_rcv_paramer usage
+   1-8. fix_nated_register usage
+   1-9. force_rtp_proxy usage
+     _________________________________________________________
+
+Chapter 1. User's Guide
+
+1.1. Overview
+
+   This is a module to help with NAT traversal. In particular, it
+   helps symmetric UAs that don't advertise they are symmetric
+   and are not able to determine their public address.
+   fix_nated_contact rewrites Contact header field with request's
+   source address:port pair. fix_nated_sdp adds the active
+   direction indication to SDP (flag 0x01) and updates source IP
+   address too (flag 0x02).
+
+   Known devices that get along over NATs with nathelper are ATAs
+   (as clients) and Cisco Gateways (since 12.2(T)) as servers.
+   See
+   http://www.cisco.com/en/US/products/sw/iosswrel/ps1839/product
+   s_feature_guide09186a0080110bf9.html">
+     _________________________________________________________
+
+1.2. Dependencies
+
+1.2.1. SER Modules
+
+   The following modules must be loaded before this module:
+
+     * No dependencies on other SER modules.
+     _________________________________________________________
+
+1.2.2. External Libraries or Applications
+
+   The following libraries or applications must be installed
+   before running SER with this module loaded:
+
+     * None.
+     _________________________________________________________
+
+1.3. Exported Parameters
+
+1.3.1. natping_interval (integer)
+
+   Period of time in seconds between sending short UDP packets to
+   all currently registered UAs to keep their NAT bindings alive.
+   Value of 0 disables this functionality.
+
+   Default value is 0. 
+
+   Example 1-1. Set natping_interval parameter
+...
+modparam("nathelper", "natping_interval", 10)
+...
+     _________________________________________________________
+
+1.3.2. ping_nated_only (integer)
+
+   If this variable is set then only contacts that have
+   "behind_NAT" flag in user location database set set will get
+   ping.
+
+   Default value is 0. 
+
+   Example 1-2. Set ping_nated_only parameter
+...
+modparam("nathelper", "ping_nated_only", 1)
+...
+     _________________________________________________________
+
+1.3.3. rtpproxy_sock (string)
+
+   The name of the socket for the communication between SER and
+   RTPProxy.
+
+   Default value is "unix:/var/run/rtpproxy.sock". 
+     _________________________________________________________
+
+1.3.4. rtpproxy_disable (integer)
+
+   This parameter can be used to disable communication with
+   RTPproxy completely.
+
+   Default value is 0 (communication with RTPproxy enabled). 
+     _________________________________________________________
+
+1.3.5. rtpproxy_disable_tout (integer)
+
+   This parameter controls the minimum interval between periodic
+   attempts to establish communication with RTPProxy. SER
+   periodically tries to establish communication with RTPProxy if
+   it failed previously, for example due to wrong protocol
+   version or RTPProxy not running. The value of -1 will disable
+   peridic attempts to reach RTPproxy.
+
+   Default value is 60 s. 
+     _________________________________________________________
+
+1.3.6. rtpproxy_retr (integer)
+
+   This parameter controls the number of attempts of SER to
+   establish communication with RTPProxy.
+
+   Default value is 5 attempts. 
+     _________________________________________________________
+
+1.3.7. rtpproxy_tout (integer)
+
+   The value of this parameter controls how long SER waits for a
+   reply from RTPProxy.
+
+   Default value is 1 s. 
+     _________________________________________________________
+
+1.3.8. received_avp (integer)
+
+   The number of the Attribute-Value-Pair (AVP) used to store the
+   URI containing the received IP, port, and protocol. The URI is
+   created by fix_nated_register function of nathelper module and
+   the attribute is then used by the registrar to store the
+   received parameters. Do not forget to change the value of
+   corresponding parameter in registrar module if you change the
+   value of this parameter.
+
+   Default value is 42. 
+
+   Example 1-3. Set received_avp parameter
+...
+modparam("nathelper", "received_avp", 43)
+...
+     _________________________________________________________
+
+1.3.9. force_socket (string)
+
+   This parameter controls the socket that will be used to send
+   NAT pings. This can be something like "udp:10.0.0.1:5060".
+
+   Default value is disabled. 
+     _________________________________________________________
+
+1.4. Exported Functions
+
+1.4.1. fix_nated_contact()
+
+   Rewrites Contact HF to contain request's source address:port.
+
+   Example 1-4. fix_nated_contact usage
+...
+if (search("User-Agent: Cisco ATA.*") {fix_nated_contact();};
+...
+     _________________________________________________________
+
+1.4.2. fix_nated_sdp(mode)
+
+   Rewrites Contact HF to contain request's source address:port.
+
+   Meaning of the parameters is as follows:
+
+     * mode - 0x01 (add direction=active), 0x02 (rewrite media IP
+       address with source address of the message). The value of
+       mode parameter is bitwise OR of the numbers (0x03 for both
+       tests).
+
+   Example 1-5. fix_nated_sdp usage
+...
+if (search("User-Agent: Cisco ATA.*") {fix_nated_sdp("3");};
+...
+     _________________________________________________________
+
+1.4.3. force_rtp_proxy()
+
+   Rewrites SDP body to ensure that media is passed through an
+   RTP proxy.
+
+   Example 1-6. force_rtp_proxy usage
+...
+if (search("User-Agent: Cisco ATA.*") {force_rtp_proxy();};
+...
+     _________________________________________________________
+
+1.4.4. add_rcv_param()
+
+   Add received parameter to Contact header fields. The parameter
+   will contain URI created from the source IP, port, and
+   protocol of the packet containing the SIP message. The
+   parameter can be then processed by another registrar, this is
+   useful, for example, when replicating register messages using
+   t_replicate function to another registrar.
+
+   Example 1-7. add_rcv_paramer usage
+...
+add_rcv_param();
+...
+     _________________________________________________________
+
+1.4.5. fix_nated_register()
+
+   The function creates a URI consisting of the source IP, port,
+   and protocol and stores the URI in an Attribute-Value-Pair.
+   The URI will be appended as "received" parameter to Contact in
+   200 OK and registrar will store it in the user location
+   database.
+
+   Example 1-8. fix_nated_register usage
+...
+fix_nated_register();
+...
+     _________________________________________________________
+
+1.4.6. force_rtp_proxy([options [, new_ip]])
+
+   Rewrites SDP body with given IP address to ensure that media
+   is passed through an RTP proxy. The function accepts 0, 1, or
+   2 parameters. Default value of options parameter is an empty
+   string and default value of new_ip parameter is the
+   destination IP of the SIP request.
+
+   Meaning of the parameters is as follows:
+
+     * options - String containing various options to control
+       behavior of force_rtp_proxy function. Each option is
+       represented by one character in the string. The function
+       supports the following options:
+          + A - The originator of the SIP message does not
+            support symmetric RTP.
+          + I - The originator of the SIP message is in the same
+            LAN as RTPProxy. Useful when RTPProxy is running in
+            bridging mode.
+          + E - The originator of the SIP message is reachable
+            through external interface, not LAN. Useful when
+            RTPProxy is running in bridging mode.
+          + L - Do not create a new session in RTPProxy, instead
+            lookup existing sessions and rewrite SDP only if it
+            exists. This is only useful for SIP requests, this
+            flag is automatically enabled when the function is
+            executed during reply processing (from onreply_route
+            blocks).
+          + F - This flag instructs nathelper to ignore marks
+            inserted by another nathelper instance along the path
+            of the message to indicate that the session is
+            already passing through another RTPProxy. This allows
+            chains of RTP proxies.
+          + R - The IP in SDP should be trusted. Without this
+            flag, nathelper would ignore address in SDP and use
+            source address of the SIP message as media address
+            which is passed to the RTPProxy.
+     * new_ip - Replace the IP address in SDP with the value of
+       this parameter if present.
+
+   Example 1-9. force_rtp_proxy usage
+...
+if (search("User-Agent: Cisco ATA.*") {
+    force_rtp_proxy("IF", 1.2.3.4");
+};
+...
+     _________________________________________________________
+
+1.4.7. nat_uac_test(mode)
+
+   Tries to guess if client's request originated behind a nat.
+   The parameter determines what heuristics is used. If flag 1 is
+   set, Contact header field is searched for occurrence of RFC1918
+   addresses. If flag 2 is set, the "received" test is used --
+   address in Via is compared against source IP address of 
+   signaling. If flag 4 is set the address in Via is compared
+   with "private" RFC1918 addresses. If flag 8 is set the ip in
+   the SDP message body is compared with RFC1918 addresses. If
+   flag 16 is set the rport test is used: the source port of the
+   message is compared with the source port advertised in Via
+   (good to catch broken STUN implementations, but might cause
+   problems for UAs with asymmetric signaling). All the flags can
+   be bitwise combined, the test returns true if any of the tests
+   identified a NAT (e.g. nat_uac_test(19) will return true if
+   any of the received test, contact RFC1918 test or. rport test
+   are true).
+     _________________________________________________________
+
+Chapter 2. Developer's Guide
+
+   The module does not provide any sort of API to use in other
+   SER modules.
+     _________________________________________________________
+
+Chapter 3. Frequently Asked Questions
+
+   3.1. Where can I find more about SER?
+   3.2. Where can I post a question about this module?
+   3.3. How can I report a bug?
+
+   3.1. Where can I find more about SER?
+
+   Take a look at http://iptel.org/ser.
+
+   3.2. Where can I post a question about this module?
+
+   First at all check if your question was already answered on
+   one of our mailing lists:
+
+     * http://mail.iptel.org/mailman/listinfo/serusers
+     * http://mail.iptel.org/mailman/listinfo/serdev
+
+   E-mails regarding any stable version should be sent to
+   <serusers@iptel.org> and e-mail regarding development versions
+   or CVS snapshots should be send to <serdev@iptel.org>.
+
+   If you want to keep the mail private, send it to
+   <serhelp@iptel.org>.
+
+   3.3. How can I report a bug?
+
+   Please follow the guidelines provided at:
+   http://iptel.org/ser/bugs

@@ -1,0 +1,49 @@
+#!/bin/sh
+
+# Note: For some reason, the output of flash_eraseall must be
+# redirected to /dev/null, otherwise the flash contents get
+# corrupted when the scripts is started by tftpd
+
+# We must save busybox and some device nodes to the RAM disk because it 
+# will be unavailable as soon as we have erased the flash part containing
+# the ROM disk!
+
+cp /bin/busybox /var/tmp
+cp /dev/mtd2 /var/tmp
+
+if [ ! -e /var/files/linuz ]; then
+	echo "Kernel file /var/files/linuz does not exist - aborting."
+	exit 1
+fi
+
+if [ ! -e /var/files/romdisk.img ]; then
+	echo "ROM disk image file /var/files/romdisk.img does not exist - aborting."
+	exit 1
+fi
+
+# Upgrading the boot loader is dangerous and thus optional
+if [ -e /var/files/boot-ldr.bin ]; then
+	echo Upgrading boot loader...
+	echo Erasing boot loader flash partition.
+	flash_eraseall /dev/mtd0 >/dev/null 2>&1
+	echo Writing boot loader to flash.
+	cat /var/files/boot-ldr.bin >/dev/mtd0
+	echo ...ok
+fi
+
+echo Upgrading kernel...
+echo Erasing kernel flash partition.
+flash_eraseall /dev/mtd1 >/dev/null 2>&1
+echo Writing kernel to flash.
+cat /var/files/linuz >/dev/mtd1
+echo ...ok
+
+echo Upgrading ROM disk image...
+echo Erasing ROM disk image flash partition.
+flash_eraseall /dev/mtd2 >/dev/null 2>&1
+/var/tmp/busybox echo Writing ROM disk image to flash.
+/var/tmp/busybox cat /var/files/romdisk.img >/var/tmp/mtd2
+/var/tmp/busybox echo ...ok
+
+/var/tmp/busybox echo Rebooting...
+/var/tmp/busybox reboot

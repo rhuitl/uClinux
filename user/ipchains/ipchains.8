@@ -1,0 +1,534 @@
+.\"
+.\" Heavily modified by Paul ``Rusty'' Russell March 1997
+.\" 
+.\" Based on the original ipfwadm man page by Jos Vos <jos@xos.nl> (see README)
+.\"
+.\"	This program is free software; you can redistribute it and/or modify
+.\"	it under the terms of the GNU General Public License as published by
+.\"	the Free Software Foundation; either version 2 of the License, or
+.\"	(at your option) any later version.
+.\"
+.\"	This program is distributed in the hope that it will be useful,
+.\"	but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"	GNU General Public License for more details.
+.\"
+.\"	You should have received a copy of the GNU General Public License
+.\"	along with this program; if not, write to the Free Software
+.\"	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\"
+.TH IPCHAINS 8 "February 8, 1998" "" ""
+.SH NAME
+ipchains \- IP firewall administration
+.SH SYNOPSIS
+.BR "ipchains -[ADC] " "chain rule-specification [options]"
+.br
+.BR "ipchains -[RI] " "chain rulenum rule-specification [options]"
+.br
+.BR "ipchains -D " "chain rulenum [options]"
+.br
+.BR "ipchains -[LFZNX] " "[chain] [options]"
+.br
+.BR "ipchains -P " "chain target [options]"
+.br
+.BR "ipchains -M " "[ -L | -S ] [options]"
+.SH DESCRIPTION
+.B Ipchains
+is used to set up, maintain, and inspect the IP firewall rules in the
+Linux kernel.  These rules can be divided into 4 different categories:
+the IP input chain, the IP output chain, the IP forwarding chain, and 
+user defined chains.
+
+For each of these categories, a separate table of rules is maintained,
+any of which might refer to one of the user-defined chains.
+See
+.IR ipfw (4)
+for more details.
+.SH TARGETS
+A firewall rule specifies criteria for a packet, and a target.  If the
+packet does not match, the next rule in the chain is the examined; if
+it does match, then the next rule is specified by the value of the
+target, which can be the name of a user-defined chain, or one of the
+special values 
+.IR ACCEPT ,
+.IR DENY ,
+.IR REJECT ,
+.IR MASQ ,
+.IR REDIRECT ,
+or
+.IR RETURN .
+.sp 0.5
+.I ACCEPT 
+means to let the packet through.  
+.I DENY
+means to drop the packet on the floor.  
+.I REJECT 
+means the same as drop, but is more polite and easier to debug, since
+an ICMP message is sent back to the sender indicating that the packet
+was dropped.  (Note that
+.I DENY 
+and 
+.I REJECT 
+are the same for ICMP packets).  
+.sp 0.5
+.I MASQ
+is only legal for the forward and user defined chains, and can only be
+used when the kernel is compiled with
+.B CONFIG_IP_MASQUERADE
+defined.
+With this, packets will be masqueraded as if they originated from the
+local host.  Furthermore, reverse packets will be recognized as such
+and they will be demasqueraded automatically, bypassing the forwarding
+chain.
+.sp 0.5
+.I REDIRECT
+is only legal for the input and user-defined chains and can only be
+used when the Linux kernel is compiled with
+.B CONFIG_IP_TRANSPARENT_PROXY
+defined.
+With this, packets will be redirected to a local socket, even if they
+were sent to a remote host.  If the specified redirection port is 0,
+which is the default value, the destination port of a packet will be
+used as the redirection port.  When this target is used, an optional
+extra argument (the port number) can be supplied.
+.sp 0.5
+If the end of a user-defined chain is reached, or a rule with target
+.I RETURN
+is matched, then the next rule in the previous (calling) chain is
+examined.  If the end of a builtin chain is reached, or a rule in a
+builtin chain with target
+.I RETURN
+is matched, the target specified by the chain policy determines the
+fate of the packet.
+.SH OPTIONS
+The options that are recognized by
+.B ipchains
+can be divided into several different groups.
+.SS COMMANDS
+These options specify the specific action to perform; only one of them
+can be specified on the command line, unless otherwise specified
+below.  For all the long versions of the command and option names, you
+only need to use enough letters to ensure that 
+.B ipchains
+can differentiate it from all other options.
+.TP
+.BR "-A, --append"
+Append one or more rules to the end of the selected chain.  
+When the source and/or destination names resolve to more than one
+address, a rule will be added for each possible address combination.
+.TP
+.BR "-D, --delete"
+Delete one or more rules from the selected chain.  There are two
+versions of this command: the rule can be specified as a number in the
+chain (starting at 1 for the first rule) or a rule to match.
+.TP
+.B "-R, --replace"
+Replace a rule in the selected chain.  If the source and/or
+destination names resolve to multiple addresses, the command will
+fail.  Rules are numbered starting at 1.
+.TP
+.B "-I, --insert"
+Insert one or more rules in the selected chain as the given rule
+number.  So, if the rule number is 1, the rule or rules are inserted
+at the head of the chain.
+.TP
+.B "-L, --list"
+List all rules in the selected chain.  If no chain is selected, all
+chains are listed.  It is legal to specify the
+.B -Z
+(zero) option as well, in which case no chain may be specified.  The
+exact output is effected by the other arguments given.
+.TP
+.B "-F, --flush"
+Flush the selected chain.  This is equivalent to deleting all the
+rules one by one.
+.TP
+.B "-Z, --zero"
+Zero the packet and byte counters in all chains.  It is legal to
+specify the
+.B "-L, --list"
+(list) option as well, to see the counters immediately before they are
+cleared; if this is done, then no specific chain can be specified
+(they will
+.I all
+be displayed and cleared.
+.TP
+.B "-N, --new-chain"
+Create a new user-defined chain of the given name.  There must be no
+target of that name already.
+.TP
+.B "-X, --delete-chain"
+Delete the specified user-defined chain.  There must be no references
+to the chain (if there are you must delete or replace the referring
+rules before the chain can be deleted).  If no argument is given, it
+will attempt to delete every non-builtin chain.
+.TP
+.B "-P, --policy"
+Set the policy for the chain to the given target.  See the section
+.B TARGETS
+for the legal targets.  Only non-userdefined chains can have policies,
+and neither built-in nor user-defined chains can be policy targets.
+.TP
+.B "-M, --masquerading"
+This option allows viewing of the currently masqueraded connections
+(in conjuction with the
+.B -L
+option) or to set the kernel masqerading parameters (with the
+.B -S
+option).
+.TP
+.BI "-S, --set tcp tcpfin udp"
+Change the timeout values used for masquerading.
+This command always takes 3 parameters, representing the timeout values
+(in seconds) for TCP sessions, TCP sessions after receiving
+a FIN packet, and UDP packets, respectively.
+A timeout value 0 means that the current timeout value of the
+corresponding entry is preserved.
+This option is only allowed in combination with the
+.B -M
+flag.
+.TP
+.B "-C, --check"
+Check the given packet against the selected chain.  This is extremely
+useful for testing, as the same kernel routines used to check "real"
+network packets are used to check this packet.  It can be used to
+check user-defined chains as well as the builtin ones.  The
+same arguments used to specify firewall rules are used to construct
+the packet to be tested.  In particular, the 
+.B -s 
+(source),
+.B -d 
+(destination),
+.B -p 
+(protocol), and
+.B -i 
+(interface) flags are compulsory.
+.TP
+.B -h
+Help.
+Give a (currently very brief) description of the command syntax.
+.SS PARAMETERS
+The following parameters make up a rule specification (as used in the
+add, delete, replace, append and check commands).
+.TP
+.BI "-p, --protocol" "[!] protocol"
+The protocol of the rule or of the packet to check.
+The specified protocol can be one of
+.IR tcp ,
+.IR udp ,
+.IR icmp ,
+or
+.IR all ,
+or it can be a numeric value, representing one of these protocols or a
+different one.  Also a protocol name from /etc/protocols is allowed.
+A "!" argument before the protocol inverts the
+test.  The number zero is equivalent to
+.IR all .
+Protocol
+.I all
+will match with all protocols and is taken as default when this
+option is omitted.
+.I All
+may not be used in in combination with the check command.
+.TP
+.BR "-s, --source " "[!] \fIaddress\fP[/\fImask\fP] [!] [\fIport[:port]\fP]"
+Source specification.
+.I Address
+can be either a hostname, a network name, or a plain IP address.
+The
+.I mask
+can be either a network mask or a plain number,
+specifying the number of 1's at the left side of the network mask.
+Thus, a mask of
+.I 24
+is equivalent to
+.IR 255.255.255.0 .
+A "!" argument before the address specification inverts the sense of
+the address.
+.sp 0.5
+The source may include a port specification or ICMP type.  This can
+either be a service name, a port number, a numeric ICMP type, or one
+of the ICMP type names shown by the command
+.br
+ipchains -h icmp
+Note that many of these ICMP names refer to both a type and code,
+meaning that an ICMP code after the
+.B -d
+flag is illegal.  In the rest of this paragraph, a
+.I port
+means either a port specification or an ICMP type.
+An inclusive range is can also be specified, using the format
+.IR port : port .
+If the first port is omitted, "0" is assumed; if the last is omitted,
+"65535" is assumed.
+.sp 0.5
+Ports may only be specified in combination with the
+.IR tcp ,
+.IR udp ,
+or
+.I icmp
+protocols.  A "!" before the port specification inverts the sense.
+When the check command is specified, exactly one port is required, and
+if the
+.B -f 
+(fragment) flag is specified, no ports are allowed.  The flag
+.B --src
+is a convenience alias for this option.
+.TP
+.BR "--source-port " "[!] [\fIport[:port]\fP]"
+This allows separate specifiction of the source port or port range.
+See the description of the
+.B -s
+flag above for details.The flag
+.B --sport
+is an alias for this option.
+.TP
+.BR "-d, --destination " "[!] \fIaddress\fP[/\fImask\fP] [!] [\fIport[:port]\fP]"
+Destination specification. 
+See the desciption of the
+.B -s
+(source) flag for a detailed description of the syntax.  For ICMP,
+which does not have ports, a "destination port" refers to the numeric
+ICMP code.  The flag
+.B --dst
+is a convenience alias for this option.
+.TP
+.BR "--destination-port " "[!] [\fIport[:port]\fP]"
+This allows separate specifiction of the ports.  See the description of
+the
+.B -s
+flag for details.  The flag
+.B --dport
+is an alias for this option.
+.TP
+.BR "--icmp-type " "[!] typename"
+This allows specification of the ICMP type (use the
+.B "-h icmp"
+option to see valid ICMP type names).  This is often more convenient
+to appending it to the destination specification.
+.TP
+.BR "-j, --jump " "\fItarget\fP"
+This specifies the target of the rule; ie. what to do if the packet
+matches it.  The target can be a user-defined chain (not the one this
+rule is in) or one of the special targets which decide the fate of the
+packet immediately.  If this option is omitted in a rule, then
+matching the rule will have no effect on the packet's fate, but the
+counters on the rule will be incremented.
+.TP
+.BI "-i, --interface " "[!] name"
+Optional name of an interface via which a packet is received (for
+packets entering the input chain), or via which is packet is going to
+be sent (for packets entering the forward or output chains).  When
+this option is omitted, the empty string is assumed, which has a
+special meaning and will match with any interface name.  When the "!"
+argument is used before the interface name, the sense is inverted.  If
+the interface name ends in a "+", then any interface which begins with
+this name will match.
+.TP
+.B "[!] " "-f, --fragment"
+This means that the rule only refers to second and furthur fragments
+of fragmented packets.  Since there is no way to tell the source or
+destination ports of such a packet (or ICMP type), such a packet will
+not match any rules which specify them.  When the "!" argument
+precedes the "-f" flag, the sense is inverted.
+.SS "OTHER OPTIONS"
+The following additional options can be specified:
+.TP
+.BI "-b, --bidirectional"
+Bidirectional mode.
+The rule will match with IP packets in both directions; this has the
+same effect as repeating the rule with the source & destination
+reversed.
+.TP
+.BI "-v, --verbose"
+Verbose output.  This option makes the list command show the interface
+address, the rule options (if any), and the TOS masks.  The packet and
+byte counters are also listed, with the suffix 'K', 'M' or 'G' for
+1000, 1,000,000 and 1,000,000,000 multipliers respectively (but see
+the
+.B -x
+flag to change this).  When used in combination with
+.BR -M ,
+information related to delta sequence numbers will also be listed.
+For appending, insertion, deletion and replacement, this causes
+detailed information on the rule or rules to be printed.
+.TP
+.BI "-n, --numeric"
+Numeric output.
+IP addresses and port numbers will be printed in numeric format.
+By default, the program will try to display them as host names,
+network names, or services (whenever applicable).
+.TP
+.BI "-l, --log"
+Turn on kernel logging of matching packets.
+When this option is set for a rule, the Linux kernel will print
+some information
+of all matching packets (like most IP header fields) via
+.IR printk ().
+.TP
+.BI "-o, --output" " [maxsize]"
+Copy matching packets to the userspace device.  This is currently
+mainly for developers who want to play with firewalling effects in
+userspace.  The optional maxsize argument can be used to limit the
+maximum number of bytes from the packet which are to be copied.  This
+option is only valid if the kernel has been compiled with
+CONFIG_IP_FIREWALL_NETLINK set.
+.TP
+.BI "-m, --mark" " markvalue"
+Mark matching packets.  Packets can be marked with a 32-bit unsigned
+value which may (one day) change how they are handled internally.  If
+you are not a kernel hacker you are unlikely to care about this.  If
+the string
+.I markvalue 
+begins with a + or -, then this value will be added or subtracted from
+the current marked value of the packet (which starts at zero).
+.TP
+.BI "-t, --TOS" " andmask xormask"
+Masks used for modifying the TOS field in the IP header.  When a
+packet matches a rule, its TOS field is first bitwise and'ed with
+first mask and the result of this will be bitwise xor'ed with the
+second mask.  The masks should be specified as hexadecimal 8-bit
+values.  As the LSB of the TOS field must be unaltered (RFC 1349), TOS
+values which would cause it to be altered are rejected, as are any
+rules which always set more than TOS bit.  Rules which might set
+multiple TOS bits for certain packets result in warnings (sent to
+stdout) which can be ignored if you know that packets with those TOS
+values will never reach that rule.   Obviously,
+manipulating the TOS is a meaningless gesture if the rule's target is
+.I DENY 
+or 
+.IR REJECT .
+.TP
+.BI "-x, --exact"
+Expand numbers.
+Display the exact value of the packet and byte counters,
+instead of only the rounded number in K's (multiples of 1000)
+M's (multiples of 1000K) or G's (multiples of 1000M).  This option is
+only relevent for the 
+.B -L 
+command.
+.TP
+.BI "[!] -y, --syn"
+Only match TCP packets with the SYN bit set and the ACK and FIN bits
+cleared.  Such packets are used to request TCP connection initiation;
+for example, blocking such packets coming in an interface will prevent
+incoming TCP connections, but outgoing TCP connections will be
+unaffected.  This option is only meaningful when the protocol type is
+set to TCP.  If the "!" flag precedes the "-y", the sense of the
+option is inverted.
+.TP
+.BI "--line-numbers"
+When listing rules, add line numbers to the beginning of each rule,
+corresponding to that rule's position in the chain.
+.TP
+.BI "--no-warnings"
+Disable all warnings.
+.SH FILES
+.I /proc/net/ip_fwchains
+.br
+.I /proc/net/ip_masquerade
+.SH DIAGNOSTICS
+Various error messages are printed to standard error.  The exit code
+is 0 for correct functioning.  Errors which appear to be caused by
+invalid or abused command line parameters cause an exit code of 2, and
+other errors cause an exit code of 1.
+.SH BUGS
+.PP
+If input is a terminal, and a rule is inserted in, or appended to, the
+forward chain, and IP forwarding does not seem to be enabled, and
+--no-warnings is not specified, a message is printed to standard
+output, warning that no forwarding will occur until this is rectified.
+This is to help users unaware of the requirement (which did not exist
+in the 2.0 kernels).
+.PP
+There is no way to reset the packet and byte counters in one chain
+only.  This is a kernel limitation.
+.PP
+Loop detection is not done in ipchains; packets in a loop get dropped
+and logged, but that's the first you'll find out about it if you
+inadvertantly create a loop.
+.PP
+The explanation of what effect marking a packet has is intentionally
+vague until documentation describing the new 2.1 kernel's packet
+scheduling routines is released.
+.PP
+There is no way to zero the policy counters (ie. those on the built-in
+chains).
+.SH NOTES
+This 
+.B ipchains
+is very different from the ipfwadm by Jos Vos, as it uses the new IP
+firewall trees.  Its functionality is a superset of ipfwadm, and there
+is generally a 1:1 mapping of commands.  I believe the new command
+names are more rational.  There are, however, a few changes of which
+you should be aware.
+.PP
+Fragments are handled differently.  All fragments after the first used
+to be let through (which is usually safe); they can now be filtered.
+This means that you should probably add an explicit rule to accept
+fragments if you are converting over.  Also, look for old accounting
+rules which check for source and destination ports of 0xFFFF (0xFF for
+ICMP packets) which was the old way of doing accounting on fragments.
+.PP
+Accounting rules are now simply integrated into the input and output
+chains; you can simulate the old behaviour like so:
+.br
+ ipchains -N acctin
+.br
+ ipchains -N acctout
+.br
+ ipchains -N acctio
+.br
+ ipchains -I input -j acctio
+.br
+ ipchains -I input -j acctin
+.br
+ ipchains -I output -j acctio
+.br
+ ipchains -I output -j acctout
+.br
+This creates three user-defined chains, 
+.IR acctin ,
+.I acctout
+and
+.IR acctio ,
+which are to contain any accounting rules (these rules should be
+specified without a 
+.B -j 
+flag, so that the packets simply pass through them unscathed).
+.PP
+A 
+.I MASQ
+or 
+.I REDIRECT
+target encountered by the kernel out of place (ie. not
+during a forward or input rule respectively) will cause a message to
+the syslog and the packet to be dropped.
+.PP
+The old behaviour of SYN and ACK matching (which was previously
+ignored for non-TCP packets) has changed; the SYN option is not valid
+for non-TCP-specific rules.
+.PP
+The ACK matching option (
+.BR -k )
+is no longer supported; the combination of
+.B !
+and 
+.B -y
+will give the equivalent).
+.PP
+It is now illegal to specify a TOS mask which will set or alter the
+least significant TOS bit; previously TOS masks were silently altered
+by the kernel if they tried to do this.
+.PP
+The 
+.B -b
+flag is now handled by simply inserting or deleting a pair of rules,
+one with the source and destination specifications reversed.
+.PP
+There is no way to specify an interface by address: use its name.
+.SH SEE ALSO
+ipfw(4)
+.SH AUTHOR
+Rusty Russell <ipchains@rustcorp.com>

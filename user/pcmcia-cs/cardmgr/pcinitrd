@@ -1,0 +1,227 @@
+#!/bin/sh
+#
+# Utility for constructing PCMCIA initrd boot images
+#
+# Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
+#
+# pcinitrd 1.23 2000/07/25 18:31:31
+#
+RELEASE=""
+ALL=""
+SIZE=2400
+MODULES="pcmcia/pcmcia_core.o pcmcia/ds.o"
+
+# Things to install when "all" is selected
+SOCK="i82365.o tcic.o"
+BLK="ide_cs.o pcmem_cs.o aha152x_cs.o fdomain_cs.o qlogic_cs.o"
+MEM="ftl_cs.o memory_cs.o sram_mtd.o iflash2_mtd.o iflash2+_mtd.o"
+
+usage()
+{
+    echo "usage: $0 [-v] [-a|-all] [-u|--update] [-r|--kernel=kernel-release]" >&2
+    echo "       [-s|--size=image-size] [-d|--dir=root-dir] <initrd-image> [modules ...]" >&2
+    exit 1
+}
+
+while [ $# -gt 0 ] ; do
+    case $1 in
+    -a|--all)
+	ALL=y
+	;;
+    -d)
+	ROOT=$2 ; shift
+	;;
+    --dir=*)
+	ROOT=`echo $1 | sed -e 's/^--dir=//'`
+	;;
+    -r)
+	KERNEL=$2 ; shift
+	;;
+    --release=*)
+	KERNEL=`echo $1 | sed -e 's/^--kernel=//'`
+	;;
+    -s)
+	SIZE=$2 ; shift
+	;;
+    --size=*)
+	SIZE=`echo $1 | sed -e 's/^--size=//'`
+	;;
+    -u|--update)
+	UPDATE=y
+	;;
+    -v|--verbose)
+	VERBOSE=--verbose
+	;;
+    -*)
+	usage
+	exit 1
+	;;
+    *)
+	break
+	;;
+    esac
+    shift
+done
+
+if [ "$KERNEL" = "" ] ; then
+    KERNEL=`uname -r`
+fi
+[ "$VERBOSE" ] && echo "Using version $KERNEL modules"
+MODDIR=$ROOT/lib/modules/$KERNEL
+
+if [ $# -lt 1 ] ; then usage ; fi
+TARGET=$1 ; shift
+if [ "$ALL" = "y" ] ; then
+    for MOD in $SOCK $BLK $MEM ; do
+	if [ -f $MODDIR/pcmcia/$MOD ] ; then
+	    MODULES="$MODULES pcmcia/$MOD"
+	fi
+    done
+fi
+
+BIN="bin/mount bin/umount sbin/insmod sbin/cardmgr"
+LIB=`ls $ROOT/lib/libc.so.? | sort | tail -1`
+ETC="/etc/ld.so.cache /etc/pcmcia/config /etc/pcmcia/config.opts"
+DEV="/dev/console /dev/null /dev/ram /dev/tty1 /dev/tty2 /dev/tty3 /dev/tty4"
+LF=`file -bL $LIB`
+for F in $* ; do
+    if [ -f $MODDIR/$F ] ; then
+	MODULES="$MODULES $F"
+    elif [ -x $ROOT/$F ] ; then
+	FT=`file -bL $ROOT/$F`
+	if [ "$FT" = "$LF" ] ; then
+	    LIB="$LIB $F"
+	else
+	    BIN="$BIN $F"
+	fi
+    elif [ -b $ROOT/$F -o -c $ROOT/$F ] ; then
+	DEV="$DEV $F"
+    elif [ -f $ROOT/$F ] ; then
+	ETC="$ETC $F"
+    else
+	echo "$F not found." 1>&2
+	exit 1
+    fi
+done
+
+fail()
+{
+    umount $VERBOSE $MNT
+    rmdir $MNT
+    exit 1
+}
+trap fail SIGTERM SIGINT
+
+strip_cp()
+{
+    if [ -d $3 ] ; then
+	DEST=$3/`basename $2`
+    else
+	DEST=$3
+    fi
+    strip $1 $VERBOSE -o $DEST $2 | sed -e 's/([^ ]*)//g' || fail
+}
+
+MNT=$ROOT/tmp/initrd.mnt-$$
+mkdir $VERBOSE $MNT || exit 1
+
+if [ "$UPDATE" = "y" ] ; then
+    if [ -b $TARGET ] ; then
+	mount $VERBOSE -t ext2 $TARGET $MNT || fail
+    else
+	mount $VERBOSE -t ext2 -o loop $TARGET $MNT || fail
+    fi
+    strip_cp --strip-all $ROOT/sbin/cardmgr $MNT/sbin || fail
+    CD=`pwd` ; cd $MNT
+    for DIR in block misc fs net pcmcia ; do
+	for MOD in $DIR/*.o ; do
+	    strip_cp --discard-all $ROOT/lib/modules/$MOD $DIR || fail
+	done
+    done
+    cd $CD
+    umount $VERBOSE $MNT
+    rmdir $MNT
+    exit 0
+fi
+
+[ "$VERBOSE" ] && echo "Creating filesystem on $TARGET"
+if [ -b $TARGET ] ; then
+    mke2fs $TARGET $SIZE > /dev/null || fail
+    mount $VERBOSE -t ext2 $TARGET $MNT || fail
+else
+    dd if=$ROOT/dev/zero of=$TARGET bs=1k count=$SIZE
+    echo "y" | mke2fs $TARGET $SIZE >/dev/null || fail
+    mount $VERBOSE -t ext2 -o loop $TARGET $MNT || fail
+fi
+
+rm -rf $MNT/lost+found
+for DIR in bin dev etc lib proc tmp mnt ; do
+    mkdir $VERBOSE $MNT/$DIR || fail
+done
+for DIR in block misc fs net pcmcia ; do
+    mkdir $VERBOSE $MNT/lib/$DIR || fail
+done
+
+for F in $DEV ; do
+    cp -a $VERBOSE $ROOT/$F $MNT/dev || fail
+done
+if [ -e $ROOT/dev/systty ] ; then
+    cp -a $VERBOSE $ROOT/dev/systty $MNT/dev || fail
+fi
+
+for F in $BIN ; do
+    strip_cp --strip-all $ROOT/$F $MNT/bin
+done
+strip_cp --strip-all $ROOT/bin/ash $MNT/bin/sh
+
+for F in $LIB ; do
+    strip_cp --strip-debug $ROOT/$F $MNT/lib
+done
+cp $VERBOSE $ROOT/lib/ld-linux.so.? $MNT/lib || fail
+
+for F in $ETC ; do
+    cp $VERBOSE $ROOT/$F $MNT/etc || fail
+done
+for F in scsi network ftl ide memory serial ; do
+    touch $MNT/etc/$F ; chmod +x $MNT/etc/$F
+done
+
+for MOD in $MODULES ; do
+    strip_cp --strip-debug $MODDIR/$MOD $MNT/lib/$MOD
+done
+
+[ "$VERBOSE" ] && echo "Creating linuxrc startup script"
+cat > $MNT/linuxrc <<- 'EOF'
+	#!/bin/sh
+	
+	# Should be either i82365 or tcic
+	PCIC=i82365
+	# Put socket driver timing parameters here
+	PCIC_OPTS=
+	# Put pcmcia_core options here
+	CORE_OPTS=
+	
+	mount -t proc /proc /proc
+
+	echo ""
+	echo "==== initrd: starting PCMCIA services ===="
+	echo ""
+	PC=/lib/pcmcia
+	insmod $PC/pcmcia_core.o $CORE_OPTS
+	insmod $PC/$PCIC.o $PCIC_OPTS
+	insmod $PC/ds.o
+	if [ "$DEBUG" != "" ] ; then V=-v ; fi
+	cardmgr $V -q -o -c /etc -m /lib -s /tmp/stab -p /tmp/pid
+	umount /proc
+	echo ""
+	
+	if [ "$DEBUG" != "" ] ; then
+	    /bin/sh < /dev/console
+	fi
+EOF
+chmod +x $MNT/linuxrc 
+
+df -P $MNT | awk '/tmp/ { printf "%dK/%dK used\n",$3,$2 }'
+umount $VERBOSE $MNT
+rmdir $MNT
+exit 0

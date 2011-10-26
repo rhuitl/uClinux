@@ -1,0 +1,214 @@
+dnl Copyright (C) 2001-2007 Peter Selinger.
+dnl This file is part of Potrace. It is free software and it is covered
+dnl by the GNU General Public License. See the file COPYING for details.
+
+dnl Process this file with autoconf to produce a configure script.
+
+dnl ----------------------------------------------------------------------
+dnl Package info
+AC_INIT(potrace, 1.8, selinger at users.sourceforge.net)
+AC_CONFIG_SRCDIR(src/trace.c)
+AM_INIT_AUTOMAKE
+AC_CONFIG_HEADER(config.h)
+
+DATE="April 2007"
+
+dnl ----------------------------------------------------------------------
+dnl The names of the installed executables are defined here, but
+dnl should not normally be changed.
+
+POTRACE=potrace
+AC_DEFINE_UNQUOTED(POTRACE,"$POTRACE",Name of the potrace binary)
+
+MKBITMAP=mkbitmap
+AC_DEFINE_UNQUOTED(MKBITMAP,"$MKBITMAP",Name of the mkbitmap binary)
+
+dnl ----------------------------------------------------------------------
+dnl figure out compiler options
+
+dnl remember user's CFLAGS, if any
+iCFLAGS="$CFLAGS"
+
+dnl Check for compiler
+AC_PROG_CC
+
+dnl If compiler is gcc, use our own CFLAGS unless user overrides them
+if test "$GCC" = "yes" && test "$iCFLAGS" = ""; then
+  CFLAGS="-g -O2 -Wall -ffloat-store"
+fi
+
+dnl ----------------------------------------------------------------------
+dnl Figure out how to build libraries
+
+AC_PROG_RANLIB
+dnl AC_LIBTOOL_WIN32_DLL
+dnl AC_PROG_LIBTOOL
+
+dnl ----------------------------------------------------------------------
+dnl check for compiler bugs. 
+
+dnl The GCC compiler has a loop optimization bug which affects potrace.
+dnl This bug has been present since gcc-2.X and is currently pending (as
+dnl of gcc version 3.3.1). Since the presence of this bug cannot be
+dnl reliably tested, we simply assume that all gcc compilers have this
+dnl bug. Once the bug is fixed, we will add a test which checks the
+dnl compiler version.
+
+if test "$GCC" = "yes"; then 
+  AC_MSG_CHECKING([whether gcc has bug number 12243])
+  AC_DEFINE(HAVE_GCC_LOOP_BUG,, [Does the C compiler have gcc bug 12243?])
+  AC_MSG_RESULT(yes)
+fi
+
+dnl ----------------------------------------------------------------------
+dnl check for features
+
+AC_ARG_ENABLE(zlib,
+ AC_HELP_STRING([--disable-zlib], [disable PostScript level 3 compression]))
+if test "$enable_zlib" != no; then
+  AC_DEFINE(HAVE_ZLIB,, Do we have the zlib library?)
+fi
+
+dnl Enable optional features
+AC_ARG_ENABLE(metric, 
+ AC_HELP_STRING([--enable-metric], [use metric units (centimeters) as default]))
+if test "$enable_metric" = yes; then
+   AC_DEFINE(USE_METRIC,, Do we use metric units by default?)
+fi
+
+AC_ARG_ENABLE(a4, 
+ AC_HELP_STRING([--enable-a4], [use a4 as the default papersize]))
+if test "$enable_a4" = yes; then
+   AC_DEFINE(USE_A4,, Do we use a4 papersize by default?)
+fi
+
+dnl ----------------------------------------------------------------------
+dnl Calculate value of "prefix", to aid guessing of include file and
+dnl library locations.
+
+USERPREFIX="$prefix"
+if test "$USERPREFIX" = "NONE"; then
+   USERPREFIX="$ac_default_prefix"
+fi
+
+dnl ----------------------------------------------------------------------
+dnl Check for header files
+
+if test "$enable_zlib" != no; then
+  AC_CHECK_HEADER(zlib.h, true,
+    [AC_MSG_WARN([zlib.h not found in standard location.
+Trying again with -I$USERPREFIX/include])
+    CPPFLAGS="$CPPFLAGS -I$USERPREFIX/include"
+    dnl need to unset cached value to repeat the test
+    unset ac_cv_header_zlib_h
+    AC_CHECK_HEADER(zlib.h, true, 
+      [AC_MSG_ERROR([cannot find zlib.h. 
+Rerun ./configure with CPPFLAGS=-I<include dir> if you have the header
+file in a non-standard directory, or with --disable-zlib to disable
+support for PostScript level 3 compression.])
+    ])
+  ])
+fi
+
+dnl ----------------------------------------------------------------------
+dnl Check for symbols
+AC_CHECK_DECL(M_PI, ,
+ AC_DEFINE(M_PI, 3.14159265358979323846, [Define if missing from math.h]),
+ [#include <math.h>])
+
+dnl ----------------------------------------------------------------------
+dnl Check for libraries
+
+if test "$enable_zlib" != no; then
+  AC_CHECK_LIB(z, deflate, EXTRA_LIBS="$EXTRA_LIBS -lz", 
+    [AC_MSG_WARN([libz library not found in standard location.
+Trying again with -L$USERPREFIX/lib])
+    LDFLAGS="$LDFLAGS -L$USERPREFIX/lib"
+    dnl need to unset cached value to repeat the test
+    unset ac_cv_lib_z_deflate
+    AC_CHECK_LIB(z, deflate, EXTRA_LIBS="$EXTRA_LIBS -lz",
+      [AC_MSG_ERROR([cannot find the libz library (-lz).
+Rerun ./configure with LDFLAGS=-L<lib dir> if you have the library in
+a non-standard directory, or with --disable-zlib to disable support
+for PostScript level 3 compression.])
+    ])
+  ])
+fi
+
+AC_CHECK_LIB(m, floor, true, AC_MSG_ERROR([cannot find the m library (-lm)]))
+
+dnl ----------------------------------------------------------------------
+dnl Check for library functions.
+
+dnl Check for getopt_long
+AC_CHECK_FUNC(getopt_long, have_getopt_long=yes, have_getopt_long=no)
+if test "$have_getopt_long" = "yes"; then
+   dnl Check whether getopt_long reorders its arguments
+   AC_MSG_CHECKING([whether getopt_long reorders its arguments])
+   AC_RUN_IFELSE([AC_LANG_PROGRAM(
+   [[ #include <getopt.h>
+      static struct option longopts[] = {
+        {"help", 0, 0, 'h'},
+	{0, 0, 0, 0}
+      };
+   ]], 
+   [[ int ac = 3;
+      char *av[] = { "main", "file", "-h" };
+      return 'h' == getopt_long(ac, av, "h", longopts, (int *)0) ? 0 : 1;
+   ]])], 
+   [AC_MSG_RESULT(yes)], 
+   [AC_MSG_RESULT(no)
+   have_getopt_long=no])
+fi
+if test "$have_getopt_long" != "yes"; then 
+   EXTRA_OBJS="$EXTRA_OBJS getopt.o getopt1.o"
+fi
+
+AC_CHECK_FUNC(strcasecmp, ,
+  [AC_CHECK_FUNC(stricmp, 
+    [AC_DEFINE_UNQUOTED(strcasecmp, stricmp, [Replacement function for strcasecmp])],
+    [AC_MSG_ERROR([cannot find a replacement for strcasecmp])]
+  )]
+)
+AC_CHECK_FUNC(strncasecmp, ,
+  [AC_CHECK_FUNC(strnicmp, 
+    [AC_DEFINE_UNQUOTED(strncasecmp, strnicmp, [Replacement function for strncasecmp])],
+    [AC_MSG_ERROR([cannot find a replacement for strncasecmp])]
+  )]
+)
+
+dnl ----------------------------------------------------------------------
+dnl Check whether we have i386 features
+AC_MSG_CHECKING([for Intel 386])
+AC_TRY_COMPILE(,
+  int x;
+  asm("bsf %1,%0\njnz 0f\nmovl $32,%0\n0:":"=r"(x):"r"(x));
+  return x; /* need this so that -O2 does not optimize the asm away */
+, AC_MSG_RESULT(yes) 
+ AC_DEFINE(HAVE_I386,, [Can we use Intel 386 optimizations?])
+, AC_MSG_RESULT(no))	
+
+
+dnl ----------------------------------------------------------------------
+dnl Check whether compiler supports inlining
+
+AC_C_INLINE
+
+dnl ----------------------------------------------------------------------
+dnl Set up substitutions of non-standard configuration parameters
+AC_SUBST(DATE)
+AC_SUBST(POTRACE)
+AC_SUBST(MKBITMAP)
+AC_SUBST(EXTRA_OBJS)
+AC_SUBST(EXTRA_LIBS)
+AC_SUBST(INCLUDES)
+AC_SUBST(POTRACELIB_VERSION)
+
+dnl ----------------------------------------------------------------------
+AC_OUTPUT([Makefile 
+	   src/Makefile 
+	   doc/Makefile
+	   check/Makefile
+	   doc/potrace.1
+	   doc/mkbitmap.1
+          ])

@@ -1,0 +1,32 @@
+The Flow tracking module is meant to start unifying the state keeping
+mechanisms of snort into a single place. Right now, only a portscan
+detector is implemented but in the long term,  many of the stateful
+subsystems of snort will be migrated over to becoming flow plugins.
+
+An IPv4 flow is defined as a unique(IPPROTO,SIP,DIP,DPORT,SPORT)
+
+     the DPORT and SPORT are 0 unless the protocol is TCP or UDP
+
+memcap
+   number of bytes to allocate
+
+rows
+   number of rows for the flow hash table
+
+stats_interval
+
+    dump statistics at a set interval to stdout. This is an integer
+    representing a time in seconds.  Set this to 0 to disable.  This
+    information will be dumped upon shutdown.
+
+hash 1 - pick a hashing method
+
+   1 - hash by byte
+   2 - hash by integer ( faster, not as much of a chance to become diverse)
+
+   The hash table has a pseudorandom salt picked to make algorithmic
+   complexity attacks much more difficult
+
+Example configuration:
+
+preprocessor flow: stats_interval 0 hash 2

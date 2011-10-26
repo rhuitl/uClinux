@@ -1,0 +1,367 @@
+#!@SHELL@
+#
+# faxrunq
+#
+# look for outgoing fax jobs, send them via sendfax, if succesful, remove
+# them from the outgoing queue (and send a mail to the originator of the
+# job)
+#
+# For details about configuration etc. see "man faxrunq".
+#
+# For heavy-duty usage (multiple lines, many 100 faxes per day), check
+# out faxrunqd.
+#
+# RCS: $Id: faxrunq.in,v 4.18 2005/02/27 11:57:31 gert Exp $ Copyright (C) 1994 Gert Doering
+#
+# $Log: faxrunq.in,v $
+# Revision 4.18  2005/02/27 11:57:31  gert
+# get "trap off" handling from mksed/sedscript
+#
+# Revision 4.17  2005/01/03 16:46:28  gert
+# workaround for needless bash3 incompatibility ("trap 0 1 2 3" doesn't work
+# anymore, need to use "trap - 0 1 2 3", which doesn't work on old /bin/sh)
+#
+# Revision 4.16  2004/11/24 13:30:38  gert
+# implement update-call-program (status update callback)
+#
+# Revision 4.15  2002/11/23 15:35:46  gert
+# test for existance of config file (not for readability) and thus produce
+# error message if it exists but is not readable (mode 600/wrong owner)
+#
+# Revision 4.14  2002/11/23 15:13:51  gert
+# revert 4.10->4.11 change: faxqueue_done is back in fax queue dir (which
+# is now owned by "fax" and no longer world-writeable, while /var/run is
+# likely not writeable by "fax")
+#
+#
+
+FAX_SPOOL=@FAX_SPOOL@
+FAX_SPOOL_OUT=@FAX_SPOOL_OUT@
+FAX_SENDER="@SBINDIR@/sendfax"
+FAX_ACCT=$FAX_SPOOL/acct.log
+LAST_RUN=@FAX_SPOOL_OUT@/faxqueue_done
+
+MAILER="@MAILER@"
+
+CONF_FILE="@CONFDIR@/faxrunq.config"
+
+#
+# echo program that will accept escapes (bash: "echo -e", sun: /usr/5bin/echo)
+#
+echo="@ECHO@"
+
+#
+# awk program that is not stone-old-brain-dead (that is, not oawk...)
+#
+AWK=@AWK@
+
+#
+# make sure we'll find "newslock" and other good stuff when run from "cron"...
+#
+PATH=@BINDIR@:$PATH
+
+#
+# set defaults, then process configuration file (if it exists)
+#
+do_mail_s="TRUE"
+do_mail_f="TRUE"
+exec_pgm_s=""
+exec_pgm_f=""
+exec_pgm_u=""
+max_fail_costly=5
+max_fail_total=10
+delete_sent=""
+
+if [ -f $CONF_FILE ] ; then
+    eval `$AWK '/^ *#/ { next }
+	     $1 == "success-send-mail" \
+		{ printf "do_mail_s=\"%s\";", ($2 ~ /^[yYjJtT1]/)? "T":"" }
+	     $1 == "failure-send-mail" \
+		{ printf "do_mail_f=\"%s\";", ($2 ~ /^[yYjJtT1]/)? "T":"" }
+	     $1 == "success-call-program" \
+		{ printf "exec_pgm_s=\"%s\";", $2 }
+	     $1 == "failure-call-program" \
+		{ printf "exec_pgm_f=\"%s\";", $2 }
+	     $1 == "update-call-program" \
+		{ printf "exec_pgm_u=\"%s\";", $2 }
+	     $1 == "maxfail-costly" && $2 ~ /^[0-9]/ \
+		{ printf "max_fail_costly=\"%s\";", $2 }
+	     $1 == "maxfail-total" && $2 ~ /^[0-9]/ \
+		{ printf "max_fail_total=\"%s\";", $2 }
+	     $1 == "delete-sent-jobs" \
+		{ printf "delete_sent=\"%s\";", ($2 ~ /^[yYjJtT1]/)? "T":"" }
+	     $1 == "acct-log" \
+		{ printf "FAX_ACCT=\"%s\";", $2 }
+	     END { printf "\n" }' - <$CONF_FILE`
+fi
+
+#
+# command line arguments
+#
+usage="usage: $0 [-s] [-q]"
+
+while :
+do
+    case "$1" in
+# sleep 30 seconds after each job, give modem time to settle
+	-s) sleepwait=30;shift;;
+# quiet operation
+	-q) exec >/dev/null ; shift ;;
+# invalid option
+	-*) $echo "$0: unknown option: $1" >&2
+            $echo "$usage" >&2
+	    exit 1
+	    ;;
+	*) break
+    esac
+done
+
+if [ $# -gt 0 ]
+then
+    $echo "$usage" >&2
+    exit 1
+fi
+
+#
+# go to fax spool directory, process all JOB files
+#
+
+cd $FAX_SPOOL_OUT || exit 1
+
+# stop flag?
+if [ -r stop ] ; then
+    $echo "faxrunq: $FAX_SPOOL_OUT/stop exists, not running queue."
+    exit 0
+fi
+
+status="0"
+jobs=`ls */JOB 2>/dev/null`
+for job in $jobs
+do
+    if [ $status -eq 4 -a -n "$sleepwait" ]
+    then
+#     old stat :no connect; modem allows next redial in $sleepwait secs
+      $echo "sleeping $sleepwait seconds"
+      sleep $sleepwait
+    fi
+    cd $FAX_SPOOL_OUT/`dirname $job`
+    $echo "processing $job..."
+#
+#   lock JOB file (by 'link(2)'ing it to JOB.locked)
+#   'newslock' is a small C program that just calls link(argv[1], argv[2])
+#
+    # make sure Lock will be removed in case the shell aborts
+    trap "rm -f JOB.locked 2>/dev/null" 0
+    trap "rm -f JOB.locked 2>/dev/null ; exit 20" 1 2 3 15
+
+    newslock JOB JOB.locked 2>/dev/null
+    if [ $? -ne 0 ]
+    then
+	$echo "already locked"
+	@TRAP_OFF@ 0 1 2 3 15
+	continue
+    fi
+#
+# get user to notify (->$MAIL_TO), phone number (->$PHONE) and
+# earliest send time (->$TIME)
+#
+# read job using 'tr', remove all quote characters, dollar, and backslash
+#
+    eval `tr -d '\042\047\140\134\044\073' <JOB | \
+	  $AWK 'BEGIN { user=""; mail=""; verbto=""; time=""; re=""; ah=""; }
+		$1=="user" { user=$2 }
+		$1=="mail" { mail=substr( $0, 6) }
+		$1=="phone" { printf "PHONE=%s;", $2 }
+		$1=="time" { time=$2 }
+		$1=="verbose_to" { verbto=substr($0,12) }
+		$1=="subject" { re=substr($0,9) }
+		$1=="acct_handle" { ah=substr($0,13) }
+		END { if ( mail != "" ) printf "MAIL_TO=\"%s\";", mail
+				   else printf "MAIL_TO=\"%s\";", user
+		      printf "TIME=\"%s\";", time
+		      printf "VERBOSE_TO=\"%s\";", verbto
+		      printf "RE=\"%s\"; AH=\"%s\"", re, ah }' - `
+
+#
+# check whether send time is reached
+#
+    if [ ! -z "$TIME" ]
+    then
+	if [ `date "+%H""%M"` -lt $TIME ]
+	then
+	    $echo "...send time not reached, postponing job"
+	    rm JOB.locked
+	    continue
+	fi
+    fi
+
+#
+# construct command line to execute
+# read job using 'tr', remove all quote characters, dollar, and backslash
+#
+    command=`tr -d '\042\047\140\134\044\073' <JOB | \
+             $AWK 'BEGIN { phone="-"; flags=""; pages="" }
+		  $1=="phone" { phone=$2 }
+		  $1=="header"     { flags=flags" -h "$2 }
+		  $1=="poll"       { flags=flags" -p" }
+		  $1=="normal_res" { flags=flags" -n" }
+		  $1=="acct_handle" { flags=flags" -A \""substr($0,13)"\"" }
+		  $1=="pages" { for( i=2; i<=NF; i++) pages=pages$i" " }
+		  END { printf "'"$FAX_SENDER"' -v%s %s %s", \
+			       flags, phone, pages }' -`
+
+#
+# execute faxsend command
+#
+    $echo "$command"
+    eval $command
+#
+# handle return values
+#
+    status=$?
+    $echo "command exited with status $status"
+
+#
+# string to include in subject line
+#
+    if [ -z "$VERBOSE_TO" ]
+    then
+        subject="your fax to $PHONE"
+    else
+        subject="your fax to $VERBOSE_TO ($PHONE)"
+    fi
+
+#
+# evaluate return codes, if success, remove fax job from queue
+#
+    if [ $status -eq 0 ]
+    then
+	# transmission successful
+	$echo "Status "`date`" successfully sent" >>JOB
+
+	# update accounting log
+	$echo "$MAIL_TO "`dirname $job`" |$PHONE |$AH|"`date`"| success" >>$FAX_ACCT
+
+	# send mail, if requested
+	if [ -n "$do_mail_s" ] ; then
+	    $echo "    send mail to $MAIL_TO..."
+	    ( 
+	      @TRAP_OFF@ 0			# catch BASH bug
+	      $echo "To: $MAIL_TO"
+	      $echo "Subject: OK: $subject"
+	      $echo "From: root (Fax Subsystem)\n"
+	      $echo "Your fax has been sent successfully at: \c"
+	      date
+	      test -z "$RE" || \
+		$echo "(Subject was: $RE)\n"
+	      $echo "\n\nJob / Log file:"
+	      cat JOB
+	      tries=`grep Status JOB | sed -e '1d' | wc -l`
+	      $echo "\nSending succeeded after" $tries "unsuccessful tries."
+	    ) |
+	    $MAILER "$MAIL_TO"
+	fi
+
+	# call "success" handler program (if requested)
+	if [ -n "$exec_pgm_s" ] ; then
+	    $echo "    calling program $exec_pgm_s..."
+	    $exec_pgm_s $FAX_SPOOL_OUT/$job 0
+	fi
+
+	# job is done -> remove it from the queue
+	mv JOB JOB.done
+
+	# completely remove JOB directory (only if requested)
+	# instead of this, the job could be archived by "$exec_pgm_s" or so
+	if [ -n "$delete_sent" ] ; then
+	    $echo "    deleting job files + directory..."
+	    cd $FAX_SPOOL_OUT
+	    rm -rf `dirname $job`
+	fi
+
+    else 
+	# error codes < 10: error before starting to transmit (try again)
+	# error codes >=10: error while transmitting, considered fatal
+	comment="failed"
+	why="unknown" ; case $status in
+	    1) why="errors in command line" ;;
+	    2) why="cannot open fax device (locked?)" ;;
+	    3) why="modem initialization error" ;;
+	    4) why="dial failed - BUSY" ;;
+	    5) why="dial failed - NO DIALTONE" ;;
+	    10) why="dial failed - NO CARRIER" ; comment="FATAL FAILURE";;
+	    11) why="protocol failure, waiting for XON" ; comment="FATAL FAILURE";;
+	    12) why="protocol failure sending page" ; comment="FATAL FAILURE";;
+	    15) why="sendfax killed by signal(?)" ; comment="FATAL FAILURE";;
+	esac
+	$echo "Status "`date`" $comment, exit($status): $why" >>JOB
+
+	# update accounting log
+	$echo "$MAIL_TO "`dirname $job`" |$PHONE |$AH|"`date`"| fail $status: $why" >>$FAX_ACCT
+
+	# if failed <max_fail_costly> or <max_fail_total> times, suspend job
+	suspend="";
+	if [ `grep "FATAL FAILURE" JOB | wc -l` -ge $max_fail_costly ]
+	then
+	    $echo "Status "`date`" job suspended: too many FATAL errors" >>JOB
+	    suspend=true
+	elif [ `grep "Status " JOB | wc -l` -ge $max_fail_total ]
+	then
+	    $echo "Status "`date`" job suspended: too many tries" >>JOB
+	    suspend=true
+	fi
+
+	if [ -n "$suspend" ]
+	then
+	    # send mail, if requested
+	    if [ -n "$do_mail_f" ] ; then
+		echo "    send mail to $MAIL_TO..."
+		( 
+		  @TRAP_OFF@ 0			# catch BASH bug
+		  $echo "To: $MAIL_TO"
+		  $echo "Subject: FAIL: $subject failed"
+		  $echo "From: root (Fax Subsystem)\n"
+		  $echo "It was not possible to send your fax to $PHONE!\n"
+		  test -z "$RE" || \
+		    $echo "(Subject was: $RE)\n"
+		  $echo "The fax job is suspended, you can requeue it with the command:"
+		  $echo "    cd $FAX_SPOOL_OUT/"`dirname $job`
+		  $echo "    mv JOB.suspended JOB\n"
+		  $echo "log file follows:"
+		  cat JOB ) |
+		$MAILER "$MAIL_TO"
+	    fi
+
+	    # call error handler, if requested
+	    if [ -n "$exec_pgm_f" ] ; then
+		$echo "    calling program $exec_pgm_f ($status)..."
+		$exec_pgm_f $FAX_SPOOL_OUT/$job $status
+	    fi
+
+	    #
+	    # suspend job (but do not delete it)
+	    #
+	    mv JOB JOB.suspended 2>/dev/null
+	else					# do not delete job yet...
+	    # call update handler, if requested
+	    if [ -n "$exec_pgm_u" ] ; then
+		$echo "    calling program $exec_pgm_u (-$status)..."
+		$exec_pgm_u $FAX_SPOOL_OUT/$job -$status
+	    fi
+	fi
+    fi
+#
+# unlock job (even if the JOB has been renamed to JOB.suspended or 
+#             JOB.done, the link to JOB.locked still exists!)
+#
+    rm -f JOB.locked
+done
+
+@TRAP_OFF@ 0 1 2 3 15
+
+#
+# touch the time stamp, to make faxspool happy
+#
+rm -f $LAST_RUN
+echo "`date` $0" >$LAST_RUN
+chmod 644 $LAST_RUN

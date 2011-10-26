@@ -1,0 +1,132 @@
+This file is INSTALL.  It contains installation instructions for the
+Tcl debugger.
+
+If you are installing on a single architecture, or are just trying it
+out to see whether it's worth installing, follow the Simple
+Installation below.  If you are installing this on multiple
+architectures or the "Simple Installation" instructions are not
+sufficient, see "Sophisticated Installations" below.
+
+--------------------
+Simple Installation
+--------------------
+
+Run "./configure".  This will generate a Makefile (from a prototype
+called "Makefile.in") appropriate to your system.
+
+Edit the Makefile and change any definitions as appropriate for your
+site.  All the definitions you are likely to want to change are
+clearly identified and described at the beginning of the file.
+
+Run "make".
+
+This will build the library libtcldbg.a that you can then experiment
+with.  "make install" will install the library.
+
+-------------------
+Modifying Your Application to Use the Debugger
+-------------------
+
+There are a number of ways to hook the debugger into your application.
+
+1) The absolute simplest way is add the following line at some point
+in your initialization.  (It always returns TCL_OK.)
+
+	Dbg_Init(interp);
+
+This will add a "debug" command to your interpreter.  (Inside your
+application, "debug 1" will start the interpreter.  "debug 0" will
+stop it.  When the debugger prompts for a command, type "h" for help.)
+
+In the same file, add the following directive before the Dbg_On call:
+
+	#include "Dbg.h"
+
+Add the libtcldebug.a to your link line.  Re-Make your application.
+
+Print the document tcl-debug.ps to get the complete instructions on
+how to hook the debugger into any Tcl program.  This describes other
+options such as invoking the debugger on ^C, as well as the debugger
+commands themselves.
+
+2) This is the same as (1) but you can change the name of the debugger
+command to be something else besides "debug".  Just add the line:
+
+	Dbg_DefaultCmdName = "whatever";
+
+before Dbg_Init(interp).  Now follow remaining instructions for (1).
+
+3) You don't have to use the default command binding.  Create your own
+command.  Internally, it should call Dbg_On(interp,0) where you want
+to start the debugger.  Another good place to invoke Dbg_On is from a
+command-line flag such as "-d".  For example:
+
+	while (c = getopt(arg,c,argv,"d")) {
+		switch (c) {
+		case 'd': Dbg_On(interp,0); break;
+		}
+	}
+
+Add the usual include and link directives as described in (1).
+
+Print the document tcl-debug.ps to get the complete instructions on
+how to hook the debugger into any Tcl program.  This describes other
+options such as invoking the debugger on ^C, as well as the debugger
+commands themselves.
+
+--------------------
+Sophisticated Installations
+--------------------
+
+The following instructions provide some suggestions for handling
+complex installations.
+
+--------------------
+Multiple-Architecture Installation
+--------------------
+
+You might want to compile a software package in a different directory
+from the one that contains the source code.  Doing this allows you to
+compile the package for several architectures simultaneously from the
+same copy of the source code and keep multiple sets of object files on
+disk.
+
+To compile the package in a different directory from the one
+containing the source code, you must use a version of make that
+supports the VPATH variable.  GNU make and most other recent make
+programs can do this.
+
+cd to the directory where you want the object files and executables to
+go and run configure.  configure automatically checks for the source
+code in the directory that configure is in and in ..  If configure
+reports that it cannot find the source code, run configure with the
+option --srcdir=dir, where dir is the directory that contains the
+source code.
+
+--------------------
+Changing Defaults
+--------------------
+
+Some of the defaults in "configure" can be overridden by environment
+variables.  This is a convenience intended for environments that
+likely affect any program that you configure and install.
+
+The following variables are supported:
+CC		C compiler program.
+		Default is `cc', or `gcc' if `gcc' is in your PATH.
+INSTALL		Program to use to install files.
+		Default is `install' if you have it, `cp' otherwise.
+
+These settings can also be given on the command line.  For example,
+you could tell configure about a particular C compiler from a
+Bourne-compatible shell as follows:
+
+	CC='gcc -traditional' DEFS=-D_POSIX_SOURCE
+
+Configure assumes that the Tcl source directory can be found in the
+parent directory of debugger.  Create a symbolic link in the
+debugger's parent directory to where the Tcl directory is.  By
+default, configure uses the latest release of Tcl that it can find.
+You can override this by creating a symbolic link of "tcl" which
+points to the release you want.
+

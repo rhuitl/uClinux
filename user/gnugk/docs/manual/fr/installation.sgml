@@ -1,0 +1,158 @@
+<!-- French translation from installation.sgml v1.3 -->
+
+<sect>Compilation et Installation
+<p>
+<sect1>Compilation du Gatekeeper
+<p>
+Pour construire le gatekeeper vous avez besoin d'au moins PWLib 1.5.0 et OpenH323 1.12.0 ou ult&#233;rieur.
+La version de d&#233;veloppement du gatekeeper a g&#233;n&#233;ralement besoin de la version
+de OpenH323 la plus r&#233;cente disponible.
+Ces librairies sont disponibles sur la
+<url url="http://sourceforge.net/projects/openh323" name="Page de T&#233;l&#233;chargement de OpenH323">.
+Voir les instructions sur
+<url url="http://www.openh323.org/build.html" name="comment compiler le code de OpenH323">.
+
+Ordre de compilation:
+<enum>
+<item>PWLib (version release + debug)
+<item>OpenH323
+<item>Application de test OpenH323 (pas n&#233;cessaire, juste pour s'assurer que tout marche)
+<item>Le Gatekeeper
+</enum>
+
+Sous Unix faire un <tt/configure/ et <tt/make debug/ ou <tt/make opt/
+dans le r&#233;pertoire du gatekeeper pour construire la version debug ou release, respectivement.
+Utiliser <tt/make both/ pour construire les deux versions.
+Il faut noter que vous devez utiliser GCC 3.3.x ou ult&#233;rieur. Les versions plus anciennes peuvent ne pas marcher.
+Une bonne habitude est de faire un <tt/make debugdepend/ ou <tt/make optdepend/
+dans le r&#233;pertoire du gatekeeper avant de commencer la compilation (make debug ou
+make opt) - ces commandes construisent les listes de d&#233;pendances appropri&#233;es, de telle sorte
+qu'apr&#232;s avoir mis &#224; jour vos sources depuis CVS, tous les fichiers affect&#233;s seront recompil&#233;s.
+Sinon vous pourriez obtenir un Gatekeeper partiellement compil&#233; avec les vieux
+en-t&#234;tes et partiellement avec les nouveaux en-t&#234;tes - une mauvaise chose.<newline>
+
+Sous Windows, ouvrez et compilez simplement la solution fournie (<tt/gk.sln/) pour
+Microsoft Visual Studio .NET 2003 ou le workspace (<tt/gk.dsw/) pour Microsoft
+Visual Studio 6.0 SP6. Bien sur, vous devez d&#233;j&#224; avoir compil&#233; PWLib
+et OpenH323 et configur&#233; les chemins appropri&#233;s pour les include/librairies.
+Si vous souhaitez le support MySQL ou PostgreSQL, installez/compilez les librairies
+clients appropri&#233;es et ajoutez HAS_MSQL=1 et/ou HAS_PGSQL=1 dans les macros du
+pr&#233;processeur du projet gatekeeper. Vous devez aussi indiquer au compilateur
+ou trouver les fichiers include/librairies et indiquer &#224; l'&#233;diteur de liens
+de linker avec ces librairies clients.
+<newline>
+
+Taper <tt/configure --help/ pour voir une liste d&#233;taill&#233;e de toutes les options
+de compilation. Vous pouvez les utiliser pour activer ou d&#233;sactiver certaines fonctions du gatekeeper.
+Par exemple, si vous n'avez pas besoin de RADIUS, taper juste: <tt/configure --disable-radius/.<newline>
+
+Les versions recommand&#233;es de PWLib/OpenH323 sont celles de la version Pandora
+(1.7.5.2/1.14.4.2) ou plus r&#233;cente. Les versions plus anciennes ne sont plus
+support&#233;es et ne sont pas garanties de fonctionner avec le gatekeeper.
+
+Pour construire le gatekeeper qui est li&#233; statiquement avec les librairies syst&#232;me et OpenH323,
+il faut utiliser <tt/make optnoshared/ ou <tt/make debugnoshared/.
+
+Pour utiliser le gatekeeper sous une charge lourde, activer la fonction LARGE_FDSET
+(SEULEMENT POUR LA VERSION UNIX) est recommand&#233; (configure --with-large-fdset=4096).
+Certains syst&#232;mes requi&#232;rent aussi l'utilisation de ulimit pour autoriser l'allocation
+de plus de 1024 sockets pour un seul processus. Il faut noter qu'&#224; partir de la version 1.5.3 la
+librairie PWLib support aussi une fonction similaire, vous pouvez donc choisir entre
+les impl&#233;mentations LARGE_FDSET GnuGk et PWLib. L'impl&#233;mentation native GnuGk donne
+de meilleures performances. La valeur maximale LARGE_FDSET devrait &#234;tra calcul&#233;e en se
+basant sur l'utilisation maximum pr&#233;vue de sockets. Un proc&#233;d&#233; empirique est:
+<tscreen><verb>
+MAX_NUMBER_OF_CONCURRENT_CALLS * 10 * 120%
+
+O&#249;:
+10 = 2 sockets pour Q.931 + 2 sockets pour H.245 + 6 sockets pour RTP et autres
+</verb></tscreen>
+Ainsi pour 100 appels simultan&#233;s vous n'avez pas besoin de plus d'environ 1024 sockets
+dans le LARGE_FDSET.
+
+<sect1>L'utilitaire addpasswd
+<p>
+L'authentification de l'acc&#232;s &#224; la ligne d'&#233;tat et le
+module SimplePasswordAuth ont besoin que des mots de passe crypt&#233;s
+soient stock&#233;s dans le fichier de configuration du gatekeeper.
+Et depuis la version 2.2.2, le gatekeeper supporte le cryptage de tous les
+mots de passe dans la configuration. L'utilitaire <tt/addpasswd/ est
+n&#233;cessaire pour g&#233;n&#233;rer et stocker les mots de passe
+crypt&#233;s. Cet utilitaire est fourni avec le gatekeeper et peut
+&#234;tre compil&#233; en utilisant:
+<tscreen><verb>
+$ make addpasswd
+</verb></tscreen>
+
+L'utilisation est la suivante:
+<tscreen><verb>
+$ addpasswd CONFIG SECTION KEYNAME PASSWORD
+</verb></tscreen>
+
+Exemple 1: l'utilisateur 'gkadmin' avec le mot de passe 'secret' doit
+&#234;tre ajout&#233; &#224; la section de configuration [GkStatus::Auth]
+pour activer l'interface de la ligne d'&#233;tat:
+<tscreen><verb>
+$ addpasswd gnugk.ini GkStatus::Auth gkadmin secret
+</verb></tscreen>
+
+Exemple 2: l'utilisateur 'joe' avec le mot de passe 'secret' doit
+&#234;tre ajout&#233; &#224; la section de configuration [Password] pour
+activer l'authentification de terminal:
+<tscreen><verb>
+$ addpasswd gnugk.ini Password joe secret
+</verb></tscreen>
+
+Exemple 3: Un secret partag&#233; crypt&#233; est ajout&#233; &#224; la
+section de configuration RadAuth:
+<tscreen><verb>
+$ addpasswd gnugk.ini RadAuth SharedSecret VerySecretPassword
+</verb></tscreen>
+
+IMPORTANT: La variable <tt/KeyFilled/ d&#233;finit une initialisation par
+d&#233;faut pour les cl&#233;s de cryptage de mot de passe. Il peut &#234;tre
+omis dans le fichier de configuration (il est alors &#233;gal &#224; 0), mais
+si il est pr&#233;cis&#233;, &#224; chaque fois qu'il change, les mots de passe
+crypt&#233;s doivent &#234;tre reg&#233;n&#233;r&#233;s (encore crypt&#233;s
+avec l'utilitaire <tt/addpasswd/).
+</sect1>
+
+<sect1>Installation du Gatekeeper
+<p>
+Il n'y a pas de proc&#233;dure d'installation sp&#233;ciale.
+Copiez juste l'ex&#233;cutable dans le r&#233;pertoire que vous voulez
+et cr&#233;ez le fichier de configuration.
+Il y a plusieurs exemples de configuration dans le r&#233;pertoire <tt>etc/</tt>
+de l'arborescence des sources. Se reporter &#224; la section
+<ref id="config" name="Fichier de Configuration"> pour de plus amples explications.
+
+Par exemple, sur une plateforme Linux x86, l'ex&#233;cutable optimis&#233;
+<tt/gnugk/ est cr&#233;&#233; dans le sous-r&#233;pertoire <tt>obj_linux_x86_r/</tt>.
+Vous pouvez le copier dans <tt>/usr/sbin/</tt>, cr&#233;er une configuration dans
+<tt>/etc/gnugk.ini</tt> et le d&#233;marrer avec
+<tscreen><verb>
+$ /usr/sbin/gnugk -c /etc/gnugk.ini -o /var/log/gnugk.log -ttt
+</verb></tscreen>
+Se reporter &#224; la section
+<ref id="commandline" name="Options de la Ligne de Commande"> pour les d&#233;tails.
+
+<sect1>Binaires Pr&#233;construits
+<p>
+Si vous ne voulez pas compiler le gatekeeper &#224; partir des sources,
+il y a plusieurs 'packages' pr&#233;construits disponibles sur
+<url url="http://sourceforge.net/project/showfiles.php?group_id=4797" name="SourceForge">.
+Toutes les versions ne sont pas disponibles - v&#233;rifier ce qui est disponible.
+
+<bf/Packages tar (.tgz ou .tar.gz)/<p>
+T&#233;l&#233;charger le fichier tar et saisir la commande suivante en tant que
+<tt/root/, en substituant le nom du fichier que vous avez t&#233;l&#233;charg&#233;.
+<tscreen><verb>
+$ tar xvzf gnugk-x.x.x.tar
+</verb></tscreen>
+
+<bf/Packages Debian (.deb)/<p>
+Debian inclut le gatekeeper en tant que package openh323gk.
+Vous pouvez l'installer en utilisation la commande suivante en tant que <tt/root/:
+<tscreen><verb>
+$ apt-get install openh323gk
+</verb></tscreen>

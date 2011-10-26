@@ -1,0 +1,65 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+CFLAGS-libutil := -DNOT_IN_libc -DIS_IN_libutil $(SSP_ALL_CFLAGS)
+
+LDFLAGS-libutil.so := $(LDFLAGS)
+
+LIBS-libutil.so := $(LIBS)
+
+libutil_FULL_NAME := libutil-$(VERSION).so
+
+libutil_DIR := $(top_srcdir)libutil
+libutil_OUT := $(top_builddir)libutil
+
+libutil_SRC := $(wildcard $(libutil_DIR)/*.c)
+ifneq ($(ARCH_USE_MMU),y)
+libutil_SRC := $(filter-out $(libutil_DIR)/forkpty.c,$(libutil_SRC))
+endif
+libutil_OBJ := $(patsubst $(libutil_DIR)/%.c,$(libutil_OUT)/%.o,$(libutil_SRC))
+
+ifeq ($(DOPIC),y)
+libutil-a-y := $(libutil_OBJ:.o=.os)
+else
+libutil-a-y := $(libutil_OBJ)
+endif
+libutil-so-y := $(libutil_OBJ:.o=.os)
+
+lib-a-y += $(top_builddir)lib/libutil.a
+lib-so-y += $(top_builddir)lib/libutil.so
+objclean-y += libutil_clean
+
+ifeq ($(DOMULTI),n)
+ifeq ($(DOPIC),y)
+$(top_builddir)lib/libutil.so: $(top_builddir)lib/libutil.a $(libc)
+else
+$(top_builddir)lib/libutil.so: $(libutil_OUT)/libutil_so.a $(libc)
+endif
+	$(call link.so,$(libutil_FULL_NAME),$(MAJOR_VERSION))
+else
+$(top_builddir)lib/libutil.so: $(libutil_OUT)/libutil.oS | $(libc)
+	$(call linkm.so,$(libutil_FULL_NAME),$(MAJOR_VERSION))
+endif
+
+$(libutil_OUT)/libutil_so.a: $(libutil-so-y)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+$(libutil_OUT)/libutil.oS: $(libutil_SRC)
+	$(Q)$(RM) $@
+	$(compile-m)
+	$(do_t_strip)
+
+$(top_builddir)lib/libutil.a: $(libutil-a-y)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+libutil_clean:
+	$(RM) $(libutil_OUT)/*.{o,os,oS,a}

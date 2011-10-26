@@ -1,0 +1,393 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>rrdgraph_rpn</title>
+<link rev="made" href="mailto:dws@ee.ethz.ch" />
+</head>
+
+<body style="background-color: white">
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#operators">OPERATORS</a></li>
+	<li><a href="#variables">VARIABLES</a></li>
+	<li><a href="#see_also">SEE ALSO</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+-->
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>rrdgraph_rpn - About RPN Math in rrdtool graph</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p><em>RPN expression</em>:=<em>vname</em>|<em>operator</em>|<em>value</em>[,<em>RPN expression</em>]</p>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>If you have ever used a traditional HP calculator you already know
+<strong>RPN</strong>. The idea behind <strong>RPN</strong> is that you have a stack and push
+your data onto this stack. Whenever you execute an operation, it
+takes as many elements from the stack as needed. Pushing is done
+implicitly, so whenever you specify a number or a variable, it gets
+pushed onto the stack automatically.</p>
+<p>At the end of the calculation there should be one and only one
+value left on the stack.  This is the outcome of the function and
+this is what is put into the <em>vname</em>.  For <strong>CDEF</strong> instructions,
+the stack is processed for each data point on the graph. <strong>VDEF</strong>
+instructions work on an entire data set in one run.</p>
+<p>Example: <code>VDEF:maximum=mydata,MAXIMUM</code></p>
+<p>This will set variable ``maximum'' which you now can use in the rest
+of your RRD script.</p>
+<p>Example: <code>CDEF:mydatabits=mydata,8,*</code></p>
+<p>This means:  push variable <em>mydata</em>, push the number 8, execute
+the operator <em>+</em>. The operator needs two elements and uses those
+to return one value.  This value is then stored in <em>mydatabits</em>.
+As you may have guessed, this instruction means nothing more than
+<em>mydatabits = mydata * 8</em>.  The real power of <strong>RPN</strong> lies in the
+fact that it is always clear in which order to process the input.
+For expressions like <code>a = b + 3 * 5</code> you need to multiply 3 with
+5 first before you add <em>b</em> to get <em>a</em>. However, with parentheses
+you could change this order: <code>a = (b + 3) * 5</code>. In <strong>RPN</strong>, you
+would do <code>a = b, 3, +, 5, *</code> without the need for parentheses.</p>
+<p>
+</p>
+<hr />
+<h1><a name="operators">OPERATORS</a></h1>
+<dl>
+<dt><strong><a name="item_boolean_operators">Boolean operators</a></strong><br />
+</dt>
+<dd>
+<strong>LT, LE, GT, GE, EQ, NE</strong>
+</dd>
+<dd>
+<p>Pop two elements from the stack, compare them for the selected condition
+and return 1 for true or 0 for false. Comparing an <em>unknown</em> or an
+<em>infinite</em> value will always result in 0 (false).</p>
+</dd>
+<dd>
+<p><strong>UN, ISINF</strong></p>
+</dd>
+<dd>
+<p>Pop one element from the stack, compare this to <em>unknown</em> respectively
+to <em>positive or negative infinity</em>. Returns 1 for true or 0 for false.</p>
+</dd>
+<dd>
+<p><strong>IF</strong></p>
+</dd>
+<dd>
+<p>Pops three elements from the stack.  If the element popped last is 0
+(false), the value popped first is pushed back onto the stack,
+otherwise the value popped second is pushed back. This does, indeed,
+mean that any value other than 0 is considered to be true.</p>
+</dd>
+<dd>
+<p>Example: <code>A,B,C,IF</code> should be read as <code>if (A) then (B) else (C)</code></p>
+</dd>
+<dd>
+<p></p>
+</dd>
+<p></p>
+<dt><strong><a name="item_comparing_values">Comparing values</a></strong><br />
+</dt>
+<dd>
+<strong>MIN, MAX</strong>
+</dd>
+<dd>
+<p>Pops two elements from the stack and returns the smaller or larger,
+respectively.  Note that <em>infinite</em> is larger than anything else.
+If one of the input numbers is <em>unknown</em> then the result of the operation will be
+<em>unknown</em> too.</p>
+</dd>
+<dd>
+<p><strong>LIMIT</strong></p>
+</dd>
+<dd>
+<p>Pops two elements from the stack and uses them to define a range.
+Then it pops another element and if it falls inside the range, it
+is pushed back. If not, an <em>unknown</em> is pushed.</p>
+</dd>
+<dd>
+<p>The range defined includes the two boundaries (so: a number equal
+to one of the boundaries will be pushed back). If any of the three
+numbers involved is either <em>unknown</em> or <em>infinite</em> this function
+will always return an <em>unknown</em></p>
+</dd>
+<dd>
+<p>Example: <code>CDEF:a=alpha,0,100,LIMIT</code> will return <em>unknown</em> if
+alpha is lower than 0 or if it is higher than 100.</p>
+</dd>
+<dd>
+<p></p>
+</dd>
+<p></p>
+<dt><strong><a name="item_arithmetics">Arithmetics</a></strong><br />
+</dt>
+<dd>
+<strong>+, -, *, /, %</strong>
+</dd>
+<dd>
+<p>Add, subtract, multiply, divide, modulo</p>
+</dd>
+<dd>
+<p><strong>SIN, COS, LOG, EXP, SQRT</strong></p>
+</dd>
+<dd>
+<p>Sine and cosine (input in radians), log and exp (natural logarithm),
+square root.</p>
+</dd>
+<dd>
+<p><strong>ATAN</strong></p>
+</dd>
+<dd>
+<p>Arctangent (output in radians).</p>
+</dd>
+<dd>
+<p><strong>ATAN2</strong></p>
+</dd>
+<dd>
+<p>Arctangent of y,x components (output in radians).
+This pops one element from the stack, the x (cosine) component, and then
+a second, which is the y (sine) component.
+It then pushes the arctangent of their ratio, resolving the ambiguity between
+quadrants.</p>
+</dd>
+<dd>
+<p>Example: <code>CDEF:angle=Y,X,ATAN2,RAD2DEG</code> will convert <code>X,Y</code>
+components into an angle in degrees.</p>
+</dd>
+<dd>
+<p><strong>FLOOR, CEIL</strong></p>
+</dd>
+<dd>
+<p>Round down or up to the nearest integer.</p>
+</dd>
+<dd>
+<p><strong>DEG2RAD, RAD2DEG</strong></p>
+</dd>
+<dd>
+<p>Convert angle in degrees to radians, or radians to degrees.</p>
+</dd>
+<p></p>
+<dt><strong><a name="item_set_operations">Set Operations</a></strong><br />
+</dt>
+<dd>
+<strong>SORT, REV</strong>
+</dd>
+<dd>
+<p>Pop one element from the stack.  This is the <em>count</em> of items to be sorted
+(or reversed).  The top <em>count</em> of the remaining elements are then sorted
+(or reversed) in place on the stack.</p>
+</dd>
+<dd>
+<p>Example: <code>CDEF:x=v1,v2,v3,v4,v5,v6,6,SORT,POP,5,REV,POP,+,+,+,4,/</code> will
+compute the average of the values v1 to v6 after removing the smallest and
+largest.</p>
+</dd>
+<dd>
+<p><strong>TREND</strong></p>
+</dd>
+<dd>
+<p>Create a ``sliding window'' average of another data series.</p>
+</dd>
+<dd>
+<p>Usage:
+CDEF:smoothed=x,1800,TREND</p>
+</dd>
+<dd>
+<p>This will create a half-hour (1800 second) sliding window average of x.  The
+average is essentially computed as shown here:</p>
+</dd>
+<dd>
+<pre>
+                 +---!---!---!---!---!---!---!---!---&gt;
+                                                     now
+                       delay     t0
+                 &lt;---------------&gt;
+                         delay       t1
+                     &lt;---------------&gt;
+                              delay      t2
+                         &lt;---------------&gt;</pre>
+</dd>
+<dd>
+<pre>
+     Value at sample (t0) will be the average between (t0-delay) and (t0)
+     Value at sample (t1) will be the average between (t1-delay) and (t1)
+     Value at sample (t2) will be the average between (t2-delay) and (t2)</pre>
+</dd>
+<p></p>
+<dt><strong><a name="item_special_values">Special values</a></strong><br />
+</dt>
+<dd>
+<strong>UNKN</strong>
+</dd>
+<dd>
+<p>Pushes an unknown value on the stack</p>
+</dd>
+<dd>
+<p><strong>INF, NEGINF</strong></p>
+</dd>
+<dd>
+<p>Pushes a positive or negative infinite value on the stack. When
+such a value is graphed, it appears at the top or bottom of the
+graph, no matter what the actual value on the y-axis is.</p>
+</dd>
+<dd>
+<p><strong>PREV</strong></p>
+</dd>
+<dd>
+<p>Pushes an <em>unknown</em> value if this is the first value of a data
+set or otherwise the result of this <strong>CDEF</strong> at the previous time
+step. This allows you to do calculations across the data.  This
+function cannot be used in <strong>VDEF</strong> instructions.</p>
+</dd>
+<dd>
+<p><strong>PREV(vname)</strong></p>
+</dd>
+<dd>
+<p>Pushes an <em>unknown</em> value if this is the first value of a data
+set or otherwise the result of the vname variable at the previous time
+step. This allows you to do calculations across the data. This
+function cannot be used in <strong>VDEF</strong> instructions.</p>
+</dd>
+<dd>
+<p><strong>COUNT</strong></p>
+</dd>
+<dd>
+<p>Pushes the number 1 if this is the first value of the data set, the
+number 2 if it is the second, and so on. This special value allows
+you to make calculations based on the position of the value within
+the data set. This function cannot be used in <strong>VDEF</strong> instructions.</p>
+</dd>
+<dd>
+<p></p>
+</dd>
+<p></p>
+<dt><strong><a name="item_time">Time</a></strong><br />
+</dt>
+<dd>
+Time inside RRDtool is measured in seconds since the epoch. The
+epoch is defined to be <code>Thu&nbsp;Jan&nbsp;&nbsp;1&nbsp;00:00:00&nbsp;UTC&nbsp;1970</code>.
+</dd>
+<dd>
+<p><strong>NOW</strong></p>
+</dd>
+<dd>
+<p>Pushes the current time on the stack.</p>
+</dd>
+<dd>
+<p><strong>TIME</strong></p>
+</dd>
+<dd>
+<p>Pushes the time the currently processed value was taken at onto the stack.</p>
+</dd>
+<dd>
+<p><strong>LTIME</strong></p>
+</dd>
+<dd>
+<p>Takes the time as defined by <strong>TIME</strong>, applies the time zone offset
+valid at that time including daylight saving time if your OS supports
+it, and pushes the result on the stack.  There is an elaborate example
+in the examples section below on how to use this.</p>
+</dd>
+<p></p>
+<dt><strong><a name="item_processing_the_stack_directly">Processing the stack directly</a></strong><br />
+</dt>
+<dd>
+<strong>DUP, POP, EXC</strong>
+</dd>
+<dd>
+<p>Duplicate the top element, remove the top element, exchange the two
+top elements.</p>
+</dd>
+<dd>
+<p></p>
+</dd>
+<p></p></dl>
+<p>
+</p>
+<hr />
+<h1><a name="variables">VARIABLES</a></h1>
+<p>These operators work only on <strong>VDEF</strong> statements.</p>
+<dl>
+<dt><strong><a name="item_maximum_2c_minimum_2c_average">MAXIMUM, MINIMUM, AVERAGE</a></strong><br />
+</dt>
+<dd>
+Return the corresponding value, MAXIMUM and MINIMUM also return
+the first occurrence of that value in the time component.
+</dd>
+<dd>
+<p>Example: <code>VDEF:avg=mydata,AVERAGE</code></p>
+</dd>
+<p></p>
+<dt><strong><a name="item_last_2c_first">LAST, FIRST</a></strong><br />
+</dt>
+<dd>
+Return the last/first value including its time.  The time for
+FIRST is actually the start of the corresponding interval, whereas
+LAST returns the end of the corresponding interval.
+</dd>
+<dd>
+<p>Example: <code>VDEF:first=mydata,FIRST</code></p>
+</dd>
+<p></p>
+<dt><strong><a name="item_total">TOTAL</a></strong><br />
+</dt>
+<dd>
+Returns the rate from each defined time slot multiplied with the
+step size.  This can, for instance, return total bytes transfered
+when you have logged bytes per second. The time component returns
+the number of seconds.
+</dd>
+<dd>
+<p>Example: <code>VDEF:total=mydata,TOTAL</code></p>
+</dd>
+<p></p>
+<dt><strong><a name="item_percent">PERCENT</a></strong><br />
+</dt>
+<dd>
+This should follow a <strong>DEF</strong> or <strong>CDEF</strong> <em>vname</em>. The <em>vname</em> is popped,
+another number is popped which is a certain percentage (0..100). The
+data set is then sorted and the value returned is chosen such that
+<em>percentage</em> percent of the values is lower or equal than the result.
+<em>Unknown</em> values are considered lower than any finite number for this
+purpose so if this operator returns an <em>unknown</em> you have quite a lot
+of them in your data.  <strong>Inf</strong>inite numbers are lesser, or more, than the
+finite numbers and are always more than the <em>Unknown</em> numbers.
+(NaN &lt; -INF &lt; finite values &lt; INF)
+</dd>
+<dd>
+<p>Example: <code>VDEF:perc95=mydata,95,PERCENT</code></p>
+</dd>
+<p></p></dl>
+<p>
+</p>
+<hr />
+<h1><a name="see_also">SEE ALSO</a></h1>
+<p><a href="././rrdgraph.html">the rrdgraph manpage</a> gives an overview of how <strong>rrdtool graph</strong> works.
+<a href="././rrdgraph_data.html">the rrdgraph_data manpage</a> describes <strong>DEF</strong>,<strong>CDEF</strong> and <strong>VDEF</strong> in detail.
+<a href="././rrdgraph_rpn.html">the rrdgraph_rpn manpage</a> describes the <strong>RPN</strong> language used in the <strong>?DEF</strong> statements.
+<a href="././rrdgraph_graph.html">the rrdgraph_graph manpage</a> page describes all of the graph and print functions.</p>
+<p>Make sure to read <a href="././rrdgraph_examples.html">the rrdgraph_examples manpage</a> for tips&amp;tricks.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<p>Program by Tobias Oetiker &lt;<a href="mailto:oetiker@ee.ethz.ch">oetiker@ee.ethz.ch</a>&gt;</p>
+<p>This manual page by Alex van den Bogaerdt &lt;<a href="mailto:alex@ergens.op.het.net">alex@ergens.op.het.net</a>&gt;</p>
+
+</body>
+
+</html>

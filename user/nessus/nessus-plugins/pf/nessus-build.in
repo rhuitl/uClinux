@@ -1,0 +1,150 @@
+#!/bin/sh
+#
+# nessus-build
+# $Id: nessus-build.in,v 1.6 1999/11/27 09:59:27 renaud Exp $
+# 
+# Author : Renaud Deraison <deraison@cvs.nessus.org>
+#
+# This script builds a .nes Nessus plugin
+# from a .c source file.
+#
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+CP=@CP@
+MV=@MV@
+RM=@RM@
+ECHO=@ECHO@
+MAKE=@MAKE@
+TEST=@TEST@
+MKDIR=@MKDIR@
+CAT=@CAT@
+
+NESSUS_BUILD="nessus-build.$RANDOM"
+
+$TEST "$1" || {
+	$ECHO "Usage : $0 input.c output.nes"
+	exit 1
+	}
+$TEST "$2" || {
+	$ECHO "Usage : $0 input.c output.nes"
+	exit 1
+	}
+$TEST "$TMP" || {
+	$ECHO "The TMP variable has not been set."
+	$ECHO "Set it, and try again (avoid to use /tmp)"
+	$ECHO "ie:"
+	$ECHO "export TMP=~/.tmp"
+	exit 1
+	}
+
+# Sanity checks
+	
+$TEST -d "$TMP" || {
+ $ECHO "$TMP is not a directory or does not exist !"
+ exit 1
+}
+
+# Make sure we can read $1
+$TEST -r "$1" || { 
+ $ECHO "$1 does not exist or can not be read"
+ exit 1
+}
+
+# Make sure we will not overwrite $2
+$TEST -f "$2" && {
+ $ECHO "$2 already exists. Delete it first"
+ exit 1
+}
+	
+# save the current working directory
+old=`pwd`
+
+# Check that no-one else is building a nessus plugin
+# and that we won't overwrite any file
+$TEST -d "$TMP/$NESSUS_BUILD" && {
+ $ECHO "$TMP/$NESSUS_BUILD exists. Delete it."
+ exit 1
+}
+
+#
+# Create a space where we are going to put our junk
+#
+$MKDIR "$TMP/$NESSUS_BUILD" || {
+	$ECHO "Could not create $TMP/$NESSUS_BUILD. Check the permissions"
+	exit 1
+	}
+
+# Copy our files to this space
+
+$TEST -d ${libdir}/nessus/plugins_factory/ ||
+{
+ $ECHO "${libdir}/nessus/plugins_factory/ does not exist"
+ $ECHO "Did you install nessus-plugins properly ?"
+ exit 1
+}
+
+
+for i in ${libdir}/nessus/plugins_factory/*;
+do
+$TEST -f $TMP/$NESSUS_BUILD/$i && {
+	$ECHO "$i already exist in $TMP/$NESSUS_BUILD/"
+	$ECHO "Delete $TMP/$NESSUS_BUILD/"
+	exit 1
+	}
+if [ -r $i ];
+then
+ $CP $i "$TMP/$NESSUS_BUILD/"
+else
+ $ECHO "Could not read $i"
+ exit 1
+fi
+
+done
+
+# Copy the plugin source code to this space too
+$CP $1 $TMP/$NESSUS_BUILD/plugin.c || {
+	$ECHO "Could not copy $1 to $TMP/$NESSUS_BUILD/plugin.c"
+	exit 1
+	}
+	
+	
+# cd to this space
+cd "$TMP/$NESSUS_BUILD"
+
+# build the plugin quietly, but store the error in a file -- in case of
+$MAKE 2>&1 > "$TMP/$NESSUS_BUILD/make_error"
+if [ $? -ne 0 ];
+then
+ $CAT "$TMP/$NESSUS_BUILD/make_error"
+ $ECHO "An error occured"
+ exit 1
+fi
+
+#
+# rename the output to plugin.nes
+#
+# depending if it's a shared a.out or ELF
+# library, it has not the same name
+#
+if [ -f .libs/libplugin.so.0 ];then
+	$CP .libs/libplugin.so.0 plugin.nes
+else
+	$CP .libs/libplugin.so.0.0 plugin.nes
+fi
+
+
+# return to the place we were called from
+cd $old
+
+# copy the plugin where we were asked to
+NAME="$2"
+
+$MV -i "$TMP/$NESSUS_BUILD/plugin.nes" "$NAME" || {
+	$ECHO "Could not do $MV $TMP/$NESSUS_BUILD/plugin.nes $NAME";
+	exit 1
+	}
+
+# delete our temporary directory
+$RM -rf "$TMP/$NESSUS_BUILD"

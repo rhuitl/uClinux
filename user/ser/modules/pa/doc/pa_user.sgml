@@ -1,0 +1,432 @@
+<!-- Module User's Guide -->
+
+<chapter>
+    <chapterinfo>
+	<revhistory>
+	    <revision>
+		<revnumber>$Revision: 1.3.2.1 $</revnumber>
+		<date>$Date: 2005/06/22 23:12:07 $</date>
+	    </revision>
+	</revhistory>
+    </chapterinfo>
+    <title>User's Guide</title>
+    
+    <section>
+	<title>Overview</title>
+	<para>
+	    This module implements a presence server, i.e. entity that receives SUBSCRIBE messages
+	    and sends NOTIFY when presence status of a user changes. Currently the presence server
+	    can be connected to registrar and jabber module so &sip; users can see presence of jabber
+	    users.
+	</para>
+	<para>
+	    This module currently cannot work as a <acronym>B2BUA</acronym>, i.e. it cannot subscribe
+	    to presence of users using &sip;. We are currently working on that feature.
+	</para>
+    </section>
+    <section>
+	<title>Dependencies</title>
+	<section>
+	    <title>&ser; Modules</title>
+	    <para>
+		The following modules must be loaded before this module:
+	    	<itemizedlist>
+		    <listitem>
+			<para>
+			    <emphasis>No dependencies on other &ser; modules</emphasis>.
+			</para>
+		    </listitem>
+	    	</itemizedlist>
+	    </para>
+	</section>
+	<section>
+	    <title>External Libraries or Applications</title>
+	    <para>
+		The following libraries or applications must be installed before running
+		&ser; with this module loaded:
+	    	<itemizedlist>
+		    <listitem>
+			<para>
+			    <emphasis>None</emphasis>.
+			</para>
+		    </listitem>
+	    	</itemizedlist>
+	    </para>
+	</section>
+    </section>
+    <section>
+	<title>Exported Parameters</title>
+	<section>
+	    <title><varname>default_expires</varname> (integer)</title>
+	    <para>
+		Default expires value to be used when the client doesn't supply one (in seconds).
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is <quote>3600</quote>.
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>default_expires</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pa", "default_expires", 3600)
+...
+</programlisting>
+	    </example>
+	</section>
+
+	<section>
+	    <title><varname>default_priority_percentage</varname> (integer)</title>
+	    <para>
+		Default priority value to be used when not included in a PUBLISH
+		message, expressed as a percentage.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 50.
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>timer_interval</varname> (integer)</title>
+	    <para>
+		This parameter controls the interval between expiration timer
+		runs, the value is in seconds.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 10.
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>use_db</varname> (integer)</title>
+	    <para>
+		This parameter enables/disables database support in pa module.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0 (disabled).
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>use_place_table</varname> (integer)</title>
+	    <para>
+		This parameter controls if pa module should use "place"
+		database table. The table assigns IDs to rooms/locations and
+		contains additional information for each place.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0 (disabled).
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>use_bsearch</varname> (integer)</title>
+	    <para>
+		Enable/disable using of binary search instead of linear
+		searching when looking up location.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0 (disabled).
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>use_location_package</varname> (integer)</title>
+	    <para>
+		Enable/disable location package support in pa.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0 (disabled).
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>db_url</varname> (string)</title>
+	    <para>
+		The URL of the database to be used when database support is
+		enabled in pa module.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is "mysql://ser:heslo@localhost/ser".
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>pa_domain</varname> (string)</title>
+	    <para>
+		Hostname of XCAP server associated with presence agent.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is "sip.handhelds.org".
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>presentity_table</varname> (string)</title>
+	    <para>
+		The name of the table in database which can store information
+		about presentities stored in the presence server. Presence
+		server can reload data from this table after restart.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is "presentity".
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>presentity_contact_table</varname> (string)</title>
+	    <para>
+		Table containing additional information on presentities, such
+		as status, location, contact value, and so on.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is "presentity_contact".
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>watcherinfo_table</varname> (string)</title>
+	    <para>
+		The name of the table in database where presence server stores
+		information about subscribers to the watcherinfo package
+		(watchers).
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is "watcherinfo".
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>place_table</varname> (string)</title>
+	    <para>
+		The name of the table in database which contains additional
+		information on places where presentities can be found. The
+		presence server can use this table to lookup additional
+		information about positions of presentities.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is "place".
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>new_watcher_pending</varname> (integer)</title>
+	    <para>
+		This parameter controls the initial state of new watchers. When
+		set to 1 then new watchers will be listed as pending (waiting
+		for authorization), when set to 0 then new watchers will be
+		listed as active
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0.
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>callback_update_db</varname> (integer)</title>
+	    <para>
+		This parameter controls the default priority value. The range
+		of the parameter is 0 to 100 percent. The value will be
+		internaly converted to a float.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 50.
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>callback_lock_pdomain</varname> (integer)</title>
+	    <para>
+		Enable/disable locking in callbacks. This is for debugging
+		only, use with care.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 1 (enabled).
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>new_tuple_on_publish</varname> (integer)</title>
+	    <para>
+		The parameter controls whether a new tuple will be created if
+		it does not already exists when the presence server receives a publish.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0 (no).
+		</emphasis>
+	    </para>
+	</section>
+
+	<section>
+	    <title><varname>pidf_priority</varname> (integer)</title>
+	    <para>
+		Enable/disable priority parameter of contacts in pidf documents.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 1 (enabled).
+		</emphasis>
+	    </para>
+	</section>
+
+
+    </section>
+    <section>
+	<title>Exported Functions</title>
+	<section>
+	    <title>
+		<function moreinfo="none">pa_handle_registration(domain)</function>
+	    </title>
+	    <para>
+		Process REGISTER messages and update the state of the
+		presentity. This function is no longer used.
+	    </para>
+	    <para>Meaning of the parameters is as follows:</para>
+	    <itemizedlist>
+		<listitem>
+		    <para><emphasis>domain</emphasis> - The domain within the
+		    presence server.
+		    </para>
+		</listitem>
+	    </itemizedlist>
+	</section>
+
+	<section>
+	    <title>
+		<function moreinfo="none">handle_subscription(domain)</function>
+	    </title>
+	    <para>
+		This function processes SUBSCRIBE and generates NOTIFY.
+	    </para>
+	    <para>Meaning of the parameters is as follows:</para>
+	    <itemizedlist>
+		<listitem>
+		    <para><emphasis>domain</emphasis> - This can be either <quote>registrar</quote> or <quote>jabber</quote>.
+		    </para>
+		</listitem>
+	    </itemizedlist>
+	    <example>
+		<title><function>handle_subscription</function> usage</title>
+		<programlisting format="linespecific">
+...
+if (method=="SUBSCRIBE") {
+    if (!t_newtran()) {
+       log(1, "newtran error\n");
+       sl_reply_error();
+    };
+    handle_subscription("registrar");
+    break;
+};
+...
+</programlisting>
+	    </example>
+	</section>
+
+	<section>
+	    <title>
+		<function moreinfo="none">handle_publish(domain)</function>
+	    </title>
+	    <para>
+		Process PUBLISH messages, update the state of the presentity
+		accordingly and generate NOTIFY.
+	    </para>
+	    <para>Meaning of the parameters is as follows:</para>
+	    <itemizedlist>
+		<listitem>
+		    <para><emphasis>domain</emphasis> - The domain within the
+		    presence server.
+		    </para>
+		</listitem>
+	    </itemizedlist>
+	    <example>
+		<title><function>handle_subscription</function> usage</title>
+		<programlisting format="linespecific">
+...
+if (method=="PUBLISH") {
+    if (!t_newtran()) {
+       log(1, "newtran error\n");
+       sl_reply_error();
+    };
+    handle_publish("registrar");
+    break;
+};
+...
+</programlisting>
+	    </example>
+	</section>
+
+	<section>
+	    <title>
+		<function moreinfo="none">existing_subscription(domain)</function>
+	    </title>
+	    <para>
+		Lookup the table of all subscriptions in the presence server
+		and return 1 if it exists and 0 if not.
+	    </para>
+	    <para>Meaning of the parameters is as follows:</para>
+	    <itemizedlist>
+		<listitem>
+		    <para><emphasis>domain</emphasis> - The domain within the
+		    presence server.
+		    </para>
+		</listitem>
+	    </itemizedlist>
+	</section>
+
+	<section>
+	    <title>
+		<function moreinfo="none">pua_exists(domain)</function>
+	    </title>
+	    <para>
+		Try to find out whether user agent supports SUBSCRIBE and
+		return 1 if yes and 0 if not or not sure.
+	    </para>
+	    <para>Meaning of the parameters is as follows:</para>
+	    <itemizedlist>
+		<listitem>
+		    <para><emphasis>domain</emphasis> - The domain within the
+		    presence server.
+		    </para>
+		</listitem>
+	    </itemizedlist>
+	</section>
+    </section>
+</chapter>
+
+<!-- Keep this element at the end of the file
+Local Variables:
+sgml-parent-document: ("pa.sgml" "Book" "chapter")
+End:
+-->

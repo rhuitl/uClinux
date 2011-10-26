@@ -1,0 +1,526 @@
+## $Id: md5.doc,v 1.3 1993/08/19 05:28:05 genek Exp $
+
+
+
+Network Working Group                                          R. Rivest
+INTERNET-DRAFT                       MIT Laboratory for Computer Science
+                                                                S. Dusse
+                                                 RSA Data Security, Inc.
+                                                            10 July 1991
+
+
+                    The MD5 Message-Digest Algorithm
+
+
+STATUS OF THIS MEMO
+
+   This draft document will be submitted to the RFC editor as a protocol
+   specification. Comments should be sent to <pem-dev@tis.com> or to the
+   authors. Distribution of this memo is unlimited.
+
+
+ACKNOWLEDGEMENT
+
+   We would like to thank Don Coppersmith, Burt Kaliski, Ralph Merkle,
+   David Chaum, and Noam Nisan for numerous helpful comments and
+   suggestions.
+
+
+Table of Contents
+
+   1. Executive Summary                                                1
+   2. Terminology and Notation                                         2
+   3. MD5 Algorithm Description                                        3
+   4. Summary                                                          7
+   5. Summary of Differences Between MD4 and MD5                       7
+   6. Security Considerations                                          7
+   References                                                          8
+   Authors' Addresses                                                  8
+   APPENDIX - Reference Implementation                                 9
+
+
+
+1. Executive Summary
+
+   This document describes the MD5 message-digest algorithm. The
+   algorithm takes as input an input message of arbitrary length and
+   produces as output a 128-bit "fingerprint" or "message digest" of the
+   input. It is conjectured that it is computationally infeasible to
+   produce two messages having the same message digest, or to produce
+   any message having a given prespecified target message digest. The
+   MD5 algorithm is intended for digital signature applications, where a
+   large file must be "compressed" in a secure manner before being
+   encrypted with a private (secret) key under a public-key cryptosystem
+   such as RSA.
+
+
+
+
+Rivest and Dusse                                                [Page 1]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+   The MD5 algorithm is designed to be quite fast on 32-bit machines. In
+   addition, the MD5 algorithm does not require any large substitution
+   tables; the algorithm can be coded quite compactly.
+
+   The MD5 algorithm is an extension of the MD4 message digest algorithm
+   [1,2]. MD5 is slightly slower than MD4, but is more "conservative" in
+   design. MD5 was designed because it was felt that MD4 was perhaps
+   being adopted for use more quickly than justified by the existing
+   critical review; because MD4 was designed to be exceptionally fast,
+   it is "at the edge" in terms of risking successful cryptanalytic
+   attack. MD5 backs off a bit, giving up a little in speed for a much
+   greater likelihood of ultimate security. It incorporates some
+   suggestions made by various reviewers, and contains additional
+   optimizations.
+
+   The MD5 algorithm is being placed in the public domain for review and
+   possible adoption as a standard.
+
+   A version of this document including the C source code in the
+   appendix is available by FTP from RSA.COM in the file "pub/md5.doc".
+
+   This document may be referred to, unofficially, as Internet draft
+   [MD5-A].
+
+   For OSI-based applications, MD5's object identifier is
+
+   md5 OBJECT IDENTIFIER ::=
+     {iso(1) member-body(2) US(840) rsadsi(113549) digestAlgorithm(2) 5}
+
+   In the X.509 type AlgorithmIdentifier [3], the parameters for MD5
+   should have type NULL.
+
+
+2. Terminology and Notation
+
+   In this document a "word" is a 32-bit quantity and a "byte" is an
+   eight-bit quantity. A sequence of bits can be interpreted in a
+   natural manner as a sequence of bytes, where each consecutive group
+   of eight bits is interpreted as a byte with the high-order (most
+   significant) bit of each byte listed first. Similarly, a sequence of
+   bytes can be interpreted as a sequence of 32-bit words, where each
+   consecutive group of four bytes is interpreted as a word with the
+   low-order (least significant) byte given first.
+
+   Let x_i denote "x sub i". If the subscript is an expression, we
+   surround it in braces, as in x_{i+1}. Similarly, we use ^ for
+   superscripts (exponentiation), so that x^i denotes x to the i-th
+   power.
+
+   Let the symbol "+" denote addition of words (i.e., modulo-2^32
+   addition). Let X <<< s denote the 32-bit value obtained by circularly
+   shifting (rotating) X left by s bit positions. Let not(X) denote the
+
+
+Rivest and Dusse                                                [Page 2]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+   bit-wise complement of X, and let X v Y denote the bit-wise OR of X
+   and Y. Let X xor Y denote the bit-wise XOR of X and Y, and let XY
+   denote the bit-wise AND of X and Y.
+
+
+3. MD5 Algorithm Description
+
+   We begin by supposing that we have a b-bit message as input, and that
+   we wish to find its message digest. Here b is an arbitrary
+   nonnegative integer; b may be zero, it need not be a multiple of
+   eight, and it may be arbitrarily large. We imagine the bits of the
+   message written down as follows:
+
+                            m_0 m_1 ... m_{b-1}
+
+   The following five steps are performed to compute the message digest
+   of the message.
+
+
+3.1 Step 1. Append Padding Bits
+
+   The message is "padded" (extended) so that its length (in bits) is
+   congruent to 448, modulo 512. That is, the message is extended so
+   that it is just 64 bits shy of being a multiple of 512 bits long.
+   Padding is always performed, even if the length of the message is
+   already congruent to 448, modulo 512 (in which case 512 bits of
+   padding are added).
+
+   Padding is performed as follows: a single "1" bit is appended to the
+   message, and then enough zero bits are appended so that the length in
+   bits of the padded message becomes congruent to 448, modulo 512.
+
+
+3.2 Step 2. Append Length
+
+   A 64-bit representation of b (the length of the message before the
+   padding bits were added) is appended to the result of the previous
+   step. In the unlikely event that b is greater than 2^64, then only
+   the low-order 64 bits of b are used. (These bits are appended as two
+   32-bit words and appended low-order word first in accordance with the
+   previous conventions.)
+
+   At this point the resulting message (after padding with bits and with
+   b) has a length that is an exact multiple of 512 bits. Equivalently,
+   this message has a length that is an exact multiple of 16 (32-bit)
+   words. Let M[0 ... N-1] denote the words of the resulting message,
+   where N is a multiple of 16.
+
+
+
+
+
+
+
+Rivest and Dusse                                                [Page 3]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+3.3 Step 3. Initialize MD Buffer
+
+   A four-word buffer (A,B,C,D) is used to compute the message digest.
+   Here each of A, B, C, D is a 32-bit register. These registers are
+   initialized to the following values in hexadecimal, low-order bytes
+   first):
+
+                            word A: 01 23 45 67
+                            word B: 89 ab cd ef
+                            word C: fe dc ba 98
+                            word D: 76 54 32 10
+
+
+3.4 Step 4. Process Message in 16-Word Blocks
+
+   We first define four auxiliary functions that each take as input
+   three 32-bit words and produce as output one 32-bit word.
+
+                         F(X,Y,Z) = XY v not(X) Z
+                         G(X,Y,Z) = XZ v Y not(Z)
+                         H(X,Y,Z) = X xor Y xor Z
+                       I(X,Y,Z) = Y xor (X v not(Z))
+
+   In each bit position F acts as a conditional: if X then Y else Z.
+   (The function F could have been defined using + instead of v since XY
+   and not(X)Z will never have 1's in the same bit position.) It is
+   interesting to note that if the bits of X, Y, and Z are independent
+   and unbiased, the each bit of F(X,Y,Z) will be independent and
+   unbiased.
+
+   The functions G, H, and I are similar to the function F, in that they
+   act in "bitwise parallel" to produce their output from the bits of X,
+   Y, and Z, in such a manner that if the corresponding bits of X, Y,
+   and Z are independent and unbiased, then each bit of G(X,Y,Z),
+   H(X,Y,Z), and I(X,Y,Z) will be independent and unbiased. Note that
+   the function H is the bit-wise "xor" or "parity" function of its
+   inputs.
+
+   Do the following:
+
+   /* Process each 16-word block. */
+   For i = 0 to N/16-1 do
+
+       /* Copy block i into X. */
+       For j = 0 to 15 do
+           Set X[j] to M[i*16+j].
+       end /* of loop on j */
+
+       /* Save A as AA, B as BB, C as CC, and D as DD. */
+       AA = A
+       BB = B
+       CC = C
+
+
+Rivest and Dusse                                                [Page 4]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+       DD = D
+
+       /* Round 1. */
+       /* Let FF(a,b,c,d,X[k],s,t) denote the operation
+           a = b + ((a + F(b,c,d) + X[k] + t) <<< s). */
+       /* Here the additive constants t are chosen as follows:
+          In step i, the additive constant is the integer part of
+          4294967296 times abs(sin(i)), where i is in radians. */
+       /* Let S11 = 7, S12 = 12, S13 = 17, and S14 = 22. */
+       /* Do the following 16 operations. */
+       FF (a, b, c, d, X[ 0], S11, 3614090360); /* Step 1 */
+       FF (d, a, b, c, X[ 1], S12, 3905402710); /* 2 */
+       FF (c, d, a, b, X[ 2], S13,  606105819); /* 3 */
+       FF (b, c, d, a, X[ 3], S14, 3250441966); /* 4 */
+       FF (a, b, c, d, X[ 4], S11, 4118548399); /* 5 */
+       FF (d, a, b, c, X[ 5], S12, 1200080426); /* 6 */
+       FF (c, d, a, b, X[ 6], S13, 2821735955); /* 7 */
+       FF (b, c, d, a, X[ 7], S14, 4249261313); /* 8 */
+       FF (a, b, c, d, X[ 8], S11, 1770035416); /* 9 */
+       FF (d, a, b, c, X[ 9], S12, 2336552879); /* 10 */
+       FF (c, d, a, b, X[10], S13, 4294925233); /* 11 */
+       FF (b, c, d, a, X[11], S14, 2304563134); /* 12 */
+       FF (a, b, c, d, X[12], S11, 1804603682); /* 13 */
+       FF (d, a, b, c, X[13], S12, 4254626195); /* 14 */
+       FF (c, d, a, b, X[14], S13, 2792965006); /* 15 */
+       FF (b, c, d, a, X[15], S14, 1236535329); /* 16 */
+
+       /* Round 2. */
+       /* Let GG(a,b,c,d,X[k],s,t) denote the operation
+           a = b + ((a + G(b,c,d) + X[k] + t) <<< s). */
+       /* Let S21 = 5, S22 = 9, S23 = 14, and S24 = 20. */
+
+       /* Do the following 16 operations. */
+       GG (a, b, c, d, X[ 1], S21, 4129170786); /* 17 */
+       GG (d, a, b, c, X[ 6], S22, 3225465664); /* 18 */
+       GG (c, d, a, b, X[11], S23,  643717713); /* 19 */
+       GG (b, c, d, a, X[ 0], S24, 3921069994); /* 20 */
+       GG (a, b, c, d, X[ 5], S21, 3593408605); /* 21 */
+       GG (d, a, b, c, X[10], S22,   38016083); /* 22 */
+       GG (c, d, a, b, X[15], S23, 3634488961); /* 23 */
+       GG (b, c, d, a, X[ 4], S24, 3889429448); /* 24 */
+       GG (a, b, c, d, X[ 9], S21,  568446438); /* 25 */
+       GG (d, a, b, c, X[14], S22, 3275163606); /* 26 */
+       GG (c, d, a, b, X[ 3], S23, 4107603335); /* 27 */
+       GG (b, c, d, a, X[ 8], S24, 1163531501); /* 28 */
+       GG (a, b, c, d, X[13], S21, 2850285829); /* 29 */
+       GG (d, a, b, c, X[ 2], S22, 4243563512); /* 30 */
+       GG (c, d, a, b, X[ 7], S23, 1735328473); /* 31 */
+       GG (b, c, d, a, X[12], S24, 2368359562); /* 32 */
+
+       /* Round 3. */
+       /* Let HH(a,b,c,d,X[k],s,t) denote the operation
+
+
+Rivest and Dusse                                                [Page 5]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+           a = b + ((a + H(b,c,d) + X[k] + t) <<< s). */
+       /* Let S31 = 4, S32 = 11, S33 = 16, and S34 = 23. */
+
+       /* Do the following 16 operations. */
+       HH (a, b, c, d, X[ 5], S31, 4294588738); /* 33 */
+       HH (d, a, b, c, X[ 8], S32, 2272392833); /* 34 */
+       HH (c, d, a, b, X[11], S33, 1839030562); /* 35 */
+       HH (b, c, d, a, X[14], S34, 4259657740); /* 36 */
+       HH (a, b, c, d, X[ 1], S31, 2763975236); /* 37 */
+       HH (d, a, b, c, X[ 4], S32, 1272893353); /* 38 */
+       HH (c, d, a, b, X[ 7], S33, 4139469664); /* 39 */
+       HH (b, c, d, a, X[10], S34, 3200236656); /* 40 */
+       HH (a, b, c, d, X[13], S31,  681279174); /* 41 */
+       HH (d, a, b, c, X[ 0], S32, 3936430074); /* 42 */
+       HH (c, d, a, b, X[ 3], S33, 3572445317); /* 43 */
+       HH (b, c, d, a, X[ 6], S34,   76029189); /* 44 */
+       HH (a, b, c, d, X[ 9], S31, 3654602809); /* 45 */
+       HH (d, a, b, c, X[12], S32, 3873151461); /* 46 */
+       HH (c, d, a, b, X[15], S33,  530742520); /* 47 */
+       HH (b, c, d, a, X[ 2], S34, 3299628645); /* 48 */
+
+       /* Round 4. */
+       /* Let II(a,b,c,d,X[k],s,t) denote the operation
+           a = b + ((a + I(b,c,d) + X[k] + t) <<< s). */
+       /* Let S41 = 6, S42 = 10, S43 = 15, and S44 = 21. */
+
+       /* Do the following 16 operations. */
+       II (a, b, c, d, X[ 0], S41, 4096336452); /* 49 */
+       II (d, a, b, c, X[ 7], S42, 1126891415); /* 50 */
+       II (c, d, a, b, X[14], S43, 2878612391); /* 51 */
+       II (b, c, d, a, X[ 5], S44, 4237533241); /* 52 */
+       II (a, b, c, d, X[12], S41, 1700485571); /* 53 */
+       II (d, a, b, c, X[ 3], S42, 2399980690); /* 54 */
+       II (c, d, a, b, X[10], S43, 4293915773); /* 55 */
+       II (b, c, d, a, X[ 1], S44, 2240044497); /* 56 */
+       II (a, b, c, d, X[ 8], S41, 1873313359); /* 57 */
+       II (d, a, b, c, X[15], S42, 4264355552); /* 58 */
+       II (c, d, a, b, X[ 6], S43, 2734768916); /* 59 */
+       II (b, c, d, a, X[13], S44, 1309151649); /* 60 */
+       II (a, b, c, d, X[ 4], S41, 4149444226); /* 61 */
+       II (d, a, b, c, X[11], S42, 3174756917); /* 62 */
+       II (c, d, a, b, X[ 2], S43,  718787259); /* 63 */
+       II (b, c, d, a, X[ 9], S44, 3951481745); /* 64 */
+
+       /* Then perform the following additions. (That is, increment each
+          of the four registers by the value it had before this block
+          was started.) */
+       A = A + AA
+       B = B + BB
+       C = C + CC
+       D = D + DD
+
+
+
+Rivest and Dusse                                                [Page 6]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+
+   end /* of loop on i */
+
+
+3.5 Step 5. Output
+
+   The message digest produced as output is A, B, C, D. That is, we
+   begin with the low-order byte of A, and end with the high-order byte
+   of D.
+
+   This completes the description of MD5. A reference implementation in
+   C is given in the Appendix.
+
+
+4. Summary
+
+   The MD5 message-digest algorithm is simple to implement, and provides
+   a "fingerprint" or message digest of a message of arbitrary length.
+   It is conjectured that the difficulty of coming up with two messages
+   having the same message digest is on the order of 2^64 operations,
+   and that the difficulty of coming up with any message having a given
+   message digest is on the order of 2^128 operations. The MD5 algorithm
+   has been carefully scrutinized for weaknesses. It is, however, a
+   relatively new algorithm and further security analysis is of course
+   justified, as is the case with any new proposal of this sort.
+
+
+5. Summary of Differences Between MD4 and MD5
+
+   The following are the differences between MD4 and MD5:
+
+     --   A fourth round has been added.
+
+     --   Each step now has a unique additive constant.
+
+     --   The function g in round 2 was changed from (XY v XZ v YZ)
+          to (XZ v Y not(Z)) to make g less symmetric.
+
+     --   Each step now adds in the result of the previous step.
+          This promotes a faster "avalanche effect".
+
+     --   The order in which input words are accessed in rounds 2
+          and 3 is changed, to make these patterns less like each
+          other.
+
+     --   The shift amounts in each round have been approximately
+          optimized, to yield a faster "avalanche effect". The
+          shifts in different rounds are distinct.
+
+
+
+
+
+
+Rivest and Dusse                                                [Page 7]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+6. Security Considerations
+
+   The level of security discussed in this memo is considered to be
+   sufficient for implementing very high security hybrid digital-
+   signature schemes based on MD5 and a public-key cryptosystem.
+
+
+References
+
+     [1]  Rivest, R.L., The MD4 Message Digest Algorithm (RFC 1186),
+          October 1990.
+
+     [2]  Rivest, R.L., The MD4 message digest algorithm, presented at
+          CRYPTO '90 (Santa Barbara, CA, August 11-15, 1990).
+
+     [3]  CCITT, The Directory---Authentication Framework
+          (Recommendation X.509), 1988.
+
+
+
+
+Authors' Addresses
+
+   Ronald L. Rivest
+   Massachusetts Institute of Technology
+   Laboratory for Computer Science
+   NE43-324
+   545 Technology Square
+   Cambridge, MA  02139-1986
+   Phone: (617) 253-5880
+   EMail: rivest@theory.lcs.mit.edu
+
+   Steve Dusse
+   RSA Data Security, Inc.
+   10 Twin Dolphin Drive
+   Redwood City, CA  94065
+   Phone: (415) 595-8782
+   EMail: dusse@rsa.com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Rivest and Dusse                                                [Page 8]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+
+
+APPENDIX - Reference Implementation
+
+   This appendix contains the following files:
+
+     md5.h -- header file for implementation of MD5
+
+     md5.c -- the source code for MD5 routines
+
+     md5driver.c -- sample test routines
+
+     session -- sample results of running md5driver
+
+   It is not difficult to improve this implementation on particular
+   platforms, an exercise left to the reader. Following are some
+   suggestions:
+
+     1.   Change MD5Update so that the context is not used at all
+          if it is empty (mdi == 0) and 64 or more bytes remain
+          (inLen >= 64). In other words, call Transform with inBuf
+          in this case. (This requires that byte ordering is
+          correct in inBuf.)
+
+     2.   Implement a procedure MD5UpdateLong modeled after
+          MD5Update where inBuf is UINT4 * instead of unsigned char
+          *. MD5UpdateLong would call Transform directly with 16-
+          word blocks from inBuf. Call this instead of MD5Update in
+          general. This works well if you have an I/O procedure
+          that can read long words from a file.
+
+     3.   On "little-endian" platforms where the lowest-address
+          byte in a long word is the least significant (and there
+          are no alignment restrictions), change MD5Update to call
+          Transform directly with 64-byte blocks from inBuf
+          (typecast to a UINT4 *).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Rivest and Dusse                                                [Page 9]
+INTERNET-DRAFT      The MD5 Message-Digest Algorithm        10 July 1991
+
+

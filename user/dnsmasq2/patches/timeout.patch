@@ -1,0 +1,232 @@
+#14312
+
+When we send a query upstream, store the query in the frec,
+so that if we timeout waiting for a reply we can resend the
+query to other servers.
+
+Index: dnsmasq2/src/dnsmasq.h
+===================================================================
+--- dnsmasq2.orig/src/dnsmasq.h	2009-03-24 13:06:04.000000000 +1000
++++ dnsmasq2/src/dnsmasq.h	2009-03-24 13:35:41.000000000 +1000
+@@ -401,6 +401,8 @@ struct frec {
+   unsigned short orig_id, new_id;
+   int fd, forwardall;
+   unsigned int crc;
++  HEADER *header;
++  size_t plen;
+   time_t time;
+   struct frec *next;
+ };
+Index: dnsmasq2/src/forward.c
+===================================================================
+--- dnsmasq2.orig/src/forward.c	2009-03-24 13:12:00.000000000 +1000
++++ dnsmasq2/src/forward.c	2009-03-24 13:35:41.000000000 +1000
+@@ -289,14 +289,20 @@ static int send_query(HEADER *header, si
+   return 0;
+ }
+ 
+-static int resend_query(HEADER *header, size_t plen, time_t now, struct frec *forward)
++static int resend_query(time_t now, struct frec *forward)
+ {
++  HEADER *header = forward->header;
++  size_t plen = forward->plen;
+   char *domain;
+   int type;
+-  unsigned short gotname = extract_request(header, plen, daemon->namebuff, NULL);
++  unsigned short gotname;
+   struct server *start;
+ 
++  if (!header)
++    return 0;
++
+   /* retry on existing query, send to all available servers  */
++  gotname = extract_request(header, plen, daemon->namebuff, NULL);
+   domain = forward->sentto->domain;
+   forward->sentto->failed_queries++;
+   if (!(daemon->options & OPT_ORDER))
+@@ -310,7 +316,10 @@ static int resend_query(HEADER *header, 
+   header->id = htons(forward->new_id);
+ 
+   if (send_query(header, plen, forward, start, type, domain, gotname))
+-    return 1;
++    {
++      forward->time = now;
++      return 1;
++    }
+   
+   /* could not send on, prepare to return */ 
+   header->id = htons(forward->orig_id);
+@@ -336,7 +345,7 @@ static int forward_query(int udpfd, unio
+     forward = NULL;
+   else if ((forward = lookup_frec_by_sender(ntohs(header->id), udpaddr, crc)))
+     {
+-      if (resend_query(header, plen, now, forward))
++      if (resend_query(now, forward))
+ 	return 1;
+       forward = NULL;
+     }
+@@ -376,6 +385,20 @@ static int forward_query(int udpfd, unio
+ 	      start = daemon->servers;
+ 	      forward->forwardall = 1;
+ 	    }
++
++	  /* Store the header so that we can resend/reply for failures/timeouts */
++	  forward->header = whine_malloc(plen);
++	  if (!forward->header)
++	    {
++	      free_frec(forward);
++	      forward = NULL;
++	      flags = F_NEG;
++	    }
++	  else
++	    {
++	      memcpy(forward->header, header, plen);
++	      forward->plen = plen;
++	    }
+ 	}
+     }
+ 
+@@ -524,25 +547,8 @@ void reply_query(int fd, int family, tim
+       forward->forwardall == 0)
+     /* for broken servers, attempt to send to another one. */
+     {
+-      unsigned char *pheader;
+-      size_t plen;
+-      int is_sign;
+-      
+-      /* recreate query from reply */
+-      pheader = find_pseudoheader(header, (size_t)n, &plen, NULL, &is_sign);
+-      if (!is_sign)
+-	{
+-	  header->ancount = htons(0);
+-	  header->nscount = htons(0);
+-	  header->arcount = htons(0);
+-	  if ((nn = resize_packet(header, (size_t)n, pheader, plen)))
+-	    {
+-	      header->qr = 0;
+-	      header->tc = 0;
+-	      resend_query(header, nn, now, forward);
+-	      return;
+-	    }
+-	}
++      resend_query(now, forward);
++      return;
+     }   
+   
+   if ((forward->sentto->flags & SERV_TYPE) == 0)
+@@ -1018,6 +1024,12 @@ static void free_frec(struct frec *f)
+     
+   f->rfd4 = NULL;
+   f->sentto = NULL;
++  if (f->header)
++    {
++      free(f->header);
++      f->header = NULL;
++      f->plen = 0;
++    }
+   
+ #ifdef HAVE_IPV6
+   if (f->rfd6 && --(f->rfd6->refcount) == 0)
+@@ -1027,6 +1039,17 @@ static void free_frec(struct frec *f)
+ #endif
+ }
+ 
++#if 0
++/* XXX: call this when we timeout with no response,
++ * (but need reasonable timeout, not 40 seconds) */
++static void timeout_frec(struct frec *f)
++{
++  size_t plen = setup_reply(f->header, f->plen, NULL, F_NEG, 0);
++  send_from(f->fd, daemon->options & OPT_NOWILD, (char *)f->header, plen, &f->source, &f->dest, f->iface);
++  free_frec(f);
++}
++#endif
++
+ /* if wait==NULL return a free or older than TIMEOUT record.
+    else return *wait zero if one available, or *wait is delay to
+    when the oldest in-use record will expire. Impose an absolute
+@@ -1034,6 +1057,7 @@ static void free_frec(struct frec *f)
+ struct frec *get_new_frec(time_t now, int *wait)
+ {
+   struct frec *f, *oldest, *target;
++  time_t timeout = 0;
+   int count;
+   
+   if (wait)
+@@ -1044,7 +1068,14 @@ struct frec *get_new_frec(time_t now, in
+       target = f;
+     else 
+       {
+-	if (difftime(now, f->time) >= 4*TIMEOUT)
++	if (!(daemon->options & OPT_ORDER) && f->forwardall == 0)
++	  {
++	    if (now >= f->time + TIMEOUT_FAST)
++	      resend_query(now, f);
++	    else if (!timeout || timeout > f->time + TIMEOUT_FAST)
++	      timeout = f->time + TIMEOUT_FAST;
++	  }
++	else if (difftime(now, f->time) >= 4*TIMEOUT)
+ 	  {
+ 	    free_frec(f);
+ 	    target = f;
+@@ -1054,6 +1085,9 @@ struct frec *get_new_frec(time_t now, in
+ 	  oldest = f;
+       }
+ 
++  if (timeout && wait)
++    *wait = timeout - now;
++
+   if (target)
+     {
+       target->time = now;
+@@ -1082,7 +1116,7 @@ struct frec *get_new_frec(time_t now, in
+   /* none available, calculate time 'till oldest record expires */
+   if (count > daemon->ftabsize)
+     {
+-      if (oldest && wait)
++      if (oldest && wait && (!timeout || oldest->time + TIMEOUT < timeout))
+ 	*wait = oldest->time + (time_t)TIMEOUT - now;
+       return NULL;
+     }
+Index: dnsmasq2/src/dnsmasq.c
+===================================================================
+--- dnsmasq2.orig/src/dnsmasq.c	2009-03-24 13:06:04.000000000 +1000
++++ dnsmasq2/src/dnsmasq.c	2009-03-24 13:12:01.000000000 +1000
+@@ -1033,6 +1033,7 @@ static int set_dns_listeners(time_t now,
+   struct serverfd *serverfdp;
+   struct listener *listener;
+   int wait = 0, i;
++  struct frec *forward = NULL;
+   
+ #ifdef HAVE_TFTP
+   int  tftp = 0;
+@@ -1047,7 +1048,7 @@ static int set_dns_listeners(time_t now,
+   
+   /* will we be able to get memory? */
+   if (daemon->port != 0)
+-    get_new_frec(now, &wait);
++    forward = get_new_frec(now, &wait);
+   
+   for (serverfdp = daemon->sfds; serverfdp; serverfdp = serverfdp->next)
+     {
+@@ -1066,7 +1067,7 @@ static int set_dns_listeners(time_t now,
+   for (listener = daemon->listeners; listener; listener = listener->next)
+     {
+       /* only listen for queries if we have resources */
+-      if (listener->fd != -1 && wait == 0)
++      if (listener->fd != -1 && forward)
+ 	{
+ 	  FD_SET(listener->fd, set);
+ 	  bump_maxfd(listener->fd, maxfdp);
+Index: dnsmasq2/src/config.h
+===================================================================
+--- dnsmasq2.orig/src/config.h	2009-03-24 13:06:04.000000000 +1000
++++ dnsmasq2/src/config.h	2009-03-24 13:12:01.000000000 +1000
+@@ -21,6 +21,7 @@
+ #define CHILD_LIFETIME 150 /* secs 'till terminated (RFC1035 suggests > 120s) */
+ #define EDNS_PKTSZ 1280 /* default max EDNS.0 UDP packet from RFC2671 */
+ #define TIMEOUT 10 /* drop UDP queries after TIMEOUT seconds */
++#define TIMEOUT_FAST 2 /* send UDP queries to all servers after TIMEOUT_FAST seconds */
+ #define RANDOM_SOCKS 64 /* max simultaneous random ports */
+ #define LEASE_RETRY 60 /* on error, retry writing leasefile after LEASE_RETRY seconds */
+ #define CACHESIZ 150 /* default cache size */

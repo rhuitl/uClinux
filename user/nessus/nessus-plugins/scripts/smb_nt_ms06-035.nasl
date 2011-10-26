@@ -1,0 +1,89 @@
+#
+# (C) Tenable Network Security
+#
+
+if(description)
+{
+ script_id(22029);
+ script_bugtraq_id(18891, 18863);
+ script_version("$Revision: 1.5 $");
+ script_cve_id("CVE-2006-1314", "CVE-2006-1315");
+
+ 
+ script_version("$Revision: 1.5 $");
+ name["english"] = "Vulnerability in Server Service Could Allow Remote Code Execution (917159)";
+
+ script_name(english:name["english"]);
+ 
+ desc["english"] = "
+Synopsis :
+
+Arbitrary code can be executed on the remote host due to a flaw in the 
+'server' service.
+
+Description :
+
+The remote host is vulnerable to heap overflow in the 'Server' service which
+may allow an attacker to execute arbitrary code on the remote host with
+the 'System' privileges.
+
+In addition to this, the remote host is also vulnerable to an information
+disclosure vulnerability in SMB which may allow an attacker to obtain
+portions of the memory of the remote host.
+
+
+Solution : 
+
+Microsoft has released a set of patches for Windows 2000, XP and 2003 :
+
+http://www.microsoft.com/technet/security/bulletin/ms06-035.mspx
+
+Risk factor : 
+
+Medium / CVSS Base Score : 6.9
+(AV:R/AC:L/Au:NR/C:P/I:P/A:P/B:N)";
+
+
+ script_description(english:desc["english"]);
+ 
+ summary["english"] = "Determines the presence of update 917159";
+
+ script_summary(english:summary["english"]);
+ 
+ script_category(ACT_GATHER_INFO);
+ 
+ script_copyright(english:"This script is Copyright (C) 2006 Tenable Network Security");
+ family["english"] = "Windows : Microsoft Bulletins";
+ script_family(english:family["english"]);
+ 
+ script_dependencies("smb_hotfixes.nasl");
+ script_require_keys("SMB/Registry/Enumerated");
+ script_require_ports(139, 445);
+ exit(0);
+}
+
+
+include("smb_hotfixes_fcheck.inc");
+include("smb_hotfixes.inc");
+include("smb_func.inc");
+
+
+if ( hotfix_check_sp(xp:3, win2003:2, win2k:6) <= 0 ) exit(0);
+
+if (is_accessible_share())
+{
+ if ( hotfix_is_vulnerable (os:"5.2", sp:0, file:"Srv.sys", version:"5.2.3790.526", dir:"\system32\drivers") ||
+      hotfix_is_vulnerable (os:"5.2", sp:1, file:"Srv.sys", version:"5.2.3790.2691", dir:"\system32\drivers") ||
+      hotfix_is_vulnerable (os:"5.1", sp:1, file:"Srv.sys", version:"5.1.2600.1832", dir:"\system32\drivers") ||
+      hotfix_is_vulnerable (os:"5.1", sp:2, file:"Srv.sys", version:"5.1.2600.2893", dir:"\system32\drivers") ||
+      hotfix_is_vulnerable (os:"5.0", file:"Srv.sys", version:"5.0.2195.7087", dir:"\system32\drivers") )
+   security_warning(get_kb_item("SMB/transport"));
+ 
+ hotfix_check_fversion_end(); 
+ exit (0);
+}
+else if ( ( hotfix_missing(name:"917159") > 0 ) && 
+	( hotfix_missing(name:"923414") > 0 ) )
+	 security_warning(get_kb_item("SMB/transport"));
+
+

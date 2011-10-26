@@ -1,0 +1,32 @@
+diff -urN orig/linsynth/hplay.c linsynth/hplay.c
+--- orig/linsynth/hplay.c     Sun Nov 21 16:16:32 1993
++++ linsynth/hplay.c     Thu Dec 16 18:08:02 1993
+@@ -64,7 +64,7 @@
+ {
+   int rate_set = 0;
+   int use_linear = 0;
+-  int use_audio = 1;
++  int use_audio = 0;
+
+   prog = argv[0];
+
+@@ -77,9 +77,16 @@
+
+   if (linear_file)
+     {
+-      linear_fd = open (linear_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+-      if (linear_fd < 0)
+-    perror (linear_file);
++      if ( !strcmp(linear_file, "-") )
++        {
++          linear_fd = 1;
++        }
++      else
++        {
++          linear_fd = open (linear_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
++          if (linear_fd < 0)
++        perror (linear_file);
++        }
+     }
+
+   if (use_audio)

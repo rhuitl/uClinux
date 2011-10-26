@@ -1,0 +1,39 @@
+\subsection{027: do not permit packets marked to tunnels to get loose}
+
+\subsubsection{027: Definition of requirement }
+
+There is a fundamental design flaw in the current FreeS/WAN KLIPS
+implementation, specifically that it must rely on devices and routing
+being stable ({\bf always} up).  Worse there seems to be a bug (that RGB and
+MCR are currently chasing) that is stroking the flaw in at least FreeS/WAN
+version "1.9".
+
+The simple way to see both the flaw (and the result of the bug) is
+take a FreeS/WAN Security Gateway setup for VPN and issue the command:
+$$
+	ifconfig ipsec0 down
+$$
+
+and look closely at the results.  The bad thing that happens is that
+all the routes put in for various CIDR's one wants to be 'secure' are
+removed by the routing machinery.  Since the SG has a default route
+(in the dumb global routing table) it will get used for all the
+packets that were (a moment ago) to be encrypted.
+
+This is a major security breach should it happen, and it can happen
+quite silently should the other ends your talking to not drop "in the
+clear" packets that should have been encrypted.
+
+Worse, many users don't notice this problem as a security failure
+but write it off as a temporary network problem.  It's easy to see why
+too as the entire FreeS/WAN machinery continues to function, never
+it's self noticing that it's not in use any more (for outgoing
+traffic).
+
+\subsubsection{027: response}
+
+In the design work for a KLIPS replacement this will not be a
+problem when running a vanilla box.
+
+
+

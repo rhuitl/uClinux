@@ -1,0 +1,107 @@
+##
+## makefile.ami					sep '90
+##
+## Erik Schoenfelder (schoenfr@tubsibr.uucp)
+##
+## Makefile for a60 (AMIGA with Aztec C-Compiler v3.x)
+##
+
+PRG = a60
+CC = cc
+FLAGS = -DAMIGA -E400 -Y200 -Z10000
+DEFS = -DVPRINTF_MISSING -DREALLOC_MISSING -DMEMORY_STATISTICS \
+	-DNO_LIMITS_H -DALLOCA_MISSING
+LD = ln
+LDFLAGS =
+## link mathlib first
+LIBS = -lml -lc
+
+IOBJS = main.o util.o tree.o symtab.o type.o stmt.o check.o expr.o\
+	err.o run.o eval.o bltin.o doeval.o a60-scan.o mkc.o
+ISRCS = main.c util.c tree.c symtab.c type.c stmt.c check.c expr.c\
+	err.c run.c eval.c bltin.c doeval.c a60-scan.c mkc.c
+MOBJS = a60-ptab.o
+MSRCS = a60-ptab.c
+EXTRA = a60-parse.y
+MHDRS = a60-ptab.h
+## MPEXT = a60-pbis.c a60-pyac.c a60-pbya.c a60-pbis.h a60-pyac.h a60-pbya.h
+IHDRS = a60.h block.h symtab.h tree.h type.h util.h\
+	version.h expr.h run.h eval.h bltin.h conv.h comm.h mkc.h\
+	a60-mkc.inc config.h
+
+MAKF = Makefile Makefile.unx Makefile.ami Makefile.ata
+QMAK = qc-a60.mak qc-makei.bat
+TMAK = tc-a60.prj tc-a60.tc
+UTIL = $(MAKF) $(QMAK) $(TMAK) README ENUM.README TODO a60.man\
+	chenums.c ChangeLog a60-lex.l INSTALL
+TDOC = RRA60.texinfo a60.texinfo
+DOCS = $(TDOC)
+MDOC = RRA60.info a60.info
+TESA = test examples
+
+OBJS = $(IOBJS) $(MOBJS)
+SRCS = $(ISRCS) $(MSRCS)
+HDRS = $(IHDRS) $(MHDRS)
+
+CFLAGS = $(FLAGS) $(DEFS)
+
+##
+
+.c.o:
+	$(CC) $(CFLAGS) $*.c
+
+##
+
+all:		$(PRG)
+
+$(PRG):		$(OBJS)
+	$(LD) $(LDFLAGS) -o $(PRG) $(OBJS) $(LIBS)
+
+prof:		$(OBJS)
+	$(LD) -t $(LDFLAGS) -o $(PRG) $(OBJS) $(LIBS)
+	p1 $(PRG)
+##
+
+clean:
+	rm -f $(OBJS) gmon.out *.output RRA60.??
+
+clobber:	clean
+	rm -f $(PRG) $(PRG).bak core err Makefile.bak\
+	RRA60.?? RRA60.aux RRA60.log RRA60.toc
+
+zoo:
+	zoo a $(PRG).zoo $(UTIL) $(EXTRA) $(SRCS) $(HDRS) $(DOCS) \
+		$(MDOC) *.a60 test/* examples/*
+	zoo PP $(PRG).zoo
+	del $(PRG).bak
+
+
+## DO NOT DELETE THIS LINE
+
+main.o : main.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  version.h eval.h run.h util.h mkc.h 
+util.o : util.c comm.h util.h a60.h tree.h block.h symtab.h type.h expr.h 
+tree.o : tree.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  run.h eval.h 
+symtab.o : symtab.c comm.h util.h a60.h tree.h block.h symtab.h type.h \
+  expr.h run.h eval.h 
+type.o : type.c type.h 
+stmt.o : stmt.c comm.h util.h tree.h block.h symtab.h type.h expr.h run.h \
+  eval.h 
+check.o : check.c comm.h util.h tree.h block.h symtab.h type.h expr.h a60.h 
+expr.o : expr.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h 
+err.o : err.c comm.h a60.h tree.h block.h symtab.h type.h expr.h 
+run.o : run.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  eval.h conv.h run.h 
+eval.o : eval.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  run.h eval.h conv.h 
+bltin.o : bltin.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  run.h eval.h conv.h bltin.h a60-mkc.inc 
+doeval.o : doeval.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  util.h conv.h run.h eval.h 
+mkc.o : mkc.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  version.h 
+a60-scan.o : a60-scan.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  util.h a60-ptab.h a60-scan.h 
+a60-ptab.o : a60-ptab.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  util.h run.h eval.h bltin.h 

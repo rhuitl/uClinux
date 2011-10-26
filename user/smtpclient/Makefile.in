@@ -1,0 +1,135 @@
+##
+##  Makefile -- smtpclient makefile
+##  Copyright (c) 1997 Ralf S. Engelschall, All Rights Reserved. 
+##
+@SET_MAKE@
+
+# ------------------------------------------------
+#   DEFINITIONS
+# ------------------------------------------------
+
+# CC              = @CC@
+# CFLAGS          = @CFLAGS@
+# LDFLAGS         = @LDFLAGS@
+LIBS            = @LIBS@
+VPATH			= @srcdir@
+
+INSTALL         = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_SCRIPT  = @INSTALL_SCRIPT@
+INSTALL_DATA    = @INSTALL_DATA@
+MKDIR           = ./etc/mkinstalldirs
+
+prefix          = @prefix@
+
+# ------------------------------------------------
+#   THE DEFAULT TARGETS
+# ------------------------------------------------
+
+all: smtpclient smtpclient.1
+
+# ------------------------------------------------
+#   THE RELEASE STUFF
+# ------------------------------------------------
+
+_GETDISTINFO = \
+    _version=`./etc/newvers -lc -d smtpclient_vers.c`; \
+    _date=`date '+%y%m%d_%H%M'`
+
+_BUILDDIST = \
+    echo "Creating tarball..."; \
+    tar cvf - * |\
+    tardy --user_number=1000  --user_name=rse \
+          --group_number=1000 --group_name=en \
+          --prefix=$${_distname} - |\
+    gzip >$${_tarball}; \
+    echo "Done"; \
+    ls -l $${_tarball}
+
+_NEWVERS = \
+    ./etc/newvers -lc -p SMTPclient $$OPT smtpclient_vers.c; \
+    V=`./etc/newvers -lc -D gfont_vers.c`;\
+    sed -e "s/Version .*(.*)/Version $$V/g" <README >README.n && mv README.n README
+
+_UPDATEVERS = \
+    V=`./etc/newvers -lc -d smtpclient_vers.c`;\
+    ./etc/newvers -lc -p SMTPclient -r $$V smtpclient_vers.c; \
+    V=`./etc/newvers -lc -D smtpclient_vers.c`;\
+    sed -e "s/Version .*(.*)/Version $$V/g" <README >README.n && mv README.n README
+
+release: distclean fixperm
+	@$(_GETDISTINFO) \
+    _distname="smtpclient-$${_version}"; \
+    _tarball="/tmp/$${_distname}.tar.gz"; \
+    echo "Release Distribution: SMTPclient Version $$_version"; \
+    $(_BUILDDIST); \
+    mv /tmp/$${_distname}.tar.gz $${_distname}.tar.gz; \
+
+new-version:
+	OPT=-iv; $(_NEWVERS)
+
+new-revision:
+	OPT=-ir; $(_NEWVERS)
+
+new-betalevel:
+	OPT=-ib; $(_NEWVERS)
+
+new-patchlevel:
+	OPT=-iP; $(_NEWVERS)
+
+new-release:
+	OPT=-r$(R); $(_NEWVERS)
+
+update-version:
+	$(_UPDATEVERS)
+
+fixperm:
+	./etc/fixperm *
+
+# ------------------------------------------------
+#   THE PROGRAM
+# ------------------------------------------------
+
+smtpclient: smtpclient_main.o smtpclient_getopt.o smtpclient_errno.o smtpclient_vers.o 
+	$(CC) $(LDFLAGS) -o $@ smtpclient_main.o smtpclient_getopt.o smtpclient_errno.o smtpclient_vers.o $(LIBS) $(LDLIBS)
+
+# ------------------------------------------------
+#   THE DOCUMENTATION
+# ------------------------------------------------
+
+smtpclient.1: smtpclient.pod
+	V=`./etc/newvers -l c -D smtpclient_vers.c`; \
+    sed -e "s|\@V\@|$$V|g" \
+        <smtpclient.pod >/tmp/smtpclient.pod; \
+    pod2man --section=1 \
+            --center="Ralf S. Engelschall" \
+            --release="EN" \
+            /tmp/smtpclient.pod >smtpclient.1 && \
+    rm -f /tmp/smtpclient.pod
+
+# ------------------------------------------------
+#   INSTALLATION
+# ------------------------------------------------
+
+install: all
+	$(MKDIR) $(prefix)/bin
+	$(MKDIR) $(prefix)/man/man1
+	$(INSTALL_PROGRAM) smtpclient $(prefix)/bin/smtpclient
+	$(INSTALL_DATA) smtpclient.1 $(prefix)/man/man1/smtpclient.1
+
+# ------------------------------------------------
+#   CLEANUP
+# ------------------------------------------------
+
+clean:
+	-rm -f *.o
+	-rm -f smtpclient smtpclient.gdb smtpclient.elf
+	-rm -f core *.core
+
+distclean:
+	-@make clean
+	-rm -f config.h
+	-rm -f config.status config.cache config.log
+	-rm -f Makefile
+
+##EOF##

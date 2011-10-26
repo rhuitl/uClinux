@@ -1,0 +1,119 @@
+        Notes for use of LILO on systems with NO keyboard
+		(Version 22.7.2 and later)
+
+
+INTRODUCTION
+============
+
+It is possible on some systems to run without a keyboard.   This may be
+desirable on certain servers, if permitted by the BIOS.  Not all systems
+will permit this mode of operation.
+
+Without a keyboard, it may be desirable to alter the default descriptor
+booted, rather than boot the default descriptor all the time.  That is
+to say, if no keyboard is present on the system, then a different default
+descriptor may be selected for booting.
+
+
+LIMITATIONS
+===========
+
+The keyboard detection code accesses the ports used by the original IBM
+PC/AT or PC/XT keyboard.  No attempt is made to check for the presence of
+one of the newer USB keyboards.  The phase "no keyboard", therefore, means
+"no IBM PC keyboard" throughout this document.
+
+If anyone has any idea how to detect the presence/absence of a USB keyboard,
+please contact the LILO maintainer at the e-mail address below.
+
+
+USAGE
+=====
+
+After LILO has been reconfigured, two new keywords are available for use
+in the configuration file (e.g., /etc/lilo.conf).  The global option:
+
+nokbdefault = <descriptor>
+
+specifies the label or alias of the descriptor which is to be booted instead
+of the "default=<descr>" default, or the first descriptor (no usage of 
+"default=").
+
+Additionally, individual descriptors may be marked unavailable for booting
+if no keyboard is present.  Note that with a serial console present (see
+"serial=" in the "lilo.conf" man page or user manual) it is possible to 
+select other boot descriptors.  If this is not desirable, then certain 
+descriptors may be marked unbootable on an individual basis; viz.,
+
+	...
+	boot = /dev/hda
+	default = linux
+	nokbdefault = linux-nokbd
+	read-only
+	...
+	image=/boot/vmlinuz
+		label=linux		# default descriptor
+		root=/dev/hda1
+		initrd=/boot/initrd
+		append=" ... standard options ..."
+	image=/boot/vmlinuz2
+		label=linux-nokbd
+		root=/dev/hda1
+		initrd=/boot/initrd2
+		append=" ... no keyboard options, e.g, console=ttS0..."
+	other=/dev/hda2
+		label=DOS
+		nokbdisable
+		table=/dev/hda
+
+In the example above, "linux", the first descriptor, is the default boot
+selection (which may be overridden at the system console at boot time).
+However, if no keyboard is plugged into the system, "linux-nokbd" will
+be the default descriptor booted.  And further, with no keyboard, "DOS"
+will not be a boot option.
+
+Note that if the "nokbdefault=" line is omitted from the above configur-
+ation file, then when no keyboard is present, the default boot will be
+"linux", and "DOS" will still not be a boot option.
+
+With no keyboard and no serial interface in use (see "serial=" in the
+"lilo.conf" man pages), the "prompt" and "timeout=" options will be
+ignored, and booting of the "nokbdefault=" (or "default=") image will
+occur after the appropriate "delay=".  If either the keyboard or serial
+interface is present, then "prompt" and "timeout=" will be honored
+as documented.
+
+
+RECONFIGURING
+=============
+
+The "NOKEYBOARD" compilation option and associated keywords "nokbdefault"
+and "nokbdisable" are new with LILO version 22.7.2 of 25-Nov-2005.
+
+Since the keyboard detection code accesses the hardware I/O ports directly,
+this code is not included in the standard LILO distribution.  If the added
+capability is desired, then LILO must be recompiled with an additional
+compile-time option:  NOKEYBOARD.
+
+The options used for compilation are described at the top of the LILO
+"Makefile", and specified on the line which begins, "CONFIG=..."  To enable
+the NOKEYBOARD option, simply append:  " -DNOKEYBOARD" to the final line
+of the "CONFIG=" setting.  Now recompile LILO by executint the shell 
+commands:
+
+	> make clean		# set up for a clean compile
+	> make all		# recompile all source codes
+	> make install		# install the new boot loader
+
+At this point you have added support for the configuration file 
+"nokbdefault=" global option, and the "nokbdisable" local option.  Now
+edit "/etc/lilo.conf", the default configuration file, and re-install
+the boot loader by running:
+
+	> lilo -t		# test installation
+	> lilo			# actual installation
+
+
+(end)
+written 11/25/05 -- John Coffman <johninsd@san.rr.com>
+updated 11/26/05 -- John Coffman

@@ -1,0 +1,69 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" ftl_format.1 1.10 2000/06/12 21:24:48
+.\"
+.TH FTL_FORMAT 1 "2000/06/12 21:24:48" "pcmcia-cs"
+.SH NAME
+ftl_format \- Flash Translation Layer formatting utility
+.SH SYNOPSIS
+.B ftl_format
+.RB [ -q ]
+.RB [ -i ]
+.RB [ "\-s "\c
+.IR spare ]
+.RB [ "\-r "\c
+.IR reserve ]
+.RB [ "\-b "\c
+.IR bootsize ]
+.I device
+.SH DESCRIPTION
+.B Ftl_format
+creates a Flash Translation Layer partition on a flash memory device.   
+It needs to access the flash partition's raw character-mode device
+(such as
+.IR /dev/mem0c0c ).
+.PP
+This is actually a low-level format operation, required before
+accessing a memory device via the FTL block device driver.  Once a
+partition is prepared with
+.BR ftl_format ,
+a filesystem should be created in a separate step.  Filesystem
+commands should access the device via the FTL device file (such as
+.IR /dev/ftl0 ).
+.PP
+Optionally,
+.B ftl_format
+can reserve a region at the beginning of the flash card address space
+for a boot image (or any other purpose).  The boot area is not part of
+the FTL partition, and can only be accessed via the raw memory device.
+.PP
+On Intel Series 100 flash cards, the first flash block is used to
+store the card's configuration information structures.  If no boot
+area is specified on the command line,
+.B ftl_format
+will automatically create one to span the first block.
+.SH OPTIONS
+.TP
+.B \-q
+Quiet mode: don't print formatting statistics.
+.TP
+.B \-i
+Interactive: confirm before beginning the format.
+.TP
+.BI "\-s " spare
+Reserve the specified number of erase blocks as spares.  The default
+is 1.  A read-write partition requires at least one spare block.
+.TP
+.BI "\-r " reserve
+Reserve the specified percentage of the total space on the device to
+improve write efficiency.  The default is 5%.  Reserving less space
+increases the frequency of flash erase operations to reclaim free
+blocks.
+.TP
+.BI "\-b " bootsize
+Requests that a portion of the flash card be reserved for a boot
+image.  The size will be rounded up to an integral number of erase
+blocks.
+.SH AUTHOR
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+ftl_cs(4), ftl_check(8).

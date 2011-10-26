@@ -1,0 +1,66 @@
+Troubleshooting
+
+In case the applet doesn't work as expected, feel free to ask me for help
+(send your mail to linux@hejl.de).
+
+Common sources of problems with the applet/application are:
+
+   * Using a 2.0.xx kernel (sorry, I haven't found a way to get the
+     information needed for the applet on one of those kernels)
+   * The firewall rules blocking access to the ports (either the
+     web-server, or the stat-port (1024 by default))
+   * /etc/hosts.allow being configured in a way that the connection to the
+     stat-port is not allowed (default on Eigerstein images)
+   * A typo/misconfiguration between /etc/services, /etc/inetd.conf and the
+     html-file. This happened a lot during the first releases (mainly due
+     to some major screw ups in the documentation). Make sure all service
+     names are correct and refer to the correct port.
+
+To give me a chance in finding the source of the problem, you should send
+the following information along with your mail:
+
+   * the relevant lines of /etc/services. For example:
+
+     online          60180/tcp                       # goOnline
+     offline         60181/tcp                       # goOffline
+     stat            1024/tcp                       # general stats
+
+   * the relevant lines of /etc/inetd.conf. For example:
+
+     online   stream  tcp  nowait  root   /usr/sbin/tcpd  /sbin/net ifup ippp0
+     offline  stream  tcp  nowait  root   /usr/sbin/tcpd  /sbin/net ifdown ippp0
+     stat     stream  tcp  nowait  nobody /usr/sbin/tcpd  /sbin/lrpStat
+
+   * the Netmon.html file (or rather, the html-file you use to load the
+     applet)
+   * a few seconds worth of the output of the stat.sh script or the lrpStat
+     executable. Or even better, the output to telneting to the port
+     defined in /etc/services (1024 if you used my default values). For
+     example:
+
+     Inter-|   Receive                                                |  Transmit
+      face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+         lo:   67320     640    0    0    0     0          0         0    67320     640    0    0    0     0       0          0
+       brg0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+       eth0:302046121 4323663    0    0    0     0          0         0 1683840136 4349804    0    0   11     0       0          0
+      ippp0:  381180     301    0    0    0     0          0         0    20065     283    0    0    0     0       0          0
+     #
+     Inter-|   Receive                                                |  Transmit
+      face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+         lo:   67320     640    0    0    0     0          0         0    67320     640    0    0    0     0       0          0
+       brg0:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+       eth0:302046301 4323666    0    0    0     0          0         0 1683841274 4349807    0    0   11     0       0          0
+      ippp0:  381180     301    0    0    0     0          0         0    20065     283    0    0    0     0       0          0
+     #
+
+   * the output of the java console (remember, it's not enabled by default
+     in Internet Explorer). For example:
+
+     Setting Autoscale for DEV_0
+     Setting Autoscale for DEV_1
+     trying to open ghlx01:1024
+     Socket opened ghlx01:1024
+
+With that information, I should be able to figure out if it's a
+misconfiguration or a bug in the applet (and hopefully solve the problem,
+no matter what the reason was).

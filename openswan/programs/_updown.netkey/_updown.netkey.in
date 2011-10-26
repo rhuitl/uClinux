@@ -1,0 +1,458 @@
+#! /bin/sh
+#
+# default updown script for use with NETKEY(XFRM)
+#
+# Copyright (C) 2003-2004 Nigel Metheringham
+# Copyright (C) 2002-2007 Michael Richardson <mcr@xelerance.com>
+# Copyright (C) 2007-2008 Paul Wouters <paul@xelerance.com>
+# Copyright (C) 2003-2010 Tuomo Soini <tis@foobar.fi>
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+
+# CAUTION:  Installing a new version of Openswan will install a new
+# copy of this script, wiping out any custom changes you make.  If
+# you need changes, make a copy of this under another name, and customize
+# that, and use the (left/right)updown parameters in ipsec.conf to make
+# Openswan use yours instead of this default one.
+
+test $IPSEC_INIT_SCRIPT_DEBUG && set -v -x
+
+LC_ALL=C export LC_ALL
+
+# Things that this script gets (from ipsec_pluto(8) man page)
+#
+#
+#	PLUTO_VERSION
+#		indicates  what	 version of this interface is being
+#		used.  This document describes version	1.1.   This
+#		is upwardly compatible with version 1.0.
+#
+#	PLUTO_VERB
+#		specifies the name of the operation to be performed
+#		(prepare-host, prepare-client, up-host, up-client,
+#		down-host, or down-client).  If the address family
+#		for security gateway to security gateway
+#		communications is IPv6, then a suffix of -v6 is added
+#		to the verb.
+#
+#	PLUTO_CONNECTION
+#		is the name of the  connection	for  which  we	are
+#		routing.
+#
+#	PLUTO_CONN_POLICY
+#		the policy of the connection, as in:
+#		RSASIG+ENCRYPT+TUNNEL+PFS+DONTREKEY+OPPORTUNISTIC
+#		+failureDROP+lKOD+rKOD	
+#
+#	PLUTO_NEXT_HOP
+#		is the next hop to which packets bound for the peer
+#		must be sent.
+#
+#	PLUTO_INTERFACE
+#		is the name of the ipsec interface to be used.
+#
+#	PLUTO_ME
+#		is the IP address of our host.
+#
+#	PLUTO_METRIC
+#		is the metric to set for the route
+#
+#	PLUTO_MTU
+#		is the mtu to set for the route
+#
+#	PLUTO_MY_CLIENT
+#		is the IP address / count of our client subnet.	 If
+#		the  client  is	 just  the  host,  this will be the
+#		host's own IP address / max (where max	is  32	for
+#		IPv4 and 128 for IPv6).
+#
+#	PLUTO_MY_CLIENT_NET
+#		is the IP address of our client net.  If the client
+#		is just the host, this will be the  host's  own	 IP
+#		address.
+#
+#	PLUTO_MY_CLIENT_MASK
+#		is  the	 mask for our client net.  If the client is
+#		just the host, this will be 255.255.255.255.
+#
+#	PLUTO_MY_SOURCEIP
+#		if non-empty, then the source address for the route will be
+#		set to this IP address.
+#
+#	PLUTO_MY_PROTOCOL
+#		is the protocol	 for this  connection.	Useful	for
+#		firewalling.
+#
+#	PLUTO_MY_PORT
+#		is the port. Useful for firewalling.
+#
+#	PLUTO_PEER
+#		is the IP address of our peer.
+#
+#	PLUTO_PEER_CLIENT
+#		is the IP address / count of the peer's client subnet.
+#		If the client is just the peer, this will be
+#		the peer's own IP address / max (where	max  is	 32
+#		for IPv4 and 128 for IPv6).
+#
+#	PLUTO_PEER_CLIENT_NET
+#		is the IP address of the peer's client net.  If the
+#		client is just the peer, this will  be	the  peer's
+#		own IP address.
+#
+#	PLUTO_PEER_CLIENT_MASK
+#		is  the	 mask  for  the	 peer's client net.  If the
+#		client	 is   just   the   peer,   this	  will	 be
+#		255.255.255.255.
+#
+#	PLUTO_PEER_PROTOCOL
+#		is  the	 protocol  set	for  remote  end  with port
+#		selector.
+#
+#	PLUTO_PEER_PORT
+#		is the peer's port. Useful for firewalling.
+#
+#	PLUTO_CONNECTION_TYPE
+#
+#       PLUTO_CONN_ADDRFAMILY
+#               is the family type, "ipv4" or "ipv6"
+#
+#	PLUTO_PROTO_STACK
+#		is the local IPsec kernel stack used, eg KLIPS, NETKEY,
+#		MAST, NOSTACK
+#
+#	PLUTO_NM_CONFIGURED
+#		is NetworkManager used for resolv.conf update
+#
+
+# rpm based systems
+if [ -f /etc/sysconfig/pluto_updown ]
+then
+    . /etc/sysconfig/pluto_updown
+# deb based systems
+elif [ -f /etc/default/pluto_updown ]
+then
+    . /etc/default/pluto_updown
+fi
+
+OPENSWAN_RESOLV_CONF=/var/run/pluto/openswan-resolv-conf-backup
+ORIG_RESOLV_CONF=/etc/resolv.conf
+
+# Ignore parameter custom
+if [ " $1" = " custom" ]; then
+    shift
+fi
+
+while [ $# -gt 0 ]; do
+    case $1 in
+	--route)
+	    case $2 in
+		[Yy]*)
+		    ROUTE=yes
+		    ;;
+		*)
+		    ROUTE=
+		    ;;
+	    esac
+	    shift; shift
+	    ;;
+	--iproute)
+	    IPRARGS="$2"
+	    shift; shift
+	    ;;
+	*)
+	    echo "$0: Unknown argument \"$1\"" >&2
+	    exit 1
+	    ;;
+    esac
+done
+	    
+# utility functions for route manipulation
+# Meddling with this stuff should not be necessary and requires great care.
+uproute() {
+    doroute replace
+    ip route flush cache
+}
+
+
+downroute() {
+    doroute del
+    ip route flush cache
+}
+
+updateresolvconf() {
+
+if [ -z "$PLUTO_NM_CONFIGURED" -o "$PLUTO_NM_CONFIGURED" = 0 ]; then
+    echo "updating resolvconf"
+
+    if [ ! -e "$ORIG_RESOLV_CONF" ]; then
+        echo "resolv.conf does not exist, so doing nothing"
+        return 1
+    fi
+
+    if [ -e "$OPENSWAN_RESOLV_CONF" ]; then
+	if grep 'Openswan' $ORIG_RESOLV_CONF > /dev/null 2>&1
+	then
+	    echo "Current resolv.conf is generated by Openswan, and backup resolv.conf already exists, so doing nothing"
+	    return 1
+	else
+            echo "backup resolv.conf exists, but current resolv.conf is not generated by Openswan"
+	fi
+    fi
+
+    rm -f $OPENSWAN_RESOLV_CONF
+    cp -- $ORIG_RESOLV_CONF $OPENSWAN_RESOLV_CONF
+
+    RESOLVE_CONF="#Generated by Openswan (IPSec)"
+
+    if [ -n "$PLUTO_CISCO_DOMAIN_INFO" ]; then
+	if grep 'domain' $ORIG_RESOLV_CONF > /dev/null 2>&1 
+	then 
+	RESOLVE_CONF="$RESOLVE_CONF\ndomain $PLUTO_CISCO_DOMAIN_INFO\nsearch $PLUTO_CISCO_DOMAIN_INFO"
+	else
+	RESOLVE_CONF="$RESOLVE_CONF\nsearch $PLUTO_CISCO_DOMAIN_INFO"
+	fi
+    fi
+
+    if [ -n "$PLUTO_CISCO_DNS_INFO" ]; then
+	for i in $PLUTO_CISCO_DNS_INFO; do
+		RESOLVE_CONF="$RESOLVE_CONF\nnameserver $i"
+	done
+   fi
+
+   ORIG_NAMESERVER=`grep -m 1 ^nameserver $ORIG_RESOLV_CONF`
+   RESOLVE_CONF="$RESOLVE_CONF\n$ORIG_NAMESERVER"
+
+   rm -f -- $ORIG_RESOLV_CONF
+   printf "$RESOLVE_CONF" > $ORIG_RESOLV_CONF
+   return $?
+
+else
+   echo "Updating resolv.conf is controlled by Network Manager"
+   openswan_reason=connect
+   export openswan_reason
+   export PLUTO_CISCO_DOMAIN_INFO
+   export PLUTO_CISCO_DNS_INFO
+   export PLUTO_PEER_BANNER
+   export PLUTO_MY_SOURCEIP
+   export PLUTO_PEER
+
+   /usr/libexec/nm-openswan-service-helper
+
+   return 0
+fi
+}
+
+restoreresolvconf() {
+if [ -z "$PLUTO_NM_CONFIGURED" -o "$PLUTO_NM_CONFIGURED" = 0 ]; then
+    echo "restoring resolvconf"
+
+    if [ ! -e "$OPENSWAN_RESOLV_CONF" ]; then
+	echo "Problem in restoring the resolv.conf, as there is no backup file"
+	return 2
+    fi
+
+    if grep 'Openswan' $ORIG_RESOLV_CONF > /dev/null 2>&1 
+    then
+	cp -- "$OPENSWAN_RESOLV_CONF" $ORIG_RESOLV_CONF
+    else
+	echo "Current resolv.conf is not generated by Openswan, so doing nothing"
+    fi
+
+    rm -f -- "$OPENSWAN_RESOLV_CONF"
+    return 0
+else
+# Here disconnect signal is sent to NetworkManager
+# whenever an already established connection is being terminated.
+    unset openswan_reason
+    unset PLUTO_CISCO_DOMAIN_INFO
+    unset PLUTO_CISCO_DNS_INFO
+    unset PLUTO_PEER_BANNER
+    unset PLUTO_MY_SOURCEIP
+    unset PLUTO_PEER
+    echo "Restoring resolv.conf is controlled by Network Manager"
+    disconnectNM
+fi
+}
+
+disconnectNM() {
+# This will be called whenever a connection fails to establish 
+# due to a state (either phase 1, xauth phase, or phase 2) fails.
+# This will send a singal to NetworkManager over dbus so that NM
+# can clear up coonnections.
+    openswan_reason=disconnect
+    export openswan_reason
+    echo "sending disconnect signal to NetworkManager"
+    /usr/libexec/nm-openswan-service-helper
+    return 0
+}
+
+addsource() {
+    st=0
+    # check if given sourceip is local and add as alias if not
+    if ! ip -o route get ${PLUTO_MY_SOURCEIP%/*} | grep -q ^local; then
+	it="ip addr add ${PLUTO_MY_SOURCEIP%/*}/32 dev ${PLUTO_INTERFACE%:*}"
+	oops="`eval $it 2>&1`"
+	st=$?
+	if [ " $oops" = " " -a " $st" != " 0" ]; then
+	    oops="silent error, exit status $st"
+	fi
+	case "$oops" in
+	    'RTNETLINK answers: File exists'*)
+		# should not happen, but ... ignore if the
+		# address was already assigned on interface
+		oops=""
+		st=0
+		;;
+	esac
+	if [ " $oops" != " " -o " $st" != " 0" ]; then
+	    echo "$0: addsource \`$it' failed ($oops)" >&2
+	fi
+    fi
+    return $st
+}
+
+
+doroute() {
+    if [ -z "$PLUTO_MY_SOURCEIP" ] && [ -n "$DEFAULTSOURCE" ]
+    then
+	PLUTO_MY_SOURCEIP="${DEFAULTSOURCE%/*}"
+    fi
+
+    st=0
+    # skip routing if it's not enabled or necessary
+    if [ " $PLUTO_MY_SOURCEIP" = " " -a " $ROUTE" != " yes" ]; then
+	return 0
+    fi
+    parms="$PLUTO_PEER_CLIENT"
+    parms2=$IPRARGS
+    # use nexthop if (right/left)nexthop is set and nexthop is not %direct
+    if [ -n "$PLUTO_NEXT_HOP" -a "$PLUTO_NEXT_HOP" != "$PLUTO_PEER" ]; then
+	parms2="via $PLUTO_NEXT_HOP"
+    fi
+
+    # old: route via pluto_interface
+    # parms2="$parms2 dev ${PLUTO_INTERFACE%:*} $IPROUTEARGS"
+    # new: route via proper interface according to routing table
+    if [ "$1" = "del" ]; then
+	PLUTO_PEER_INTERFACE=`ip -o route get $PLUTO_PEER_CLIENT | sed "s/^.*dev \([^ ]*\) .*/\1/"`
+    else
+	PLUTO_PEER_INTERFACE=`ip -o route get $PLUTO_PEER | sed "s/^.*dev \([^ ]*\) .*/\1/"`
+    fi
+    if [ -z "$PLUTO_PEER_INTERFACE" ]; then
+	PLUTO_PEER_INTERFACE=$PLUTO_INTERFACE
+    fi
+    parms2="$parms2 dev ${PLUTO_PEER_INTERFACE%:*}${PLUTO_MTU:+ mtu ${PLUTO_MTU}}${PLUTO_METRIC:+ metric ${PLUTO_METRIC}} $IPROUTEARGS"
+
+    # make sure whe have sourceip locally in this machine
+    if [ "$1" = "replace" -a -n "$PLUTO_MY_SOURCEIP" ]; then
+	addsource
+	# use sourceip as route default source
+	parms2="$parms2 src ${PLUTO_MY_SOURCEIP%/*}"
+    fi
+
+    case "$PLUTO_PEER_CLIENT" in
+	"0.0.0.0/0")
+	    # opportunistic encryption work around
+	    # need to provide route that eclipses default, without 
+	    # replacing it.
+	    it="ip route $1 0.0.0.0/1 $parms2 && ip route $1 128.0.0.0/1 $parms2"
+	    ;;
+	*)
+	    it="ip route $1 $parms $parms2"
+	    ;;
+    esac
+    oops="`eval $it 2>&1`"
+    st=$?
+    if [ " $oops" = " " -a " $st" != " 0" ]; then
+	oops="silent error, exit status $st"
+    fi
+    if [ " $oops" != " " -o " $st" != " 0" ]; then
+	echo "$0: doroute \`$it' failed ($oops)" >&2
+    fi
+    return $st
+}
+ 
+
+# the big choice
+case "$PLUTO_VERB" in
+    prepare-host|prepare-client)
+	# Delete possibly-existing route (preliminary to adding a route)
+	# Not used for NETKEY
+	;;
+    route-host|route-client)
+	# connection to me or my client subnet being routed
+	uproute
+	;;
+    unroute-host|unroute-client)
+	# connection to me or my client subnet being unrouted
+	downroute
+	;;
+    up-host)
+	# connection to me coming up
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    down-host)
+	# connection to me going down
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    up-client)
+	# connection to my client subnet coming up
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    down-client)
+	# connection to my client subnet going down
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    updateresolvconf-host|updateresolvconf-client)
+        # updating resolv.conf using DNS info obtained from the server
+        updateresolvconf
+        ;;
+    restoreresolvconf-host|restoreresolvconf-client)
+        # restoring resolv.conf
+        restoreresolvconf
+        ;;
+    disconnectNM-host|disconnectNM-client)
+        # sending disconnect signal to NM, as something went wrong.
+        disconnectNM
+        ;;
+    #
+    # IPv6
+    #
+    prepare-host-v6|prepare-client-v6)
+	# prepare client for connection
+	;;
+    route-host-v6|route-client-v6)
+	# connection to me or my client subnet being routed
+	;;
+    unroute-host-v6|unroute-client-v6)
+	# connection to me or my client subnet being unrouted
+	;;
+    up-host-v6)
+	# connection to me coming up
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    down-host-v6)
+	# connection to me going down
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    up-client-v6)
+	# connection to my client subnet coming up
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    down-client-v6)
+	# connection to my client subnet going down
+	# If you are doing a custom version, firewall commands go here.
+	;;
+    *)	echo "$0: unknown verb \`$PLUTO_VERB' or parameter \`$1'" >&2
+	exit 1
+	;;
+esac

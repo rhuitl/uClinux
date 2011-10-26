@@ -1,0 +1,63 @@
+From:	Uwe Fuerst <uwe@phiger.com>
+To:	gert@greenie.muc.de (Gert Doering)
+Date:	Mon, 8 Nov 1993 10:45:55 +0100
+Cc:	mgetty@greenie.muc.de (MGETTY Mailing List)
+
+Gert Doering wrote:
+> Uwe Obst wrote:
+> > > BTW, ECU isn't checking ut_type at all. It's checking ut_user for "getty"
+> > > and "uugetty". Since mgetty is entered as "mgetty" by init, it is not
+> > > recognized. (The next version checks case-insensitive for any string
+> > > containing "getty").
+> > 
+> > Yeah, I see. I've fixed this in ECU. It now checks for "getty", "uugetty" *and*
+> > "mgetty".  So, mgetty-0.14 now's running fine w/o any nasty "patches" ;-)
+> 
+> Fine.
+> 
+> Could you send me a set of patches, so that I could include them with
+> mgetty - for users of older ECUs? (Warren made a new test release in the
+> meantime that should also work, but I didn't find time to get it yet).
+
+Of course, here you are.
+
+Apply this patch to "utmpstat.c", add "-DMGETTY" to CFLAGS *after* having run
+the "Configure" utility of ECU 3.20, that's it.
+
+-------------------------------------------------------------------------------
+*** orig/utmpstat.c	Thu Oct  7 09:57:01 1993
+--- utmpstat.c	Mon Nov  8 10:15:49 1993
+***************
+*** 30,35 ****
+--- 30,36 ----
+  
+  --------------------------------------------------------------------------*/
+  /*+:EDITS:*/
++ /*:09-18-1993-13:20-uwe@phiger.com-added utmp check for "mgetty" */
+  /*:09-10-1992-14:00-wht@n4hgf-ECU release 3.20 */
+  /*:09-02-1992-14:18-wht@n4hgf-some mark dead utmp entries instead of rming */
+  /*:08-22-1992-15:39-wht@n4hgf-ECU release 3.20 BETA */
+***************
+*** 208,214 ****
+--- 209,219 ----
+  			else if(line_lock_status(line) == LINST_WEGOTIT)
+  				status = US_WEGOTIT;
+  		}
++ #if defined(MGETTY)
++ 	    else if((!strcmp(namecopy,"uugetty") || !strcmp(namecopy,"getty") || !strcmp(namecopy,"mgetty")))
++ #else
+  	    else if((!strcmp(namecopy,"uugetty") || !strcmp(namecopy,"getty")))
++ #endif
+  		{
+  			if(itmp = line_lock_status(line))
+  			{
+-------------------------------------------------------------------------------
+
+BTW: I also have a set of patches to make ECU 3.20 support B50, B75 and B110
+     baud rates which are neccessary when using a DigiWare Multiport card
+     w/ the "fastbaud" feature enabled.
+     ("fastbaud" translates B50 to 57600bd, B75 to 76800bd and B110 to 115200bd)
+     Anyone interested in could send me an email...
+
+Regards,
+		Uwe

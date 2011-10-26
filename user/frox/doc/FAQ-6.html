@@ -1,0 +1,157 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 0.9.21">
+ <TITLE>Frox FAQ: Security</TITLE>
+ <LINK HREF="FAQ-7.html" REL=next>
+ <LINK HREF="FAQ-5.html" REL=previous>
+ <LINK HREF="FAQ.html#toc6" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="FAQ-7.html">Next</A>
+<A HREF="FAQ-5.html">Previous</A>
+<A HREF="FAQ.html#toc6">Contents</A>
+<HR>
+<H2><A NAME="s6">6.</A> <A HREF="FAQ.html#toc6">Security</A></H2>
+
+<H2><A NAME="ss6.1">6.1</A> <A HREF="FAQ.html#toc6.1">User, Group and Chroot</A>
+</H2>
+
+<P>Unless compiled with --enable-run-as-root you must specify
+a non root user and group for frox to run as. It is strongly
+recommended that you do this rather than recompiling.</P>
+<P>You must specify WorkingDir for frox in the config file. By
+default it will also chroot to this directory. If you do not
+wish to run chrooted you must explicitly set DontChroot to "yes"
+in the config file.</P>
+<H2><A NAME="ss6.2">6.2</A> <A HREF="FAQ.html#toc6.2">Access control lists</A>
+</H2>
+
+<P>Access to frox is controlled by the access control lists in
+the config file. These take the format  
+<PRE>
+        ACL ACTION CLIENT - [USER@]SERVER [PORTS]
+        
+</PRE>
+
+<CODE>ACTION</CODE> can be one of <CODE>Deny</CODE> or <CODE>Allow</CODE>. 
+<CODE>CLIENT</CODE> and <CODE>SERVER</CODE> are either a domain name,
+a <CODE>*</CODE>, an ip address, or an address/netmask in either
+<CODE>x.x.x.x/y</CODE> or <CODE>x.x.x.x/y.y.y.y</CODE> form. 
+<CODE>PORTS</CODE> is optional. If present it should contain one
+or more port numbers or ranges of port numbers, separated by
+&quot;,&quot;. There should be no whitespace within the
+<CODE>PORTS</CODE> string. If no ports are specified then ports
+are not taken into account in matching that rule.<CODE>USER</CODE>
+is also optional. If present then note that it should be
+<CODE>ftp</CODE> to match any anonymous connections.</P>
+<P>Acls are checked after the client has connected to frox,
+but before frox connects to the server. If non-transparent
+proxying is enabled then the client will enter the username
+before the acl is checked. The acls are checked in the order
+they appear in the config file until one matches. If no acls
+match the connection is denied.</P>
+<H2><A NAME="ss6.3">6.3</A> <A HREF="FAQ.html#toc6.3">Command Control Program</A>
+</H2>
+
+<P>Frox has optional support for a ftp-proxy like command
+control program (ccp). Just to confuse things there are two
+different ways that this can work. The default is still the
+old version based on ftp-proxy, while the new version is a bit
+more like the squid redirector interface.</P>
+<P>To use either method you should compile with
+<CODE>--enable-ccp</CODE>, and set <CODE>CCProgram</CODE> to the
+program you wish use. This must be within the chroot jail with
+any libraries and/or shells it needs to run. To use the new
+version you should also explicitly set <CODE>UseOldCCP</CODE> to
+<CODE>no</CODE> in the config file.</P>
+<H3>The Old Version</H3>
+
+<P>The ccp will then be called for every command that the
+client sends. It will not be called for any commands that
+frox decides to send itself (eg. as part of determining
+whether a file is suitable for caching). It can make use of
+the following environment variables:
+<PRE>
+          FROX_CLIENT, FROX_SERVER: Ip addresses of client and server.
+          FROX_SERVERNAME:          Server's domain name if known.
+          FROX_SESSION:             Unique string for this session.
+          FROX_COMMAND:             FTP command just given.
+          FROX_PARAMATER:           Argument to that command.
+          
+</PRE>
+
+With a new connection the ccp will be called with the
+special <CODE>FROX_COMMAND</CODE> of <CODE>+NEW</CODE>. The server
+variables may subsequently change if a user name is given
+which contains a different server to contact.</P>
+<P>If the ccp exits with a value of 0 then the command is
+dealt with as normal. If it exits with 1 then the command is
+discarded. If it exits with 2 then the session is closed. If
+the ccp writes a line to stderr then it will be sent to the
+client over the control connection. If it writes a line to
+stdout it will be logged by frox. If the ccp returns a value
+other than 0 it is its responsibility to write a well formed
+ftp message to the client which tells it what is happening
+(eg. from a shell script by echo -ne "533 Permission
+denied\r\n" &gt;&amp;2) . Failure to do this will result in
+the client and proxy getting out of sync.</P>
+<H3>The New Version</H3>
+
+<P>One copy of the ccp will be executed each time a client
+connects. It should read commands and messages from
+<CODE>stdin</CODE> and write its replies back to
+<CODE>stdout</CODE>. Each call is a '\n' terminated string which
+starts with a single char, followed optionally by a space
+and a string.</P>
+<P>If the initial char is "I" then it is followed by
+<CODE>&quot;client_ip server_ip server_name&quot;</CODE>,
+although if the server_name is not known it will be replaced
+by an "X". If the char is a "C" then it is followed by a
+command from the client, and if it is a "S" it is followed
+by a message from the server.</P>
+<P>The ccp should reply with a similar string. "C" should be
+followed by a message to go the client, while S is followed
+by a command for the server. In response to an "I" a "R" can
+be sent where the argument is the IP address of a server to
+contact in place of the currently selected one. A single "X"
+tells frox to continue as before, while a "Q" tells frox to
+drop the connection. Finally the string after an "L" will be
+logged by frox. It should also be followed by another line
+giving an action to take.</P>
+<P>Written like that is is pretty confusing, so there are
+two example ccp scripts in the doc/ directory. One is a
+simple bash script to disallow downloading of files greater
+than a certain size. The other is a more complicated C
+program which attempts to redirect users to mirrors of ftp
+sites. I am sure there are other applications.</P>
+<H2><A NAME="ss6.4">6.4</A> <A HREF="FAQ.html#toc6.4">TLS/SSL Support</A>
+</H2>
+
+<P>There is very experimental (currently only tested with
+vsftpd) support for having frox use encryption when connecting
+to the ftp server. You need to give <CODE>--enable-ssl</CODE> to
+<CODE>./configure</CODE>, and define <CODE>UseSSL yes</CODE> in the
+config file. By default data connections will also be
+encrypted, but you can turn this off by setting <CODE>DataSSL
+no</CODE>. Note you will need to create <CODE>/dev/urandom</CODE>
+and <CODE>/dev/random</CODE> at least in the chroot jail, and
+possibly some other stuff, for the openssl libraries to work. 
+If you are having difficulties try defining <CODE>DontChroot
+yes</CODE> temporarily to see if it fixes things.</P>
+<P>Note SSL support currently only covers the connection
+between frox and the ftp server. Frox does not support clients
+connecting to it with SSL at the moment.</P>
+<P>It is suggested to have a config file subsection which turns
+off SSL for anonymous connections. There is little point in having
+the overhead of encryption for this, and ftp servers may deny an
+anonymous connection once SSL has been negotiated (this is the
+default configuration of vsftpd). At this stage frox is not able to
+undo the ssl negotiation.</P>
+<P>This is not yet rfc compliant. It should be at some point...</P>
+<HR>
+<A HREF="FAQ-7.html">Next</A>
+<A HREF="FAQ-5.html">Previous</A>
+<A HREF="FAQ.html#toc6">Contents</A>
+</BODY>
+</HTML>

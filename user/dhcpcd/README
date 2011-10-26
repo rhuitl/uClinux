@@ -1,0 +1,154 @@
+0. Introduction
+
+This is an RFC2131 and RFC1541 compliant DHCP client daemon. RFC1541
+was obsoleted by RFC2131, but there are still some RFC1541 compliant
+DHCP servers. dhcpcd gets an IP address and other information from a
+corresponding DHCP server, configures the network interface
+automatically, and tries to renew the lease time according to RFC2131
+or RFC1541 depending on the command line option.
+
+
+1. Install
+
+Do 'make' followed by 'make install'.
+
+
+2. How to Use It
+
+Invoke the client by typing 'dhcpcd' if you want it to run as a daemon
+(i.e., background task).  Note that you do not have to explicitly put
+it in the background with the '&' character - background processing is
+automatic unless overridden by the '-d' option.  By default, it will
+attach to 'eth0' unless you explicitly give an interface name on the
+command line.
+
+
+3. Supported DHCP Options
+
+The current version of dhcpcd supports the following DHCP options:
+
+  o lease time
+  o renewal (T1) time
+  o rebind (T2) time
+  o netmask
+  o broadcast address
+  o router
+  o time server
+  o DNS
+  o lpr server
+  o host name
+  o domain name
+  o NTP server
+  o NIS domain name
+
+dhcpcd uses the netmask and broadcast address options if it gets these
+options from the DHCP server. It uses the 'natural' netmask and
+broadcast address if it does not get those options. dhcpcd configures
+the host name by using the 'sethostname' system call if it gets the
+host name option. It configures the NIS domain name by using the
+'setdomainname' system call if it gets the NIS domain name option. It
+creates the file '/etc/dhcpc/resolv.conf' if it gets DNS and domain
+name options.  It also creates the file '/etc/dhcpc/ntp.conf' if it
+gets NTP server option. The host name, NIS domain name, lpr server,
+NTP server, and time server option values are written into the file 
+'/etc/dhcpc/hostinfo-ifname' (ifname is actually replaced with the
+network interface name like "eth0").
+
+
+4. Command File
+
+dhcpcd invokes the specified command file (specified with the '-c'
+option) just after it gets an IP address from the DHCP server and
+configures the network interface and host information. The following
+options are passed to the command file as environmental variables (if
+dhcpcd gets those options):
+
+  o host name           HOSTNAME
+  o NIS domainname      NISDOMAINNAME
+  o lpr server          LPRSERVER, (LPRSERVER2, ...)
+  o NTP server          NTPSERVER, (NTPSERVER2, ...)
+  o time server         TIMESERVER, (TIMESERVER2, ...)
+  o router              ROUTER, (ROUTER2, ...)
+
+
+5. Cache File
+
+dhcpcd saves the assigned IP address to the file
+'/var/run/dhcpcd-cache.interface' (the word 'interface' is actually
+replaced with the interface name like eht0, etc. to which dhcpcd is
+attached) so that it can try to use that IP address when it is invoked
+next time. Remove the file '/var/run/dhcpcd-cache.interface' before
+you invoke dhcpcd unless you like using the previously assigned IP
+address.
+
+
+6. PCMCIA
+
+dhcpcd can be automatically invoked when the PCMCIA card service gets
+started. There is a sample 'network' shell script for pcmcia-cs in
+the directory './pcmcia'. Read the file './pcmcia/README' for more
+details.
+
+
+7. Cable Modems and ADSL Modems
+
+DHCP servers used in some cable modem servecices and ADSL services
+require DHCP clients to include the hostname option having a specific
+string provided by the service providers when the clients send the
+DHCPDISCOVER and DHCPREQUEST messages. Try '-h' option in the case
+you are using either cable modem service or ADSL service and dhcpcd
+outputs the "no DHCPOFFER messages" error message.
+
+
+8. Other Information
+
+dhcpcd sends DHCPRELEASE message to the DHCP server and makes the
+attached network interface down when it gets SIGINT or SIGTERM
+signal.
+
+dhcpcd currently does not support DHCPINFORM message.
+
+dhcpcd does not work in the case that the same DHCP option
+(e.g. domain name) appears multiple times in a message. dhcpcd simply
+uses the option which appeared last. This happens only when options
+have a long (more than 255 characters) value. This limitation will be
+fixed in the next release. 
+
+
+9. In case dhcpcd does not work
+
+Some people send me emails stating just like:
+
+  "Hey, Windows95 works, but dhcpcd does not work and it outputs
+  the 'no DHCPOFFER messages' error message. Do you have any ideas?"
+
+I have no idea only with such a comment. I cannot fix your problem
+only from such kind of information either. I would appreciate it if
+you could set up the following environment, log the output of
+tcpdump, and send it to me in the case Win95 box works and dhcpcd
+does not work:
+
+                   Ethernet
+    ------+---------------------+--------
+       +--+--+               +--+--+
+       |Win95|               |Linux|
+       | box |               | box |
+       +-----+               +-----+
+
+  1. run tcpdump as:
+
+	   tcpdump -s 500 -x udp port 67 or port 68 
+
+	 on the Linux box
+
+  2. boot the Win95 box
+  3. log the output of tcpdump running on the Linux box
+
+
+
+
+
+Enjoy,
+Yoichi
+
+$Id: README,v 1.1.1.1 1999-11-22 03:47:59 christ Exp $

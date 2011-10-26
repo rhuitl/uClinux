@@ -1,0 +1,225 @@
+############################################################################
+#
+#  A Generic m68k config.arch that can be included by other platforms
+#  to reduce the number of places that need to be edited when something
+#  common changes.  If you include this file you may provide:
+#
+#  CPUFLAGS            - cpu specific flags to pass to the compiler
+#  VENDOR_CFLAGS       - vendor specific flags to pass to the compiler
+#  DISABLE_XIP         - set this to 1 to disable XIP code
+#  DISABLE_SHARED_LIBS - set this to 1 to disable shared libraries
+#  DISABLE_MOVE_RODATA - set this to 1 to disable moving rodata to text
+#  LOPT                - library optimisation flags
+#  UOPT                - user optimisation flags
+#
+#  David McCullough <davidm@snapgear.com>
+#
+############################################################################
+#
+# Generic settings
+#
+
+ifndef CONSOLE_BAUD_RATE
+CONSOLE_BAUD_RATE = 9600
+endif
+
+ifndef EXTRA_MODULE_DIRS
+ifeq ($(ROOTDIR)/modules,$(wildcard $(ROOTDIR)/modules))
+ifneq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules/
+else
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules
+endif
+endif
+endif
+
+ifndef VERSIONPKG
+#define VERSIONPKG 1.0.0
+endif
+
+ifndef VERSIONSTR
+VERSIONSTR = $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+endif
+
+ifndef RELFILES
+RELFILES = boot/boot.bin,.sgb boot/boot.elf images/imagez.bin,.sgu images/image.elf
+endif
+
+ifndef NFIMAGE
+NFIMAGE=imagez.bin
+endif
+
+############################################################################
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all builds
+#
+
+# ARCH = kernel,  TARGET_ARCH = uClibc
+
+MACHINE       = m68k
+ifeq ($(shell egrep 'linux-2.[024]' $(ROOTDIR)/.config),)
+ARCH          = m68k
+else
+ARCH          = m68knommu
+endif
+ENDIAN        = big
+ifneq ($(shell which m68k-uclinux-20060615-gcc),)
+CROSS_COMPILE = m68k-uclinux-20060615-
+else
+CROSS_COMPILE = m68k-uclinux-
+endif
+CROSS         = $(CROSS_COMPILE)
+CONFIGURE_HOST = m68k-elf
+
+CONFIG_UCLINUX=y
+
+CC        = ucfront-gcc $(CROSS_COMPILE)gcc $(CPUFLAGS)
+AS        = $(CROSS_COMPILE)as $(CPUFLAGS)
+CXX       = ucfront-g++ $(CROSS_COMPILE)g++ $(CPUFLAGS)
+AR        = $(CROSS_COMPILE)ar
+LD        = ucfront-ld $(CROSS_COMPILE)ld
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+ELF2FLT   = elf2flt
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+UCLINUX_BUILD_SET = 0					# have we set a special config below
+
+ifndef DISABLE_SHARED_LIBS
+  ifeq ($(CONFIG_BINFMT_SHARED_FLAT),y)
+	BUILD_SHARED = 1
+  endif
+endif
+
+# These can be used by configure.
+# Either configure $(CONFIGURE_OPTS)
+# or     configure --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+#
+TARGETARCH    := $(CROSS)linux
+HOSTARCH      := $(shell sh $(ROOTDIR)/tools/config.guess)
+CONFIGURE_OPTS := --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+
+############################################################################
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O2) -g -fomit-frame-pointer
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += $(VENDOR_CFLAGS) -DEMBED
+
+  ifdef BUILD_SHARED
+	CFLAGS  += -mid-shared-library
+  else
+	ifndef DISABLE_XIP
+	  CFLAGS  += -msep-data
+	endif
+  endif
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CPUFLAGS) $(CFLAGS)
+
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+	CFLAGS  += -D__uClinux__
+	LDFLAGS += -Wl,-elf2flt
+  ifndef DISABLE_MOVE_RODATA
+  	LDFLAGS += -Wl,-move-rodata
+  endif
+
+  ifdef BUILD_SHARED
+	LDFLAGS += -mid-shared-library -mshared-library-id=0 -Wl,-shared-lib-id,0
+  else
+	ifndef DISABLE_XIP
+	  LDFLAGS  += -msep-data
+	endif
+  endif
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+  ifdef BUILD_SHARED
+	# We use a special shared libc
+	LIBC          = -Wl,-R,$(ROOTDIR)/lib/libc.gdb $(SLIBC)
+  endif
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-Os) -g -fomit-frame-pointer
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += $(VENDOR_CFLAGS) -DEMBED
+
+  ifdef BUILD_SHARED
+	CFLAGS  += -mid-shared-library -mshared-library-id=0
+  else
+	ifndef DISABLE_XIP
+	  CFLAGS  += -msep-data
+	endif
+  endif
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CFLAGS)
+
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+	CFLAGS  += -D__uClinux__
+
+	CXXFLAGS = $(CFLAGS) -nostdinc++ -fno-exceptions
+	CXXSUP := 
+
+	LDFLAGS += -Wl,-elf2flt
+  ifndef DISABLE_MOVE_RODATA
+  	LDFLAGS += -Wl,-move-rodata
+  endif
+
+  ifdef BUILD_SHARED
+	LDFLAGS += -mid-shared-library -mshared-library-id=0 -Wl,-shared-lib-id,0
+  else
+	ifndef DISABLE_XIP
+	  LDFLAGS  += -msep-data
+	endif
+  endif
+
+  ifndef FLTFLAGS
+	FLTFLAGS :=
+  endif
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+	EXTRA_CFLAGS := $(CPUFLAGS)
+
+	CXXLIBS =
+  	 
+	LDLIBS = $(LIBBIND)
+endif
+
+############################################################################

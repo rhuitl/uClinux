@@ -1,0 +1,97 @@
+Intel Monte Jade IXP425 Demonstration Platform
+----------------------------------------------
+
+1. Compiler Tool Chain
+
+   Before you can compile the Linux kernel, libraries and applications to
+   generate a Monte Jade image you must install an appropriate compiler tool
+   chain. I suggest you use the arm-linux tool chain that accompanies this
+   source distribution (the arm-linux-tools-XXXXXXXX.tar.gz package). You can
+   also get this tool chain from the http://www.snapgear.org/downloads web
+   site. To install this toolchain do:
+
+   1. login as root
+   2. cd /
+   3. tar xvzf arm-linux-tools-XXXXXXXX.tar.gz
+
+   This package contains binaries of the following GNU tools:
+
+        binutils (as of this writing version 2.14)
+        gcc (as of this writing version 3.3.2)
+        glibc (as of this writing version 2.2.5)
+
+2. Building the Source
+
+   Follow these simple steps to compile binary images ready to run on the
+   Intel Monte Jade board:
+
+   1.  tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+   2.  cd uClinux-dist
+   3.  make xconfig
+
+       . Choose the "Target Platform Selection" menu item
+       . Select the "Vendor/Product" tab and choose "Intel/MonteJade"
+       . Select the "Libc version" tab and choose "Glibc"
+       . "Save and Exit" this configuration
+
+   4.  make dep
+   5.  make
+
+   That is it!  The final make step will run through and compile the Linux
+   kernel, glibc library and a sample application set. It will also package
+   the result into two files ready to load onto the Monte Jade board, zImage
+   and ramdisk.gz.
+
+   Only the linux-2.4.x kernel can currently be used on the Monte Jade board.
+   Either glibc or uClibc library can be used. There is no linux-2.6.x kernel,
+   linux-2.0.x kernel or uC-libc support for this board.
+
+
+3.  Loading and Running
+
+    You will need the Intel Monte Jade board fitted with the RedBoot loader
+    in flash. You should firstly setup RedBoot configuration with a client
+    and server IP address (alternatively you can use the builtin DHCP
+    support).
+
+    Copy the binary files from uClinux-dist, images/zImage and
+    images/ramdisk.gz to the TFTP area of the download server.
+
+    To load and run Linux with directly from RAM issue the following commands:
+
+        load -r -v -b 0x01600000 zImage
+        load -r -v -b 0x00800000 ramdisk.gz
+        go  -n 0x01600000
+
+    You should see the Linux boot banner, and then be presented with a
+    bash shell prompt. A reasonable utility set is in place, mostly using
+    the busybox tool set. 
+
+
+4. Saving to Flash with RedBoot
+
+   You can setup the flash memory to contain the newly build binaries
+   instead of the pre-installed SnapGear Linux that is included on the
+   Monte Jade board.
+
+   The following procedure describes howto setup and load Linux into
+   the flash:
+
+     load -r -v -b 0x01600000 zImage
+     fis write -f 0x50080000 -b 0x01600000 -l 0x100000
+     load -r -v -b 0x00800000 ramdisk.gz
+     fis write -f 0x50180000 -b 0x00800000 -l 0x600000
+
+   The default boot script and other Redboot setup does not need to be
+   changed. On the next reboot the system will be running the new images.
+
+
+5. Customizing the Build
+
+   Using "make xconfig" in uClinux-dist you can customize the kernel and
+   application configurations. There is a large selection of packages in
+   the application configuration.
+
+   Consult the README file at the top level of uClinux-dist for some more
+   information about configuration and building.
+

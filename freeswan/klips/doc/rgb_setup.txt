@@ -1,0 +1,428 @@
+*
+* RCSID $Id: rgb_setup.txt,v 1.6 1999/04/06 04:54:24 rgb Exp $
+*
+
+This is an example of a network set up to test the FreeS/WAN KLIPS
+package.  It details the hardware setup and the steps necessary to
+manually configure and set up two types of connections.  It assumes
+that all machines are configured and can talk to each other.
+
+1.  Here is a simplified view of RGB's testbed:
+
+
+    +---------+						   +---------+
+    |  ping4  |						   |  ping5  |
+    +----*----+						   +----*----+
+   eth0 * 192.168.4.104      	        		   eth0 * 192.168.5.104
+	*							*
+    *************************               *************************
+			*			*
+                   eth1 * 192.168.4.110    eth1 * 192.168.5.100
+                   +----*-----+	           +----*-----+
+                   | gonzales |            | magellan ***-> eth2 to Internet
+                   +----*-----+            +----*-----+
+		   eth0 * 192.168.2.110    eth0 * 192.168.2.100
+			*			*	
+	******************************************************************
+
+
+Only magellan and gonzales need to run IPSEC. 
+
+All netmasks in this example are 255.255.255.0, but yours should reflect
+your network architecture.
+
+Ping4 has a route to 192.168.5.x via gonzales, and ping5 has a route to
+192.168.4.x via magellan. 
+
+gonzales and magellan know how to route only to their connected subnets;
+gonzales does not (yet) know how to get to 192.168.5.x and magellan does
+not know how to get to 192.168.4.x. 
+
+First, follow the instructions in the top-level INSTALL to compile and
+install the software on both gonzales and magellan, and reboot.
+
+Let us set up gonzales.
+
+ipsec0 needs to be associated with a real interface. In our case,
+we shall associate it with the interface on the 192.168.2.0 subnet, that
+is, eth0, because that's where IPSEC'ed traffic will flow. Then we
+need to configure the new pseudo interface:
+
+	gonzales# ipsec tncfg --attach --virtual ipsec0 --physical eth0
+	gonzales# ifconfig ipsec0 192.168.2.110 netmask 255.255.255.0 
+
+On magellan, do the same:
+
+	magellan# ipsec tncfg --attach --virtual ipsec0 --physical eth0
+	magellan# ifconfig ipsec0 192.168.2.100 netmask 255.255.255.0 
+
+Note:  The ipsec interface IP, broadcast address and netmask should be
+identical to the physical interface to which it is attached.
+
+2. Transport Mode.
+
+Let us have gonzales and magellan communicate securely, using the latest and
+greatest IPSEC transform: triple-DES with 96-bits of HMAC-MD5 hash.  This
+transform requires an 8-byte (16 nybble) Initialisation Vector
+(0x1000000000000001), a 24-byte (48 nybble) encryption key
+(0x663066306630663066306630663066306630663066301111) and a 16-byte (32 nybble)
+authentication key (0x66306630663066306630663066302222).
+
+To set the actual Security Association, type:
+
+	gonzales# ipsec spi --edst 192.168.2.100 --spi 0x125 --proto esp \
+		   --esp 3des-md5-96 \
+		   --enckey 0x663066306630663066306630663066306630663066301111 \
+		   --authkey 0x66306630663066306630663066302222
+
+To verify it worked, type:
+
+	gonzales# cat /proc/net/ipsec_spi
+
+to get:
+
+	esp0x125@192.168.2.100 ESP_proto_3DES_encrypt_MD5_auth_:  dir=out
+		win=0  seq=0  bit=0x00000000  flags=0x0
+
+And set the same SA on magellan, so it will know how to decrypt packets:
+
+	magellan# ipsec spi --edst 192.168.2.100 --spi 0x125 --proto esp \
+		   --esp 3des-md5-96 \
+		   --enckey 0x663066306630663066306630663066306630663066301111 \
+		   --authkey 0x66306630663066306630663066302222
+
+Then, issue the following command, which tells gonzales to process packets
+originating with it and destined for magellan by applying a transform
+defined by destination address 192.168.2.100 (magellan), SPI 0x125 and
+protocol 'esp'.
+
+	gonzales# ipsec eroute --add --src 192.168.2.110/32 \
+			--dst 192.168.2.100/32 \
+ 			--edst 192.168.2.100 --spi 0x125 --proto esp
+
+To verify it has worked, type:
+
+	gonzales# cat /proc/net/ipsec-eroute
+
+you should get:
+
+	192.168.2.110/32 -> 192.168.2.110/32 => esp0x125@192.168.2.110
+
+Last, let's route all the packets destined for magellan through the ipsec0
+interface:
+
+	gonzales# route del 192.168.2.100 #(to clear any old routes)
+	gonzales# route add -net 192.168.2.100 \
+			netmask 255.255.255.255 \
+			dev ipsec0 \
+			gw 192.168.2.100
+
+
+If you ping magellan from gonzales, and look at the traffic on the wire,
+you'll see that packets from gonzales to magellan are encrypted (and
+authenticated), while packets from magellan to gonzales are in the clear.
+Needless to say, you can set up a symmetric set of transforms on magellan
+and gonzales, repspectively, so that the reverse traffic is also encrypted.
+
+To undo all these commands, work in reverse:
+
+        gonzales# route del 192.168.2.100
+	gonzales# ipsec eroute --del --src 192.168.2.110/32 \
+			--dst 192.168.2.100/32
+	gonzales# ipsec spi 192.168.2.100 125 del
+	gonzales# ipsec spi --edst 192.168.2.100 --spi 0x125 --proto esp --del
+
+	magellan# ipsec spi --edst 192.168.2.100 --spi 0x125 --proto esp --del
+
+and don't forget to replace any routes that may have been removed by
+the original 'route del' command.
+
+3. Tunnel mode.
+
+3.1.  Set up the tunnel.
+
+Now, we want to set up gonzales so that packets from ping4 to ping5 will be
+tunneled through the (gonzales->magellan) tunnel.
+
+We now want to tell the IPSEC code what the processing for packets
+which have been selected to be processed with DA=192.168.2.100,
+SPI=0x103 and proto=tun. First, they will be encapsulated in simple
+IP-in-IP (proto 4) encapsulation, and to enable that we type:
+
+	gonzales# ipsec spi --edst 192.168.2.100 --spi 0x103 --proto tun \
+			--ip4 --src 192.168.2.110 --dst 192.168.2.100
+
+This tells the IPSEC code that packets which have been selected to be
+processed with DA=192.168.2.100, SPI=0x103 and proto=tun should be run
+through IP-in-IP, with "outer" (encapsulating packet) source and
+destination addresses of 192.168.2.110 (gonzales) and 192.168.2.100
+(magellan) respectively. Type:
+
+	gonzales# cat /proc/net/ipsec-spi
+
+to verify that the SAID has been formed. You should get
+
+	tun0x103@192.168.2.100 IPIP_proto_:  dir=out  flags=0x0
+		192.168.2.110 -> 192.168.2.100
+
+Now, issue the following command:
+
+	gonzales# ipsec eroute --add --src 192.168.4.0/24 \
+		   --dst 192.168.5.0/24 \
+		   --edst 192.168.2.100 --spi 0x103 --proto tun
+
+To verify it has worked, type:
+
+	gonzales# cat /proc/net/ipsec-eroute
+
+you should get:
+
+	192.168.4.0/24 -> 192.168.5.0/24 => tun0x103@192.168.4.0
+
+
+This means that packets originating from net 192.168.4.x and destined
+for net 192.168.5.x should be IPSEC-processed, with a "Destination
+Address" of 192.168.2.100, a "Security Parameters Index" of 0x103 and
+a "Protocol" of 'tun'.  The Destination Address indicates the other
+point of the tunnel, whether it is a real tunnel (as in this case), or
+simply the destination (in what we call "transport mode"). The
+Security Parameters Index, or SPI, is an opaque value that indicates,
+along with the DA and the protocol, what processing these packets will
+receive at our end as well as the remote end. The triple (DA, SPI,
+Proto) is called a SAID (Security Association IDentifier) in this
+document.
+
+The last step is to set up a route to net 192.168.4.0 through the ipsec0
+interface:
+
+	gonzales# route del 192.168.5.0 (to clear any old routes)
+	gonzales# route add -net 192.168.5.0 \
+			netmask 255.255.255.0 \
+			dev ipsec0 \
+			gw 192.168.2.100
+
+[ To understand what this does, remember that we "attached" eth0 to
+ipsec0; the route is set up so that packets will be routed through
+magellan, but they will first pass through the ipsec0 interface; then, when
+they have been processed, they will be passed on to the attached
+interface and delivered to the next-hop specified in the gw parameter
+in the route command. ]
+
+3.2  Add security.
+
+So far so good, but we've simply reproduced already existing
+functionality. Now, let's add security. First, we'll tell the code to
+encrypt packets using the ESP-3DES-CBC transform. We'll create another
+SAID, this time for ESP-3DES-CBC.
+
+	gonzales# ipsec spi --edst 192.168.2.100 --spi 0x105 --proto esp \
+		    --esp 3des \
+		    --enckey 0x663066306630313663066306630313226630663066303132
+
+This tells the IPSEC layer that packets destined to be processed with
+DA=192.168.2.100, SPI=0x105, proto=esp, should be processed with 
+ESP-DES-CBC, use 0x6630663066306630 as the DES-CBC Initialization Vector,
+and use 0x663066306630313266306630663031326630663066303132 as the 3DES
+key (the 3DES parity bits are ignored, so this yields the 168-bit 3DES
+key). 
+
+Next, we also want to authenticate the resulting packet, so we
+create another SAID, this time for the AH-HMAC-MD5 transform:
+
+	gonzales# ipsec spi --edst 192.168.2.100 --spi 0x106 --proto ah \
+			--ah hmac-md5 \
+			--authkey 0x66306630663031326630663066303132
+
+To see the picture so far, type:
+
+	gonzales# cat /proc/net/ipsec-spi
+
+you should have:
+
+	tun0x103@192.168.2.100 IPIP_proto_: dir=out  flags=0x0  
+		192.168.2.110 -> 192.168.2.100
+	ah0x106@192.168.2.100 AH_proto_MD5_auth_:  dir=out  alen=16  win=0
+	esp0x105@192.168.2.100 ESP_proto_3DES_encrypt_NO_auth_: dir=out
+		win=0  seq=0  bit=0x00000000  flags=0x0
+
+Now comes the crucial step. What the original eroute add command did was to
+establish that outgoing packets are to be processed with IP-in-IP
+encapsulation first. Now, we need to "link" this transform (IPIP) to the ESP
+transform and then the AH. We do that with the spigrp ("group SPIs")command:
+
+	gonzales# ipsec spigrp 192.168.2.100 0x103 tun \
+			192.168.2.100 0x105 esp \
+			192.168.2.100 0x106 ah
+
+To verify all this worked type:
+
+	gonzales# cat /proc/net/ipsec-spigrp
+
+should give you:
+
+	tun0x103@192.168.2.100 esp0x105@192.168.2.100 ah0x106@192.168.2.100 
+
+
+Now, on magellan, to receive and decode these packets, we need:
+
+	magellan# ipsec spi --edst 192.168.2.100 --spi 0x105 --proto esp \
+		    --esp 3des \
+		    --enckey 0x663066306630313663066306630313226630663066303132
+	magellan# ipsec spi --edst 192.168.2.100 --spi 0x106 --proto ah \
+			--ah hmac-md5 \
+			--authkey 0x66306630663031326630663066303132
+
+since IP-in-IP does not need any special handling.  ESP and AH,
+however, need the SAIDs to be established.  We use the same commands we
+used for the outgoing packets on gonzales.
+
+Typing:
+
+	magellan# cat /proc/net/ipsec-spi 
+
+should give us:
+
+	ah0x106@192.168.2.100 AH_proto_MD5_auth_: dir=out  alen=16
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	esp0x105@192.168.2.100 ESP_proto_3DES_encrypt_NO_auth_: dir=out
+		win=0  seq=0  bit=0x00000000  flags=0x0
+
+On magellan, now, we have to send things up the opposite way. Here are the
+commands to use:
+
+
+
+	magellan# ipsec spi --edst 192.168.2.110 --spi 0x113 --proto tun \
+			--ip4 --src 192.168.2.100 --dst 192.168.2.110
+	magellan# ipsec spi --edst 192.168.2.110 --spi 0x115 --proto esp \
+		    --esp 3des \
+		    --enckey 0x663066306630313663066306630313226630663066303132
+	magellan# ipsec spi --edst 192.168.2.110 --spi 0x116 --proto ah \
+			--ah hmac-md5 \
+			--authkey 0x66306630663031326630663066303132
+
+	magellan# ipsec spigrp 192.168.2.110 0x113 tun \
+			192.168.2.110 esp 0x115 \
+			192.168.2.110 ah 0x116
+	magellan# ipsec eroute --add --src 192.168.5.0/24 \
+		   --dst 192.168.4.0/24 \
+		   --edst 192.168.2.110 --spi 0x113 --proto tun
+	magellan# route del 192.168.4.0 #(to clear any old routes)
+	magellan# route add -net 192.168.4.0 netmask 255.255.255.0 dev ipsec0 \
+			gw 192.168.2.110
+
+Now, we also need to specify what will happen when gonzales receives
+magellan's packets.
+
+	gonzales# ipsec spi --edst 192.168.2.110 --spi 0x115 --proto esp \
+		    --esp 3des \
+		    --enckey 0x663066306630313663066306630313226630663066303132
+	gonzales# ipsec spi --edst 192.168.2.110 --spi 0x116 --proto ah \
+			--ah hmac-md5 \
+			--authkey 0x66306630663031326630663066303132
+
+To see the whole picture, type:
+
+	gonzales# cat /proc/net/ipsec-spi
+
+to get:
+
+	tun0x103@192.168.2.100 IPIP_proto_:  dir=out  
+		192.168.2.110 -> 192.168.2.100
+	ah0x106@192.168.2.100 AH_proto_MD5_auth_: dir=out  alen=16
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	esp0x105@192.168.2.100 ESP_proto_3DES_encrypt_NO_auth_: dir=out
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	ah0x116@192.168.2.110 AH_proto_MD5_auth_: dir=in  alen=16
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	esp0x115@192.168.2.110 ESP_proto_3DES_encrypt_NO_auth_: dir=in
+		win=0  seq=0  bit=0x00000000  flags=0x0
+
+Type:
+
+	magellan# cat /proc/net/ipsec-eroute 
+
+to get:
+
+	192.168.5.0/24 -> 192.168.4.0/24 => esp0x113@192.168.4.0
+
+and type:
+
+	magellan# cat /proc/net/ipsec-spi 
+
+to get:
+
+	tun0x113@192.168.2.110 IPIP_proto_:  dir=out  
+		192.168.2.100 -> 192.168.2.110
+	ah0x116@192.168.2.110 AH_proto_MD5_auth_: dir=out  alen=16
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	esp0x115@192.168.2.110 ESP_proto_3DES_encrypt_NO_auth_: dir=out
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	ah0x106@192.168.2.100 AH_proto_MD5_auth_: dir=in  alen=16
+		win=0  seq=0  bit=0x00000000  flags=0x0
+	esp0x105@192.168.2.100 ESP_proto_3DES_encrypt_NO_auth_: dir=in
+		win=0  seq=0  bit=0x00000000  flags=0x0
+
+and type:
+
+	magellan# cat /proc/net/ipsec-spigrp
+
+to get:
+
+	tun0x113@192.168.2.110 esp0x115@192.168.2.110 ah0x116@192.168.2.110 
+
+If you ping ping5 from ping4, ICMP packets will leave ping4, reach
+gonzales, get encapsulated in IPIP, encrypted with DES and authenticated
+with HMAC-MD5, tunneled to magellan, get decapsulated, and then sent to ping5;
+the return packets will follow the inverse path.
+
+3.3  The whole routing picture.
+
+For completeness, let us show part of the routing tables on all four machines:
+
+gonzales# netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+192.168.2.0     0.0.0.0         255.255.255.0   U     0      0        3 eth0
+192.168.5.0     0.0.0.0         255.255.255.0   U     0      0        2 ipsec0
+192.168.4.0     0.0.0.0         255.255.255.0   U     0      0        2 eth1
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        4 lo
+0.0.0.0         <firewall>      0.0.0.0         UG    0      0        0 eth0
+
+magellan# netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+192.168.2.0     0.0.0.0         255.255.255.0   U     0      0        1 eth0
+192.168.5.0     0.0.0.0         255.255.255.0   U     0      0        2 eth1
+192.168.4.0     0.0.0.0         255.255.255.0   U     0      0        1 ipsec0
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        1 lo
+0.0.0.0         207.236.55.1    0.0.0.0         UG    0      0        0 eth2
+
+ping4# netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+192.168.5.0     192.168.4.110   255.255.255.0   UG    0      0        1 eth0
+192.168.4.0     0.0.0.0         255.255.255.0   U     0      0        1 eth0
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        1 lo
+0.0.0.0         192.168.4.110   0.0.0.0         UG    0      0        0 eth0
+
+ping5# netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+192.168.5.0     0.0.0.0         255.255.255.0   U     0      0        1 eth0
+192.168.4.0     192.168.5.100   255.255.255.0   UG    0      0        1 eth0
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        1 lo
+0.0.0.0         192.168.5.100   0.0.0.0         UG    0      0        0 eth0
+
+
+
+
+	rgb, February 22, 1999
+
+*
+* $Log: rgb_setup.txt,v $
+* Revision 1.6  1999/04/06 04:54:24  rgb
+* Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+* patch shell fixes.
+*
+*

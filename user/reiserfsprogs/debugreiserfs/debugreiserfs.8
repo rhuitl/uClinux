@@ -1,0 +1,68 @@
+.\" -*- nroff -*-
+.\" Copyright 1996-2001 Hans Reiser.
+.\" 
+.TH DEBUGREISERFS 8 "March 2001" "Reiserfsprogs 3.x.0j"
+.SH NAME
+debugreiserfs
+.SH SYNOPSIS
+.B debugreiserfs
+[
+.B -jdcmos
+] [
+.B -b \fIblocknumber
+] [
+.B -p \fIfilename.bmp
+] [
+.B -P \fIfilename.bmp
+]
+.I device
+.SH DESCRIPTION
+It helps sometimes to solve problems with reiserfs filesystems. Being
+called w/o options it prints super block of reiserfs filesystem found
+on the \fIdevice\fR.
+.TP
+.I device
+is the special file corresponding to the device (e.g /dev/hdXX for
+IDE disk partition or /dev/sdXX for SCSI disk partition).
+.SH OPTIONS
+.TP
+\fB-j
+print contents of journal
+.TP
+\fB-d
+print formatted nodes of the filesystem
+.TP
+\fB-c
+print contents of direct items
+.TP
+\fB-m
+print contents of bitmap (not very useful)
+.TP
+\fB-o
+print objectid map (not very useful)
+.TP
+\fB-s
+scans the partition and prints a line when any kind of reiserfs formatted nodes found
+.TP
+\fB-b \fIblocknumber
+print specified block of the filesystem
+.TP
+\fB-p \fIfilename
+\fB-P \fIfilename
+
+Makes \fBdebugreiserfs\fR to find filesystem metadata 
+These exist to help reiserfsck debugging. If reiserfsck fails -
+you may extract filesystem metadata with  \fBdebugreiserfs\fR -p filename /dev/xxx |gzip
+-c > xxx.gz. We download that data and make the filesystem similar
+to your with gunzip -c xxx.gz | unpack /dev/xxx (unpack is included
+into reiserfsprogs package). This usually allows to reproduce and
+debug the problem quickly. When data file is not too large.
+-P will cause  \fBdebugreiserfs\fR to find and pack metadata from all the device whereas with -p it will only go through blocks marked used in filesystem bitmaps
+
+.SH AUTHOR
+This version of \fBdebugreiserfs\fR has been written by Hans Reiser <reiser@idiom.com>.
+.SH BUGS
+There are probably few of them. Please, report bugs to Hans Reiser <reiser@idiom.com>.
+.SH SEE ALSO
+.BR reiserfsck (8),
+.BR mkreiserfs (8)

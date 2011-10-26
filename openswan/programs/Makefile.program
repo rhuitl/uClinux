@@ -1,0 +1,264 @@
+
+include ${OPENSWANSRCDIR}/Makefile.ver
+include ${OPENSWANSRCDIR}/Makefile.inc
+
+LEX=flex
+BISON=bison
+RM=rm
+
+INCLUDES+=-I${OPENSWANSRCDIR} -I${KLIPSINC} -I${OPENSWANSRCDIR}/include
+CFLAGS+=${USERCOMPILE} ${PORTINCLUDE} ${INCLUDES} ${CROSSFLAGS}
+
+ifneq ($(BUILDENV),darwin)
+CFLAGS+= -Wall
+endif
+#CFLAGS+= -Wconversion
+#CFLAGS+= -Wmissing-prototypes
+CFLAGS+= -Wpointer-arith
+CFLAGS+= -Wcast-qual
+#CFLAGS+= -Wmissing-declarations
+CFLAGS+= -Wstrict-prototypes
+#CFLAGS+= -pedantic
+#CFLAGS+= -W
+#CFLAGS+= -Wwrite-strings
+CFLAGS+= -Wbad-function-cast 
+
+ifeq ($(USE_SAREF_KERNEL),true)
+CFLAGS+=-DSAREF_SUPPORTED
+endif
+
+ifeq ($(USE_KLIPS),true)
+CFLAGS+= -DKLIPS
+endif
+
+ifeq ($(USE_NAT_TRAVERSAL),true)
+NAT_DEFS=-DNAT_TRAVERSAL
+endif
+CFLAGS+= ${NAT_DEFS}
+
+LIBS?=${PROGLIBS} ${OSWLOGLIB} ${OPENSWANLIB} ${CRYPTOLIBS} 
+
+ifeq ($(USE_NAT_TRAVERSAL),true)
+CFLAGS+= -DNAT_TRAVERSAL
+endif
+
+CFLAGS+=-DKERNEL_ALG -DIKE_ALG
+CFLAGS+=-DFINALCONFDIR=\"${FINALCONFDIR}\"
+CFLAGS+=-DFINALCONFDDIR=\"${FINALCONFDDIR}\"
+CFLAGS+=-DFINALCONFFILE=\"${FINALCONFFILE}\"
+CFLAGS+=-DFINALVARDIR=\"${FINALVARDIR}\"
+
+# die if there are any warnings
+ifndef WERROR
+WERROR:= -Werror
+endif
+
+CFLAGS+= ${WERROR}
+
+ifneq ($(LD_LIBRARY_PATH),)
+LDFLAGS=-L$(LD_LIBRARY_PATH)
+endif
+
+ifeq ($(USE_DMALLOC),true)
+CFLAGS+=-DDMALLOC
+LIBS+= -ldmalloc
+endif
+
+MANDIR8=$(MANTREE)/man8
+MANDIR5=$(MANTREE)/man5
+
+ifndef PROGRAMDIR
+PROGRAMDIR=${LIBEXECDIR}
+endif
+
+ifndef MANPROGPREFIX
+MANPROGPREFIX=ipsec_
+endif
+
+ifndef CONFDSUBDIR
+CONFDSUBDIR=.
+endif
+
+ifndef SOURCEDIR
+SOURCEDIR=${PROGRAM}
+endif
+
+# we can't do tests with two conditions, but we can concatenate the strings
+SHOULDWERESTART=${USE_OBJDIR}$(wildcard ../Makefile.program)
+ifeq ($(SHOULDWERESTART),true../Makefile.program)
+all programs clean install:
+	cd ${OPENSWANSRCDIR} && cd ${OBJDIRTOP}/programs/${SOURCEDIR} && $(MAKE) $@
+else
+all: ${PROGRAM}
+programs: all
+clean:	cleanall
+install: doinstall
+
+endif
+
+ifneq ($(PROGRAM),check)
+check: $(PROGRAM)
+endif
+
+
+ifneq ($(NOINSTALL),true)
+
+doinstall:: $(PROGRAM) $(CONFFILES) $(EXTRA8MAN) $(EXTRA5MAN) $(EXTRA5PROC) $(LIBFILES) $(CONFDFILES)
+	# remove any old vendor file installed previously
+	@rm -f $(FINALLIBEXECDIR)/vendor
+	@mkdir -p $(PROGRAMDIR) $(MANDIR8) $(MANDIR5) $(LIBDIR) $(CONFDIR) $(CONFDDIR) $(CONFDDIR)/$(CONFDSUBDIR) $(EXAMPLECONFDIR)
+	@if [ -n "$(PROGRAM)" ]; then $(INSTALL) $(INSTBINFLAGS) $(PROGRAM) $(PROGRAMDIR); fi
+	@$(foreach f, $(addsuffix .8, $(PROGRAM)), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		$(INSTALL) $(INSTMANFLAGS) $$g $(MANDIR8)/$(MANPROGPREFIX)$f || exit 1; \
+	)
+	@$(foreach f, $(EXTRA8MAN), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		$(INSTALL) $(INSTMANFLAGS) $$g $(MANDIR8)/ipsec_$f || exit 1; \
+	)
+	@$(foreach f, $(EXTRA5MAN), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		$(INSTALL) $(INSTMANFLAGS) $$g $(MANDIR5)/$f || exit 1 ;\
+	)
+	@$(foreach f, $(EXTRA5PROC), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		$(INSTALL) $(INSTMANFLAGS) $$g $(MANDIR5)/ipsec_$f || exit 1 ;\
+	)
+	@$(foreach f, $(LIBFILES), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		$(INSTALL) $(INSTCONFFLAGS) $$g $(LIBDIR)/$f || exit 1 ;\
+	)
+	@$(foreach f, $(CONFFILES), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		if [ ! -f $(CONFDIR)/$f ]; then $(INSTALL) $(INSTCONFFLAGS) $$g $(CONFDIR)/$f || exit 1; fi;\
+		$(INSTALL) $(INSTCONFFLAGS) $$g $(EXAMPLECONFDIR)/$f-sample || exit 1; \
+	)
+	@$(foreach f, $(EXCONFFILES), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		$(INSTALL) $(INSTCONFFLAGS) $$g $(EXAMPLECONFDIR)/$f-sample || exit 1; \
+	)
+	@$(foreach f, $(CONFDFILES), \
+		g=`if [ -r $f ]; then echo $f; else echo ${srcdir}/$f; fi`; \
+		if [ ! -f $(CONFDDIR)/$(CONFDSUBDIR)/$f ]; then $(INSTALL) $(INSTCONFFLAGS) $$g $(CONFDDIR)/$(CONFDSUBDIR)/$f || exit 1; fi;\
+	)
+
+install_file_list::
+	@if [ -n "$(PROGRAM)" ]; then echo $(PROGRAMDIR)/$(PROGRAM); fi
+	@$(foreach f, $(addsuffix .8, $(PROGRAM)), \
+		echo $(MANDIR8)/${MANPROGPREFIX}$f; \
+	)
+	@$(foreach f, $(EXTRA8MAN), \
+		echo $(MANDIR8)/ipsec_$f; \
+	)
+	@$(foreach f, $(EXTRA5MAN), \
+		echo $(MANDIR5)/$f;\
+	)
+	@$(foreach f, $(EXTRA5PROC), \
+		echo $(MANDIR5)/ipsec_$f; \
+	)
+	@$(foreach f, $(LIBFILES), \
+		echo $(LIBDIR)/$f;\
+	)
+	@$(foreach f, $(CONFFILES), \
+		echo $(CONFDIR)/$f;\
+		echo $(EXAMPLECONFDIR)/$f-sample;\
+	)
+	@$(foreach f, $(EXCONFFILES), \
+		echo $(EXAMPLECONFDIR)/$f-sample;\
+	)
+	@$(foreach f, $(CONFDFILES), \
+		echo $(CONFDDIR)/${CONFDSUBDIR}/$f;\
+	)
+
+endif
+
+# set values for implicit rules.
+LOADLIBS=${OBJS} 
+
+# ${LIBS} is repeated due to possible circular dependancies among libraries
+ifeq ($(USE_LIBNSS),false)
+LDLIBS=${LIBS} ${USERLINK} ${LIBS} ${EXTRALIBS} -lgmp
+else
+LDLIBS=${LIBS} ${USERLINK} ${LIBS} ${EXTRALIBS} -lgmp -lnspr4 -lnss3
+endif
+
+
+%: %.o $(OBJS) ${LIBS}
+ifeq ($(USE_LIBNSS),true)
+	$(CC) $(CFLAGS) -o $@ $@.o ${OBJS} $(LDFLAGS) $(LDLIBS) $(USERLINK) -lnspr4 -lnss3
+else
+	$(CC) $(CFLAGS) -o $@ $@.o ${OBJS} $(LDFLAGS) $(LDLIBS) $(USERLINK)
+endif
+
+# cancel direct version
+%: %.c
+
+# cancel direct version
+%: %.c
+
+%.o: ${srcdir}%.c
+	${CC} -c ${CFLAGS} $<
+
+include ${OPENSWANSRCDIR}/programs/Makefile.manpages
+
+%.i: %.c 
+	$(CC) $(CFLAGS) -E -o $@ $< 
+
+TRANSFORM_VARIABLES = sed -e "s:@IPSECVERSION@:$(IPSECVERSION):" \
+			-e "s:@IPSEC_DIR@:$(FINALBINDIR):" \
+			-e "s:@IPSEC_EXECDIR@:$(FINALLIBEXECDIR):" \
+			-e "s:@IPSEC_SBINDIR@:$(FINALSBINDIR):" \
+			-e "s:@IPSEC_LIBDIR@:$(FINALLIBDIR):" \
+			-e "s:@FINALCONFDIR@:$(FINALCONFDIR):" \
+			-e "/@${OSDEP}_START@/,/@${OSDEP}_END@/d" \
+			-e "s:@EXAMPLECONFDIR@:$(EXAMPLECONFDIR):" \
+			-e "s:@FINALDOCDIR@:$(FINALDOCDIR):" \
+			-e "s:@FINALEXAMPLECONFDIR@:$(FINALEXAMPLECONFDIR):" \
+			-e "s:@RSAKEYBITS@:$(RSAKEYBITS):" \
+			-e "s:@MODULE_GOO_LIST@:$(MODULE_GOO_LIST):" \
+			-e "s:@IPSEC_CONFS@:$(FINALCONFDIR):" \
+			-e "s:@IPSEC_CONFDDIR@:$(FINALCONFDDIR):" \
+			-e "s:@USE_IPROUTE2@:$(USE_IPROUTE2):" \
+			-e "s:@USE_DEFAULT_CONNS@:$(USE_DEFAULT_CONNS):" \
+                        -e "s:@MODPROBE@:$(MODPROBE):" \
+
+
+%: ${srcdir}%.in ${OPENSWANSRCDIR}/Makefile.inc ${OPENSWANSRCDIR}/Makefile.ver
+	@echo  'IN' $< '->' $@
+	${TRANSFORM_VARIABLES} < $< > $@
+	@if [ -x $< ]; then chmod +x $@; fi
+	@if [ "${PROGRAM}.in" = $< ]; then chmod +x $@; fi
+
+%: ${srcdir}%.pl ${OPENSWANSRCDIR}/Makefile.inc ${OPENSWANSRCDIR}/Makefile.ver
+	@echo  'PL' $< '->' $@
+	@${TRANSFORM_VARIABLES} < $< > $@
+	@if [ -x $< ]; then chmod +x $@; fi
+	@if [ "${PROGRAM}.pl" = $< ]; then chmod +x $@; fi
+
+distclean: clean
+
+mostlyclean: clean
+
+realclean: clean
+
+cleanall::
+ifneq ($(strip $(PROGRAM)),)
+	@if [ -r ${srcdir}$(PROGRAM).in ]; then rm -f $(PROGRAM); fi
+	@if [ -r ${srcdir}$(PROGRAM).pl ]; then rm -f $(PROGRAM); fi
+	@if [ -r ${srcdir}$(PROGRAM).c ];  then rm -f $(PROGRAM); fi
+	@if [ -n "$(OBJS)" ];     then rm -f $(PROGRAM); fi
+endif
+	@rm -f *.o
+
+checkprograms:
+
+OPENSWANSRCDIRREL?=../..
+
+# Gather dependencies caused by explicit #includes within .c files
+depend: ${DISTSRC}
+	@(ls $(DISTSRC) | grep '\.c' | xargs $(GCC) -MM ${PORTINCLUDE} ${INCLUDES} ${ALLFLAGS} ) | sed -e 's,${OPENSWANSRCDIR},../..,g' >Makefile.depend
+
+-include ${srcdir}Makefile.depend
+
+
+

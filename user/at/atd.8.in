@@ -1,0 +1,63 @@
+.Id $Id: atd.8.in,v 1.5 1997/04/18 12:33:20 ig25 Exp $
+.TH ATD 8 "Mar 1997" local "Linux Programmer's Manual"
+.SH NAME
+atd \- run jobs queued for later execution
+.SH SYNOPSIS
+.B atd
+.RB [ -l
+.IR load_avg ]
+.RB [ -b
+.IR batch_interval ]
+.RB [ -d ]
+.RB [ -s ]
+.SH DESCRIPTION
+.B atd
+runs jobs queued by
+.BR at(1) .
+.PP
+.SH OPTIONS
+.TP 8
+.B -l
+Specifies a limiting load factor, over which batch jobs should
+not be run, instead of the compile-time choice of @LOADAVG_MX@.
+For an SMP system with
+.I n
+CPUs, you will probably want to set this higher than
+.IR n-1.
+.TP 8
+.B -b
+Specifiy the minimum interval in seconds between the start of two
+batch jobs (60 default).
+.TP 8
+.B -d
+Debug; print error messages to standard error instead of using
+.BR syslog(3) .
+.TP 8
+.B -s
+Process the at/batch queue only once.
+This is primarily of use for compatibility with old versions of
+.BR at ;
+.B "atd -s"
+is equivalent to the old
+.B atrun
+command.
+A script invoking
+.B "atd -s"
+is installed as
+.B @prefix@/sbin/atrun
+for backward compatibility.
+.SH FILES
+.I @ATJBD@
+The directory for storing jobs; this should be mode 700, owner
+@DAEMON_USERNAME@.
+.PP
+.I @ATSPD@
+The direcotry for storing output; this should be mode 700, owner
+@DAEMON_USERNAME@.
+.SH "SEE ALSO"
+at(1), atrun(1), cron(1), crontab(1), syslog(3)
+.SH BUGS
+The functionality of 
+.B atd
+should be merged into
+.BR cron(1) .

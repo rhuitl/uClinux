@@ -1,0 +1,289 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" i82365.4 1.37 2001/04/16 00:28:37
+.\"
+.TH I82365 4 "2001/04/16 00:28:37" "pcmcia-cs"
+.SH NAME
+i82365 \- Intel i82365sl PCMCIA controller driver
+
+.SH SYNOPSIS
+.B insmod i82365.o
+.RB [ pc_debug=\c
+.IR n ]
+.RB [ i365_base=\c
+.IR n ]
+.RB [ ignore=\c
+.IR n ]
+.RB [ extra_sockets=\c
+.IR n ]
+.RB [ do_scan=\c
+.IR n ]
+.RB [ irq_list=\c
+.IR i,j,... ]
+.RB [ cs_irq=\c
+.IR n ]
+.RB [ poll_interval=\c
+.IR n ]
+.RB [ cycle_time=\c
+.IR n ]
+.RB [ do_pci_probe=\c
+.IR n ]
+.RB [ cb_write_post=\c
+.IR n ]
+.RB [ pci_csc=\c
+.IR n ]
+.RB [ pci_int=\c
+.IR n ]
+.RB [ pci_irq_list=\c
+.IR i,j,... ]
+.RB [ has_dma=\c
+.IR n ]
+.RB [ has_led=\c
+.IR n ]
+.RB [ has_ring=\c
+.IR n ]
+.RB [ freq_bypass=\c
+.IR n ]
+.RB [ setup_time=\c
+.IR n ]
+.RB [ cmd_time=\c
+.IR n ]
+.RB [ recov_time=\c
+.IR n ]
+.RB [ wakeup=\c
+.IR n ]
+.RB [ fast_pci=\c
+.IR n ]
+.RB [ async_clock=\c
+.IR n ]
+.RB [ cable_mode=\c
+.IR n ]
+.RB [ irq_mode=\c
+.IR n ]
+.RB [ p2cclk=\c
+.IR n ]
+
+.SH DESCRIPTION
+This is the low-level driver for the Intel i82365sl PCMCIA host
+controller, and many derivative controllers.  It also implements the
+Intel "Yenta" register specification for CardBus bridges.  Common
+clones of the i82365sl include controllers made by Cirrus Logic, IBM, 
+O2Micro, Omega Micro, Ricoh, SMC, Texas Instruments, Toshiba, Vadem,
+and VLSI.  The overwhelming majority of current PCMCIA controllers,
+and all CardBus bridges, are register compatible with the i82365sl.
+This driver is used by Card Services for configuring the host
+controller, and for monitoring card status change events.
+.PP
+An ISA i82365-compatible controller normally sits at the IO addresses
+0x3e0-0x3e1.  Two ISA controllers can cooperate to share the same IO
+ports, supporting a total of four sockets.  A second pair of
+controllers can be located at 0x3e2-0x3e3.  Probing at this position
+is controlled by the \fBextra_sockets\fR parameter.  This only affects
+ISA bridges: the PCI bridge probe handles multiple controllers
+automatically.  The driver will support a maximum of eight sockets. 
+
+.SH CardBus interrupt delivery
+CardBus bridges generally support both PCI and ISA interrupt signals,
+and multiple methods of deliving interrupt events to the host system.
+The system BIOS is partly responsible for correctly configuring the
+bridge to match the implemented interrupt hardware at boot time.  This
+module provides several parameters for overriding this default
+interrupt configuration.  The \fBpci_int\fR and \fBpci_csc\fR settings
+can be used to control use of PCI interrupts for card interrupts or
+card status changes.  The \fBirq_mode\fR setting, for bridges that
+support it, can be used to select an interrupt delivery method.
+.PP
+When the \fBi82365\fR module is loaded, it performs a scan of free
+ISA interrupts to determine which ones appear to be usable for PCMCIA
+events.  The interrupt scan results are reported in the system log.  A
+successful scan will report a list of interrupts as ``scanned''; if no
+interrupts appear to work, then a ``default'' list is reported.  Some
+bridges (Cirrus non-CardBus bridges, some Toshiba bridges) do not
+support the software interrupt test and will always report a
+``default'' list.  In other cases, this may be a sign of an incorrect
+\fBirq_mode\fR.
+
+.SH PARAMETERS
+.TP
+.BI pc_debug= n
+Selects the PCMCIA debugging level.  This parameter is only available
+if the module is compiled with debugging enabled.  A non-zero value
+enables debugging.
+.TP
+.BI i365_base= n
+Sets the base I/O port address of the i82365sl chip.  The default is
+0x3e0.  Applies only to ISA-to-PCMCIA bridges.
+.TP
+.BI ignore= n
+Causes the driver to ignore a single socket.  Sockets are numbered
+starting at 0.  The socket will be left in whatever state it was
+already in, so it can be used for cards with point enablers that do
+not cooperate with Card Services.
+.TP
+.BI extra_sockets= n
+A flag indicating if the driver should probe at IO base 0x3e2 in
+addition to the default 0x3e0 base.  The default is 0 (do not probe at
+0x3e2).  Systems with two independent ISA-to-PCMCIA controllers (say,
+one internal and one in a docking station) may require this flag to be
+set.  If this flag is set, then 
+.BR poll_interval
+will automatically be enabled.
+.TP
+.BI do_scan= n
+This flag specifies that all free ISA interrupts should be tested to
+see if they can be triggered by the PCMCIA controller.  The default is
+1 (true).
+.TP
+.BI irq_list= i,j,...
+Specifies the set of interrupts that may be allocated by this driver,
+if they are otherwise available.
+The default list is 3, 4, 5, 7, 9, 10, 11, 12, 14, and 15.
+.TP
+.BI cs_irq= n
+Sets the interrupt line to use for monitoring card status changes.
+The default is 0, which means pick the highest-numbered legal
+interrupt not already in use.  Legal values are 15, 14, 12, 11,
+10, 9, 7, 5, 4, and 3.
+.TP
+.BI poll_interval= n
+Sets the card status polling delay, in 1/100 second increments.  If
+this parameter is set, card status interrupts will be disabled.  A
+reasonable value is 100.  Polling only affects detection of card
+insert and eject events.
+.TP
+.BI cycle_time= n
+Sets the length of a host bus cycle, in nanoseconds.  The default is
+210 ns, corresponding to a standard 4.77 MHz clock.
+
+.SH Options for CardBus controllers
+.TP
+.BI do_pci_probe= n
+This flag indicates if the PCI bus should be probed for PCI-to-PCMCIA
+and/or PCI-to-CardBus bridges.  The default is 1 (true).
+.TP
+.BI cb_write_post= n
+A flag indicating if write posting (a performance feature) should be
+enabled.  The default is 1 (true), except on certain TI 1130 bridges.
+.TP
+.BI pci_csc= n
+Specifies that card status change interrupts should be routed to PCI
+interrupts, for CardBus controllers.  The default is 1 (true).
+.TP
+.BI pci_int= n
+Specifies that functional interrupts for IO cards should be routed to
+PCI interrupts, for CardBus controllers.  The default is 1 (true),
+except on systems that require use of PCI interrupts.
+.TP
+.BI pci_irq_list = i,j,...
+The Linux kernel sometimes cannot deduce the PCI interrupt assignments
+for CardBus sockets.  If this information can be determined some other
+way, it can be entered here.  The Nth socket will get the Nth
+interrupt number from the list. 
+
+.SH Options specific for Cirrus controllers
+When the
+.B i82365
+driver is loaded, it will try to determine what interrupts can safely
+be allocated for use by PCMCIA devices.  Cirrus controllers support
+some optional features that interfere with the use of certain
+interrupt lines.  Cirrus chips also lack the functionality needed to
+detect whether or not an interrupt can be used.  The
+.BR has_dma ,
+.BR has_ring ,
+and
+.B has_led
+options are used to specify if these features are implemented.
+.TP
+.BI has_dma= n
+A flag indicating if the controller has DMA support.
+.TP
+.BI has_led= n
+A flag indicating if the controller is wired for a disk status LED.
+This is set by default.
+.TP
+.BI has_ring= n
+A flag indicating if the controller's "ring indicate" signal is
+implemented.  This is set by default.
+.TP
+.BI freq_bypass= n
+A flag indicating that the controller should be set up in "frequency
+bypass" mode.  This disables the normal 7/4 clock multiplier, and
+slows down all PCMCIA bus access, for systems with fast system clocks.
+.TP
+.BI setup_time= n
+Sets the bus setup time, in internal clock cycles. The default is 1.
+.TP
+.BI cmd_time= n
+Sets the bus command time, in internal clock cycles. The default is 6.
+.TP
+.BI recov_time= n
+Sets the bus recovery time, in internal clock cycles. The default is 0.
+.TP
+.BI wakeup= n
+A flag indicating if the probe function should attempt to wake up a
+suspended controller chip.  The default is 0.
+.TP
+.BI fast_pci= n
+A flag for the PD6729 PCI controller, indicating that the PCI bus
+speed exceeds 25 MHz.
+.TP
+.BI irq_mode= n
+For the PD6729 PCI controller, specifies the interrupt delivery mode.
+The default is to use ISA bus interrupts; a value of 1 selects PCI
+interrupts.  This must be set for correct operation of some PCI card
+readers.
+
+.SH Options specific for Ricoh CardBus controllers
+.TP
+.BI irq_mode= n
+Selects the interrupt routing method.  A value of 0 selects only PCI
+interrupts; 1 selects ISA interrupt routing, and 2 selects ISA
+interrupt routing via an external serial interrupt controller.  The
+default is to use whatever ISA routing method is already enabled.
+.TP
+.BI setup_time= n
+Sets the bus setup time, in internal clock cycles. The default is 3.
+.TP
+.BI cmd_time= n
+Sets the bus command time, in internal clock cycles. The default is 6.
+.TP
+.BI hold_time= n
+Sets the bus hold time, in internal clock cycles. The default is 1.
+
+.SH Options specific for Vadem ISA controllers
+.TP
+.BI async_clock= n
+This flag specifies that PCMCIA bus cycles should be clocked
+asynchronously from host bus cycles.  It effectively adds a wait state
+to some operations.
+.TP
+.BI cable_mode= n
+For the VG469, this flag adjusts certain socket signals for driving a
+socket connected via a cable.
+
+.SH Options specific for TI CardBus controllers
+Normally, a system's BIOS will configure these options appropriately,
+so all these options default to leaving these features configured the
+way the driver finds them.
+.TP
+.BI has_ring= n
+A flag indicating if the controller is wired for "ring indicate".
+The default is to read the current setting from the controller.
+.TP
+.BI irq_mode= n
+Selects the interrupt routing method.  A value of 0 selects only PCI
+interrupts; 1 selects ISA interrupt routing; 2 selects ISA interrupt
+routing via an external serial interrupt controller; and 3 selects
+serial routing for both PCI and ISA interrupts.  The default is to use
+whatever routing  method is already active, or ISA routing if no
+method is enabled.
+.TP
+.BI p2cclk= n
+A flag, indicating if the P2CCLK pin should be configured as an input
+(0) or an output (1).  This signal is used for communicating with a
+socket power controller; if set incorrectly, the bridge will be unable
+to power up cards.  The default is to use the BIOS setting.
+
+.SH AUTHOR
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+cardmgr(8), pcmcia(5).

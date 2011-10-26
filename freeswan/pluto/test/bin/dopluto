@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# fill in most pluto flags for debugging
+# Only argument is east or west
+# Actually, extra args are passed on to pluto, so --nofork might be useful
+
+. CONFIG
+
+case "$1" in
+east) INTERFACE=$EASTIF ;;
+west) INTERFACE=$WESTIF ;;
+north) INTERFACE=$NORTHIF ;;
+south) INTERFACE=$SOUTHIF ;;
+*) echo "$0: \"east\" or \"west\" expected" >&2
+   exit 1;
+   ;;
+esac
+
+SIDE=$1
+shift
+
+function perform() {
+	echo "$@"
+	"$@" || echo RC: $?
+	}
+
+PLUTO=${PLUTO:-../pluto}
+
+LOCK=pluto.$SIDE.pid
+
+[ -f $LOCK ] && rm $LOCK
+
+perform $PLUTO \
+	--ctlbase pluto.$SIDE \
+	--interface $INTERFACE \
+	--ikeport $IKEPORT \
+	--secretsfile ./ipsec.secrets/$SIDE \
+	--noklips --uniqueids --stderrlog \
+	--debug-all --debug-private \
+	"$@"

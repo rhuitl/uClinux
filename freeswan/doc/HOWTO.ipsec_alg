@@ -1,0 +1,107 @@
+Modular ALGO support version 0.8.0 for freeswan-1.97
+$Id: HOWTO.ipsec_alg,v 1.1 2002-07-15 05:55:20 danield Exp $
+
+HOWTO-ipsec_alg.txt       --Juanjo <jjo-ipsec@mendoza.gov.ar> 
+====================        Linux IP Aliasing creator, IPMASQ 2.2 Maintainer
+These patches provide additional algorithm support for 
+Phase1 (OAKLEY/IKE) and Phase2 (ESP).
+
+
+Quickstart
+==========
+1) Patches:
+* Depeding of installation (stock or x509), use:
+  - Stock freeswan:
+     freeswan-alg-0.8.0-BASE-common.diff.gz
+     freeswan-alg-0.8.0-BASE-klips.diff.gz
+     freeswan-alg-0.8.0-BASE-pluto.diff.gz
+
+  - x509 (0.9.11) patched freeswan : 
+     freeswan-alg-0.8.0-BASE-common.diff.gz
+     freeswan-alg-0.8.0-BASE-klips.diff.gz
+     freeswan-alg-0.8.0-BASE-pluto_with_x509.diff.gz
+
+* Decide which ciphers you want (you can patch in any order)
+     --file--------------------------------- -phase-- --comment---------
+     freeswan-alg-0.8.0-enc-3des.diff.gz      -  P2   x86 optimized asm
+     freeswan-alg-0.8.0-enc-aes.diff.gz       P1 P2   128-256 bits
+     freeswan-alg-0.8.0-enc-blowfish.diff.gz  P1 P2   128-256 bits
+     freeswan-alg-0.8.0-enc-null.diff.gz      -  P2  
+     freeswan-alg-0.8.0-enc-serpent.diff.gz   P1 P2   128-256 bits
+     freeswan-alg-0.8.0-enc-twofish.diff.gz   P1 P2   128-256 bits
+                                                     
+     freeswan-alg-0.8.0-auth-md5.diff.gz      -  P2   x86 optimized asm
+     freeswan-alg-0.8.0-auth-sha1.diff.gz     -  P2   x86 optimized asm
+     freeswan-alg-0.8.0-auth-sha2.diff.gz     P1 P2   sha2_256 and sha2_512
+
+Eg: you want AES and TWOFISH ciphers:
+	cd /path/to/src/freeswan-1.97
+	zcat freeswan-alg-0.8.0-BASE-common.diff.gz   | patch -p1 -s
+	zcat freeswan-alg-0.8.0-BASE-klips.diff.gz    | patch -p1 -s
+	zcat freeswan-alg-0.8.0-BASE-pluto.diff.gz    | patch -p1 -s
+	zcat freeswan-alg-0.8.0-enc-aes.diff.gz       | patch -p1 -s
+	zcat freeswan-alg-0.8.0-enc-twofish.diff.gz   | patch -p1 -s
+
+2) Proceed as always with freeswan configuration/compilation,
+   you MUST recompile KLIPS (kernel) _and_ pluto.
+
+   For kernel config., these new kernel config items will appear:
+    
+>>  IPSEC Modular Extensions (CONFIG_IPSEC_ALG) [Y/n/?] y
+>>       AES encryption algorithm (CONFIG_IPSEC_ALG_AES) [M/n/y/?] m
+>>       TWOFISH encryption algorithm (CONFIG_IPSEC_ALG_TWOFISH) [M/n/y/?] m
+
+   Compile, install, etc.
+   Don't forget to compile and also INSTALL PATCHED PLUTO (phase I algorithms
+   will be added to pluto)
+
+
+3) Reload ipsec/pluto and insert algo module
+	+ modprobe ipsec_aes
+   Confirm algo is present with
+	+ ipsec auto --status | egrep ESP
+	000 algorithm ESP encrypt: id=3, name=ESP_3DES, ...
+	000 algorithm ESP encrypt: id=12, name=ESP_AES, ...
+	000 algorithm ESP auth attr: id=1, name=AUTH_ALGORITHM_HMAC_MD5, ...
+	000 algorithm ESP auth attr: id=2, name=AUTH_ALGORITHM_HMAC_SHA1, ...
+	:
+	000 algorithm IKE encrypt: id=65005, name=OAKLEY_TWOFISH_CBC, ...
+	000 algorithm IKE encrypt: id=7, name=OAKLEY_AES_CBC, ...
+	000 algorithm IKE encrypt: id=5, name=OAKLEY_3DES_CBC, ...
+	000 algorithm IKE hash: id=6, name=OAKLEY_SHA2_512, ...
+	000 algorithm IKE hash: id=4, name=OAKLEY_SHA2_256, ...
+	000 algorithm IKE hash: id=2, name=OAKLEY_SHA, ...
+	000 algorithm IKE hash: id=1, name=OAKLEY_MD5, ...
+
+       
+3) Edit connection parameters
+   - For Phase2 (ESP) algorithms:
+     Add to your dotconf to the connection:
+  		esp=aes128-sha1,aes128-md5
+
+   - For Phase1 (IKE) algorithms:
+  		ike=aes128-sha,aes128-md5   (NOTE: Phase1 sha1 string is "sha")
+   
+   Reload that configuration
+  		+ ipsec auto --replace <connection>
+
+4) Bring up a connection against peer with AES support (eg. ditto patched peer)
+	+ ipsec auto --up  <connection>
+   Confirm
+   ESP:
+	+ ipsec spi | grep AES
+
+   IKE (and ESP) from pluto' view:
+	+ ipsec auto --status | grep <connection>.*algo
+
+5) Additional testing
+   All modules accept test argument, eg:
+	+ modprobe ipsec_aes test=1	# ask module to probe itself
+	+ dmesg | tail -10		# show timing results
+   Recommended comparison:    ipsec_3des vs ipsec_aes	8)
+
+6) TIPS:
+   * You can permanently add ipsec_* algo modules loading in 
+     /etc/modules.conf:
+	  add above ipsec ipsec_aes ipsec_3des ipsec_md5 ipsec_sha1
+        

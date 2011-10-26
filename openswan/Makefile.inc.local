@@ -1,0 +1,50 @@
+
+CFLAGS := $(subst -Werror,,$(CFLAGS))
+export CFLAGS
+
+ifeq ($(HOSTBUILD),)
+ifneq ($(CONFIG_OCF_CRYPTODEV),)
+HAVE_OCF := true
+endif
+ifneq ($(CONFIG_LIB_LIBSSL),)
+HAVE_OPENSSL := true
+endif
+ifneq ($(CONFIG_USER_FLATFSD_FLATFSD),)
+USE_SINGLE_CONF_DIR := true
+endif
+ifneq ($(CONFIG_LIB_LIBPAM_FORCE)$(CONFIG_LIB_LIBPAM),)
+USE_XAUTHPAM := true
+HAVE_THREADS := true # the comments below about XAUTH say we need threads
+endif
+ifdef CONFIG_PROP_STATSD_STATSD
+EXTRA_DEFINES += -DHAVE_STATSD=1
+endif
+ifdef CONFIG_IPSEC_CONNECTION_LIMIT_BOOL
+USE_IPSEC_CONNECTION_LIMIT := true
+IPSEC_CONNECTION_LIMIT     := $(CONFIG_IPSEC_CONNECTION_LIMIT)
+endif
+endif
+
+ifdef CONFIG_USER_FLATFSD_FLATFSD
+FINALCONFDIR        := /etc/config
+FINALCONFDDIR       := /etc/config
+FINALLOGDIR         := /var/log
+USE_SINGLE_CONF_DIR := true
+USE_WEAKSTUFF       := true
+USE_NOCRYPTO        := true
+USE_DYNAMICDNS      := true
+USE_DEFAULT_CONNS   := false
+FINALSBINDIR        := /bin
+FINALLIBDIR         := /bin
+FINALLIBEXECDIR     := /bin
+endif
+
+PORTINCLUDE := -I${OPENSWANSRCDIR}/ports/linux/include
+PORTDEFINE   = -DKLIPS -DSCANDIR_HAS_CONST
+
+USE_OBJDIR := false
+OBJDIR     := OBJ.uclinux-dist
+OBJDIRTOP  := ${OPENSWANSRCDIR}/${OBJDIR}
+WERROR     :=  -Wall
+
+USE_MAST   := false

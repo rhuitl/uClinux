@@ -1,0 +1,128 @@
+From owner-mgetty Sat Apr 15 15:42:09 1995
+Return-Path: <owner-mgetty>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0s086y-0001zfC@greenie.muc.de>; Sat, 15 Apr 95 15:42 MEST
+Return-Path: <l-mgetty-owner@muc.de>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0s086w-0003hlC@greenie.muc.de>; Sat, 15 Apr 95 15:42 MEST
+Received: from greenie.muc.de ([193.174.4.62]) by colin.muc.de with SMTP id <25540-2>; Sat, 15 Apr 1995 15:41:48 +0200
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0s085H-0001zfC@greenie.muc.de>; Sat, 15 Apr 95 15:40 MEST
+Received: from GATEWAY by greenie.muc.de with netnews
+	for mgetty@muc.de (mgetty@muc.de)
+To: mgetty@muc.de
+Date: Fri, 14 Apr 1995 01:06:16 +0200
+From: rs@purple.in-ulm.de (Ralph Schleicher)
+Message-ID: <RS.95Apr14010615@purple.in-ulm.de>
+Organization: Me and organized?
+Subject: vacation(1) with mgetty
+Status: RO
+
+Here is an example FAX_NOTIFY_PROGRAM for use with mgetty.
+Cees de Croot <cg@tricbbs.fn.sub.org> once asked me for it
+and I would have done it earlier if I would have known that
+it is so dammed simple (is this correct english?).
+                               ,,,
+                              (o o)
+---------------------------oOO-(_)-OOo---------------------------
+#!/usr/local/bin/perl
+#
+# Ralph Schleicher
+# rs@purple.in-ulm.de
+
+
+$message = '/usr/local/lib/mgetty+sendfax/vacation.tex';
+
+exit 0
+  if ! -r $message;	# Do nothing.
+
+$code = shift @ARGV;
+$id = shift @ARGV;
+
+exit 0
+  if $code;
+
+$_ = $id;
+
+s/[()]//g;		# Delete unwanted characters.
+s/(\s|\/)/-/g;		# Translate spaces and slashes to hyphens.
+s/--+/-/g;		# Reduce multiple hyphens to a single one.
+s/^\+49-/0/;		# Replace country code with a leading zero ...
+s/^\+/00/;		# ... or built a real interstate phone number.
+s/^07352-//;		# Strip the local area prefix of my home town.
+s/-//g;			# Delete all remaining hyphens.
+
+exit 0
+  if /^$/ || /\D/;	# Not a number!
+exit 0
+  if /^00/;		# Call-back is too expensive!
+
+$to = $_;
+
+$name = "./$0.$$";
+$edit = "-e 's/@ID@/$id/g' -e 's/@TO@/$to/g'";
+
+chdir '/tmp'
+  if ! -w '.';
+
+sub cleanup
+{
+  local ($sig) = @_;
+
+  unlink "$name.tex";
+  unlink "$name.dvi";
+  unlink "$name.log";
+
+  exit (($sig eq '') ? 0 : 1);
+}
+
+$SIG{'HUP'} = 'cleanup';
+$SIG{'INT'} = 'cleanup';
+$SIG{'QUIT'} = 'cleanup';
+$SIG{'PIPE'} = 'cleanup';
+$SIG{'TERM'} = 'cleanup';
+
+system ("sed $edit <$message >$name.tex 2>/dev/null") == 0
+  && system ("tex $name.tex >/dev/null 2>&1") == 0
+    && system ("faxdvi $name.dvi >/dev/null 2>&1");
+
+&cleanup
+---------------------------oOo-----oOo---------------------------
+
+$MESSAGE may look like this:
+                               ,,,
+                              (o o)
+---------------------------oOO-(_)-OOo---------------------------
+\input faxformat
+\input today
+
+
+\from
+Ralph Schleicher
+FAX: (07522) 7425
+
+\to
+Unknown Sender
+FAX: @ID@
+\fax{to: @TO@}
+
+\subject
+Your facsimile message of \today.
+
+\body
+Hello,
+
+I will not be able to read the incoming facsimile messages
+for a while.  Your message will be read and maybe replied
+when I am back.
+
+\closing
+Regards,
+
+\signature rs.ps
+
+\bye
+---------------------------oOo-----oOo---------------------------
+-- 
+Ralph Schleicher, Germany (Freie Republik Allg\"au)
+

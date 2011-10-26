@@ -1,0 +1,22 @@
+#!/bin/sh
+# Convert an asm source file to gdb commands.
+# Useful for loading small programs in gdbinit scripts.
+
+case "$#" in
+2)	;;
+3)	ARCH=$1-
+	shift
+	;;
+*)	echo "Usage: $0 [arch] file address" >&2
+	exit 1
+	;;
+esac
+
+INPUT=$1
+ADDR=$2
+
+${ARCH}gcc -nostartfiles -nostdlib -Wl,-Ttext=$ADDR -o /tmp/asm2gdb.elf $INPUT || exit 1
+${ARCH}objcopy -O binary /tmp/asm2gdb.elf /tmp/asm2gdb.bin || exit 1
+od -Ad -tx4 -w4 -v /tmp/asm2gdb.bin | awk "{ if (NF == 2) printf \"set *((unsigned long *) 0x%08x\1) = 0x%s\\n\", $ADDR + \$1, \$2 }"
+echo "set \$pc = $ADDR"
+

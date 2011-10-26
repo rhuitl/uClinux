@@ -1,0 +1,220 @@
+From owner-mgetty Tue Nov 30 18:06:44 1993
+Return-Path: <owner-mgetty>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0p4YWt-0001LDC@greenie.muc.de>; Tue, 30 Nov 93 18:06 MET
+Return-Path: <colin!hal6000.thp.uni-duisburg.de!michael>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0p4YWp-00000dC@greenie.muc.de>; Tue, 30 Nov 93 18:06 MET
+Received: from unidui.uni-duisburg.de ([134.91.4.3]) by colin.muc.de with SMTP id <22296>; Tue, 30 Nov 1993 12:14:53 +0100
+Received: from hal6000.uni-duisburg.de by unidui.uni-duisburg.de (1.37.109.4/SMI-3.2)
+	id AA15582; Tue, 30 Nov 93 12:13:30 +0100
+Received: by hal6000.thp.Uni-Duisburg.DE (AIX 3.2/UCB 5.64/4.03)
+          id AA26890; Tue, 30 Nov 1993 12:13:17 +0100
+From:	michael@hal6000.thp.uni-duisburg.de (Michael Staats)
+Message-Id: <9311301113.AA26890@hal6000.thp.Uni-Duisburg.DE>
+Subject: Re: AIX/6000 mgetty+sendfax (fwd)
+To:	mgetty@greenie.muc.de (mgetty)
+Date:	Tue, 30 Nov 1993 12:13:17 +0100
+X-Mailer: ELM [version 2.4 PL5]
+Mime-Version: 1.0
+Content-Type: text/plain; charset=ISO-8859-1
+Content-Transfer-Encoding: 8bit
+Content-Length: 6728      
+Status: RO
+
+
+Hello,
+
+> 
+> As far as I know, there's an xview based front end to faxspool by
+> Michael Staats, but since I'm not able to run it (no xview libs),
+> I don't know much about it. Michael?
+
+Yes, I wanted an easy to use X11 frontend. I asked news, but before
+getting some useful answers, I decided to waste some time on an own
+interface builder.
+It is very simple, not to compare wit TCL. It only understands
+a few commands with some options.
+
+I append excerpts from the man page and a sample file for using
+sendfax.
+
+Maybe you like it, but if you're used to more flexible tools, it won't
+be worth a lot.
+
+You can find it at
+hal6000.thp.Uni-Duisburg.DE:/pub/source/X11/xform-1.12.tar.gz
+
+	Michael
+
+==================== excerpts from the manpage ====================
+     DESCRIPTION
+	  xform	is a command interpreter to generate windows with some
+	  widgets under	X11.
+
+	  xforms reads a configuration file and	generates the X
+	  window.  If no configuration file is given, xform will
+	  determine piped input	and read from stdin.
+
+     Config file format
+	  * Comment lines start	with a #, just like in shells.
+
+	  * Empty lines	are ignored.
+
+	  * The	first non-empty	line may contain the command
+
+	  format x y
+
+	  where	x and y	are integers specifying	the size of the
+	  window.  If this command is not the first one, default
+	  dimensions will be used. If this command appears later it
+	  will generate	an error.
+
+	  * Lines following the	format command may contain various commands
+	       which will be described below.
+
+	  In the description below some	meta word are used.
+
+	  Meta word   replace with
+
+	  x	      x	coordinate of widget
+	  y	      y	coordinate of widget
+
+	  Opt	      one or more characters with command specific meanings
+
+	  String      text enclosed in double quotes. If the last character
+		      in the string is a '|' (pipe symbol), the	text will be
+		      read from	a popen	call.
+
+	  Action      one of
+		      quit     (means: quit the	program)
+
+     XFORM(1L)	      Nov  9 1993 (XForm Version 1.1)	     XFORM(1L)
+
+		      toutput  (means: print the contents of input items)
+		      goutput  (means: dump window contents in xwd format to
+				       the file	specified with -g option. If
+				       no file is specified, xform calls
+				       tmpnam to generate a name and prints
+				       a line in the format
+				       GRAFFILE=<Name of graffile>. A button
+				       with this action	may specify an
+				       outputfile.)
+		      output   (calls toutput and goutput)
+		      exit     (calls output and quit)
+		      system   (means: call system() with argument)
+
+	  xform	understands the	following commands:  (Optional
+	  arguments will appear	in brackets [].)
+
+	  * title String
+	      Sets the window title to the specified string.
+
+	  * font String
+	      Sets the font. String must be a valid X11	font name.
+
+	  * text x y [Opt] String
+	      Writes String at x,y.
+	      Specify b	as option to write bold	text.
+
+	  * button Action x y String [String]
+	      Generates	a button at x,y	with label String. When	pushed,
+	      Action will be performed.	For Action system you have to
+	      specify the systemcommand	with the second	string,	for Action
+	      goutput you can optionally specify an output file	name, this
+	      overrides	the -g option only for this button.
+
+	  * input x y sl l [Opt	[format]] String [String]
+	      Creates an input item at x,y with	the length of l
+	      characters, internally sl	characters will	be saved. Option can be
+	      n	      means: Don't write contents of inputfile when toutput.
+	      b	      means: Write the label bold (there are problems under AIX,
+			     where the label is	always bold :-(	)
+	      u	      means: Underline input field.
+	      f	      allows the specification of a format string.
+		      If toutput is called, the	contents of the	input field
+		      is printed with
+		      printf(format, <Label>, <Contents	of inputfield>);
+		      The format has to	be included in double quotes.
+	      c	      This item	will have the caret on program start.
+	      e	      call alternative eventhandler. Don't use this, it	is
+		      under development.
+	      The label	of the input item is specified with the	first
+	      string, the input	field is filled	with the optional
+	      second string.
+
+     XFORM(1L)	      Nov  9 1993 (XForm Version 1.1)	     XFORM(1L)
+
+	  * minput x y l [Opt [format]]	String [String]
+	      Creates a	multiline input	item at	x,y with length	l. Other
+	      Arguments	see input.
+
+	  * line x1 y1 x2 y2 DOES NOT WORK! (UP	TO NOW...)
+
+     AUTHOR
+	  Copyright (C)	1993 by	Michael	Staats
+===========================================================================
+==================== sample fax frontend (xfax) ===========================
+#!/bin/ksh
+# 
+eval $(/users/bin/faxform)   # see below
+trap "/bin/rm -f $GRAFFILE; exit" 1 2 13 15
+
+while [ -z "$FAXNO" -a -n "$GRAFFILE" ]; do
+  echo -n "Please specify Fax Number: "
+  read FAXNO
+done
+
+[ -n "$GRAFFILE" -a -n "$FAXNO" ] &&
+(xwdtopnm "$GRAFFILE" 2>/dev/null|pnmscale -xscale 2.47 -yscale 2.69|\
+ppmtopgm|pgmtopbm|pbm2g3|\
+enq -P fax -o -fg3 -o "-n$FAXNO"; /bin/rm -f "$GRAFFILE" )&
+
+===========================================================================
+=============== sample form for a fax formular (/users/bin/faxform) =======
+#!/usr/local/bin/xform -f
+#
+format 700 846
+title "XFax Utility by Michael Staats"
+button quit 10 820 "Cancel Fax"
+button system 150 820 "lfaxv" "lfaxv"
+button exit 600 820 "Send Fax"
+font "-*-lucida-medium-r-*-*-16-*-*-*-*-*-*-*"
+text 480 14 "Datum:"
+input 550 14 12 12 nu "" "/usr/bin/date +'%d. %b. %y'|"
+font "-*-lucida-medium-r-*-*-18-*-*-*-*-*-*-*"
+text  10  10 "Universität - GH - Duisburg"
+text  10  32 "Theoretische Tieftemperaturphysik"
+input 10  54 40 40 cn "" "z. Hd. "
+text  10  90 "47048 Duisburg"
+text  10 112 "FAX No.: +49-0203-3792965"
+font "-*-lucida-medium-r-*-*-20-*-*-*-*-*-*-*"
+text  10 150 "To:"
+input 10 180 30 30 nu ""
+input 10 210 30 30 nu ""
+input 10 240 30 30 nu ""
+input 10 270 30 30 nu ""
+font "-*-lucidatypewriter-medium-r-*-*-20-*-*-*-*-*-*-*"
+text  10  310 "FAX No.:"
+input 115 310 30 30 f "%.0sFAXNO='%s'" ""
+#
+font "-*-lucida-medium-r-*-*-20-*-*-*-*-*-*-*"
+input 10 370 53 53 nu ""
+input 10 400 53 53 nu ""
+input 10 430 53 53 nu ""
+input 10 460 53 53 nu ""
+input 10 490 53 53 nu ""
+input 10 520 53 53 nu ""
+input 10 550 53 53 nu ""
+input 10 580 53 53 nu ""
+input 10 610 53 53 nu ""
+input 10 640 53 53 nu ""
+input 10 670 53 53 nu ""
+input 10 700 53 53 nu ""
+input 10 730 53 53 nu ""
+input 10 760 53 53 nu ""
+===========================================================================
+-- 
+Michael Staats, Theoretical Physics, Uni-GH Duisburg 
+email: michael@hal6000.thp.Uni-Duisburg.DE
+

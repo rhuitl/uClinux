@@ -1,0 +1,59 @@
+Patches to module-init-tools are welcome.  Please note the following
+design goals:
+
+1) insmod and rmmod are designed to be as simple as possible.
+
+2) modprobe is designed to be a swiss-army-knife, but the config file
+   format is designed to be as simple as possible: let the user create
+   complexity if they wish.
+
+3) module-init-tools contains a testsuite.  Patches which do not pass
+   the testsuite get a frowny face.
+
+The testsuite
+-------------
+
+The testsuite is under tests/test-*: one directory for each tool.  You
+can run "make check" to run the testsuite: it will use valgrind (much
+slower, but catches more things) if it is installed.
+
+"make check" simply invokes "./tests/runtests".
+
+To start the tests at a particular test, use that test name on the
+command line, eg. "./tests/runtests 26blacklist.sh".  To see exactly
+what the test is doing, use -vv, eg
+
+	./tests/runtests -vv 26blacklist.sh
+
+Each test is a shell script run with "-e": ie. if any command fails,
+the test will fail.  The path is set up with special test versions of
+the utilities (and possibly valgrind wrappers), so just invoke
+"modprobe" etc. as normal.  Environment variables can be used to
+control normally hardwired behaviour:
+
+1) $MODTEST_UNAME:
+	The result "uname" is to return.  Set to 2.5.52 by default.
+
+2) $MODTEST_OVERRIDE<n>, $MODTEST_OVERRIDE_WITH<n>
+	These cause file operations on $MODTEST_OVERRIDE1 to occur on
+	$MODTEST_OVERRIDE_WITH1, etc.  The numbers must be consecutive:
+	the code stops searching for a replacement when a number is not
+	found.  This is used to stop the utilities looking in 
+	/lib/modules/2.5.52/ for example.
+
+	Other environment variables can be found in testing.h.
+
+There are various pre-compiled test modules under tests/data/.  Each
+one has big and little endian and 32 and 64-bit variants: modprobe
+must handle both 32 and 64 bit (for x86-64, PPC64, Sparc64, IA64), and
+depmod and modinfo must handle any endianness as well.  If you need to
+add a new module to test something, put the source under tests/src,
+make sure it passes for the cases you can test, and I'll compile and
+test the others.
+
+When writing tests, make sure your test aborts on any unexpected
+behaviour: eg. compare the result is equal to what you expect, rather
+than not equal to something.
+
+Cheers!
+Rusty.

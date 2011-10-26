@@ -1,0 +1,43 @@
+#
+
+PREFIX=@prefix@
+exec_prefix=@exec_prefix@
+ETCDIR=@sysconfdir@
+BINDIR=@sbindir@
+
+ULOGD_CONFIGFILE=@sysconfdir@/ulogd.conf
+
+ULOGD_LIB_PATH=@libdir@/ulogd
+
+# Path of libipulog (from iptables)
+LIBIPULOG=@top_srcdir@/libipulog
+INCIPULOG=-I@top_srcdir@/libipulog/include
+INCCONFFILE=-I@top_srcdir@/conffile
+
+CC=@CC@
+LD=@LD@
+INSTALL=@INSTALL@
+
+CFLAGS=@CFLAGS@ @CPPFLAGS@ -Wall
+CFLAGS+=-DULOGD_CONFIGFILE=\"$(ULOGD_CONFIGFILE)\"
+# doesn't work for subdirs
+#CFLAGS+=$(INCIPULOG) $(INCCONFFILE)
+CFLAGS+=-I/lib/modules/`uname -r`/build/include
+#CFLAGS+=@DEFS@
+#CFLAGS+=-g -DDEBUG -DDEBUG_MYSQL -DDEBUG_PGSQL
+
+LIBS=@LIBS@
+
+
+# Names of the plugins to be compiled
+ULOGD_SL:=BASE OPRINT PWSNIFF LOGEMU LOCAL SYSLOG
+
+# mysql output support
+#ULOGD_SL+=MYSQL
+MYSQL_CFLAGS=-I@MYSQLINCLUDES@ @EXTRA_MYSQL_DEF@
+MYSQL_LDFLAGS=@DATABASE_LIB_DIR@ @MYSQL_LIB@
+
+# postgreSQL output support
+#ULOGD_SL+=PGSQL
+PGSQL_CFLAGS=-I@PGSQLINCLUDES@ @EXTRA_PGSQL_DEF@
+PGSQL_LDFLAGS=@DATABASE_LIB_DIR@ @PGSQL_LIB@

@@ -1,0 +1,59 @@
+# etherspoof-2.7.diff -- kernel patch to spoof your source mac address
+# OpenBSD 2.7 [diff version] by obecian <obecian@subterrain.net>
+#
+# based on earlier versions by:
+# Copyright (c) 1999, 2000 Trevor Scheroeder <tschroed@zweknu.org>
+# Copyright (c) 1998, 1999, 2000 Mike D. Schiffman <mike@infonexus.com>
+# Original code and idea 1997 Thomas Ptacek <tqbf@pobox.com
+#
+# to patch kernel simply (as root):
+# cd /usr/src/sys/net
+# patch -p0 < etherspoof-2.7.diff
+# recompile kernel
+#
+
+--- if_ethersubr.c.orig	Sun May  7 11:39:34 2000
++++ if_ethersubr.c	Sun May  7 11:44:33 2000
+@@ -242,7 +242,7 @@ ether_output(ifp, m0, dst, rt0)
+ {
+ 	u_int16_t etype;
+ 	int s, error = 0;
+- 	u_char edst[6];
++ 	u_char edst[6], esrc[6];
+ 	register struct mbuf *m = m0;
+ 	register struct rtentry *rt;
+ 	struct mbuf *mcopy = (struct mbuf *)0;
+@@ -284,6 +284,7 @@ ether_output(ifp, m0, dst, rt0)
+ 		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX))
+ 			mcopy = m_copy(m, 0, (int)M_COPYALL);
+ 		etype = htons(ETHERTYPE_IP);
++		bcopy(ac->ac_enaddr, esrc, sizeof (edst));
+ 		break;
+ #endif
+ #ifdef INET6
+@@ -453,7 +454,7 @@ ether_output(ifp, m0, dst, rt0)
+ 			if (mcopy) {
+ 				eh = mtod(mcopy, struct ether_header *);
+ 				bcopy(edst, eh->ether_dhost, sizeof (edst));
+-				bcopy(ac->ac_enaddr, eh->ether_shost,
++				bcopy(esrc, eh->ether_shost,
+ 				    sizeof (edst));
+ 			}
+ 		}
+@@ -477,6 +478,7 @@ ether_output(ifp, m0, dst, rt0)
+ 	case AF_UNSPEC:
+ 		eh = (struct ether_header *)dst->sa_data;
+  		bcopy((caddr_t)eh->ether_dhost, (caddr_t)edst, sizeof (edst));
++		bcopy((caddr_t)eh->ether_shost, (caddr_t)esrc, sizeof (edst));
+ 		/* AF_UNSPEC doesn't swap the byte order of the ether_type. */
+ 		etype = eh->ether_type;
+ 		break;
+@@ -501,7 +503,7 @@ ether_output(ifp, m0, dst, rt0)
+ 	bcopy((caddr_t)&etype,(caddr_t)&eh->ether_type,
+ 		sizeof(eh->ether_type));
+  	bcopy((caddr_t)edst, (caddr_t)eh->ether_dhost, sizeof (edst));
+- 	bcopy((caddr_t)ac->ac_enaddr, (caddr_t)eh->ether_shost,
++ 	bcopy((caddr_t)esrc, (caddr_t)eh->ether_shost,
+ 	    sizeof(eh->ether_shost));
+ 
+ #if NBRIDGE > 0

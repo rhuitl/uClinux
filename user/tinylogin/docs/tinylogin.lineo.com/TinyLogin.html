@@ -1,0 +1,328 @@
+<HTML>
+<HEAD>
+<TITLE>tinylogin - a multi-call binary for login and user account administration</TITLE>
+<LINK REV="made" HREF="mailto:none">
+</HEAD>
+
+<BODY>
+
+<!-- INDEX BEGIN -->
+
+<UL>
+
+	<LI><A HREF="#NAME">NAME</A>
+	<LI><A HREF="#SYNOPSIS">SYNOPSIS</A>
+	<LI><A HREF="#DESCRIPTION">DESCRIPTION</A>
+	<UL>
+
+		<LI><A HREF="#HACKING">HACKING</A>
+	</UL>
+
+	<LI><A HREF="#MAKING_IT_WORK">MAKING IT WORK</A>
+	<LI><A HREF="#COMMANDS">COMMANDS</A>
+	<LI><A HREF="#SEE_ALSO">SEE ALSO</A>
+	<LI><A HREF="#AUTHORS">AUTHORS</A>
+</UL>
+<!-- INDEX END -->
+
+<HR>
+<P>
+<H1><A NAME="NAME">NAME</A></H1>
+<P>
+tinylogin - a multi-call binary for login and user account administration
+
+<P>
+<HR>
+<H1><A NAME="SYNOPSIS">SYNOPSIS</A></H1>
+<P>
+<PRE>  tinylogin &lt;function&gt; [arguments...]   # or
+</PRE>
+<P>
+<PRE>  &lt;function&gt; [arguments...]             # if symlinked
+</PRE>
+<P>
+<HR>
+<H1><A NAME="DESCRIPTION">DESCRIPTION</A></H1>
+<P>
+TinyLogin is a suite of tiny Unix utilities for handling logging into,
+being authenticated by, changing one's password for, and otherwise
+maintaining users and groups on an embedded system. It also provides shadow
+password support to enhance system security. TinyLogin is, as the name
+implies, very small, and makes an excellent complement to BusyBox on an
+embedded System. It can be used without BusyBox, of course, but I envision
+them being used together most of the time.
+
+<P>
+Why is something like TinyLogin useful?
+
+<P>
+<PRE>    [andersen@slag]$ du -ch `which addgroup adduser delgroup deluser getty login passwd su sulogin`
+    0   /usr/sbin/addgroup
+    24k /usr/sbin/adduser
+    16k /sbin/getty
+    36k /bin/login
+    28k /usr/bin/passwd
+    24k /bin/su
+    12k /sbin/sulogin
+    140k        total
+</PRE>
+<P>
+<PRE>    [andersen@slag]$ ls -sh ./tinylogin
+    40k ./tinylogin*
+</PRE>
+<P>
+`nuff said.
+
+<P>
+TinyLogin is a curious blend of code from a whole bunch of folks. It was
+originally cobbled together by Sean Bastille &lt;<A
+HREF="mailto:hightide@ginch.org">hightide@ginch.org</A>&gt; based in part
+on the May of 1998 version of the shadow utilities, which can be downloaded
+from: <A
+HREF="ftp://ftp.ists.pwr.wroc.pl/pub/linux/shadow/">ftp://ftp.ists.pwr.wroc.pl/pub/linux/shadow/</A>
+The build system, and the way in which TinyLogin invokes its component
+applications has been totally rewritten, based on the build system used for
+BusyBox. The code has also been majorly reworked to make it more internally
+consistent, to make it use fewer global variables, etc, by Erik Andersen.
+
+<P>
+TinyLogin may be used and distributed under the terms of GNU General Public
+License, with the addition of the special terms enumerated below by the
+shadow utilities license (a BSD style license which allows me to make
+future releases under the GPL).
+
+<P>
+<HR>
+<H2><A NAME="HACKING">HACKING</A></H2>
+<P>
+TinyLogin, like BusyBox, is now modularized to easily allow you to build
+only the components you need, thereby reducing binary size. To turn off
+unwanted TinyLogin components, simply edit the file tinylogin.def.h and
+comment out the parts you do not want using C++ style (//) comments.
+
+<P>
+After the build is complete a tinylogin.links file is generated which is
+then used by 'make install' to create symlinks to the tinylogin binary for
+all compiled in functions. By default, 'make install' will place a symlink
+forest into `pwd`/_install unless you have defined the PREFIX environment
+variable.
+
+<P>
+<HR>
+<H1><A NAME="MAKING_IT_WORK">MAKING IT WORK</A></H1>
+<P>
+I often get email from people wondering why tinylogin doesn't work. It is
+almost always the case that they compiled with ``USE_SYSTEM_PWD_GRP =
+true'' in the Makefile, and they are using GNU Libc, and have either failed
+to install /etc/nsswitch.conf, have badly configured their
+/etc/nsswitch.conf file, or have a properly configured /etc/nsswitch.conf
+file but have not installed the libraries the GNU Libc is looking for
+(which is determined based on the contents of the /etc/nsswitch.conf file).
+To avoid these problems, I recommend that unless you have a very good
+reason, you should always leave the Makefile's ``USE_SYSTEM_PWD_GRP =
+false'' setting in place. This will cause tinylogin to directly use the
+system's password and group files. This way, you do not need to worry about
+GNU Libc's NSS at all (thereby making your embedded system even smaller).
+If you absolutely must use GNU libc NSS for authentication you must include
+something such as the following in your embedded systems'
+/etc/nsswitch.conf file:
+
+<P>
+<PRE>  # /etc/nsswitch.conf
+  # Note that if you are doing networking, 
+  # other entries will also be needed.
+  passwd:         compat
+  group:          compat
+  shadow:         compat
+</PRE>
+<P>
+Furthermore, you will also need to include the library /lib/libnss_compat
+so that GNU Libc can find it when it is needed (it is dynamicaly loaded, so
+'ldd' won't tell you that you need it -- which is why I've devoted this
+entire section of the manual to tell you you need it). If you want to do
+something more complicated, such as authenticating vs a remote LDAP
+database, well tinylogin can work just fine with that type of setup using
+GNU libc NSS, but setting it up is your problem, not mine.
+
+<P>
+<HR>
+<H1><A NAME="COMMANDS">COMMANDS</A></H1>
+<P>
+Currently defined functions include:
+
+<P>
+adduser, addgroup, deluser, delgroup, login, su, sulogin, passwd, getty
+
+<UL>
+<LI><STRONG><A NAME="item_adduser">adduser</A></STRONG>
+<P>
+Add a user to the system
+
+<P>
+Usage: adduser [OPTIONS]... &lt;USER&gt;
+
+<P>
+Options:
+
+<P>
+<PRE>  -h &lt;directory&gt;    specify home directory
+  -s &lt;shell&gt;        specify shell
+  -g &lt;gecos&gt;        specify GECOS string
+</PRE>
+<P>
+Default values are as follows:  
+
+<P>
+<PRE>  HOME=/home/$USER
+  SHELL=/bin/sh
+  GECOS=&quot;Embedix,,,&quot;
+</PRE>
+<P>
+Description:
+
+<P>
+This utility adds a user to /etc/passwd and /etc/group. If shadow is
+enabled /etc/shadow and /etc/gshadow are also updated w/ appropriate
+information. The group name is set to the same value as the user name. To
+set the initial password, adduser executes passwd which presents an
+interactive prompt. This makes adduser inappropriate for batch account
+creation.
+
+<P>
+Normally, something like adduser is implemented in a scripting language,
+but this one was implemented in C. The rationale for this was that in a
+small system, one might not have space for certain Unix shell utilities
+that are normally taken for granted or that one might not have space for
+even a minimal perl installation. Such limitations could make making a
+robust adduser implementation difficult, so the only viable option left was
+to do it in C.
+
+<P>
+When implementing adduser, the semantics of Debian's adduser perl script
+were used as a reference, so those of you familiar with that should notice
+similarities.
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_addgroup">addgroup</A></STRONG>
+<P>
+Add a group to the system
+
+<P>
+Usage: addgroup [OPTIONS]... &lt;GROUP&gt;
+
+<P>
+Options:
+
+<P>
+<PRE>  -g &lt;number&gt;       specify gid
+</PRE>
+<P>
+Description:
+
+<P>
+This utility adds a group to /etc/group and if necessary, /etc/gshadow as
+well. If the GID is not specified, addgroup will try to find the next
+available gid within the range of [100..64000].
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_deluser">deluser</A></STRONG>
+<P>
+Delete a user from the system
+
+<P>
+Usage: deluser &lt;USER&gt;
+
+<P>
+Description:
+
+<P>
+This utility only takes one parameter which is the user name. It will
+search /etc/passwd and delete the user's account if it exists.
+
+<P>
+<STRONG>NOTE</STRONG>: Although adduser adds both users and groups, deluser only deletes users.
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_delgroup">delgroup</A></STRONG>
+<P>
+Delete a group from the system
+
+<P>
+Usage: delgroup &lt;USER&gt;
+
+<P>
+Description:
+
+<P>
+This utility only takes one parameter which is the group name. It will
+search /etc/passwd and delete the group if it exists.
+
+<P>
+<STRONG>NOTE</STRONG>: Although adduser adds both users and groups, delgroup only deletes
+groups.
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_login">login</A></STRONG>
+<P>
+Begin session on the system
+
+<P>
+Usage: login
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_su">su</A></STRONG>
+<P>
+Change uid or become root
+
+<P>
+Note that for su to work, the tinylogin binary must be setuid root.
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_sulogin">sulogin</A></STRONG>
+<P>
+Single-user login
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_passwd">passwd</A></STRONG>
+<P>
+Change user password
+
+<HR noshade>
+
+<LI><STRONG><A NAME="item_getty">getty</A></STRONG>
+<P>
+Opens a tty and invokes /bin/login
+
+</UL>
+<P>
+<HR>
+<H1><A NAME="SEE_ALSO">SEE ALSO</A></H1>
+<P>
+<CODE>busybox(1),</CODE> <CODE>pam(8)</CODE>
+
+<P>
+<HR>
+<H1><A NAME="AUTHORS">AUTHORS</A></H1>
+<P>
+Erik Andersen &lt;<A HREF="mailto:erik@lineo.com">erik@lineo.com</A>&gt;
+
+<P>
+Sean Bastille &lt;<A
+HREF="mailto:hightide@ginch.org">hightide@ginch.org</A>&gt;
+
+<P>
+John Beppu &lt;<A HREF="mailto:beppu@lineo.com">beppu@lineo.com</A>&gt;
+
+<P>
+Julianne Frances Haugh &lt;unknown@unknown&gt;
+
+</BODY>
+
+</HTML>

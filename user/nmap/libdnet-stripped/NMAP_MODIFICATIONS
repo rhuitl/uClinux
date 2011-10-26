@@ -1,0 +1,312 @@
+$Id: NMAP_MODIFICATIONS 4219 2006-12-03 00:34:19Z fyodor $
+
+This is Dug Song's excellent Libdnet networking library version 1.10.
+It has been stripped down for inclusion within Nmap and modified as follows:
+
+o Removed the following directories:
+  python, test, man
+
+o Removed all filenames from EXTRA_libdnet_la_SOURCES sources, as
+  they aren't needed with GNU automake 1.9.2
+
+o Removed the fw-* files except for fw-none because Nmap doesn't use
+  the firewall API.  Changed configure.in to always use fw-non.
+
+o Removed files in now-removed dires that were reference from
+  configure.in:318
+
+o Ran "aclocal -I . -I config" to regenerate aclocal.m4 with my newer
+  aclocal.
+
+o Replaced config.guess config.sub and missing in config dir with
+  versions from Autoconf 2.59.
+
+o Added this NMAP_MODIFICATIONS file.
+
+o Added include/winconfig.h, which is a modified config.h to better support
+  Windows compilation via Visual Studio.  Added conditional includes
+  for it to a bunch of the dnet source files.
+
+o A number of portability changes to remove errors/warnings during
+  Win32 Visual Studio.Net compilation.  This was mostly a matter of
+  adding casts and a few extra include files.
+
+o Added libdnet-stripped.vcproj -- A Visual Studio.Net project file
+  for dnet.
+
+o Rewrote eth_open() for Win32 as its technique for translating from
+  a dnet-named interface to a pcap-named one did not work on any of my
+  systems.
+
+o Added intf_get_pcap_devname() function for Win32.  This tries to
+  convert a dnet if name into its pcap equivalent.  It is a hack, but
+  arguably better than the hacks that were there before.  The main
+  down side is that it won't work with interfaces that don't have an
+  IPv4 address configured.
+
+o Increase the number of available bpf devices from 32 to 128.  Patch:
+--- eth-bsd.c   (revision 2774)
++++ eth-bsd.c   (working copy)
+@@ -45,7 +45,7 @@
+        int i;
+ 
+        if ((e = calloc(1, sizeof(*e))) != NULL) {
+-               for (i = 0; i < 32; i++) {
++               for (i = 0; i < 128; i++) {
+                        snprintf(file, sizeof(file), "/dev/bpf%d", i);
+                        e->fd = open(file, O_WRONLY);
+                        if (e->fd != -1 || errno != EBUSY)
+
+
+o Made some code changes to intf.c (the patch below).  This does the following:
+
+  o Preserve the alias qualifier from interface name in more cases
+    (e.g. don't blow away :2 from eth0:2 when it may still be needed.
+
+  o Set the SO_BROADCAST flag on the interface list descriptor so that
+    broadcast/network IPs can be investigated.
+
+  o Update _match_intf_src so that it checks interface aliases for the
+    given source address rather than only the main interface address.
+
+diff -Nruw old/src/intf.c nmap-3.83.new/src/intf.c
+--- src/intf.c  2005-05-03 09:41:35.000000000 -0700
++++ src/intf.c  2005-07-16 20:55:05.000000000 -0700
+@@ -119,12 +119,16 @@
+ intf_open(void)
+ {
+        intf_t *intf;
++       int one = 1;
+ 
+        if ((intf = calloc(1, sizeof(*intf))) != NULL) {
+                intf->fd = intf->fd6 = -1;
+ 
+                if ((intf->fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+                        return (intf_close(intf));
++
++               setsockopt(intf->fd, SOL_SOCKET, SO_BROADCAST, 
++                          (const char *) &one, sizeof(one));
+ #ifdef SIOCGIFNETMASK_IN6
+                if ((intf->fd6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+ #  ifdef EPROTONOSUPPORT
+@@ -472,6 +476,7 @@
+ _intf_get_aliases(intf_t *intf, struct intf_entry *entry)
+ {
+        struct ifreq *ifr, *lifr;
++       struct ifreq tmpifr;
+        struct addr *ap, *lap;
+        char *p;
+ 
+@@ -492,9 +497,12 @@
+                if ((p = strchr(ifr->ifr_name, ':')) != NULL)
+                        *p = '\0';
+ 
+-               if (strcmp(ifr->ifr_name, entry->intf_name) != 0)
++               if (strcmp(ifr->ifr_name, entry->intf_name) != 0) {
++                 if (p) *p = ':';
+                        continue;
++               }
+ 
++               if (p) *p = ':'; /* Fix the name back up */
+                if (addr_ston(&ifr->ifr_addr, ap) < 0)
+                        continue;
+ 
+@@ -506,6 +514,11 @@
+                        if (ap->addr_ip == entry->intf_addr.addr_ip ||
+                            ap->addr_ip == entry->intf_dst_addr.addr_ip)
+                                continue;
++                       strlcpy(tmpifr.ifr_name, ifr->ifr_name, 
++                              sizeof(tmpifr.ifr_name));
++                       if (ioctl(intf->fd, SIOCGIFNETMASK, &tmpifr) == 0)
++                         addr_stob(&tmpifr.ifr_addr, &ap->addr_bits);
++
+                }
+ #ifdef SIOCGIFNETMASK_IN6
+                else if (ap->addr_type == ADDR_TYPE_IP6 && intf->fd6 != -1) {
+@@ -547,10 +560,22 @@
+ static int
+ _match_intf_src(const struct intf_entry *entry, void *arg)
+ {
++       int matched = 0;
++       int cnt;
+        struct intf_entry *save = (struct intf_entry *)arg;
+ 
+        if (entry->intf_addr.addr_type == ADDR_TYPE_IP &&
+-           entry->intf_addr.addr_ip == save->intf_addr.addr_ip) {
++           entry->intf_addr.addr_ip == save->intf_addr.addr_ip)
++         matched = 1;
++  
++       for (cnt = 0; !matched && cnt < (int) entry->intf_alias_num; cnt++) {
++         if (entry->intf_alias_addrs[cnt].addr_type != ADDR_TYPE_IP)
++           continue;
++         if (entry->intf_alias_addrs[cnt].addr_ip == save->intf_addr.addr_ip)
++           matched = 1;
++       }
++
++       if (matched) {
+                /* XXX - truncated result if entry is too small. */
+                if (save->intf_len < entry->intf_len)
+                        memcpy(save, entry, save->intf_len);
+@@ -678,14 +703,18 @@
+                if ((p = strchr(ifr->ifr_name, ':')) != NULL)
+                        *p = '\0';
+ 
+-               if (pifr != NULL && strcmp(ifr->ifr_name, pifr->ifr_name) == 0)
++               if (pifr != NULL && strcmp(ifr->ifr_name, pifr->ifr_name) == 0) {
++                 if (p) *p = ':';
+                        continue;
++               }
+ 
+                memset(ebuf, 0, sizeof(ebuf));
+                strlcpy(entry->intf_name, ifr->ifr_name,
+                    sizeof(entry->intf_name));
+                entry->intf_len = sizeof(ebuf);
+ 
++               /* Repair the alias name back up. */
++               if (p) *p = ':';
+                if (_intf_get_noalias(intf, entry) < 0)
+                        return (-1);
+                if (_intf_get_aliases(intf, entry) < 0)
+
+
+
+o Consider Windows interfaces to be down if they are disconnected, unreachable, or otherwise non-operational:
+
+--- intf-win32.c        (revision 2976)
++++ intf-win32.c        (working copy)
+@@ -116,7 +116,9 @@
+
+        /* Get interface flags. */
+        entry->intf_flags = 0;
+-       if (ifrow->dwAdminStatus == MIB_IF_ADMIN_STATUS_UP)
++       if (ifrow->dwAdminStatus == MIB_IF_ADMIN_STATUS_UP &&
++           (ifrow->dwOperStatus == MIB_IF_OPER_STATUS_OPERATIONAL ||
++            ifrow->dwOperStatus == MIB_IF_OPER_STATUS_CONNECTED))
+                entry->intf_flags |= INTF_FLAG_UP;
+        if (ifrow->dwType == MIB_IF_TYPE_LOOPBACK)
+                entry->intf_flags |= INTF_FLAG_LOOPBACK;
+
+o Made some AIX/HP-UX portability changes sent in by Peter O'Gorman
+(nmap-dev@mlists.thewrittenword.com):
+
+
+Index: include/dnet/ip6.h
+===================================================================
+--- include/dnet/ip6.h  (revision 3309)
++++ include/dnet/ip6.h  (working copy)
+@@ -25,7 +25,9 @@
+ } ip6_addr_t;
+
+ #ifndef __GNUC__
++#ifndef __attribute__
+ # define __attribute__(x)
++#endif
+ # pragma pack(1)
+ #endif
+
+Index: include/dnet/ip.h
+===================================================================
+--- include/dnet/ip.h   (revision 3309)
++++ include/dnet/ip.h   (working copy)
+@@ -25,7 +25,9 @@
+ typedef uint32_t       ip_addr_t;
+
+ #ifndef __GNUC__
++#ifndef __attribute__
+ # define __attribute__(x)
++#endif
+ # pragma pack(1)
+ #endif
+
+Index: include/dnet/arp.h
+===================================================================
+--- include/dnet/arp.h  (revision 3309)
++++ include/dnet/arp.h  (working copy)
+@@ -16,7 +16,9 @@
+ #define ARP_ETHIP_LEN  20      /* base ARP message length */
+
+ #ifndef __GNUC__
++#ifndef __attribute__
+ # define __attribute__(x)
++#endif
+ # pragma pack(1)
+ #endif
+
+Index: include/dnet/tcp.h
+===================================================================
+--- include/dnet/tcp.h  (revision 3309)
++++ include/dnet/tcp.h  (working copy)
+@@ -17,7 +17,9 @@
+ #define TCP_HDR_LEN_MAX        (TCP_HDR_LEN + TCP_OPT_LEN_MAX)
+
+ #ifndef __GNUC__
++#ifndef __attribute__
+ # define __attribute__(x)
++#endif
+ # pragma pack(1)
+ #endif
+
+Index: include/dnet/icmp.h
+===================================================================
+--- include/dnet/icmp.h (revision 3309)
++++ include/dnet/icmp.h (working copy)
+@@ -16,7 +16,9 @@
+ #define ICMP_LEN_MIN   8       /* minimum ICMP message size, with header */
+
+ #ifndef __GNUC__
++#ifndef __attribute__
+ # define __attribute__(x)
++#endif
+ # pragma pack(1)
+ #endif
+
+Index: src/arp-ioctl.c
+===================================================================
+--- src/arp-ioctl.c     (revision 3309)
++++ src/arp-ioctl.c     (working copy)
+@@ -383,7 +383,7 @@
+        }
+        return (ret);
+ }
+-#elif defined(HAVE_NET_RADIX_H)
++#elif defined(HAVE_NET_RADIX_H) && !defined(_AIX)
+ /* XXX - Tru64, others? */
+ #include <netinet/if_ether.h>
+ #include <nlist.h>
+Index: src/intf.c
+===================================================================
+--- src/intf.c  (revision 3309)
++++ src/intf.c  (working copy)
+@@ -284,7 +284,9 @@
+        /* Set interface MTU. */
+        if (entry->intf_mtu != 0) {
+                ifr.ifr_mtu = entry->intf_mtu;
++#ifdef SIOCSIFMTU
+                if (ioctl(intf->fd, SIOCSIFMTU, &ifr) < 0)
++#endif
+                        return (-1);
+        }
+        /* Set interface address. */
+@@ -396,7 +398,9 @@
+        _intf_set_type(entry);
+
+        /* Get interface MTU. */
++#ifdef SIOCGIFMTU
+        if (ioctl(intf->fd, SIOCGIFMTU, &ifr) < 0)
++#endif
+                return (-1);
+        entry->intf_mtu = ifr.ifr_mtu;
+
+o Made the following change for Windows Vista support (thanks to Dan
+Griffin):
+--- old/intf-win32.c        2005-12-28 16:30:38.000000000 -0800
++++ intf-win32.c        2006-11-26 20:46:13.000000000 -0800
+@@ -31,7 +31,7 @@
+        int              max;
+ };
+
+-#define MIB_IF_TYPE_MAX         32     /* XXX - ipifcons.h */
++#define MIB_IF_TYPE_MAX                MAX_IF_TYPE     /* XXX - ipifcons.h */
+
+ struct intf_handle {
+        struct ifcombo   ifcombo[MIB_IF_TYPE_MAX];

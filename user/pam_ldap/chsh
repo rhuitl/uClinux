@@ -1,0 +1,107 @@
+#!/usr/bin/perl
+# chsh implementation for LDAP
+# Copyright (C) 2000 Tom Lear <tom@trap.mtview.ca.us>  
+
+# This program is free software; you can redistribute it and/or modify   
+# it under the terms of the GNU General Public License as published by  
+# the Free Software Foundation; either version 2 of the License, or  
+# (at your option) any later version.  
+#
+# This program is distributed in the hope that it will be useful,  
+# but WITHOUT ANY WARRANTY; without even the implied warranty of  
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the  
+# GNU General Public License for more details.                   
+#                                               
+# You should have received a copy of the GNU General Public License  
+# along with this program; if not, write to the Free Software        
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA  
+#
+
+if($ARGV[0] eq '-s') {
+  shift;
+  $shell=shift;
+}
+
+$user=$ARGV[0];
+if($user eq '') {
+  $user=(getpwuid($<))[0];
+} else {
+  die "You can't change that user.\n" if($< and $<!=getpwnam($user));
+}
+
+# use pam_ldap's config file since this script is ldap specific and
+# is a work around for a deficiency in pam
+$CONF{'pam_login_attribute'}='uid';
+open(CONF,"/etc/ldap.conf") or die "$!\n";
+while(<CONF>) {
+  next if(m/^\s*($|#)/);
+  m/^\s*(\S+)\s+(.*?)\s*$/;
+  $CONF{$1}=$2;
+}
+close(CONF);
+open(CONF,"/etc/ldap.secret") and chomp($CONF{'rootbindpw'}=<CONF>);
+close(CONF);
+
+use Net::LDAP;
+
+$ldap=Net::LDAP->new($CONF{'host'});
+
+if($< or $CONF{'rootbinddn'} eq '') {
+  $ENV{'PATH'}='';
+  system "/bin/stty -echo";
+  print 'Password:';
+  chomp($password = <STDIN>);
+  print "\n";
+  system "/bin/stty echo";
+  %bindargs=('dn'         => "$CONF{pam_login_attribute}=$user,ou=People,$CONF{base}",
+             'password'   => $password,
+  );
+} else {
+  %bindargs=('dn'         => $CONF{'rootbinddn'},
+             'password'   => $CONF{'rootbindpw'},
+  );
+}
+$bindargs{'version'}=$CONF{'ldap_version'}?$CONF{'ldap_version'}:2;
+
+$ldap->bind(%bindargs) or die "unable to bind to ldap server: $@";
+
+# check if the old shell is valid
+$oldshell=(getpwnam($user))[8];
+open(IN,"/etc/shells");
+while(<IN>) {
+  chomp;
+  $valid=1 if($oldshell eq $_);
+}
+close(IN);
+die "can't change shell for `$user'\n" if($< and !$valid);
+
+# get the new shell if neccesary
+if($shell eq '') {
+  print "Enter the new value, or press return for the default\n\n";
+  print "\t Login Shell [$oldshell]: ";
+  $shell=<STDIN>;
+  chomp $shell;
+  $shell=$oldshell if($shell eq '');
+}
+
+# check the shells validity
+if($<) {
+  $valid=0;
+  open(IN,"/etc/shells");
+  while(<IN>) {
+    chomp;
+    $valid=1 if($shell eq $_);
+  }
+  close(IN);
+  die "$shell is an invalid shell.\n" if(!$valid);
+}
+
+# change the shell
+$ret=$ldap->modify("$CONF{pam_login_attribute}=$user,ou=People,$CONF{base}",
+        replace => {'loginShell' => $shell});
+if($ret->code) {
+  printf STDERR ("failed: %s\n",$ret->error);
+} else {
+  print "changed user `$user' shell to `$shell'\n";
+}
+

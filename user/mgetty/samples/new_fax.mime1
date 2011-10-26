@@ -1,0 +1,69 @@
+#!/bin/ksh
+#
+# new_fax.mime
+#
+# From: Marc@Synergytics.Com
+# To:	gert@greenie.muc.de
+# cc:	mgetty@muc.de
+# Subject: MIME support for voice (and/or fax) messages
+#
+# [..] I have created revised vg_message and also new_fax scripts which 
+# generate a MIME messages. [..]
+#
+# The script needs the ``mh'' mailer installed
+#
+#
+#! /bin/ksh
+
+FAX_DIR=/var/spool/fax
+
+# This script is called when a message was recorded. 
+# It gets the following arguments:
+#      $1 : the hangup code
+#      $2 : the remote id
+#      $3 : the number of pages
+#      $4... : the file names
+
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/local/bin/mh
+MAILTO=faxmaster
+CODE="$1"	; shift
+ID="$1"		; shift
+PAGES="$1"	; shift
+TMP=/var/tmp/`basename $0`.$$
+
+#  Add the following lines (less the comment character) to /etc/mailcap:
+#   image/x-fax-g3; g32pbm %s | xv -; description="Group-3 encoded fax"
+#  OR, add the following lines to your ~/.mh_profile (if you use mhn):
+#   mhn-show-image/x-fax-g3: g32pbm %f | xv -
+
+## Notify user by mail that a message has arrived
+#
+umask 077
+( echo "To: $MAILTO"
+  echo "Subject: Fax from $ID"
+  echo "--------"
+  echo "A fax from $ID was received at about `date` consisting of"
+  echo "$PAGES pages. The termination code of the fax program was $CODE. The pages are included"
+  echo "below."
+  echo
+  let page=1
+  for i in $* ; do
+    echo "# image/x-fax-g3 [ Page $page of $PAGES ] $i"
+    let page=page+1
+  done
+) >$TMP
+echo 'send' | comp -use -editor /usr/local/bin/mh/mhn -file $TMP >/dev/null
+rm -f $TMP
+
+## Alternative method (using metamail directly)
+# let page=1
+# files=''
+# for i in $* ; do
+#   t=$TMP.`echo $page | awk '{printf "%03d\n",$1}'`
+#   mmencode $1 >$t
+#   let page=page+1
+#   files="$files -m audio/adpcm3 -f $t"
+# done
+# metasend -t $MAILTO -c '' -z -s "Voice-mail message" -e base64 $files \
+#   </dev/null 2>&1 >/dev/null
+# rm -f $TMP*

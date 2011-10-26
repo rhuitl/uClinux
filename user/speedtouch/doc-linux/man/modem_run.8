@@ -1,0 +1,68 @@
+.TH modem_run "8" "May 2004" "SpeedTouch USB driver"
+.SH NAME
+modem_run \- SpeedTouch USB and SpeedTouch 330 firmware loader
+.SH SYNOPSIS
+.B modem_run
+[\fIOPTION\fR]... -f firmware_file
+.SH DESCRIPTION
+.PP
+.\" Add any additional description here
+.PP
+This program loads the firmware contained in firmware_file into a SpeedTouch USB modem. Then a monitoring daemon is left running. On Linux based systems, this daemon can be used to inform the "speedtch" module about the adsl link state.
+.SH OPTIONS
+.TP
+\fB\-f firmware_file\fR
+Specifies the file containing the firmware code of the modem.
+.TP
+\fB\-a boot_file\fR
+Specifies the file containing the boot code of the modem.
+.TP
+\fB\-b\fR
+Enables the use of the modem's "software buffering" mode. This option seems to cause state line instability.
+.TP
+\fB\-d device\fR
+Defines which USB device should be used as the SpeedTouch USB modem. On Linux, this is something like /proc/bus/usb/003/006. Usefull when using more than one modem on the same machine.
+
+.TP
+\fB\-i seconds\fR
+Defines the time between each device state polling. The default is 10s.
+.TP
+\fB\-k\fR
+Enables "speedtch" Linux kernel module coupling. If the state line goes up or down, then the module is informed through a special ioctl call.
+.TP
+\fB\-n number\fR
+Number of firmware upload tries before failure is reported.
+.TP
+\fB\-r number\fR
+Forces a specific modem revision. Valid values range from 0 to 4. Default is autodetection.
+.TP
+\fB\-s\fR
+Skips the first 512 bytes read (if you have a bulk read error 512 bytes on startup try this option)
+.TP
+\fB-t seconds\fR
+Sets the sychronization timeout in seconds. The default is 120s.
+.TP
+\fB\-v number\fR
+Verbosity level
+    - 0 Error messages
+    - 1 level 0 + State messages
+    - 2 level 1 + USB packet dumping
+.TP
+\fB\-\-help\fR
+display this help and exit
+.SH DEPRECATED
+.TP
+\fB\-m\fR
+This option used to be specified to make modem_run monitor the state line in a background process (daemon). As the monitoring seems to be mandatory, this option has been removed.
+.SH RETURN VALUES
+.TP
+0 if the firmware file has been successfully loaded into SpeedTouch USB modem and adsl link has gone up.
+.TP
+For all failure cases, exit status is not equal to 0.
+.TP
+If \fBmodem_run\fR fails to load the firmware, try to run \fBmodem_run\fR with the \fB\-v 1\fR or \fB\-v 2\fR option, this can help you finding out the failure reason.
+.SH SEE ALSO
+.TP
+\fBpppoa3(8)\fR, \fBpppoa2(8)\fR
+.SH AUTHOR
+SpeedTouch USB driver development team.

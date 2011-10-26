@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# get the current settings
+#
+set -e
+
+CUR_DIR=`pwd`
+
+cd $ROOTDIR
+
+echo `pwd`
+
+. ./$LINUXDIR/.config
+
+if [ "$CONFIG_X86" = y -o "$CONFIG_M586" = y ]; then
+	if [ "$CONFIG_JFFS_FS" = y ]; then
+		bin/mkflashjffs
+	elif [ "$CONFIG_JFFS2_FS" = y ]; then
+		bin/mkflashjffs2
+	else
+		bin/mkflashx86
+	fi
+elif [ "$CONFIG_CLEOPATRA" = y ]; then
+	if [ "$CONFIG_M5307" = y ]; then
+		if [ "$CONFIG_RAM16MB" = y ]; then
+			bin/mkflashcleo $ROOTDIR/vendors/Feith/boot/Cleopatra/boot_c1_m16.bin CLEOPATRA-1 16MB
+		else
+			bin/mkflashcleo $ROOTDIR/vendors/Feith/boot/Cleopatra/boot_c1_m8.bin CLEOPATRA-1 8MB
+      fi
+	else
+		if [ "$CONFIG_RAM16MB" = y ]; then
+			bin/mkflashcleo $ROOTDIR/vendors/Feith/boot/Cleopatra2/boot_c2_m16.bin CLEOPATRA-2 16MB
+		else
+			bin/mkflashcleo $ROOTDIR/vendors/Feith/boot/Cleopatra2/boot_c2_m8.bin CLEOPATRA-2 8MB
+      fi
+   fi
+elif [ "$CONFIG_CanCam" = y ]; then
+	bin/mkflashcancam
+
+elif [ "$CONFIG_SCALES" = y ]; then
+	bin/mkflashcleo $ROOTDIR/vendors/Feith/boot/SCALES/boot.bin SCALES 4MB
+
+elif [ "$CONFIG_FLASH1MB" = y ]; then
+	bin/mkflash
+elif [ "$CONFIG_FLASH2MB" = y ]; then
+	bin/mkflash2mb
+elif [ "$CONFIG_FLASH4MB" = y ]; then
+	bin/mkflash2mb
+else
+	echo "$0: Unknown flash size!" >&2
+	exit 1
+fi
+
+cd $CUR_DIR
+
+exit 0

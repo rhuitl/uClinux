@@ -1,0 +1,19 @@
+#!/bin/sh
+
+INTERFACE=$1
+
+echo Configuring IP address for $INTERFACE using DHCP
+dhcpcd $INTERFACE &
+for i in 0 1 2 3 4 5 6 7; do
+    sleep 1
+    if [ -f /etc/dhcpc/dhcpcd-$INTERFACE.info ]; then
+        break
+    else
+        echo Waiting for DHCP grant on $INTERFACE
+    fi
+done
+
+. /etc/dhcpc/dhcpcd-$INTERFACE.info
+
+echo DHCP granted IP address $IPADDR for $INTERFACE
+

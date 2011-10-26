@@ -1,0 +1,87 @@
+Soekris NET4801
+---------------
+by Davidm McCullough <davidm@snapgear.com>
+
+
+1. Compiler Tool Chain
+
+   Before you can compile the Linux kernel, libraries and applications to
+   generate a Soekris/NET4801 image you must install an appropriate compiler
+   tool chain.  You should use the i386-linux tool chain that accompanies
+   this source distribution (the i386-linux-XXXXXXXX.tar.gz package). To
+   install this toolchain do:
+
+   1. login as root
+   2. cd /
+   3. tar xvzf i386-linux-XXXXXXXX.tar.gz
+
+   This package contains binaries of the following tools:
+
+        binutils-2.14
+        gcc-3.2.3
+        glibc-2.2.5
+
+2. Building the Source
+
+   Follow these simple steps to compile Compact Flash images ready to load
+   and run on the Soekris net4801 board:
+
+   1.  tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+   2.  cd uClinux-dist
+   3.  make xconfig
+
+       . Choose the "Vendor/Product Selection" menu item
+       . Select Soekris as the "Vendor"
+       . Scroll down to the "Soekris Products" and select net4801
+       . scroll to the bottom and select "Main Menu".
+       . Choose the "Kernel/Library/Defaults Selection" menu item
+       . Select "linux-2.4.x" as the kernel
+       . Select "glibc" or "uClibc" as the library
+       . scroll to the bottom and select "Main Menu".
+       . Select "Save and Exit" this configuration
+
+   4.  make dep
+   5.  make
+
+       . The make process will ask for the root password when required to
+         build the images.  You will need ext3 and romfs support in your
+         kernel as well as loopback device support.
+
+   The make process will build everything,  kernel, libraries and
+   applications and package it ready to copy onto a Compact Flash.
+
+   Currently only 64MiB and 128MiB images are generated,  but adding more
+   images is simply a matter of editing the vendors/Soekris/net4801/Makefile
+   and adding the image names and parameters. Search for "extimage-64MB"
+   to find the appropriate parts.
+
+3. Making a bootable Compact Flash
+
+   This is relatively simple if you have a Compact Flash reader/writer on
+   your linux box.  Just uncompress and "dd" the image onto the copact
+   flash.  Depending on your setup something like this should work:
+
+       gunzip < images/net4801-CF-64MB.img.gz | dd of=/dev/sda bs=1024k
+
+   Then insert the Compact Flash into the board and power it up.  The
+   console should appear at 19200.  The password for "root"
+   is "default".
+
+4. Customizing the Build
+
+   Using "make xconfig" in uClinux-dist you can customize the kernel and
+   application configurations. There is a large selection of packages in
+   the application configuration.
+
+   Consult the README file at the top level of uClinux-dist for some more
+   information about configuration and building.
+
+5. Network Upgrades
+
+   You can upgrade the image in the Soekris over the network by running the
+   command:
+
+        netflash -i <ip-of-tftp-server> net4801-CF-XXXMB.img.gz
+
+   Which is much faster than using "dd" to the Compact Flash.
+

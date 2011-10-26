@@ -1,0 +1,69 @@
+file:  README.common.problems
+date:  04-Oct-2000
+revised:  03-Jan-2001, 07-Jan-2001, 04-Apr-2001, 25-May-2001
+
+
+Caution:  All of the LILO components are installed in the proper
+================================================================
+default directories ONLY if you use "make install".
+===================================================
+
+
+Problem:  LILO won't 'make'
+==========================
+If you get errors trying to 'make all', and the errors are occurring
+during the assembly of 'temp2.s', you have encountered the most common
+problem trying to build LILO:  the lines in error all have the assembler
+directive 'near' on them.  This problem occurs when your assembler for
+the real-mode bootstrap code is out-of-date:  'as86'.  Certain current
+distributions of Linux distribute version 4 of this assembler; whereas
+the current version is 15.
+
+Two sources for an updated version are:
+
+Redhat RPM distribution:
+     site: http://www.redhat.com      (search for 'dev86')
+     pkg:  dev86-0.15.0-2.i386.rpm  
+
+or Robert de Bath's page at:
+     site: http://www.cix.co.uk/~mayday
+     link: bin86-0.15.1.tar.gz
+
+
+Problem:  When I boot, all I get is 'LI'
+=======================================
+This means the first-stage loader gained control; it thought it success-
+fully loaded the second-stage loader; but it never got there.  This most
+often occurs when the second-stage loader, '/boot/boot.b', is not load-
+able using the BIOS.
+
+First, have you tried specifying 'lba32' in your 'lilo.conf' file?  On
+newer systems, this will almost always work, since the loader will now
+use the newer EDD packet calls, which are not cylinder-limited.
+
+Second, do you know your disk geometry?  This means, do you know the
+numbers of cylinders/heads/sectors of all your hard drives; and are these
+the numbers that LILO is using when it installs the boot loader.  Three
+reports of the disk geometry may be obtained:
+
+  1.  Run 'lilo -t -v5' and check the geometry reports for each device.
+  2.  Run 'lilo -Tgeom' and see if the same numbers are reported.  (This
+      may fail on some systems, where LILO has trouble running BIOS 
+      calls in v86 mode.)
+  3.  Create the diagnostic floppy (see README.disk) and check the
+      reported disk geometries.
+
+If any of the geometry reports differ, then you may have to specify the
+disk geometry to LILO using 'disk= heads= sectors='.  Use the actual
+numbers reported by the BIOS:  #3 above, or #2.
+
+The reports above will also indicate the BIOS device codes used by each
+disk.  LILO uses heuristics to obtain these device codes, and usually gets
+the codes right on all-IDE or all-SCSI systems.  However, systems with
+multiple IDE controllers, mixed IDE/SCSI systems, and SCSI systems on
+Future Domain controllers, will require you to tell LILO what disks are
+assigned to what device codes.  This can be done using 'disk= bios=' lines
+in 'lilo.conf'.
+
+John Coffman <johninsd@san.rr.com>
+(end)

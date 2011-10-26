@@ -1,0 +1,575 @@
+///
+///	@file 	capiModule.cpp
+/// @brief 	C language interface module
+///
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+//	The latest version of this code is available at http://www.mbedthis.com
+//
+//	This software is open source; you can redistribute it and/or modify it 
+//	under the terms of the GNU General Public License as published by the 
+//	Free Software Foundation; either version 2 of the License, or (at your 
+//	option) any later version.
+//
+//	This program is distributed WITHOUT ANY WARRANTY; without even the 
+//	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+//	See the GNU General Public License for more details at:
+//	http://www.mbedthis.com/downloads/gplLicense.html
+//	
+//	This General Public License does NOT permit incorporating this software 
+//	into proprietary programs. If you are unable to comply with the GPL, a 
+//	commercial license for this software and support services are available
+//	from Mbedthis Software at http://www.mbedthis.com
+//
+/////////////////////////////////// Includes ///////////////////////////////////
+
+#define		IN_C_API_MODULE 1
+
+#include	"http/http.h"
+
+#if BLD_FEATURE_C_API_MODULE
+#if BLD_FEATURE_EGI_MODULE
+#include	"http/modules/egiHandler.h"
+#endif
+#if BLD_FEATURE_ESP_MODULE
+#include	"http/modules/espHandler.h"
+#endif
+#include	"http/capi.h"
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////// CapiModule //////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//	This is called when the capi module is loaded as a DLL
+//
+
+int mprCapiInit(void *handle)
+{
+	if (maGetHttp() == 0) {
+		return MPR_ERR_NOT_INITIALIZED;
+	}
+	new MaCapiModule(handle);
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Register us as a module. No initialization to do
+//
+
+MaCapiModule::MaCapiModule(void *handle) : MaModule("capi", handle)
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MaCapiModule::~MaCapiModule()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// Local Classes ////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+//
+//	Egi Form class for C forms
+//
+class CEgiForm : public MaEgiForm {
+  private:
+	MaEgiCb		egiCallback;
+  public:
+				CEgiForm(char *egiName, MaEgiCb fn);
+				~CEgiForm();
+	void		run(MaRequest *rq, char *script, char *path, char *query, 
+						char *postData, int postLen);
+};
+
+//
+//	Esp class for C Esp functions
+//
+class CEspProc : public MaEspProc {
+  private:
+	MaEspCb		espCallback;
+  public:
+				CEspProc(char *name, MaEspCb fn);
+				~CEspProc();
+	int			run(MaRequest *rq, int argc, char **argv);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// Support C++ Code ///////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+#if BLD_FEATURE_ESP_MODULE
+
+CEspProc::CEspProc(char *name, MaEspCb fn) : MaEspProc(name)
+{
+	espCallback = fn;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+CEspProc::~CEspProc()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int CEspProc::run(MaRequest *rq, int argc, char **argv)
+{
+	rq->setScriptEngine(getScriptEngine());
+	return (*espCallback)(rq, argc, argv);
+}
+
+#endif // BLD_FEATURE_ESP_MODULE
+////////////////////////////////////////////////////////////////////////////////
+#if BLD_FEATURE_EGI_MODULE
+
+CEgiForm::CEgiForm(char *formName, MaEgiCb fn) : MaEgiForm(formName)
+{
+	egiCallback = fn;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+CEgiForm::~CEgiForm()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void CEgiForm::run(MaRequest *rq, char *script, char *path, char *query, 
+	char *postData, int postLen)
+{
+	(*egiCallback)(rq, script, path, query, postData, postLen);
+}
+
+#endif // BLD_FEATURE_EGI_MODULE
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////// C API /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+extern "C" {
+
+int mprCreateMpr(char *appName)
+{
+	new Mpr(appName);
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprDeleteMpr()
+{
+	delete mprGetMpr();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int mprGetFds(fd_set* readInterest, fd_set* writeInterest, 
+	fd_set* exceptInterest, int *maxFd, int *lastGet)
+{
+	return mprGetMpr()->getFds(readInterest, writeInterest, exceptInterest,
+		maxFd, lastGet);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int mprGetIdleTime()
+{
+	return mprGetMpr()->getIdleTime();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int mprIsExiting()
+{
+	return mprGetMpr()->isExiting();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int mprRunTasks()
+{
+	return mprGetMpr()->runTasks();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int mprRunTimers()
+{
+	return mprGetMpr()->runTimers();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprServiceIO(int readyFds, fd_set* readFds, fd_set* writeFds, 
+	fd_set* exceptFds)
+{
+	mprGetMpr()->serviceIO(readyFds, readFds, writeFds, exceptFds);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#if WIN
+
+int mprGetAsyncSelectMode()
+{
+	return mprGetMpr()->getAsyncSelectMode();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprServiceWinIO(int sock, int winMask)
+{
+	mprGetMpr()->serviceIO(sock, winMask);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprSetAsyncSelectMode(int on)
+{
+	mprGetMpr()->setAsyncSelectMode(on != 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprSetHwnd(HWND appHwnd)
+{
+	mprGetMpr()->setHwnd(appHwnd);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprSetSocketHwnd(HWND socketHwnd)
+{
+	mprGetMpr()->setSocketHwnd(socketHwnd);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprSetSocketMessage(int  msgId)
+{
+	mprGetMpr()->setSocketMessage(msgId);
+}
+#endif
+////////////////////////////////////////////////////////////////////////////////
+
+int mprStartMpr(int startFlags)
+{
+	return mprGetMpr()->start(startFlags);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprStopMpr()
+{
+	mprGetMpr()->stop(1);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprServiceEvents(int loopOnce, int maxTimeout)
+{
+	mprGetMpr()->serviceEvents(loopOnce != 0, maxTimeout);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#if BLD_FEATURE_LOG
+
+void mprAddLogFileListener()
+{
+	mprGetMpr()->addListener(new MprLogToFile());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprSetLogSpec(char *logSpec)
+{
+	mprGetMpr()->setLogSpec(logSpec);
+}
+
+#endif
+////////////////////////////////////////////////////////////////////////////////
+
+void mprTrace(int level, char* fmt, ...) 
+{
+	va_list		ap;
+	char		buf[MPR_MAX_STRING];
+	int			len;
+
+	va_start(ap, fmt);
+	len = mprVsprintf(buf, sizeof(buf), fmt, ap);
+	mprLog(level, buf);
+	va_end(ap);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void mprTerminate(int graceful)
+{
+	mprGetMpr()->terminate(graceful == 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MaHttp *maCreateHttp()
+{
+	return new MaHttp();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maDeleteHttp(MaHttp *http)
+{
+	delete http;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maDeleteServer(MaServer *server)
+{
+	delete server;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MaServer *maCreateServer(MaHttp *http, char *name, char *serverRoot)
+{
+	return new MaServer(http, name, serverRoot);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maConfigureServer(MaServer *server, char *configFile, int outputConfig)
+{
+	return server->configure(configFile, outputConfig != 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maGetConfigErrorLine(MaServer *server)
+{
+	return server->getLine();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maStartServers(MaHttp *http)
+{
+	return http->start();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maStopServers(MaHttp *http)
+{
+	http->stop();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#if BLD_FEATURE_ESP_MODULE
+
+int maDefineEsp(char *name, MaEspCb fn)
+{
+	new CEspProc(name, fn);
+	return 0;
+}
+
+#endif
+////////////////////////////////////////////////////////////////////////////////
+#if BLD_FEATURE_EGI_MODULE
+
+int maDefineEgiForm(char *name, MaEgiCb fn) 
+{
+	new CEgiForm(name, fn);
+	return 0;
+}
+
+#endif
+////////////////////////////////////////////////////////////////////////////////
+#if NOT_NEEDED
+
+void maDone(MaRequest *rq, int code) 
+{
+}
+
+#endif
+////////////////////////////////////////////////////////////////////////////////
+
+void maRequestError(MaRequest *rq, int code, char *msg, ...) 
+{
+	va_list		ap;
+	char		buf[MPR_MAX_STRING];
+
+	va_start(ap, msg);
+	mprVsprintf(buf, sizeof(buf), msg, ap);
+	rq->requestError(code, buf);
+	va_end(ap);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+char *maGetFileName(MaRequest *rq) 
+{
+	return rq->getFileName();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#if BLD_FEATURE_COOKIE
+
+char *maGetCookie(MaRequest *rq)
+{
+	return rq->getCookie();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maGetCrackedCookie(MaRequest *rq, char **name, char **value, char **path)
+{
+	rq->getCrackedCookie(name, value, path);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maSetCookie(MaRequest *rq, char *name, char *value, int lifetime, 
+	char *path, bool secure)
+{
+	rq->setCookie(name, value, lifetime, path, secure);
+}
+
+#endif
+////////////////////////////////////////////////////////////////////////////////
+
+void maSetHeader(MaRequest *rq, char *value, int allowMultiple)
+{
+	rq->setHeader(value, allowMultiple != 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maSetResponseCode(MaRequest *rq, int code)
+{
+	rq->setResponseCode(code);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+char *maGetVar(MaRequest *rq, char *var, char *defaultValue) 
+{
+	return rq->getVar(var, defaultValue);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maCreateEnvVars(MaRequest *rq, char *buf, int len)
+{
+	rq->createEnvVars(buf, len);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maRedirect(MaRequest *rq, int code, char *url) 
+{
+	rq->redirect(code, url);
+	rq->flushOutput(MPR_HTTP_FOREGROUND_FLUSH, MPR_HTTP_FINISH_REQUEST);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maSetFileName(MaRequest *rq, char *fileName) 
+{
+	return rq->setFileName(fileName);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maSetVar(MaRequest *rq, char *var, char *value) 
+{
+	rq->setVar(var, value);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maWrite(MaRequest *rq, char *buf, int nChars) 
+{
+	return rq->write(buf, nChars);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maWriteFmt(MaRequest *rq, char* fmt, ...) 
+{
+	va_list		ap;
+	char		buf[MPR_MAX_STRING];
+	int			rc, len;
+
+	va_start(ap, fmt);
+	len = mprVsprintf(buf, sizeof(buf), fmt, ap);
+	rc = rq->write(buf, len);
+	va_end(ap);
+	return rc;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maWriteStr(MaRequest *rq, char *s) 
+{
+	return rq->write(s);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void maSetResult(MaRequest *rq, char *s) 
+{
+	MprEjs	*engine;
+
+	engine = (MprEjs*) rq->getScriptEngine();
+
+	engine->setResult(s);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+char *maGetUserName(MaRequest *rq)
+{
+    return rq->getUser();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+char *maGetUri(MaRequest *rq)
+{
+    return rq->getUri();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maIsKeepAlive(MaRequest *rq)
+{
+   return rq->getFlags() & MPR_HTTP_KEEP_ALIVE;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int maIsEsp(MaRequest *rq)
+{
+   MaHandler* handler = ((MaRequest*) rq)->getCurrentHandler();
+   return (strcmp(handler->getName(), "espHandler") == 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+} //	extern "C"
+
+#else
+void mprCapiModuleDummy() {}
+
+#endif // BLD_FEATURE_C_API_MODULE
+
+//
+// Local variables:
+// tab-width: 4
+// c-basic-offset: 4
+// End:
+// vim:tw=78
+// vim600: sw=4 ts=4 fdm=marker
+// vim<600: sw=4 ts=4
+//

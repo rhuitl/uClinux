@@ -1,0 +1,238 @@
+2002-05-14  Sergey Poznyakoff  <gray@Mirddin.farlep.net>
+
+	* ftp.c: Checks for HAVE_DECL variables must read
+	  #if !HAVE_DECL_something, since AC_CHECK_DECLS always
+	  declares HAVE_DECL, either to 0 or to 1. 	  
+	* extern.h: Likewise.
+	* ftpd.c: Likewise.
+
+2002-04-29  Alfred M. Szmidt  <ams@kemisten.nu>
+
+	* ftpd.c <version.h>: Include removed.
+	(inetutils_package): Renamed to PACKAGE_NAME.
+	(inetutils_version): Renamed to PACKAGE_VERSION.
+	(inetutils_bugaddr): Renamed to PACKAGE_BUGREPORT.
+
+2002-04-21  Alfred M. Szmidt <ams@kemisten.nu>
+
+        * Makefile.am (inetdaemon_PROGRAMS): Use ftpd_BUILD instead of
+        BUILD_FTPD.
+        * extern.h [HAVE_GETUSERSHELL_DECL]: Renamed to HAVE_DECL_GETUSERSHELL.
+        * ftpd.c [HAVE_FCLOSE_DECL]: Renamed to HAVE_DECL_FCLOSE.
+
+2002-02-10  Jeff Bailey  <jbailey@outpost.dnsalias.org>
+
+	* Makefile.am: Add -I$(top_builddir)/include to INCLUDES
+
+	* .cvsignore: Add ftpcmd.c
+
+2001-11-03  Alain Magloire
+
+	* server_mode.c: [DEFPORT] defiine to 21.
+	Fallback to DEFPORT if getservbyname() failed.
+	Lots of site does not configure the /etc/services
+	correctly.
+
+2001-11-02  Marcus Brinkmann  <marcus@gnu.org>
+
+	* ftpd.c (complete_login): Add missing `;'.
+
+2001-10-25  Sergey Poznyakoff
+
+	* pam.c: Provide replacements for PAM_CONV_AGAIN and
+	PAM_INCOMPLETE for systems that miss them (e.g. Solaris)
+
+2001-08-27  Alain Magloire
+
+	* Makefile.am: Add EXTRA_DIST = ftpcmd.c.  To force the
+	generation of the file when doing the distribution.  This way
+	YACC is no longer an requirement.
+
+2001-08-25  Alain Magloire
+
+	* Makefile.am: Check for LIBLS and add it to the link.
+	* popen.c:  WITH_LIBLS check.
+
+2000-10-31  Marcus Brinkmann  <marcus@gnu.org>
+
+	* ftpd.c: Remove PROGRAM, declare __PROGNAME. Remove COPYRIGHT
+	(it's in the header) and "#if 0"-out SCCSID.
+	(usage): Replace PROGRAM with __PROGNAME.
+	(main): Likewise. Also initialize __PROGNAME if not HAVE___PROGNAME.
+
+2000-10-30  Marcus Brinkmann  <marcus@gnu.org>
+
+	* ftpd.c: New variable PROGRAM.
+	(usage): Frob it to behave like the syslogd usage(),
+	so it gives the correct output.
+	(main): Beautify option parsing code (more comments, proper
+	use of usage). Reject unknown options instead ignoring them.
+	Initialize PROGRAM and use it instead of argv.
+
+2000-08-21  Alain Magloire
+
+	The idea is to reduce the number of side effects i.e. reducing the
+	number of global variables.  To help we regroup some of them in a
+	structure call credentials, that is pass around.  The second approach
+	to help detect side effects; when possible the variables are pass by
+	parameter. All the gots of the authentication have move out
+	elsewere(auth.c, pam.c) this will save us from the pesky #ifdef's.
+
+	* ftpd.c: Passwd handling code removed.  PAM code removed.
+	Variables guess, pw, logged_in, remotehost part of
+	the credential structure.
+	(end_login): Take the credential as an argument.
+	(dolog): Likewise.
+	(user): Call auth_user() to do the job.
+	(pass): Call auth_pass() to do the job.
+	(complete_login): Draft support for guest chroot.
+	Do not display passwd part of setproctitle() and syslog() messages.
+	(main): Remove on anonymous-name, was not use.
+	* auth.c: New file.
+	* Makefile.am: PATHDEF_FTPCHROOT in INCLUDES.
+	* logwtmp.c: bzero replaced by memset.
+
+2000-08-11  Alain Magloire
+
+Audit: Coding style to comply to GNU style, cleanup the code
+to be ANSI C, provide the necessary prototypes, reinforce const
+policy for strings, move functions definitions only where
+they are use and make them static scope if possible, variables
+not exported are change to static scope, all function declarations
+are ANSI C and rely on ansi2knr for OS lacking, nuke non-portable
+semantics, POSIX functions/behaviour are followed intead of BSD.
+The definition for setproctitle is remove, this function is to
+machine dependant and we did not get it right, if the OS supplies
+we'll use it.  The approach later will be to provide a fairly
+portable of setproctitle() and get configure to the rigth thing, with
+AC_REPLACE_FUNC (setproctitle).
+
+	* ftpd.c: allow_severity, deny_severity should be guarded
+	with [HAVE_TCPD_H].
+	Move all globals to <extern.h>.
+	Remove [SETPROCTITLE] add [HAVE_SETPROCTITLE]
+	[HAVE_INITSETPROCTITLE], remove setproctitle () definition.
+	(main): SA_LEN () macro not portable remove.
+	Variable "quiet" change for "no_version".
+	(reapchild): Use waitpid ().
+	(user): Remove previous code handling of PAM.
+	and move the relevant pieces to sgetpwnam ().
+	(user): when strncpy ()ing curname make sure we
+	null terminate the string.
+	(user): complete_login () call removed form user ().
+	(delete): Use the portable S_ISDIR () marcro.
+	(main): Don't typecast signal () use SIG_ERR.
+	(display_file): New function.
+	(statcmd): Global variable mode, rename to the
+	more informative stru_mode, it was also shadowing a lot
+	of local variable mode, for fopen ().
+	(main):  Remove initialization of global
+	variables and initialize when defined.
+	(main): New option '-p' to override pid file.
+	(main): Adding SO_KEEPALIVE, to let the tcp/ip stack
+	detect when the connection been drop, IPTOS_LOWDELAY
+	for the control connection and IPTOS_THROUGHPUT for
+	the data connection.
+
+	* ftpcmd.y: Remove definition of yyerror () from ftpd.c
+	and move it to ftpcmd.y, result "cbuf" static scope.
+	Move all globals to <extern.h>.
+	Move declaration of cmdtab[] and sitetab[] to <extern.h>.
+
+	* conf.c: New file, define checkuser () and display_file ().
+
+	* pam.c: New file, define PAM related functions.
+
+	* wrap.c: New file, define TCPD related functions.
+
+	* server.c: New file, move all related standalone function to
+	this module reapchild (), server_mode () and tcpd wrapper handling.
+
+2000-08-10  Michael Vogt <mvo@debian.org>
+
+	* ftpd/ftpd.c: cleaned up PAM code.
+
+2000-07-30  Alain Magloire
+
+	* ftpd.c: protect initgroups() with HAVE_INITGROUPS.
+
+2000-07-30  Michael Vogt <mvo@debian.org>
+
+	* ftpd.c(main): added TCP_WRAPPER support for daemon mode.
+
+2000-07-26  Michael Vogt  <mvo@debian.org>
+
+	* ftpd.c(pass): added pam support.
+
+2000-07-08  Michael Vogt  <mvo@debian.org>
+
+	* ftpd.c(main): added new option "-A" anonymous login only
+	added new option "-q" quiet to  do not print ftpd version.
+
+2000-07-08  Michael Vogt  <mvo@debian.org>
+
+	* ftpd.c(main): added new option "-D" for daemon-mode,
+	ftpd can now run without inetd.
+
+2000-07-07 Alain Magloire
+
+	* ftpd.c(sgetpwnam()): if HAVE_GETSPNAM && HAVE_SHADOW_H, call
+	getspnam() to get the encrypted passwd.
+
+2000-07-06 Michel Vogt
+
+	* popen.c: Instead of spwaning "/bin/ls" use the internal ls
+	from libls.a.
+
+	* ftpd.c: use setproctitle ("%s", protittle);
+
+2000-07-05 Alain Magloire
+
+	* *: Clause 3 removed.
+	excerpt from email with RMS:
+	"UCB has agreed to drop the advertising clause from the license for all
+	BSD software.  The advertising clause is this one:
+
+	3. All advertising materials mentioning features or use of this software
+		must display the following acknowledgement:
+		This product includes software developed by the University of
+		California, Berkeley and its contributors.
+
+	This means that we can delete that paragraph from all files which give
+	the University of California as the only copyright holder."
+
+1999-02-26 Alain Magloire
+
+	The security fixes are gather from different sources:
+	folks of OpenBSD, FreeBSD, Debian, Redhat and wu-ftpd.
+	Heads-up for their nice work.
+
+
+	* popen.c : overflow in argv[] and gargv[] fix.
+
+1999-02-17 Alain Magloire
+
+	* ftpd.c(send_data): Use mmap() if possible, HAVE_MMAP.
+	* extern.h : Add toolong() to be exported.
+	* ftpcmnd.y : toolong() no longer a static function.
+	* ftpd.c : Set the alarm(timeout) when doing an accept() for
+	the data port and use signal(SIGALRM, toolong).
+	* ftpd.c(maing): tzset(), in case no timezone database in ~ftp.
+	* ftpd.c(datacon) : Use snprintf() instead of sprintf() for
+	fix array buffers. Assign *sizebuf ='\0' instead of
+	strcpy (sizebuf, "");
+	* Use xgetcwd() from libinetutils instead of getcwd();
+
+1999-02-13 Alain Magloire
+
+	* ftpcmd.y : PORT command disallow PORT if :
+		- port <= 1023 || data_addr.sin_addr != his_addr.sin_addr
+	This will take care of FTP bounce. See README.sec
+	* ftpcmd.y : PASS clear passwd var(memset) asap.
+	* ftpcmd.y : PASV check if loggin.
+	* ftpcmd.y : RNTO check loggin and free $4 pointer.
+	* ftpcmd.y : HELP free $3 pointer.
+	* ftpcmd.y : SITE free $5 pointer.
+	* ftpcmd.y : RNFR free $4 pointer.
+	* ftpcmd.y : MDTM year 2000 compliant use %04d (tm_year + 1900).
+	* ftpcmd.y : SITE IDLE not permit to disable timeout and check login.

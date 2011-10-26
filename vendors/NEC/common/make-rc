@@ -1,0 +1,129 @@
+#!/bin/sh
+# This script produces an /etc/rc file with some configurable changes
+#
+#  Copyright (C) 2002,03  NEC Electronics Corporation
+#  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
+#
+# This file is subject to the terms and conditions of the GNU General Public
+# License.  See the file "COPYING" in the main directory of this archive
+# for more details.
+#
+# Written by Miles Bader <miles@gnu.org>
+
+# These are the options to use when nfs-mounting the root filesystem
+NFS_OPTS="nolock,timeo=100,retrans=10,rsize=1024"
+# Which directories to create in /var
+VAR_DIRS="tmp log run lock"
+
+
+# The build system screws up the values of string variables so that they
+# include explicit quotes; undo this:
+for var in `printenv | sed -n 's@=".*"$@@p'`; do
+  eval "$var=`printenv $var`"
+  [ x"`printenv $var`" = x"none" ] && eval unset "$var"
+done
+
+# Switch to section $1
+section () { SEC="$1"; }
+# If in a different section than before, output an appropriate comment
+output_section_header ()
+{
+  if [ "$SEC" != "$OLD_SEC" ]; then
+    [ "$OLD_SEC" ] && echo ''
+    echo "# $SEC"
+  fi
+  OLD_SEC="$SEC"
+}
+
+# This just outputs the command string given by the args, preceded by an
+# `echo' of the same, and possibly by a section header.
+# Only the first _arg_ is echoed though, which can be used if the command
+# is complicated to simplify the output.
+init_cmd () { output_section_header; echo echo "init: $1";  echo "$*"; }
+# Like init_cmd, but doesn't echo anything
+invis_init_cmd () { output_section_header; echo "$*"; }
+# Output a variable assignment setting $1 to $2, possibly preceded by a
+# section header.
+param () { output_section_header; echo "$1=\"$2\""; PARAMS="$PARAMS $1"; }
+
+
+#### parameters
+
+section params
+
+# hostname
+[ "$CONFIG_HOSTNAME" ] && param HOST "$CONFIG_HOSTNAME"
+
+# Network params
+if [ "$CONFIG_NET_ADDR" ]; then
+  NET="`echo "$CONFIG_NET_ADDR" | sed 's@\.[^.]*$@@'`"
+  param ADDR "$CONFIG_NET_ADDR"
+  param INTERFACE "${CONFIG_NET_INTERFACE:-eth0}"
+  param NETMASK "${CONFIG_NET_NETMASK:-255.255.255.0}"
+  param BROADCAST "${CONFIG_NET_BROADCAST:-$NET.255}"
+  [ "$CONFIG_NET_GATEWAY" ] && param GATEWAY "$CONFIG_NET_GATEWAY"
+fi
+
+# NFS root param
+[ "$CONFIG_NFSROOT" ] && param NFSROOT "$CONFIG_NFSROOT"
+
+# Export parameters
+[ "$PARAMS" ] && echo "export$PARAMS"
+
+
+#### setup
+
+if [ "$CONFIG_NFS_ROOT_TREE" != y ]; then
+  # A normal host
+  section hostname
+  [ "$CONFIG_HOSTNAME" ] && init_cmd 'hostname "$HOST"'
+fi
+
+section mounts
+init_cmd 'mount -n -t proc proc /proc'
+
+if [ "$CONFIG_NFS_ROOT_TREE" = y ]; then
+  # An nfs-mounted root
+  section chroot_cleanup
+  # Get rid of the old root; we must do this after creating the new /proc
+  invis_init_cmd 'umount /mnt/proc'
+  invis_init_cmd 'umount /mnt'
+fi
+
+if [ ! "$CONFIG_NFSROOT" ]; then
+  section temp_dirs
+  init_cmd 'mount -n -t ramfs ram /var'
+  init_cmd "mkdir `echo "$VAR_DIRS" | sed 's@\<@/var/@g'`"
+  init_cmd 'chmod 01777 /var/tmp'
+fi
+
+if [ "$CONFIG_NFS_ROOT_TREE" != y ]; then
+  if [ "$CONFIG_NET_ADDR" ]; then
+    section net
+    init_cmd 'ifconfig lo 127.0.0.1'
+    init_cmd 'route add -net 127.0.0.0 netmask 255.0.0.0 lo'
+    init_cmd 'ifconfig "$INTERFACE" "$ADDR" netmask "$NETMASK" broadcast "$BROADCAST"'
+    init_cmd 'route add "$ADDR" "$INTERFACE"'
+    [ "$CONFIG_NET_GATEWAY" ] && init_cmd 'route add default gw "$GATEWAY"'
+  fi
+fi
+
+section epilogue
+if [ "$CONFIG_NFSROOT" ]; then
+  section nfsroot
+  invis_init_cmd 'echo init: mounting root from "$NFSROOT"'
+  invis_init_cmd 'if mount -n -o '"'$NFS_OPTS'"' "$NFSROOT" "/mnt"; then'
+  invis_init_cmd '  # chain to the rc file from NFS'
+  invis_init_cmd '  cd /mnt'
+  invis_init_cmd '  pivot_root . mnt'
+  invis_init_cmd '  exec chroot . /bin/init'
+  invis_init_cmd 'fi'
+  invis_init_cmd 'echo init: failed to mount "$NFSROOT"'
+  invis_init_cmd 'echo init: spawning shell...'
+  invis_init_cmd 'sh'
+else
+  invis_init_cmd "echo ''"
+  invis_init_cmd 'cat /etc/motd'
+  invis_init_cmd "echo ''"
+  invis_init_cmd 'cat /etc/version'
+fi

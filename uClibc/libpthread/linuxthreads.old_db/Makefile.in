@@ -1,0 +1,75 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+# Get the thread include dependencies and shared object name
+CFLAGS-linuxthreads.old_db := -DNOT_IN_libc -DLIBPTHREAD_SO="\"libpthread.so.$(MAJOR_VERSION)\""
+
+LDFLAGS-libthread_db.so := $(LDFLAGS_NOSTRIP) $(call check_ld,--warn-unresolved-symbols)
+ifeq ($(DOSTRIP),y)
+LDFLAGS-libthread_db.so += -s
+endif
+
+LIBS-libthread_db.so := $(LIBS)
+
+libthread_db_FULL_NAME := libthread_db-$(VERSION).so
+
+libthread_db_DIR := $(top_srcdir)libpthread/linuxthreads.old_db
+libthread_db_OUT := $(top_builddir)libpthread/linuxthreads.old_db
+
+libthread_db_SRC := $(wildcard $(libthread_db_DIR)/*.c)
+
+libthread_db_OBJ := $(patsubst $(libthread_db_DIR)/%.c,$(libthread_db_OUT)/%.o,$(libthread_db_SRC))
+
+libthread_db-so-y := $(libthread_db_OBJ:.o=.os)
+ifeq ($(DOPIC),y)
+libthread_db-a-y  := $(libthread_db-so-y)
+else
+libthread_db-a-y  := $(libthread_db_OBJ)
+endif
+
+lib-a-$(PTHREADS_DEBUG_SUPPORT) += $(top_builddir)lib/libthread_db.a
+lib-so-$(PTHREADS_DEBUG_SUPPORT) += $(top_builddir)lib/libthread_db.so
+objclean-y += libthread_db_clean
+headers-$(PTHREADS_DEBUG_SUPPORT) += linuxthreads_db_headers
+headers_clean-y += linuxthreads_db_headers_clean
+
+#ifeq ($(DOMULTI),n)
+ifeq ($(DOPIC),y)
+$(top_builddir)lib/libthread_db.so: $(top_builddir)lib/libthread_db.a $(libc)
+else
+$(top_builddir)lib/libthread_db.so: $(libthread_db_OUT)/libthread_db_so.a $(libc)
+endif
+	$(call link.so,$(libthread_db_FULL_NAME),1)
+#else
+#$(top_builddir)lib/libthread_db.so: $(libthread_db_OUT)/libthread_db.oS | $(libc)
+#	$(call linkm.so,$(libthread_db_FULL_NAME),1)
+#endif
+
+$(libthread_db_OUT)/libthread_db_so.a: $(libthread_db-so-y)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+$(libthread_db_OUT)/libthread_db.oS: $(libthread_db_SRC)
+	$(Q)$(RM) $@
+	$(compile-m)
+	$(do_t_strip)
+
+$(top_builddir)lib/libthread_db.a: $(libthread_db-a-y)
+	$(Q)$(INSTALL) -d $(dir $@)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+linuxthreads_db_headers:
+	$(Q)$(LN) -sf ../$(PTDIR)_db/thread_db.h $(top_builddir)include/
+
+linuxthreads_db_headers_clean:
+	$(RM) $(top_builddir)include/thread_db.h
+
+libthread_db_clean:
+	$(RM) $(libthread_db_OUT)/*.{o,os,oS,a}

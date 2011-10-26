@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# faxmemo <memo-text> <faxnr> [page file(s)]
+# 
+# Similar to "faxspool(1)", except that the file "memo-text" will be
+# put on the *cover* page. For that to work, you need a cover page
+# program that understands the "-m <file>" switch (look at my sample
+# coverpg.ps).
+#
+# The length of the memo file is limited to 18 lines.
+#
+#
+# this is the cover page to use for memo. Faxspool will call
+# "$COVER_PAGE -m <memo-text> <standard options as of coverpg(1)>
+#
+COVER_PAGE=/usr/local/lib/mgetty+sendfax/make.coverpg
+
+if [ $# -lt 2 ]
+then
+    echo "usage: $0 <memo-text> <fax-number> [file(s)]" >&2
+    exit 1
+fi
+
+MEMO=$1 ; shift
+
+if [ ! -f $MEMO ]
+then
+    echo "$0: $MEMO: no such file or directory" >&2
+    exit 2
+fi
+if [ ! -r $MEMO ]
+then
+    echo "$0: $MEMO: permission denied" >&2
+    exit 3
+fi
+
+if [ `wc -l <$MEMO` -gt 18 ]
+then
+    echo "$0: $MEMO: too long, won't fit on cover page (18 lines max)" >&2
+    exit 4
+fi
+
+# faxspool cd's, so make $MEMO contain a full path
+case $MEMO in
+    /*) ;;
+    *) MEMO=`pwd`/$MEMO ;;
+esac
+
+echo "faxspool -C \"make.coverpg -m $MEMO\" $@"
+#faxspool -C "./make.coverpg -m $MEMO" "$@"
+faxspool -C "$COVER_PAGE -m $MEMO" "$@"

@@ -1,0 +1,74 @@
+\subsection{017: integrate IPsec and firewall policy into Security Policy.}
+
+\subsubsection{017: Definition of requirement }
+
+To provide industrial-strength security, the IPsec Security Policy Database
+should be integrated with the regular Linux firewalling facilities,
+specifically into the Netfilter/IPtables code. 
+
+Integration provides a single place to express policy.
+It prevents duplication of code: this is both a savings in physical
+quantities (kernel time and code space) as well as a reduction in
+opportunities for errors.
+
+\subsubsection{017: response}
+
+This is a core design requirement for KLIPS3.
+
+As I said at OLS (see Claudia's notes, posted to this list at 11:04 AM 
+8/1/01 -0400)...  Any form of IPsec *requires* proper firewall rule 
+management.  IPsec security is (and always has been, and always will be) 
+totally dependent on this.
+
+People think that bringing up a tunnel creates security.  This is 
+diametrically wrong.  Real life is always a tradeoff between security and 
+functionality.  A tunnel creates new functionality;  it creates a new path 
+for packets to flow.  Security comes when AND ONLY WHEN you close down the 
+old insecure paths.
+
+The IPsec rfcs require IPsec to have a Security Policy Database.  "The form 
+of the database and its interface are outside the scope of this 
+specification."  according to section 4.4.1 in
+   http://www.ietf.org/rfc/rfc2401.txt
+
+But some nontrivial semantics is required.  Just bringing up a tunnel (a 
+"virtual wire") is !not! sufficient to comply with the letter or the spirit 
+of this rfc.  IPsec !must! provide the IPsec-administrator with some means 
+to express a security policy that cuts off the bad old insecure paths.
+
+The tricky part comes when we try to integrate the tunnel-related policies 
+with whatever other policies the admin might have in mind.
+
+=======
+
+To look at it from a slightly different viewpoint:  Everybody who installs 
+freeswan will be able to express an ultra-vague ultra-high-level security 
+objectives:  they want all the good things to happen, and they want none of 
+the bad things to happen, whatever that means.
+
+At the ultra-low level, the kernel provides some tools for allowing and 
+disallowing various packet flows based on various criteria.
+
+The problem is that there is a huge disconnect between the high-level 
+objectives and the low-level tools.  The low-level stuff has a lot of 
+changeable details:
+  -- the details change on boot up:  rc.d/init.d/network start
+  -- the details change on card insertion:  pcmcia/network start $dev
+  -- the details change when DHCP runs....
+  -- the details change when tunnels go up and down...
+  -- the details might depend on what our routing daemons are telling us.
+
+  *) Making this work is a royal pain in the neck or worse.
+  *) Making it work robustion for redhat AND debian AND suse, etc. is an 
+even bigger pain.
+... but in my humble opinion this is a REQUIRED part of any real-world 
+IPsec implementation.
+
+The freeswan project has taken quite a firm stand on some other 
+security-related issues such as single-DES.  I hope it will take an equally 
+firm stand on implementing an industrial-strength Security Policy 
+Database.  Single-DES is a joke, suitable for hobbyists only.  Tunneling 
+without firewalling (etc.) is in the same category.
+
+
+

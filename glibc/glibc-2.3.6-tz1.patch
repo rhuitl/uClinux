@@ -1,0 +1,61 @@
+--- glibc-2.3.6/time/tzset.old	2004-12-07 08:50:41.000000000 +1000
++++ glibc-2.3.6/time/tzset.c	2008-09-10 20:08:39.000000000 +1000
+@@ -21,10 +21,12 @@
+ #include <bits/libc-lock.h>
+ #include <stddef.h>
+ #include <stdio.h>
++#include <stdio_ext.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <time.h>
+-
++#include <unistd.h>
++#include <sys/stat.h>
+ 
+ #define NOID
+ #include <timezone/tzfile.h>
+@@ -160,6 +162,29 @@
+ 
+   /* Examine the TZ environment variable.  */
+   tz = getenv ("TZ");
++  if (tz == NULL) {
++    /* Load our TZ file from our sysconfig directory */
++    struct stat64 st;
++    FILE *ptzf;
++    
++    /* Stat the file to make sure it exists, and to get the size of the TZ string */
++    if (stat64(POSIX_TZ_FILE, &st) == 0) {
++      if (st.st_size > 256)
++        return;
++      /* After we've checked we're not going to smash our stack, allocate */ 
++      tzbuf = __alloca(st.st_size + 1);
++      /* Open the file, and read a line. That is all the file should contain */
++      if ((ptzf = fopen(POSIX_TZ_FILE, "r")) != NULL) {
++        /* No threads reading this stream.  */
++        __fsetlocking (ptzf, FSETLOCKING_BYCALLER);
++        if (fgets_unlocked(tzbuf, st.st_size, ptzf) != NULL) {
++          tz = tzbuf;
++        }
++        fclose(ptzf);
++      }
++    }
++  }
++          
+   if (tz == NULL && !explicit)
+     /* Use the site-wide default.  This is a file name which means we
+        would not see changes to the file if we compare only the file
+@@ -192,12 +217,12 @@
+   if (old_tz != NULL)
+     free (old_tz);
+   old_tz = tz ? __strdup (tz) : NULL;
+-
++#if 0
+   /* Try to read a data file.  */
+   __tzfile_read (tz, 0, NULL);
+   if (__use_tzfile)
+     return;
+-
++#endif
+   /* No data file found.  Default to UTC if nothing specified.  */
+ 
+   if (tz == NULL || *tz == '\0'

@@ -1,0 +1,21 @@
+#!/bin/sh
+
+rm /etc/config/*
+cp /etc/default/* /etc/config/
+fdisk /dev/sda <<EOF
+o
+n
+p
+1
+
+
+w
+EOF
+mke2fs /dev/sda1
+mount -o noatime /dev/sda1 /home
+cd /home
+wget -O - http://10.46.2.14/~pauli/public_music.tar | tar xf -
+tune2fs -c 0 -i 0 -j /dev/sda1
+sync
+sync -f
+reboot

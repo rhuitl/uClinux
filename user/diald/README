@@ -1,0 +1,148 @@
+The Diald README File
+
+----------------------------------------------------------------------------
+
+This is release 0.16 of diald.
+
+Diald is a daemon that provides on demand IP links via SLIP or PPP. The
+purpose of diald is to make it transparently appear that you have a
+permanent connection to a remote site. Diald sets up a "proxy" device which
+stands in for the physical connection to a remote site. It then monitors the
+proxy, waiting for packets to arrive. When interesting packets arrive it
+will attempt to establish the physical link to the remote site using either
+SLIP or PPP, and if it succeeds it will forward traffic from the proxy to
+the physical link. As well, diald will monitor traffic once the physical
+link is up, and when it has determined that the link is idle, the remote
+connection is terminated. The criteria for bringing the link up and taking
+it down are configurable at run time, and are based upon the type of traffic
+passing over the link.
+
+Getting Diald
+
+The file is called diald-0.16.tar.gz. I've uploaded it to
+sunsite.unc.edu:/pub/Linux/Incoming. It should move to
+sunsite.unc.edu:/pub/Linux/system/Network/serial after a suitable interval.
+It can also be obtained from the diald home page at
+"http://www.dna.lth.se/~erics/diald.html". Note that the diald home page has
+moved from its old location at the University of Toronto.
+
+Mailing List
+
+David S. Miller provides a mailing for the discussion of diald on his
+Majordomo server at vger.rutgers.edu. Send mail containing the line
+"subscribe linux-diald" in the BODY of the message to
+Majordomo@vger.rutgers.edu to join the list. Send mail with the word "help"
+in the body to get help on the correct use of the Majordomo list server.
+Announcements of new releases are made on the mailing list, and its a good
+place to ask questions of users who already have diald up and running. I
+would prefer the mailing list to be my primary channel of communication with
+users. This gives you the added benefit of asking your questions of everyone
+on the list, many of whom may have the same question, or some of who may
+have already solved your problem. This minimizes the time I have to spend
+answering questions about diald, and gives me more time to spend improving
+the program. Let me repeat that. Please, if at all possible, use the mailing
+list to ask questions! I read the list every day, sometimes more than once,
+and your question will not be answered any more quickly if it is sent
+directly to me, in fact, if I don't see the answer to your question right
+away, then it may just get filed until I have time to deal with it. Someone
+on the mailing list will probably be able to suggest a solution to your
+problem well before that.
+
+The mailing list is being archived by Jeremy Hall . Copies of the archive
+can be obtained at ftp://rex.isdn.net/pub/diald. Currently the archives are
+updated once a month.
+
+FAQ
+
+There is a copy of the FAQ distributed with the diald release in the
+subdirectory "doc". This is the version that was current when the diald
+release was packaged. This may not be the most up to date version of the
+FAQ. The most up to date version can always be obtained from the diald home
+page. (See "Getting Diald" for the address of the home page.)
+
+Before Installation
+
+You must have SLIP devices in your kernel in order to use diald, EVEN IF YOU
+PLAN TO USE ONLY PPP CONNECTIONS! Let me repeat that, diald needs SLIP to
+work under all circumstances. It uses a SLIP link on a pseudo terminal to
+create the proxy device that stands in for the real connection. Naturally,
+if you plan on using diald to establish PPP connections, you must also have
+PPP devices in your kernel. You must also have a program like "chat" to do
+dialing.
+
+Configuring Diald
+
+Various pathnames that diald needs to know can be configured in "config.h".
+Edit this file appropriately. The eventual installation location for the
+diald binaries, the man pages and the diald definitions files can be
+configured in the Makefile.
+
+Basic Installation (First Time Users)
+
+First run "make depend" then "make" and then "make install" as root. This
+makes the diald daemon and installs it. After installation you need to write
+a /etc/diald.conf file to be able to use diald. Read the manual page to find
+out what this file can contain. The diald-examples manual page gives several
+example diald.conf files.
+
+Installation If You Are Already Using an Earlier Version
+
+Unlike previous releases of diald, the basic installation procedure no
+longer installs an /etc/diald.conf file. Therefore, you can follow the same
+installation procedure as for first time users (above). The set of standard
+filters rules is now located in "/usr/lib/diald/standard.filter". This used
+to be installed as /etc/diald.conf. If you want, you can now include this
+file into your /etc/diald.conf file with the new "include" directive. If you
+wish to change the rules in this file you should just copy them into another
+file and edit them as desired. You can either place rules directly in
+/etc/diald.conf, or put then in another file that is included by
+/etc/diald.conf. In any case, the syntax of the filter rules has not changed
+between diald 0.14 and diald 0.15, so you should be able to continue using
+your old /etc/diald.conf file. If you want to use a particuarly old
+/etc/diald.conf file you may need to update some of the contents as the
+names and meanings of various commands have evolved a little over time. In
+particular a major change in syntax took place between version 0.3 and 0.4
+and a change in semantics took place between version 0.7 and 0.8 and again
+between 0.10 and 0.11. See the CHANGES file for more information. If you are
+planning to use diald with a kernel numbered 1.3.75 or greater, then you
+MUST compile diald using the include files for that kernel.
+
+Using Diald
+
+There are several manual pages that cover the use of diald. The "diald"
+manual page is the basic reference manual for diald. It will point you at
+other relevant manual pages. Of particular interest will be the
+"diald-examples" manual page, which will help you get diald configured. You
+might also want to look at the contents of the "contrib" directory in this
+distribution.
+
+Bugs, Limitations and Warnings
+
+There are some known problems and limitations.
+
+Lines in options files can contain at most 1024 characters. Longer lines are
+silently truncated.
+
+If there are no filter rules specified then no packets will be matched and
+the daemon won't do anything. It should probably match all packets by
+default in this case.
+
+Diald attempts to automatically adjust the MTU of the proxy to match the MTU
+of the actual connection negotiated by ppp, but this is not guaranteed to
+work, since changing the MTU on an active interface is not supported by the
+kernel. It is possible that an auto adjusted MTU will cause some long
+packets to get dropped on the floor. If you are having problems you should
+match these values manually. Diald will report the negotiated MTU in the
+system logs and warn you that you should adjust the settings.
+
+The monitor command represents a security risk as anyone who has access to a
+diald control fifo can ask diald to write to any named pipe in the system.
+Be careful with the permissions on your fifo's.
+
+Please send bug reports, patches or suggestions for improvements to me,
+preferably via the mailing list.
+
+Eric Schenk
+Eric.Schenk@dna.lth.se
+
+Lund, Sweden, January 28th, 1997.

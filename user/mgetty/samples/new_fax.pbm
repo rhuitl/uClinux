@@ -1,0 +1,46 @@
+#!/bin/sh
+# From:	michael@hal6000.thp.uni-duisburg.de (Michael Staats)
+# Subject: Re: Fax notify without in/output redirection?
+# To:	mgetty@greenie.muc.de
+#
+# Now that looks really like a problem for a shell, not C. Look at my
+# faxnotifier, it does almost the same thing you want, but I think a
+# little easier....
+
+# first notify some people directly....
+for i in michael root; do
+	{ echo "A new fax has been received..."
+	  echo "Hangup Code:      $1"
+	  echo "Remote Id:        $2"
+	  echo "Pages:            $3"
+	  echo "1st Filename:     $4"
+	} |write $i 2>/dev/null # ignore errors if someone is not logged on
+done
+
+shift 3
+case $1 in
+ */faxn|faxn*|*/fn*|fn*) STRETCH=-s ;; # find out resolution
+ *) STRETCH=
+esac
+
+# convert fax files to pbm, and compress them
+
+id=
+for i in $@
+do
+  /usr/local/bin/g32pbm $STRETCH $i | compress > $i.pbm.Z
+  # our compress is faster than gzip, so use this here.
+  # this make preview faster....
+  [ $? -eq 0 -a -f $i.pbm.Z ] && /bin/rm -f $i
+  id="$id $i.pbm.Z"
+done
+  
+[ "$id" ] && echo "$id" > /usr/spool/fax/incoming/.lastid
+exit 0
+
+-- 
+Michael Staats, Theoretical Physics, Uni-GH Duisburg 
+email: michael@hal6000.thp.Uni-Duisburg.DE
+<a href="http://WWW.thp.Uni-Duisburg.DE/">Click</a> me!
+<a href="http://WWW.thp.Uni-Duisburg.DE/cuaix/cuaix.html">A c.u.aix archive</a>
+

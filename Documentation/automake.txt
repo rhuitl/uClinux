@@ -1,0 +1,112 @@
+
+automake.inc provides a simple mechanism for downloading/patching/building
+and installing packages within the uClinux-dist framework.
+
+How to use it is documented below by example.
+
+Using this build system requires a working net connection (at least for the
+first time you turn on a package in the build).  All downloaded files will
+be stored in ~/.downloads. If you want to share downloads to save bandwidth
+or time you can copy this directory or mount it as a shared filesystem.  It
+is just a directory of files.
+
+For this example we will work through the steps needed to add a package
+called "mypkg":
+
+1) Create user/mypkg
+
+2) Add user/mypkg/Makefile
+
+      URL = http://mypkg.net/downloads/mypkg-1.2.tar.gz
+      include $(ROOTDIR)/tools/automake.inc
+
+   or if you want to build more than one package:
+
+      mkpkg-1.2_URL   = http://mypkg.net/downloads/mypkg-1.2.tar.gz
+      yourpkg-2.3_URL = http://yourpkg.net/downloads/yourpkg-2.3.tar.gz
+
+      AUTOMAKE_y = mypkg-1.2 yourpkg-2.3
+
+      include $(ROOTDIR)/tools/automake.inc
+
+3) Put your patches in user/mypkg/patches/.
+
+   Patches can be of the form:
+
+      mypkg-1.2-fix-strcpy.patch
+      mypkg-1.2-more-fixes.patch
+
+   or in quilt format with a "series" files listing the patches in the order
+   the need to be applied.
+
+   Patches should apply with -p1 from the top directory in the extracted
+   tarball.
+
+4) Run "make oldconfig" which will let you enable your new application in
+   the build.
+
+5) try building ;-),  if you have already built a full tree you can just
+   run:
+
+      make user/mypkg_only
+
+   or run "make" from the top level.
+
+6) Customising your new package.
+
+   Extra variables you can add to your makefile to customise how the package
+   is built,  followed by an example.
+
+   <pkg>_CONFOPTS - configure options needed to build package
+
+      mypkg-1.2_CONFOPTS = --with-installed-zlib
+
+   <pkg>_CONFVARS - env vars passed to configure to override settings
+
+      mypkg-1.2_CONFVARS = ac_cv_func_posix_getpwuid_r=yes
+
+   <pkg>_CFLAGS   - CFLAGS needed to build package
+
+      mypkg-1.2_CFLAGS = -DPTYS_ARE_GETPT=1
+
+   <pkg>_BUILDDIR - if the subdir to build in isn't <pkg> after extraction,
+                    patches apply -p1 within this directory.
+
+      mypkg-1.2_BUILDDIR = mypkg/src
+
+   <pkg>_MAKEVARS - variables to force when making
+
+      mypkg-1.2_MAKEVARS = LIBS=-lintl
+
+   <pkg>_ROMFS - package specific romfs make target to be run after default
+                 romfs target
+
+   AUTOMAKE_ROMFS - override the main romfs target,  you have complete
+                    control.
+
+   Most of these can be used in the short version if you are only building 
+   one package (ie., BUILDDIR, MAKEVARS).
+
+   You can also add your own Kconfig file if you want fine grained config
+   control.  If you do not provide a Kconfig a simple version will be
+   created for you automatically at config time.  If you do add your own
+   Kconfig file then you must include a top level config option to build
+   your new directory, for example, a Kconfig for a packge with one extra
+   option:
+
+      config USER_MYPKG
+      bool "mypkg"
+      help
+         This is mypkg
+
+      config USER_MYPKG_OPTION
+      bool "mypkg: simple option"
+      depends on USER_MYPKG
+      default n
+      help
+         Change the mypkg build in some useful way.
+
+   If you add your library/application to the "lib" directory,  then change
+   all occurances of of the text USER in the above example to LIB.
+
+Copyright (C) 2009 David McCullough <davidm@uclinux.org>

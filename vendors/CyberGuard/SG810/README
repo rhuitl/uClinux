@@ -1,0 +1,79 @@
+How to start using the SG810 development image
+------------------------------------------------
+
+These instructions document how to install the SG810 image onto a 
+compact flash card, with intent to be used on the Nexgate NSA1086 
+hardware.
+
+Requirements:
+
+ * A 64MB or 128MB compact flash card,
+ * A copy of SG810-CF-64MB.bin.gz or SG810-CF-128MB.bin.gz depending 
+       your CF card size,
+ * A Linux system with CF writer.
+
+1. WRITING THE IMAGE
+
+The SG810 image is simply a CF disk image that has been compressed 
+using gzip. All we essentially need to do is write the decompressed 
+image directly onto the card.
+
+SG development uses a USB CF writer to write to the CF cards. Using 
+this setup first connect the CF card writer to the linux system and 
+then look at the system log to see where the CF card has been mapped.
+
+On my RedHat 9 system I see the following messages appear when I 
+connect the CF writer to my host:    
+
+    hub.c: new USB device 00:02.0-3, assigned address 2
+    usb.c: USB device 2 (vend/prod 0x58f/0x9321) is not claimed by any 
+    active driver.
+    SCSI subsystem driver Revision: 1.00
+    Initializing USB Mass Storage driver...
+    usb.c: registered new driver usb-storage
+    scsi0 : SCSI emulation for USB Mass Storage devices
+      Vendor: Generic   Model: USB CF Reader     Rev: 2.00
+      Type:   Direct-Access                      ANSI SCSI revision: 02
+    WARNING: USB Mass Storage data integrity not assured
+    USB Mass Storage device found at 2
+    USB Mass Storage support registered.
+    Attached scsi removable disk sda at scsi0, channel 0, id 0, lun 0
+    SCSI device sda: 125440 512-byte hdwr sectors (64 MB)
+    sda: Write Protect is off
+     sda: sda1
+
+The last line, "sda: sda1", tells that the CF card has been mapped to
+/dev/sda.
+
+Next, you need to decompress and write the correct image to the CF
+card. The following commands assume you are using a 64MB CF card,
+if you have a 128MB card subsistute SG810-CF-128MB.bin for 
+SG810-CF-64MB.bin:
+
+    gunzip SG810-CF-64MB.bin.gz
+    su -c "dd if=SG810-CF-64MB.bin of=/dev/sda"
+
+Make sure that the "sda" in "/dev/sda" matches up with the the line 
+you saw above in the system log.
+
+3. BOOTING THE IMAGE
+
+If you are using the NSA1086, first check that the CF card is set to
+be the IDE master by connecting a jumper across pins 1 and 2 on J18 
+(as referred to in the NSB1086 Quick Reference Guide). Install the CF
+card with the SG810 image into the CF slot on the NSA1086. 
+
+The SG810 image can be used with either a vga or a serial console. 
+
+If you have monitor and keyboard connected to the NSA1086 during boot
+then after the BIOS messages are displayed, a standard LILO prompt 
+will be displayed on screen. Typing 'vga' at this prompt will
+configure the boot to use the monitor as the system console. 
+
+If 'serial' is typed, or if a 15 second timeout expires, then a serial
+port at the front of the unit will be used as a system console. In 
+this case a PC with a null-modem cable and terminal emulation 
+software can be connected at 9600 baud to see the console output.
+
+The system should then boot as a SG unit. 
+ 

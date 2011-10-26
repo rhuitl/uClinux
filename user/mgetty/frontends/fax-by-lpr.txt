@@ -1,0 +1,266 @@
+Date: Tue, 24 Sep 1996 21:47:52 +0200
+Message-Id: <199609241947.PAA25941@enhanced.com>
+From: Camm Maguire <camm@enhanced.com>
+To: gert@greenie.muc.de
+Subject: Remote printing to mgetty+sendfax
+Reply-To: cmaguire@enhanced.com
+
+
+Greetings, and thank you for this wonderful package!  We're using
+vgetty now as a voice/fax machine, and have lpr setup to remotely
+print out faxes via faxspool.  I recently offered to share my lpr
+scripts on one of the Linux newsgroups, and have received quite a few
+replies.  I therefore thought that these scripts might somehow be
+useful to you, either now or in future distributions of the package.
+These scripts really aren't very professional, but work just fine.  I
+am so grateful for mgetty+sendfax that I just wanted to contribute
+something back, however small.
+
+Taks Care!
+
+-- 
+cmaguire@enhanced.com				      Camm Maguire
+==================================================================
+"The earth is one country, and mankind its citizens."  Baha'u'llah
+
+=============================================================================
+Greetings!  To all who requested my scripts for printing to
+mgetty+sendfax, here they are.  These could certainly be polished, but
+they work just fine.  They assume that faxspool is already set up to
+print text and postscript files with a coverpage.  
+
+Basically, I just set up a standard filter shell script called tf.
+This script uses the 'file' command to determine how to process its
+input.  The script was written this way so that it could also serve as
+a filter for our other printers here, thereby lowering our
+administrative overhead.  You can therefore simplify it quite a bit if
+you only intend to use it for a fax modem.  I've added some comments
+to the script to clarify what's going on.  
+
+
+The only unusual item about this setup is that the printcap
+entry forces a "short banner" to be printed to the file "foo" in the
+spool directory.  This spool directory must therefore be writable by
+user 'lp'.  The tf script then reads the "foo" file to parse the
+command line arguments given to lpr.  Hence, lpr -P<printername>
+-C<name>@<phonenumber> <text or postscript filename> sends the
+specified file to <name> at <phonenumber> via lpr/faxprinter
+<printername>.  If you've setup your faxaliases or $HOME/.faxnrs
+database in mgetty+sendfax, then you can also use lpr -P<printername>
+-C<short name in fax database> <filename> to do the trick.  
+
+This system queues faxes as user 'bin', the user lpr uses to run the
+filter script.  Therefore, they can only be canceled by root.  The
+only way around this that I can see is to change your bin and daemon
+user and group definitions, as faxspool will only allow user 'daemon'
+to queue jobs under a different user ID.  I didn't want to fool with
+this here, but you might.  
+
+The host running mgetty+sendfax here is called 'love'.  The spool
+directory name is "lpf1".  You will have to create empty files "foo"
+and "lf" in this directory, as well as copy the files "tf" and "param"
+to this directory with the permissions as shown.  The other files are
+created automatically by the printing system.  
+
+The relevant entries in /etc/printcap are also shown.   Printer "lf"
+will print to this faxmodem from any site on our network, while
+printer "lpf1" only works locally.
+
+Here are the relevant files and directory listings:
+
+=============================================================================
+/etc/printcap entries:
+=============================================================================
+    #
+    # love remote fax 
+    # 
+    lf|love_fax:\
+	    :lp=:\
+	    :rm=love:\
+	    :rp=lpf1:\
+	    :sd=/usr/spool/lf:\
+	    :sh:\
+	    :mx#0: 
+    # 
+    # Local Fax printer 
+    # 
+    lpf1:\
+	    :lp=/usr/spool/lpf1/foo:\
+	    :sd=/usr/spool/lpf1:\
+	    :lf=/usr/spool/lpf1/lf:\
+	    :sb:\
+	    :if=/usr/spool/lpf1/tf:\
+	    :mx#0:
+=============================================================================
+ls -l /var/spool:
+=============================================================================
+  /var/spool:
+  drwxrwxrwx   2 lp       lp           1024 Sep 23 13:03 lpf1
+  etc.
+=============================================================================
+ls -l /var/spool/lpf1:
+=============================================================================
+  /var/spool/lpf1:
+  total 11
+  -rw-r--r--   1 root     root            3 Sep 23 19:34 lock
+  drwxrwxrwx   2 lp       lp           1024 Sep 23 13:03 .
+  -rw-rw-rw-   1 bin      root            0 Sep 23 13:02 foo
+  -rw-rw-r--   1 root     root           27 Sep 23 13:02 status
+  -rw-rw-rw-   1 bin      root           68 Sep 23 13:02 foo.26246
+  -rw-rw-r--   1 lp       lp           2021 Sep 13 07:55 lf
+  drwxr-xr-x  33 root     root         1024 Aug 22 22:29 ..
+  -rw-rw-r--   1 lp       lp             35 Aug 20 17:04 param
+  -rwxrwxr-x   1 lp       lp           2062 Aug 20 16:58 tf
+=============================================================================
+File tf:
+=============================================================================
+#!/bin/sh
+
+PATH=/usr/local/bin:/usr/bsd:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/X11/bin:/usr/andrew/bin:/usr/openwin/bin:/usr/games:.
+
+# This has to be done very carefully, because the spooling system
+# can be writing banners to foo at unexpected times.
+
+j=`ls -1rt foo* |tail -1l`
+mv $j foo.$$
+for i in `ls -1 foo*|grep -v foo.$$`; do
+	rm $i
+done
+touch foo
+sleep 10
+
+q=`tail -2l foo.$$ |head -n 1 |awk '{print $1}'`
+q1=`echo $q | awk '{j=index($1,"@"); if (j==0) print "none"; else print substr($1,1,j-1);}'` 
+q2=`echo $q | awk '{j=index($1,"@"); k=index($1,":");  print substr($1,j+1,k-j-1);}'`
+
+# This is only needed if you want to have underscores in your "name"
+# variable and use TeX to format your coverpage.  Otherwise, you can
+# use q1 for q3.
+
+q3=`echo $q1 |sed 's/\_/\\\_/g'`
+
+i=tf.$$
+cat >$i
+
+d=`pwd | sed 's/usr//g' | sed 's/var//g' | sed 's/spool//g' | sed 's/\///g' `
+j=`file $i`
+
+MAILU=$5
+
+# You can ignore this here, I have two usernames under which I receive
+# mail
+
+if test X$5 = "Xcamm" && test X$7 = "Xwisdom"; then
+	MAILU=cmaguire
+fi
+if test X$5 = "Xcamm" && test X$7 = "Xlove"; then
+	MAILU=cmaguire
+fi
+
+
+DEST=""
+if test $q3 = "none"; then
+	true;
+else
+	DEST=" -D $q3"
+fi
+
+# These are primarily used for real printers, but they're put in here
+# for compatibility
+
+GDEV=`grep GDEV param | awk '{print $2}'`
+RES=`grep RES param | awk '{print $2}'`
+NP=`grep NP param | awk '{print $2}'`
+ODEV=`grep ODEV param | awk '{print $2}'`
+NL=`grep NL param | awk '{print $2}'`
+
+# Obviously, only the first entry in the following two case statements
+# will apply for the fax printer
+
+case $d in 
+
+	lpf*)	FILTER="cat "
+
+	;;
+	
+	*)		
+		case $j in
+			*ost?cript*) 	FILTER="gs -sDEVICE=$GDEV -r$RES -sOutputFile=- -q - ";;
+			*text*) 	
+					cat <<EOF >textprint
+					awk 'BEGIN {i=0;printf("%c%c",'\013','\010')} 
+						{i++;printf("%s\r\n",\$0);
+						if (i==$NL) 
+						{i=0;printf("%c%c%c",'\012','\013','\010')}} 
+						END {printf("%c",'\012')}'
+EOF
+					chmod +x textprint
+					FILTER="textprint $NL";;
+
+			*) 		FILTER="cat "
+		esac
+	;;
+
+esac
+
+case $d in 
+
+	lpf*)	OUT="faxspool -q $DEST -f $MAILU -F $5 $q2 - "
+
+	;;
+	
+	lpp*)	OUT="cat"
+
+	;;
+
+	lpn*)	OUT="nprint -S INTECH -q $NP -U supervisor -P *us#1 -"
+
+	;;
+
+esac
+
+if cat $i | $FILTER | $OUT >$ODEV; then
+	true;
+else
+
+# You can certainly come up with more friendly error reporting!
+
+	echo Print error: >tf.err
+	echo i=$i >>tf.err
+	echo d=$d >>tf.err
+	echo j=$j >>tf.err
+	echo q=$q q3=$q3 q2=$q2 >>tf.err
+	echo FILTER=$FILTER >>tf.err
+	echo OUT=$OUT >>tf.err
+	echo ODEV=$ODEV >>tf.err
+	echo >>tf.err
+	cat tf.err | mail $MAILU -s PrintError 
+	rm tf.err
+fi
+
+if test -r textprint; then
+	rm textprint
+fi
+
+rm $i
+exit 0
+=============================================================================
+File params:
+=============================================================================
+GDEV 
+RES 
+ODEV /dev/null
+NP 
+NL 63
+=============================================================================
+
+If you have any questions, please feel free to write!  
+
+Good Luck!
+
+-- 
+cmaguire@enhanced.com				      Camm Maguire
+==================================================================
+"The earth is one country, and mankind its citizens."  Baha'u'llah
+
+

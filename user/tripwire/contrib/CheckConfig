@@ -1,0 +1,31 @@
+#!/bin/sh
+# "analyze" a config file 
+#
+# Lance Bailey <lrb@ctrg.rri.uwo.ca>
+#
+
+if [ ".$1" = ".-v" ];then verbose="yes";shift
+else verbose="";fi
+
+file="$1"
+
+sed -e "s/#.*//" \
+    -e "/^$/d" \
+    -e "s=[^/]*\(/[^ 	]*\).*=\1=" \
+    $file |
+    while read line
+    do if [ ! -s $line ];then
+           if [ $verbose ];then echo ${line}:	not found;fi
+           continue
+       fi
+    
+       case `ls -ld $line` in
+           d*) if [ $verbose ];then echo "${line}:	directory";fi ;;
+           l*) echo "${line}:	symlink";;
+           *)  if [ $verbose ];then echo "${line}:	file";fi ;;
+       esac
+    done
+
+#
+# EOF
+#

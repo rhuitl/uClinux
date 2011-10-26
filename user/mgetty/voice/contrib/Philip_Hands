@@ -1,0 +1,99 @@
+Hi,
+
+Guess what, USR have changed their mind yet again about their GSM implementation :-/
+
+They've dropped the head and tail bytes, so the data just arrives raw.
+
+This is on a Sportster Flash that responds thus to ATI0/3/7:
+
+ATI0
+5601
+
+ATI3
+U.S. Robotics Sportster Flash 56000 Rev. 10.1.29
+
+ATI7
+Configuration Profile...
+
+Product type           UK External
+Options                V32bis,V.FC,V.34+,x2
+Fax Options            Class 1/Class 2.0
+Clock Freq             92.0Mhz
+Eprom                  256k
+Ram                    64k
+
+FLASH date             4/10/97
+FLASH rev              10.1.29
+
+OK
+
+
+Attached is a rather naff patch that makes it work.  It ought really to be a run-time rather than compile time switch, but I've lost track of which USR's support what.
+
+Cheers, Phil.
+
+--- mgetty-1.1.8.orig/voice/libpvf/usr.c
++++ mgetty-1.1.8/voice/libpvf/usr.c
+@@ -94,9 +94,13 @@
+          }
+        }
+        gsm_encode(r, s, d);
++#if defined(old_USR_GSM_with_head_and_tail_bytes)
+        fwrite((char *)gsm_head, 2, 1, fd_out);
++#endif
+        fwrite((char *)d, sizeof(d), 1, fd_out);
++#if defined(old_USR_GSM_with_head_and_tail_bytes)
+        fwrite((char *)gsm_tail, 3, 1, fd_out);
++#endif
+      }
+      gsm_destroy(r);
+      return(OK);
+@@ -104,9 +108,20 @@
+
+ static int usrgsmtopvf (FILE *fd_in, FILE *fd_out, pvf_header *header_out)
+      {
+-     unsigned char   inbuf[38];
++     unsigned char   inbuf[
++#if defined(old_USR_GSM_with_head_and_tail_bytes)
++38
++#else
++33
++#endif
++];
+      gsm             r;
+-     gsm_byte        *s = &inbuf[2];
++     gsm_byte        *s =
++#if defined(old_USR_GSM_with_head_and_tail_bytes)
++     &inbuf[2];
++#else
++     &inbuf[0];
++#endif
+      gsm_signal      d[ 160 ];
+      int             opt_fast = 0;
+      int             opt_verbose = 0;
+@@ -121,6 +136,7 @@
+      (void)gsm_option(r, GSM_OPT_VERBOSE,    &opt_verbose);
+
+      while (fread(inbuf, sizeof(inbuf), 1, fd_in) > 0) {
++#if defined(old_USR_GSM_with_head_and_tail_bytes)
+        if ((inbuf[0] != inbuf[1]) || ((inbuf[0] != 0xfe) && (inbuf[0] != 0xb6))
+            || (inbuf[35] != 0) || (inbuf[36] != 0xa5) || (inbuf[37] != 0xa5)) {
+          fprintf(stderr, "%s: input doesn't appear to be USR GSM data\n",
+@@ -128,6 +144,7 @@
+          gsm_destroy(r);
+          return(ERROR);
+        }
++#endif
+
+        if (gsm_decode(r, s, d)) {
+          fprintf(stderr, "%s: bad frame in input\n", program_name);
+--- mgetty-1.1.8.orig/voice/libvoice/detect.c
++++ mgetty-1.1.8/voice/libvoice/detect.c
+@@ -35,6 +35,7 @@
+      {"2886", &US_Robotics},
+      {"3361", &US_Robotics},
+      {"3366", &US_Robotics},
++     {"5601", &US_Robotics},
+      {"33600", &Rockwell},
+      {"3X WYSIWYF 628DBX", &Rockwell},
+      {"Linux ISDN", &ISDN4Linux},

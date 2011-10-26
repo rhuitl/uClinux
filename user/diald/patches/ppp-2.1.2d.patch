@@ -1,0 +1,15 @@
+--- ppp-2.1.2d/pppd/main.c.orig	Thu Mar 28 09:48:43 1996
++++ ppp-2.1.2d/pppd/main.c	Thu Mar 28 09:48:50 1996
+@@ -376,7 +376,11 @@
+     /*
+      * Open the serial device and set it up to be the ppp interface.
+      */
+-    if ((fd = open(devname, O_RDWR | (connector ? O_NDELAY : 0))) < 0) {
++    if (!default_device)
++    	fd = open(devname, O_RDWR | (connector ? O_NDELAY : 0));
++    else
++	fd = dup(0);
++    if (fd < 0) {
+ 	syslog(LOG_ERR, "open(%s): %m", devname);
+ 	die(1);
+     }

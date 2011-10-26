@@ -1,0 +1,102 @@
+.\" $Id: pppoe-server.8,v 1.5 2000/09/15 01:22:30 dfs Exp $ 
+.TH PPPOE-SERVER 8 "3 July 2000"
+.\""
+.UC 4
+.SH NAME
+pppoe-server \- user-space PPPoE server
+.SH SYNOPSIS
+.B pppoe-server \fR[\fIoptions\fR]
+
+.SH DESCRIPTION
+\fBpppoe-server\fR is a user-space server for PPPoE (Point-to-Point Protocol
+over Ethernet) for Linux and other UNIX systems.  \fBpppoe-server\fR works in
+concert with the \fBpppoe\fR client to respond to PPPoE discovery packets
+and set up PPPoE sessions.
+
+.SH OPTIONS
+.TP
+.B \-F
+The \fB\-F\fR option causes \fBpppoe-server\fR not to fork and become a
+daemon.  The default is to fork and become a daemon.
+
+.TP
+.B \-I \fIinterface\fR
+The \fB\-I\fR option specifies the Ethernet interface to use.  Under Linux,
+it is typically \fIeth0\fR or \fIeth1\fR.  The interface should be "up"
+before you start \fBpppoe-server\fR, but should \fInot\fR be configured to have
+an IP address.
+
+.TP
+.B \-T \fItimeout\fR
+This option is passed directly to \fBpppoe\fR; see \fBpppoe\fR(8) for
+details.
+
+.B \-C \fIac_name\fR
+Specifies which name to report as the access concentrator name.  If not
+supplied, the host name is used.
+
+.B \-m \fIMSS\fR
+This option is passed directly to \fBpppoe\fR; see \fBpppoe\fR(8) for
+details.
+
+.B \-s
+This option is passed directly to \fBpppoe\fR; see \fBpppoe\fR(8) for
+details.  In addition, it causes \fBpppd\fR to be invoked with the
+\fIsync\fR option.
+
+.B \-L \fIip\fR
+Sets the local IP address.  This is passed to spawned \fBpppd\fR processes.
+If not specified, the default is 10.0.0.1.
+
+.B \-R \fIip\fR
+Sets the starting remote IP address.  As sessions are established,
+IP addresses are assigned starting from \fIip\fR.   \fBpppoe-server\fR
+automatically keeps track of the pool of addresses and passes a
+valid remote IP address to \fBpppd\fR.  If not specified, a starting address
+of 10.67.15.1 is used.
+
+.B \-N \fInum\fR
+Allows at most \fInum\fR concurrent PPPoE sessions.  If not specified,
+the default is 64.
+
+.TP
+.B \-f disc:sess
+The \fB\-f\fR option sets the Ethernet frame types for PPPoE discovery
+and session frames.  The types are specified as hexadecimal numbers
+separated by a colon.  Standard PPPoE uses frame types 8863:8864.
+\fIYou should not use this option\fR unless you are absolutely sure
+the peer you are dealing with uses non-standard frame types.
+
+.B \-h
+The \fB\-h\fR option prints a brief usage message and exits.
+
+.SH OPERATION
+
+\fBpppoe-server\fR listens for incoming PPPoE discovery packets.  When
+a session is established, it spawns a \fBpppd\fR process.  The following
+options are passed to \fBpppd\fR:
+
+.nf
+nodetach noaccomp nobsdcom nodeflate nopcomp novj novjccomp
+default-asyncmap
+.fi
+
+In addition, the local and remote IP address are set based on the
+\fB\-L\fR and \fB\-R\fR options.  The \fBpty\fR option is supplied along
+with a \fBpppoe\fR command to initiate the PPPoE session.  Finally,
+additional \fBpppd\fR options can be placed in the file
+\fB/etc/ppp/pppoe-server-options\fR (which must exist, even if it is just
+empty!)
+
+Note that \fBpppoe-server\fR is meant mainly for testing PPPoE clients.
+It is \fInot\fR a high-performance server meant for production use.
+
+.SH AUTHORS
+\fBpppoe-server\fR was written by David F. Skoll <dfs@roaringpenguin.com>.
+
+The \fBpppoe\fR home page is \fIhttp://www.roaringpenguin.com/pppoe/\fR.
+
+.SH SEE ALSO
+adsl-start(8), adsl-stop(8), adsl-connect(8), pppd(8), pppoe.conf(5),
+pppoe(8), adsl-setup(8), adsl-status(8), pppoe-sniff(8)
+

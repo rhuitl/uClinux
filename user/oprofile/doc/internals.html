@@ -1,0 +1,1616 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+    <title>OProfile Internals</title>
+    <meta name="generator" content="DocBook XSL Stylesheets V1.68.1" />
+  </head>
+  <body>
+    <div class="book" lang="en" xml:lang="en">
+      <div class="titlepage">
+        <div>
+          <div>
+            <h1 class="title"><a id="oprofile-internals"></a>OProfile Internals</h1>
+          </div>
+          <div>
+            <div class="authorgroup">
+              <div class="author">
+                <h3 class="author"><span class="firstname">John</span> <span class="surname">Levon</span></h3>
+                <div class="affiliation">
+                  <div class="address">
+                    <p>
+                      <code class="email">&lt;<a href="mailto:levon@movementarian.org">levon@movementarian.org</a>&gt;</code>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p class="copyright">Copyright © 2003 John Levon</p>
+          </div>
+        </div>
+        <hr />
+      </div>
+      <div class="toc">
+        <p>
+          <b>Table of Contents</b>
+        </p>
+        <dl>
+          <dt>
+            <span class="chapter">
+              <a href="#introduction">1. Introduction</a>
+            </span>
+          </dt>
+          <dd>
+            <dl>
+              <dt>
+                <span class="sect1">
+                  <a href="#overview">1. Overview</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#components">2. Components of the OProfile system</a>
+                </span>
+              </dt>
+              <dd>
+                <dl>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#arch-specific-components">2.1. Architecture-specific components</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#filesystem">2.2. oprofilefs</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#driver">2.3. Generic kernel driver</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#daemon">2.4. The OProfile daemon</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#post-profiling">2.5. Post-profiling tools</a>
+                    </span>
+                  </dt>
+                </dl>
+              </dd>
+            </dl>
+          </dd>
+          <dt>
+            <span class="chapter">
+              <a href="#performance-counters">2. Performance counter management</a>
+            </span>
+          </dt>
+          <dd>
+            <dl>
+              <dt>
+                <span class="sect1">
+                  <a href="#performance-counters-ui">1. Providing a user interface</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#performance-counters-programming">2. Programming the performance counter registers</a>
+                </span>
+              </dt>
+              <dd>
+                <dl>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#performance-counters-start">2.1. Starting and stopping the counters</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#id264864">2.2. IA64 and perfmon</a>
+                    </span>
+                  </dt>
+                </dl>
+              </dd>
+            </dl>
+          </dd>
+          <dt>
+            <span class="chapter">
+              <a href="#collecting-samples">3. Collecting and processing samples</a>
+            </span>
+          </dt>
+          <dd>
+            <dl>
+              <dt>
+                <span class="sect1">
+                  <a href="#receiving-interrupts">1. Receiving interrupts</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#core-structure">2. Core data structures</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#logging-sample">3. Logging a sample</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#logging-stack">4. Logging stack traces</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#synchronising-buffers">5. Synchronising the CPU buffers to the event buffer</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#dentry-cookies">6. Identifying binary images</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#finding-dentry">7. Finding a sample's binary image and offset</a>
+                </span>
+              </dt>
+            </dl>
+          </dd>
+          <dt>
+            <span class="chapter">
+              <a href="#sample-files">4. Generating sample files</a>
+            </span>
+          </dt>
+          <dd>
+            <dl>
+              <dt>
+                <span class="sect1">
+                  <a href="#processing-buffer">1. Processing the buffer</a>
+                </span>
+              </dt>
+              <dd>
+                <dl>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#handling-kernel-samples">1.1. Handling kernel samples</a>
+                    </span>
+                  </dt>
+                </dl>
+              </dd>
+              <dt>
+                <span class="sect1">
+                  <a href="#sample-file-generation">2. Locating and creating sample files</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#sample-file-writing">3. Writing data to a sample file</a>
+                </span>
+              </dt>
+            </dl>
+          </dd>
+          <dt>
+            <span class="chapter">
+              <a href="#output">5. Generating useful output</a>
+            </span>
+          </dt>
+          <dd>
+            <dl>
+              <dt>
+                <span class="sect1">
+                  <a href="#profile-specification">1. Handling the profile specification</a>
+                </span>
+              </dt>
+              <dt>
+                <span class="sect1">
+                  <a href="#sample-file-collating">2. Collating the candidate sample files</a>
+                </span>
+              </dt>
+              <dd>
+                <dl>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#sample-file-classifying">2.1. Classifying sample files</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#sample-file-inverting">2.2. Creating inverted profile lists</a>
+                    </span>
+                  </dt>
+                </dl>
+              </dd>
+              <dt>
+                <span class="sect1">
+                  <a href="#generating-profile-data">3. Generating profile data</a>
+                </span>
+              </dt>
+              <dd>
+                <dl>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#bfd">3.1. Processing the binary image</a>
+                    </span>
+                  </dt>
+                  <dt>
+                    <span class="sect2">
+                      <a href="#processing-sample-files">3.2. Processing the sample files</a>
+                    </span>
+                  </dt>
+                </dl>
+              </dd>
+              <dt>
+                <span class="sect1">
+                  <a href="#generating-output">4. Generating output</a>
+                </span>
+              </dt>
+            </dl>
+          </dd>
+          <dt>
+            <span class="glossary">
+              <a href="#glossary">Glossary of OProfile source concepts and types</a>
+            </span>
+          </dt>
+        </dl>
+      </div>
+      <div class="list-of-figures">
+        <p>
+          <b>List of Figures</b>
+        </p>
+        <dl>
+          <dt>3.1. <a href="#id265001">The OProfile buffers</a></dt>
+        </dl>
+      </div>
+      <div class="chapter" lang="en" xml:lang="en">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h2 class="title"><a id="introduction"></a>Chapter 1. Introduction</h2>
+            </div>
+          </div>
+        </div>
+        <div class="toc">
+          <p>
+            <b>Table of Contents</b>
+          </p>
+          <dl>
+            <dt>
+              <span class="sect1">
+                <a href="#overview">1. Overview</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#components">2. Components of the OProfile system</a>
+              </span>
+            </dt>
+            <dd>
+              <dl>
+                <dt>
+                  <span class="sect2">
+                    <a href="#arch-specific-components">2.1. Architecture-specific components</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#filesystem">2.2. oprofilefs</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#driver">2.3. Generic kernel driver</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#daemon">2.4. The OProfile daemon</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#post-profiling">2.5. Post-profiling tools</a>
+                  </span>
+                </dt>
+              </dl>
+            </dd>
+          </dl>
+        </div>
+        <p>
+This document is current for OProfile version 0.9.2.
+This document provides some details on the internal workings of OProfile for the
+interested hacker. This document assumes strong C, working C++, plus some knowledge of
+kernel internals and CPU hardware.
+</p>
+        <div class="note" style="margin-left: 0.5in; margin-right: 0.5in;">
+          <h3 class="title">Note</h3>
+          <p>
+Only the "new" implementation associated with kernel 2.6 and above is covered here. 2.4
+uses a very different kernel module implementation and daemon to produce the sample files.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="overview"></a>1. Overview</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+OProfile is a statistical continuous profiler. In other words, profiles are generated by
+regularly sampling the current registers on each CPU (from an interrupt handler, the
+saved PC value at the time of interrupt is stored), and converting that runtime PC
+value into something meaningful to the programmer.
+</p>
+          <p>
+OProfile achieves this by taking the stream of sampled PC values, along with the detail
+of which task was running at the time of the interrupt, and converting into a file offset
+against a particular binary file. Because applications <code class="function">mmap()</code>
+the code they run (be it <code class="filename">/bin/bash</code>, <code class="filename">/lib/libfoo.so</code>
+or whatever), it's possible to find the relevant binary file and offset by walking
+the task's list of mapped memory areas. Each PC value is thus converted into a tuple
+of binary-image,offset. This is something that the userspace tools can use directly
+to reconstruct where the code came from, including the particular assembly instructions,
+symbol, and source line (via the binary's debug information if present).
+</p>
+          <p>
+Regularly sampling the PC value like this approximates what actually was executed and
+how often - more often than not, this statistical approximation is good enough to
+reflect reality. In common operation, the time between each sample interrupt is regulated
+by a fixed number of clock cycles. This implies that the results will reflect where
+the CPU is spending the most time; this is obviously a very useful information source
+for performance analysis.
+</p>
+          <p>
+Sometimes though, an application programmer needs different kinds of information: for example,
+"which of the source routines cause the most cache misses ?". The rise in importance of
+such metrics in recent years has led many CPU manufacturers to provide hardware performance
+counters capable of measuring these events on the hardware level. Typically, these counters
+increment once per each event, and generate an interrupt on reaching some pre-defined
+number of events. OProfile can use these interrupts to generate samples: then, the
+profile results are a statistical approximation of which code caused how many of the
+given event.
+</p>
+          <p>
+Consider a simplified system that only executes two functions A and B. A
+takes one cycle to execute, whereas B takes 99 cycles. Imagine we run at
+100 cycles a second, and we've set the performance counter to create an
+interrupt after a set number of "events" (in this case an event is one
+clock cycle). It should be clear that the chances of the interrupt
+occurring in function A is 1/100, and 99/100 for function B. Thus, we
+statistically approximate the actual relative performance features of
+the two functions over time. This same analysis works for other types of
+events, providing that the interrupt is tied to the number of events
+occurring (that is, after N events, an interrupt is generated).
+</p>
+          <p>
+There are typically more than one of these counters, so it's possible to set up profiling
+for several different event types. Using these counters gives us a powerful, low-overhead
+way of gaining performance metrics. If OProfile, or the CPU, does not support performance
+counters, then a simpler method is used: the kernel timer interrupt feeds samples
+into OProfile itself.
+</p>
+          <p>
+The rest of this document concerns itself with how we get from receiving samples at
+interrupt time to producing user-readable profile information.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="components"></a>2. Components of the OProfile system</h2>
+              </div>
+            </div>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="arch-specific-components"></a>2.1. Architecture-specific components</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+If OProfile supports the hardware performance counters found on
+a particular architecture, code for managing the details of setting
+up and managing these counters can be found in the kernel source
+tree in the relevant <code class="filename">arch/<span class="emphasis"><em>arch</em></span>/oprofile/</code>
+directory. The architecture-specific implementation works via
+filling in the oprofile_operations structure at init time. This
+provides a set of operations such as <code class="function">setup()</code>,
+<code class="function">start()</code>, <code class="function">stop()</code>, etc.
+that manage the hardware-specific details of fiddling with the
+performance counter registers.
+</p>
+            <p>
+The other important facility available to the architecture code is
+<code class="function">oprofile_add_sample()</code>.  This is where a particular sample
+taken at interrupt time is fed into the generic OProfile driver code.
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="filesystem"></a>2.2. oprofilefs</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+OProfile implements a pseudo-filesystem known as "oprofilefs", mounted from
+userspace at <code class="filename">/dev/oprofile</code>. This consists of small
+files for reporting and receiving configuration from userspace, as well
+as the actual character device that the OProfile userspace receives samples
+from. At <code class="function">setup()</code> time, the architecture-specific may
+add further configuration files related to the details of the performance
+counters. For example, on x86, one numbered directory for each hardware
+performance counter is added, with files in each for the event type,
+reset value, etc.
+</p>
+            <p>
+The filesystem also contains a <code class="filename">stats</code> directory with
+a number of useful counters for various OProfile events.
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="driver"></a>2.3. Generic kernel driver</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+This lives in <code class="filename">drivers/oprofile/</code>, and forms the core of
+how OProfile works in the kernel. Its job is to take samples delivered
+from the architecture-specific code (via <code class="function">oprofile_add_sample()</code>),
+and buffer this data, in a transformed form as described later, until releasing
+the data to the userspace daemon via the <code class="filename">/dev/oprofile/buffer</code>
+character device.
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="daemon"></a>2.4. The OProfile daemon</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+The OProfile userspace daemon's job is to take the raw data provided by the
+kernel and write it to the disk. It takes the single data stream from the
+kernel and logs sample data against a number of sample files (found in
+<code class="filename">/var/lib/oprofile/samples/current/</code>. For the benefit
+of the "separate" functionality, the names/paths of these sample files
+are mangled to reflect where the samples were from: this can include
+thread IDs, the binary file path, the event type used, and more.
+</p>
+            <p>
+After this final step from interrupt to disk file, the data is now
+persistent (that is, changes in the running of the system do not invalidate
+stored data). So the post-profiling tools can run on this data at any
+time (assuming the original binary files are still available and unchanged,
+naturally).
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en"><div class="titlepage"><div><div><h3 class="title"><a id="post-profiling"></a>2.5. Post-profiling tools</h3></div></div></div>
+So far, we've collected data, but we've yet to present it in a useful form
+to the user. This is the job of the post-profiling tools. In general form,
+they collate a subset of the available sample files, load and process each one
+correlated against the relevant binary file, and finally produce user-readable
+information.
+</div>
+        </div>
+      </div>
+      <div class="chapter" lang="en" xml:lang="en">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h2 class="title"><a id="performance-counters"></a>Chapter 2. Performance counter management</h2>
+            </div>
+          </div>
+        </div>
+        <div class="toc">
+          <p>
+            <b>Table of Contents</b>
+          </p>
+          <dl>
+            <dt>
+              <span class="sect1">
+                <a href="#performance-counters-ui">1. Providing a user interface</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#performance-counters-programming">2. Programming the performance counter registers</a>
+              </span>
+            </dt>
+            <dd>
+              <dl>
+                <dt>
+                  <span class="sect2">
+                    <a href="#performance-counters-start">2.1. Starting and stopping the counters</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#id264864">2.2. IA64 and perfmon</a>
+                  </span>
+                </dt>
+              </dl>
+            </dd>
+          </dl>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="performance-counters-ui"></a>1. Providing a user interface</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+The performance counter registers need programming in order to set the
+type of event to count, etc. OProfile uses a standard model across all
+CPUs for defining these events as follows :
+</p>
+          <div class="informaltable">
+            <table border="1">
+              <colgroup>
+                <col />
+                <col />
+              </colgroup>
+              <tbody>
+                <tr>
+                  <td>
+                    <code class="option">event</code>
+                  </td>
+                  <td>The event type e.g. DATA_MEM_REFS</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code class="option">unit mask</code>
+                  </td>
+                  <td>The sub-events to count (more detailed specification)</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code class="option">counter</code>
+                  </td>
+                  <td>The hardware counter(s) that can count this event</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code class="option">count</code>
+                  </td>
+                  <td>The reset value (how many events before an interrupt)</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code class="option">kernel</code>
+                  </td>
+                  <td>Whether the counter should increment when in kernel space</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code class="option">user</code>
+                  </td>
+                  <td>Whether the counter should increment when in user space</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+The term "unit mask" is borrowed from the Intel architectures, and can
+further specify exactly when a counter is incremented (for example,
+cache-related events can be restricted to particular state transitions
+of the cache lines).
+</p>
+          <p>
+All of the available hardware events and their details are specified in
+the textual files in the <code class="filename">events</code> directory. The
+syntax of these files should be fairly obvious. The user specifies the
+names and configuration details of the chosen counters via
+<span><strong class="command">opcontrol</strong></span>. These are then written to the kernel
+module (in numerical form) via <code class="filename">/dev/oprofile/N/</code>
+where N is the physical hardware counter (some events can only be used
+on specific counters; OProfile hides these details from the user when
+possible). On IA64, the perfmon-based interface behaves somewhat
+differently, as described later.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="performance-counters-programming"></a>2. Programming the performance counter registers</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+We have described how the user interface fills in the desired
+configuration of the counters and transmits the information to the
+kernel. It is the job of the <code class="function">-&gt;setup()</code> method
+to actually program the performance counter registers. Clearly, the
+details of how this is done is architecture-specific; it is also
+model-specific on many architectures. For example, i386 provides methods
+for each model type that programs the counter registers correctly
+(see the <code class="filename">op_model_*</code> files in
+<code class="filename">arch/i386/oprofile</code> for the details). The method
+reads the values stored in the virtual oprofilefs files and programs
+the registers appropriately, ready for starting the actual profiling
+session.
+</p>
+          <p>
+The architecture-specific drivers make sure to save the old register
+settings before doing OProfile setup. They are restored when OProfile
+shuts down. This is useful, for example, on i386, where the NMI watchdog
+uses the same performance counter registers as OProfile; they cannot
+run concurrently, but OProfile makes sure to restore the setup it found
+before it was running.
+</p>
+          <p>
+In addition to programming the counter registers themselves, other setup
+is often necessary. For example, on i386, the local APIC needs
+programming in order to make the counter's overflow interrupt appear as
+an NMI (non-maskable interrupt). This allows sampling (and therefore
+profiling) of regions where "normal" interrupts are masked, enabling
+more reliable profiles.
+</p>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="performance-counters-start"></a>2.1. Starting and stopping the counters</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+Initiating a profiling session is done via writing an ASCII '1'
+to the file <code class="filename">/dev/oprofile/enable</code>. This sets up the
+core, and calls into the architecture-specific driver to actually
+enable each configured counter. Again, the details of how this is
+done is model-specific (for example, the Athlon models can disable
+or enable on a per-counter basis, unlike the PPro models).
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="id264864"></a>2.2. IA64 and perfmon</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+The IA64 architecture provides a different interface from the other
+architectures, using the existing perfmon driver. Register programming
+is handled entirely in user-space (see
+<code class="filename">daemon/opd_perfmon.c</code> for the details). A process
+is forked for each CPU, which creates a perfmon context and sets the
+counter registers appropriately via the
+<code class="function">sys_perfmonctl</code> interface. In addition, the actual
+initiation and termination of the profiling session is handled via the
+same interface using <code class="constant">PFM_START</code> and
+<code class="constant">PFM_STOP</code>. On IA64, then, there are no oprofilefs
+files for the performance counters, as the kernel driver does not
+program the registers itself.
+</p>
+            <p>
+Instead, the perfmon driver for OProfile simply registers with the
+OProfile core with an OProfile-specific UUID. During a profiling
+session, the perfmon core calls into the OProfile perfmon driver and
+samples are registered with the OProfile core itself as usual (with
+<code class="function">oprofile_add_sample()</code>).
+</p>
+          </div>
+        </div>
+      </div>
+      <div class="chapter" lang="en" xml:lang="en">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h2 class="title"><a id="collecting-samples"></a>Chapter 3. Collecting and processing samples</h2>
+            </div>
+          </div>
+        </div>
+        <div class="toc">
+          <p>
+            <b>Table of Contents</b>
+          </p>
+          <dl>
+            <dt>
+              <span class="sect1">
+                <a href="#receiving-interrupts">1. Receiving interrupts</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#core-structure">2. Core data structures</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#logging-sample">3. Logging a sample</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#logging-stack">4. Logging stack traces</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#synchronising-buffers">5. Synchronising the CPU buffers to the event buffer</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#dentry-cookies">6. Identifying binary images</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#finding-dentry">7. Finding a sample's binary image and offset</a>
+              </span>
+            </dt>
+          </dl>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="receiving-interrupts"></a>1. Receiving interrupts</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+Naturally, how the overflow interrupts are received is specific
+to the hardware architecture, unless we are in "timer" mode, where the
+logging routine is called directly from the standard kernel timer
+interrupt handler.
+</p>
+          <p>
+On the i386 architecture, the local APIC is programmed such that when a
+counter overflows (that is, it receives an event that causes an integer
+overflow of the register value to zero), an NMI is generated. This calls
+into the general handler <code class="function">do_nmi()</code>; because OProfile
+has registered itself as capable of handling NMI interrupts, this will
+call into the OProfile driver code in
+<code class="filename">arch/i386/oprofile</code>. Here, the saved PC value (the
+CPU saves the register set at the time of interrupt on the stack
+available for inspection) is extracted, and the counters are examined to
+find out which one generated the interrupt. Also determined is whether
+the system was inside kernel or user space at the time of the interrupt.
+These three pieces of information are then forwarded onto the OProfile
+core via <code class="function">oprofile_add_sample()</code>. Finally, the
+counter values are reset to the chosen count value, to ensure another
+interrupt happens after another N events have occurred. Other
+architectures behave in a similar manner.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="core-structure"></a>2. Core data structures</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+Before considering what happens when we log a sample, we shall digress
+for a moment and look at the general structure of the data collection
+system.
+</p>
+          <p>
+OProfile maintains a small buffer for storing the logged samples for
+each CPU on the system. Only this buffer is altered when we actually log
+a sample (remember, we may still be in an NMI context, so no locking is
+possible). The buffer is managed by a two-handed system; the "head"
+iterator dictates where the next sample data should be placed in the
+buffer. Of course, overflow of the buffer is possible, in which case
+the sample is discarded.
+</p>
+          <p>
+It is critical to remember that at this point, the PC value is an
+absolute value, and is therefore only meaningful in the context of which
+task it was logged against. Thus, these per-CPU buffers also maintain
+details of which task each logged sample is for, as described in the
+next section. In addition, we store whether the sample was in kernel
+space or user space (on some architectures and configurations, the address
+space is not sub-divided neatly at a specific PC value, so we must store
+this information).
+</p>
+          <p>
+As well as these small per-CPU buffers, we have a considerably larger
+single buffer. This holds the data that is eventually copied out into
+the OProfile daemon. On certain system events, the per-CPU buffers are
+processed and entered (in mutated form) into the main buffer, known in
+the source as the "event buffer". The "tail" iterator indicates the
+point from which the CPU may be read, up to the position of the "head"
+iterator. This provides an entirely lock-free method for extracting data
+from the CPU buffers. This process is described in detail later in this chapter.
+</p>
+          <div class="figure">
+            <a id="id265001"></a>
+            <p class="title">
+              <b>Figure 3.1. The OProfile buffers</b>
+            </p>
+            <div>
+              <img src="buffers.png" alt="The OProfile buffers" />
+            </div>
+          </div>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="logging-sample"></a>3. Logging a sample</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+As mentioned, the sample is logged into the buffer specific to the
+current CPU. The CPU buffer is a simple array of pairs of unsigned long
+values; for a sample, they hold the PC value and the counter for the
+sample. (The counter value is later used to translate back into the relevant
+event type the counter was programmed to).
+</p>
+          <p>
+In addition to logging the sample itself, we also log task switches.
+This is simply done by storing the address of the last task to log a
+sample on that CPU in a data structure, and writing a task switch entry
+into the buffer if the new value of <code class="function">current()</code> has
+changed. Note that later we will directly de-reference this pointer;
+this imposes certain restrictions on when and how the CPU buffers need
+to be processed.
+</p>
+          <p>
+Finally, as mentioned, we log whether we have changed between kernel and
+userspace using a similar method. Both of these variables
+(<code class="varname">last_task</code> and <code class="varname">last_is_kernel</code>) are
+reset when the CPU buffer is read.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="logging-stack"></a>4. Logging stack traces</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+OProfile can also provide statistical samples of call chains (on x86). To
+do this, at sample time, the frame pointer chain is traversed, recording
+the return address for each stack frame. This will only work if the code
+was compiled with frame pointers, but we're careful to abort the
+traversal if the frame pointer appears bad. We store the set of return
+addresses straight into the CPU buffer. Note that, since this traversal
+is keyed off the standard sample interrupt, the number of times a
+function appears in a stack trace is not an indicator of how many times
+the call site was executed: rather, it's related to the number of
+samples we took where that call site was involved. Thus, the results for
+stack traces are not necessarily proportional to the call counts:
+typical programs will have many <code class="function">main()</code> samples.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="synchronising-buffers"></a>5. Synchronising the CPU buffers to the event buffer</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+At some point, we have to process the data in each CPU buffer and enter
+it into the main (event) buffer. The file
+<code class="filename">buffer_sync.c</code> contains the relevant code. We
+periodically (currently every <code class="constant">HZ</code>/4 jiffies) start
+the synchronisation process. In addition, we process the buffers on
+certain events, such as an application calling
+<code class="function">munmap()</code>. This is particularly important for
+<code class="function">exit()</code> - because the CPU buffers contain pointers
+to the task structure, if we don't process all the buffers before the
+task is actually destroyed and the task structure freed, then we could
+end up trying to dereference a bogus pointer in one of the CPU buffers.
+</p>
+          <p>
+We also add a notification when a kernel module is loaded; this is so
+that user-space can re-read <code class="filename">/proc/modules</code> to
+determine the load addresses of kernel module text sections. Without
+this notification, samples for a newly-loaded module could get lost or
+be attributed to the wrong module.
+</p>
+          <p>
+The synchronisation itself works in the following manner: first, mutual
+exclusion on the event buffer is taken. Remember, we do not need to do
+that for each CPU buffer, as we only read from the tail iterator (whilst
+interrupts might be arriving at the same buffer, but they will write to
+the position of the head iterator, leaving previously written entries
+intact). Then, we process each CPU buffer in turn. A CPU switch
+notification is added to the buffer first (for
+<code class="option">--separate=cpu</code> support). Then the processing of the
+actual data starts.
+</p>
+          <p>
+As mentioned, the CPU buffer consists of task switch entries and the
+actual samples. When the routine <code class="function">sync_buffer()</code> sees
+a task switch, the process ID and process group ID are recorded into the
+event buffer, along with a dcookie (see below) identifying the
+application binary (e.g. <code class="filename">/bin/bash</code>). The
+<code class="varname">mmap_sem</code> for the task is then taken, to allow safe
+iteration across the tasks' list of mapped areas. Each sample is then
+processed as described in the next section.
+</p>
+          <p>
+After a buffer has been read, the tail iterator is updated to reflect
+how much of the buffer was processed. Note that when we determined how
+much data there was to read in the CPU buffer, we also called
+<code class="function">cpu_buffer_reset()</code> to reset
+<code class="varname">last_task</code> and <code class="varname">last_is_kernel</code>, as
+we've already mentioned. During the processing, more samples may have
+been arriving in the CPU buffer; this is OK because we are careful to
+only update the tail iterator to how much we actually read - on the next
+buffer synchronisation, we will start again from that point.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="dentry-cookies"></a>6. Identifying binary images</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+In order to produce useful profiles, we need to be able to associate a
+particular PC value sample with an actual ELF binary on the disk. This
+leaves us with the problem of how to export this information to
+user-space. We create unique IDs that identify a particular directory
+entry (dentry), and write those IDs into the event buffer. Later on,
+the user-space daemon can call the <code class="function">lookup_dcookie</code>
+system call, which looks up the ID and fills in the full path of
+the binary image in the buffer user-space passes in. These IDs are
+maintained by the code in <code class="filename">fs/dcookies.c</code>; the
+cache lasts for as long as the daemon has the event buffer open.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="finding-dentry"></a>7. Finding a sample's binary image and offset</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+We haven't yet described how we process the absolute PC value into
+something usable by the user-space daemon. When we find a sample entered
+into the CPU buffer, we traverse the list of mappings for the task
+(remember, we will have seen a task switch earlier, so we know which
+task's lists to look at). When a mapping is found that contains the PC
+value, we look up the mapped file's dentry in the dcookie cache. This
+gives the dcookie ID that will uniquely identify the mapped file. Then
+we alter the absolute value such that it is an offset from the start of
+the file being mapped (the mapping need not start at the start of the
+actual file, so we have to consider the offset value of the mapping). We
+store this dcookie ID into the event buffer; this identifies which
+binary the samples following it are against.
+In this manner, we have converted a PC value, which has transitory
+meaning only, into a static offset value for later processing by the
+daemon.
+</p>
+          <p>
+We also attempt to avoid the relatively expensive lookup of the dentry
+cookie value by storing the cookie value directly into the dentry
+itself; then we can simply derive the cookie value immediately when we
+find the correct mapping.
+</p>
+        </div>
+      </div>
+      <div class="chapter" lang="en" xml:lang="en">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h2 class="title"><a id="sample-files"></a>Chapter 4. Generating sample files</h2>
+            </div>
+          </div>
+        </div>
+        <div class="toc">
+          <p>
+            <b>Table of Contents</b>
+          </p>
+          <dl>
+            <dt>
+              <span class="sect1">
+                <a href="#processing-buffer">1. Processing the buffer</a>
+              </span>
+            </dt>
+            <dd>
+              <dl>
+                <dt>
+                  <span class="sect2">
+                    <a href="#handling-kernel-samples">1.1. Handling kernel samples</a>
+                  </span>
+                </dt>
+              </dl>
+            </dd>
+            <dt>
+              <span class="sect1">
+                <a href="#sample-file-generation">2. Locating and creating sample files</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#sample-file-writing">3. Writing data to a sample file</a>
+              </span>
+            </dt>
+          </dl>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="processing-buffer"></a>1. Processing the buffer</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+Now we can move onto user-space in our description of how raw interrupt
+samples are processed into useful information. As we described in
+previous sections, the kernel OProfile driver creates a large buffer of
+sample data consisting of offset values, interspersed with
+notification of changes in context. These context changes indicate how
+following samples should be attributed, and include task switches, CPU
+changes, and which dcookie the sample value is against. By processing
+this buffer entry-by-entry, we can determine where the samples should
+be accredited to. This is particularly important when using the 
+<code class="option">--separate</code>.
+</p>
+          <p>
+The file <code class="filename">daemon/opd_trans.c</code> contains the basic routine
+for the buffer processing. The <code class="varname">struct transient</code>
+structure is used to hold changes in context. Its members are modified
+as we process each entry; it is passed into the routines in
+<code class="filename">daemon/opd_sfile.c</code> for actually logging the sample
+to a particular sample file (which will be held in
+<code class="filename">/var/lib/oprofile/samples/current</code>).
+</p>
+          <p>
+The buffer format is designed for conciseness, as high sampling rates
+can easily generate a lot of data. Thus, context changes are prefixed
+by an escape code, identified by <code class="function">is_escape_code()</code>.
+If an escape code is found, the next entry in the buffer identifies
+what type of context change is being read. These are handed off to
+various handlers (see the <code class="varname">handlers</code> array), which
+modify the transient structure as appropriate. If it's not an escape
+code, then it must be a PC offset value, and the very next entry will
+be the numeric hardware counter. These values are read and recorded
+in the transient structure; we then do a lookup to find the correct
+sample file, and log the sample, as described in the next section.
+</p>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="handling-kernel-samples"></a>1.1. Handling kernel samples</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+Samples from kernel code require a little special handling. Because
+the binary text which the sample is against does not correspond to
+any file that the kernel directly knows about, the OProfile driver
+stores the absolute PC value in the buffer, instead of the file offset.
+Of course, we need an offset against some particular binary. To handle
+this, we keep a list of loaded modules by parsing
+<code class="filename">/proc/modules</code> as needed. When a module is loaded,
+a notification is placed in the OProfile buffer, and this triggers a
+re-read. We store the module name, and the loading address and size.
+This is also done for the main kernel image, as specified by the user.
+The absolute PC value is matched against each address range, and
+modified into an offset when the matching module is found. See 
+<code class="filename">daemon/opd_kernel.c</code> for the details.
+</p>
+          </div>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="sample-file-generation"></a>2. Locating and creating sample files</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+We have a sample value and its satellite data stored in a
+<code class="varname">struct transient</code>, and we must locate an
+actual sample file to store the sample in, using the context
+information in the transient structure as a key. The transient data to
+sample file lookup is handled in
+<code class="filename">daemon/opd_sfile.c</code>. A hash is taken of the
+transient values that are relevant (depending upon the setting of
+<code class="option">--separate</code>, some values might be irrelevant), and the
+hash value is used to lookup the list of currently open sample files.
+Of course, the sample file might not be found, in which case we need
+to create and open it.
+</p>
+          <p>
+OProfile uses a rather complex scheme for naming sample files, in order
+to make selecting relevant sample files easier for the post-profiling
+utilities. The exact details of the scheme are given in
+<code class="filename">oprofile-tests/pp_interface</code>, but for now it will
+suffice to remember that the filename will include only relevant
+information for the current settings, taken from the transient data. A
+fully-specified filename looks something like :
+</p>
+          <code class="computeroutput">
+/var/lib/oprofile/samples/current/{root}/usr/bin/xmms/{dep}/{root}/lib/tls/libc-2.3.2.so/CPU_CLK_UNHALTED.100000.0.28082.28089.0
+</code>
+          <p>
+It should be clear that this identifies such information as the
+application binary, the dependent (library) binary, the hardware event,
+and the process and thread ID. Typically, not all this information is
+needed, in which cases some values may be replaced with the token
+<code class="filename">all</code>.
+</p>
+          <p>
+The code that generates this filename and opens the file is found in
+<code class="filename">daemon/opd_mangling.c</code>. You may have realised that
+at this point, we do not have the binary image file names, only the
+dcookie values. In order to determine a file name, a dcookie value is
+looked up in the dcookie cache. This is to be found in
+<code class="filename">daemon/opd_cookie.c</code>. Since dcookies are both
+persistent and unique during a sampling session, we can cache the
+values. If the value is not found in the cache, then we ask the kernel
+to do the lookup from value to file name for us by calling
+<code class="function">lookup_dcookie()</code>. This looks up the value in a
+kernel-side cache (see <code class="filename">fs/dcookies.c</code>) and returns
+the fully-qualified file name to userspace.
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="sample-file-writing"></a>3. Writing data to a sample file</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+Each specific sample file is a hashed collection, where the key is
+the PC offset from the transient data, and the value is the number of
+samples recorded against that offset. The files are
+<code class="function">mmap()</code>ed into the daemon's memory space. The code
+to actually log the write against the sample file can be found in
+<code class="filename">libdb/</code>.
+</p>
+          <p>
+For recording stack traces, we have a more complicated sample filename
+mangling scheme that allows us to identify cross-binary calls. We use
+the same sample file format, where the key is a 64-bit value composed
+from the from,to pair of offsets.
+</p>
+        </div>
+      </div>
+      <div class="chapter" lang="en" xml:lang="en">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h2 class="title"><a id="output"></a>Chapter 5. Generating useful output</h2>
+            </div>
+          </div>
+        </div>
+        <div class="toc">
+          <p>
+            <b>Table of Contents</b>
+          </p>
+          <dl>
+            <dt>
+              <span class="sect1">
+                <a href="#profile-specification">1. Handling the profile specification</a>
+              </span>
+            </dt>
+            <dt>
+              <span class="sect1">
+                <a href="#sample-file-collating">2. Collating the candidate sample files</a>
+              </span>
+            </dt>
+            <dd>
+              <dl>
+                <dt>
+                  <span class="sect2">
+                    <a href="#sample-file-classifying">2.1. Classifying sample files</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#sample-file-inverting">2.2. Creating inverted profile lists</a>
+                  </span>
+                </dt>
+              </dl>
+            </dd>
+            <dt>
+              <span class="sect1">
+                <a href="#generating-profile-data">3. Generating profile data</a>
+              </span>
+            </dt>
+            <dd>
+              <dl>
+                <dt>
+                  <span class="sect2">
+                    <a href="#bfd">3.1. Processing the binary image</a>
+                  </span>
+                </dt>
+                <dt>
+                  <span class="sect2">
+                    <a href="#processing-sample-files">3.2. Processing the sample files</a>
+                  </span>
+                </dt>
+              </dl>
+            </dd>
+            <dt>
+              <span class="sect1">
+                <a href="#generating-output">4. Generating output</a>
+              </span>
+            </dt>
+          </dl>
+        </div>
+        <p>
+All of the tools used to generate human-readable output have to take
+roughly the same steps to collect the data for processing. First, the
+profile specification given by the user has to be parsed. Next, a list
+of sample files matching the specification has to obtained. Using this
+list, we need to locate the binary file for each sample file, and then
+use them to extract meaningful data, before a final collation and
+presentation to the user.
+</p>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="profile-specification"></a>1. Handling the profile specification</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+The profile specification presented by the user is parsed in
+the function <code class="function">profile_spec::create()</code>. This
+creates an object representing the specification. Then we
+use <code class="function">profile_spec::generate_file_list()</code>
+to search for all sample files and match them against the
+<code class="varname">profile_spec</code>.
+</p>
+          <p>
+To enable this matching process to work, the attributes of
+each sample file is encoded in its filename. This is a low-tech
+approach to matching specifications against candidate sample
+files, but it works reasonably well. A typical sample file
+might look like these:
+</p>
+          <table xmlns="" border="0" style="background: #E0E0E0;" width="90%">
+            <tr>
+              <td>
+                <pre class="screen">
+/var/lib/oprofile/samples/current/{root}/bin/ls/{dep}/{root}/bin/ls/{cg}/{root}/bin/ls/CPU_CLK_UNHALTED.100000.0.all.all.all
+/var/lib/oprofile/samples/current/{root}/bin/ls/{dep}/{root}/bin/ls/CPU_CLK_UNHALTED.100000.0.all.all.all
+/var/lib/oprofile/samples/current/{root}/bin/ls/{dep}/{root}/bin/ls/CPU_CLK_UNHALTED.100000.0.7423.7424.0
+/var/lib/oprofile/samples/current/{kern}/r128/{dep}/{kern}/r128/CPU_CLK_UNHALTED.100000.0.all.all.all
+</pre>
+              </td>
+            </tr>
+          </table>
+          <p>
+This looks unnecessarily complex, but it's actually fairly simple. First
+we have the session of the sample, here
+<code class="filename">/var/lib/oprofile/samples/current</code>. This could
+equally well be inside an archive from <span><strong class="command">oparchive</strong></span>.
+Next we have one of the tokens <code class="filename">{root}</code> or
+<code class="filename">{kern}</code>. <code class="filename">{root}</code> indicates
+that the binary is found on a file system, and we will encode its path
+in the next section (e.g. <code class="filename">/bin/ls</code>).
+<code class="filename">{kern}</code> indicates a kernel module - on 2.6 kernels
+the path information is not available from the kernel, so we have to
+special-case kernel modules like this; we encode merely the name of the
+module as loaded.
+</p>
+          <p>
+Next there is a <code class="filename">{dep}</code> token, indicating another
+token/path which identifies the dependent binary image. This is used even for
+the "primary" binary (i.e. the one that was
+<code class="function">execve()</code>d), as it simplifies processing. Finally,
+if this sample file is a normal flat profile, the actual file is next in
+the path. If it's a call-graph sample file, we need one further
+specification, to allow us to identify cross-binary arcs in the call
+graph.
+</p>
+          <p>
+The actual sample file name is dot-separated, where the fields are, in
+order: event name, event count, unit mask, task group ID, task ID, and
+CPU number.
+</p>
+          <p>
+This sample file can be reliably parsed (with
+<code class="function">parse_filename()</code>) into a
+<code class="varname">filename_spec</code>. Finally, we can check whether to
+include the sample file in the final results by comparing this
+<code class="varname">filename_spec</code> against the
+<code class="varname">profile_spec</code> the user specified (for the interested,
+see <code class="function">valid_candidate()</code> and
+<code class="function">profile_spec::match</code>). Then comes the really
+complicated bit...
+</p>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="sample-file-collating"></a>2. Collating the candidate sample files</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+At this point we have a duplicate-free list of sample files we need
+to process. But first we need to do some further arrangement: we
+need to classify each sample file, and we may also need to "invert"
+the profiles.
+</p>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="sample-file-classifying"></a>2.1. Classifying sample files</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+It's possible for utilities like <span><strong class="command">opreport</strong></span> to show 
+data in columnar format: for example, we might want to show the results
+of two threads within a process side-by-side. To do this, we need
+to classify each sample file into classes - the classes correspond
+with each <span><strong class="command">opreport</strong></span> column. The function that handles
+this is <code class="function">arrange_profiles()</code>. Each sample file
+is added to a particular class. If the sample file is the first in
+its class, a template is generated from the sample file. Each template
+describes a particular class (thus, in our example above, each template
+will have a different thread ID, and this uniquely identifies each
+class).
+</p>
+            <p>
+Each class has a list of "profile sets" matching that class's template.
+A profile set is either a profile of the primary binary image, or any of
+its dependent images. After all sample files have been listed in one of
+the profile sets belonging to the classes, we have to name each class and
+perform error-checking. This is done by
+<code class="function">identify_classes()</code>; each class is checked to ensure
+that its "axis" is the same as all the others. This is needed because
+<span><strong class="command">opreport</strong></span> can't produce results in 3D format: we can
+only differ in one aspect, such as thread ID or event name.
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="sample-file-inverting"></a>2.2. Creating inverted profile lists</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+Remember that if we're using certain profile separation options, such as
+"--separate=lib", a single binary could be a dependent image to many
+different binaries. For example, the C library image would be a
+dependent image for most programs that have been profiled. As it
+happens, this can cause severe performance problems: without some
+re-arrangement, these dependent binary images would be opened each
+time we need to process sample files for each program.
+</p>
+            <p>
+The solution is to "invert" the profiles via
+<code class="function">invert_profiles()</code>. We create a new data structure
+where the dependent binary is first, and the primary binary images using
+that dependent binary are listed as sub-images. This helps our
+performance problem, as now we only need to open each dependent image
+once, when we process the list of inverted profiles.
+</p>
+          </div>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="generating-profile-data"></a>3. Generating profile data</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+Things don't get any simpler at this point, unfortunately. At this point
+we've collected and classified the sample files into the set of inverted
+profiles, as described in the previous section. Now we need to process
+each inverted profile and make something of the data. The entry point
+for this is <code class="function">populate_for_image()</code>.
+</p>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="bfd"></a>3.1. Processing the binary image</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+The first thing we do with an inverted profile is attempt to open the
+binary image (remember each inverted profile set is only for one binary
+image, but may have many sample files to process). The
+<code class="varname">op_bfd</code> class provides an abstracted interface to
+this; internally it uses <code class="filename">libbfd</code>. The main purpose
+of this class is to process the symbols for the binary image; this is
+also where symbol filtering happens. This is actually quite tricky, but
+should be clear from the source.
+</p>
+          </div>
+          <div class="sect2" lang="en" xml:lang="en">
+            <div class="titlepage">
+              <div>
+                <div>
+                  <h3 class="title"><a id="processing-sample-files"></a>3.2. Processing the sample files</h3>
+                </div>
+              </div>
+            </div>
+            <p>
+The class <code class="varname">profile_container</code> is a hold-all that
+contains all the processed results. It is a container of
+<code class="varname">profile_t</code> objects. The
+<code class="function">add_sample_files()</code> method uses
+<code class="filename">libdb</code> to open the given sample file and add the
+key/value types to the <code class="varname">profile_t</code>. Once this has been
+done, <code class="function">profile_container::add()</code> is passed the
+<code class="varname">profile_t</code> plus the <code class="varname">op_bfd</code> for
+processing.
+</p>
+            <p>
+<code class="function">profile_container::add()</code> walks through the symbols
+collected in the <code class="varname">op_bfd</code>.
+<code class="function">op_bfd::get_symbol_range()</code> gives us the start and
+end of the symbol as an offset from the start of the binary image,
+then we interrogate the <code class="varname">profile_t</code> for the relevant samples
+for that offset range. We create a <code class="varname">symbol_entry</code>
+object for this symbol and fill it in. If needed, here we also collect
+debug information from the <code class="varname">op_bfd</code>, and possibly
+record the detailed sample information (as used by <span><strong class="command">opreport
+-d</strong></span> and <span><strong class="command">opannotate</strong></span>).
+Finally the <code class="varname">symbol_entry</code> is added to
+a private container of <code class="varname">profile_container</code> - this
+<code class="varname">symbol_container</code> holds all such processed symbols.
+</p>
+          </div>
+        </div>
+        <div class="sect1" lang="en" xml:lang="en">
+          <div class="titlepage">
+            <div>
+              <div>
+                <h2 class="title" style="clear: both"><a id="generating-output"></a>4. Generating output</h2>
+              </div>
+            </div>
+          </div>
+          <p>
+After the processing described in the previous section, we've now got
+full details of what we need to output stored in the
+<code class="varname">profile_container</code> on a symbol-by-symbol basis. To
+produce output, we need to replay that data and format it suitably.
+</p>
+          <p>
+<span><strong class="command">opreport</strong></span> first asks the
+<code class="varname">profile_container</code> for a
+<code class="varname">symbol_collection</code> (this is also where thresholding
+happens).
+This is sorted, then a
+<code class="varname">opreport_formatter</code> is initialised.
+This object initialises a set of field formatters as requested. Then
+<code class="function">opreport_formatter::output()</code> is called. This
+iterates through the (sorted) <code class="varname">symbol_collection</code>;
+for each entry, the selected fields (as set by the
+<code class="varname">format_flags</code> options) are output by calling the
+field formatters, with the <code class="varname">symbol_entry</code> passed in.
+</p>
+        </div>
+      </div>
+      <div class="glossary">
+        <div class="titlepage">
+          <div>
+            <div>
+              <h2 class="title"><a id="glossary"></a>Glossary of OProfile source concepts and types</h2>
+            </div>
+          </div>
+        </div>
+        <dl>
+          <dt>application image</dt>
+          <dd>
+            <p>
+The primary binary image used by an application. This is derived
+from the kernel and corresponds to the binary started upon running
+an application: for example, <code class="filename">/bin/bash</code>.
+</p>
+          </dd>
+          <dt>binary image</dt>
+          <dd>
+            <p>
+An ELF file containing executable code: this includes kernel modules,
+the kernel itself (a.k.a. <code class="filename">vmlinux</code>), shared libraries,
+and application binaries.
+</p>
+          </dd>
+          <dt>dcookie</dt>
+          <dd>
+            <p>
+Short for "dentry cookie". A unique ID that can be looked up to provide
+the full path name of a binary image.
+</p>
+          </dd>
+          <dt>dependent image</dt>
+          <dd>
+            <p>
+A binary image that is dependent upon an application, used with
+per-application separation. Most commonly, shared libraries. For example,
+if <code class="filename">/bin/bash</code> is running and we take
+some samples inside the C library itself due to <span><strong class="command">bash</strong></span>
+calling library code, then the image <code class="filename">/lib/libc.so</code>
+would be dependent upon <code class="filename">/bin/bash</code>.
+</p>
+          </dd>
+          <dt>merging</dt>
+          <dd>
+            <p>
+This refers to the ability to merge several distinct sample files
+into one set of data at runtime, in the post-profiling tools. For example,
+per-thread sample files can be merged into one set of data, because
+they are compatible (i.e. the aggregation of the data is meaningful),
+but it's not possible to merge sample files for two different events,
+because there would be no useful meaning to the results.
+</p>
+          </dd>
+          <dt>profile class</dt>
+          <dd>
+            <p>
+A collection of profile data that has been collected under the same
+class template. For example, if we're using <span><strong class="command">opreport</strong></span>
+to show results after profiling with two performance counters enabled
+profiling <code class="constant">DATA_MEM_REFS</code> and <code class="constant">CPU_CLK_UNHALTED</code>,
+there would be two profile classes, one for each event. Or if we're on
+an SMP system and doing per-cpu profiling, and we request
+<span><strong class="command">opreport</strong></span> to show results for each CPU side-by-side,
+there would be a profile class for each CPU.
+</p>
+          </dd>
+          <dt>profile specification</dt>
+          <dd>
+            <p>
+The parameters the user passes to the post-profiling tools that limit
+what sample files are used. This specification is matched against
+the available sample files to generate a selection of profile data.
+</p>
+          </dd>
+          <dt>profile template</dt>
+          <dd>
+            <p>
+The parameters that define what goes in a particular profile class.
+This includes a symbolic name (e.g. "cpu:1") and the code-usable
+equivalent.
+</p>
+          </dd>
+        </dl>
+      </div>
+    </div>
+  </body>
+</html>

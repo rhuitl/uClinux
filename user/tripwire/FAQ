@@ -1,0 +1,146 @@
+# $Id: FAQ,v 1.19 1994/08/30 06:09:48 gkim Exp $
+
+#
+# FAQ for Tripwire
+#
+
+    This file answers frequently asked questions about Tripwire.
+The first section of the file covers Tripwire concepts and design,
+while the second section addresses troubleshooting.
+
+Concepts:
+=========
+
+Q:	Why doesn't Tripwire ever traverse across mounted filesystems?
+
+A:	This is a feature.  This behavior makes it possible to put a
+	directory (e.g., '/') in your tw.config file, and you won't
+	have to worry whether it will traverse all the locally-mounted
+	filesystems.  If you want it do the whole filesystem, list
+	each partion separately in the configuration file.
+
+
+Q:	What is the difference between pruning an entry in your 
+	tw.config file (via "!") and ignoring everything (via the "E" 
+	template)?
+
+A:	Ignoring everything in a directory still monitors for added 
+	and deleted files.  Pruning a directory will prevent Tripwire
+	from even looking in the specified directory.
+
+
+Q:	Tripwire runs very slowly.  What can I do to make it run 
+	faster?
+
+A:	You can modify your tw.config entries to skip the Snefru 
+	signatures by appending a "-2" to the ignore flags.  Or you can
+	tell Tripwire at run-time to skip Snefru by:
+		
+			tripwire -i 2
+			
+	This computationally expensive operation may not be needed for 
+	many applications.  (See README section on security vs. 
+	performance trade-offs for further details.)
+
+Troubleshooting:
+================
+
+Q:	I build Tripwire and the test suite fails.  What do I do?
+A:	Read the README section on "Common Compilation Problems."
+
+Q:	Tripwire reports that my database version is out of date.  What
+	should I do?
+A:	The database format used by Tripwire v1.2 changed.
+	You need to rebuild the database with Tripwire v1.2; see the
+	README file for details.
+
+
+Q:	Where do I find Larry Wall's patch program?
+A:	You can get it via anonymous FTP at ftp.uu.net:/pub/patch.tar.Z.
+
+
+Q: 	When running Tripwire in Integrity Checking mode, Tripwire
+	fails when it tries to find a file with a name consisting of
+	dozens/hundreds/thousands of '/'s.  What went wrong?
+
+A:	Your setting for the #define DIRENT value in your conf-<os>.h
+	file is probably incorrect.  Trying switching the setting and
+	see if the problem goes away.  (i.e., switch #define to 
+	#undef, or vice versa.)
+
+
+Q:	I have /tmp in my tw.config file, but none of the files in 
+	the directory are being read by Tripwire.  What's going on?
+
+A:	Check to see that your /tmp directory isn't a symbolic link
+	to another filesystem.  When recursing down into directories,
+	Tripwire never traverses symbolic links or enters another
+	filesystem.  
+
+
+Q:	Is there any way I can get Tripwire to print out the names of the
+	files as they are being scanned?  I want to know which files
+	Tripwire is spending all of its time crunching.
+
+A:	Try using 'tripwire -v'.  This wasn't documented in the first
+	tripwire.8 manual page.
+
+
+Q:	I try to initialize the database by typing 'tripwire -initialize'
+	but I can't find the binary.  Where is the tripwire executable?
+
+A:	./src/tripwire is where the binary is built.  'make install'
+	will install in the $(DESTDIR) of your choice, as defined
+	in the top-level Makefile.
+
+
+Q:	I have the following line in my tw.config file to do host specific
+	actions.  Why doesn't it work?
+
+		@@ifhost chapel || chekov || chewie || data || guinan 
+			....
+		@@endif
+
+A:	You must put the hostnames as returned by 'hostname' or 'uname'
+	(depending on whether you're running a BSD or SYSV derived OS).
+	So, the correct form would be:
+
+		@@ifhost chapel.enterprise.fed || chekov.enterprise.fed ...
+
+	The Tripwire preprocessor tries its best to figure out if you
+	have used misformed hostnames.
+
+Q.	As part of my operational security plan for my exported NFS
+	partitions, I want to run "fsirand" regularly.  Unfortunately,
+	if I do this, Tripwire will complain that every file has changed
+	(because the i-node numbers will change).  I don't want to
+	rebuild the entire system database each time. What can I do?
+
+A.	We have included a Perl script in the distribution that will
+	go through a Tripwire db file (the output database) and update
+	the i-node fields while leaving everything else the same.  To
+	use it, you need to modify the first line to point to your Perl
+	interpreter (if you don't have Perl, you'll need to write your
+	own program in C or get Perl from an ftp site).  
+
+	The Perl script is ./contrib/twdb_newinode.pl.
+
+	After the next time you are in single-user mode running fsirand,
+	run this script with the db as input.  For example,
+	    cd /usr/local/adm/tcheck/databases
+	    ./twdb_newinode.pl tw.db_myhost
+	It will automatically create a backup version of the file for
+	you as a "just in case." 
+
+	*Afterwards, be certain to set the disk with the database back
+	to read-only!!*  Also, store the Perl script in the same secure
+	place as the Tripwire program.
+
+
+Gene & Gene
+Kim  & Spafford
+
+Last updated: July 17, 1994
+(gkim@cs.purdue.edu)
+(spaf@cs.purdue.edu)
+	

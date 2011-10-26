@@ -1,0 +1,57 @@
+udev - userspace device management
+
+For more information see the files in the docs/ directory.
+
+Important Note:
+  Integrating udev in the system has complex dependencies and differs from distro
+  to distro. All major distros depend on udev these days and the system may not
+  work without a properly installed version. The upstream udev project does not
+  recommend to replace a distro's udev installation with the upstream version.
+
+Requirements:
+  - Version 2.6.22 of the Linux kernel for reliable operation of this release of
+    udev. The kernel must not use the CONFIG_SYSFS_DEPRECATED* option.
+
+  - The kernel must have sysfs, unix domain sockets and networking enabled.
+    Unix domain sockets (CONFIG_UNIX) as a loadable kernel module is not
+    supported.
+
+  - The proc filesystem must be mounted on /proc/, the sysfs filesystem must
+    be mounted at /sys/. No other locations are supported by udev.
+
+  - The system must have the following group names resolvable at udev startup:
+      disk, cdrom, floppy, tape, audio, video, lp, tty, dialout, kmem.
+    Especially in LDAP setups, it is required, that getgrnam() is able to resolve
+    these group names with only the rootfs mounted, and while no network is
+    available.
+
+Operation:
+  Udev creates and removes device nodes in /dev/, based on events the kernel
+  sends out on device discovery or removal.
+
+  - Very early in the boot process, the /dev/ directory should get a 'tmpfs'
+    filesystem mounted, which is populated from scratch by udev. Created nodes
+    or changed permissions will not survive a reboot, which is intentional.
+
+  - The content of /lib/udev/devices/ directory which contains the nodes,
+    symlinks and directories, which are always expected to be in /dev, should
+    be copied over to the tmpfs mounted /dev, to provide the required nodes
+    to initialize udev and continue booting.
+
+  - The old hotplug helper /sbin/hotplug should be disabled on bootup, before
+    actions like loading kernel modules are taken, which may cause a lot of
+    events.
+
+  - The udevd daemon must be started on bootup to receive netlink uevents
+    from the kernel driver core.
+
+  - All kernel events are matched against a set of specified rules in
+    /lib/udev/rules.d/ which make it possible to hook into the event
+    processing to load required kernel modules and setup devices. For all
+    devices the kernel exports a major/minor number, udev will create a
+    device node with the default kernel name, or the one specified by a
+    matching udev rule.
+
+Please direct any comment/question/concern to the linux-hotplug mailing list at:
+  linux-hotplug@vger.kernel.org
+

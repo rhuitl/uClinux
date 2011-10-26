@@ -1,0 +1,381 @@
+#!/bin/sh
+#
+# Author      : Edouard Gomez <ed.gomez@free.fr>
+# Last Modifs : May, the 7th 2002
+#
+# ToDo : this needs a special module configuration for debian
+#        which uses files in /etc/modules/ and then run update-modules
+#
+
+# Configuration script for the pppd daemon
+PEER="adsl"
+PPP_DIR="/etc/ppp"
+PEER_DIR=$PPP_DIR"/peers"
+PEER_FILE=$PEER_DIR"/"$PEER
+CHAP_FILE="/etc/ppp/chap-secrets"
+PAP_FILE="/etc/ppp/pap-secrets"
+PPPOA3=`which pppoa3`
+WHOAMI=`whoami`
+
+echo "PPPD Configuration Script for GNU/Linux"
+echo
+
+if [ "$WHOAMI" != "root" ]; then
+  echo "You must launch this script with root privileges"
+  exit -1
+fi
+
+if [ ! -x $PPOA3 ] ; then
+  echo "You must install the drivers first"
+  exit -1
+fi
+
+# Reads user input
+read -p "Login    : " LOGIN
+read -p "Password : " PASSWORD
+
+cat << EOF
+
+You will be prompted for your Vpi Vci,
+Here are some working values but your configuration may differ
+
++----------------+---------+
+|    Country     | vpi.vci |
++----------------+---------+
+|Belgium, ?      |   8.35  |
++----------------+---------+
+|Denmark, Orange |   8.35  |
++----------------+---------+
+|France, wanadoo |   8.35  |
++----------------+---------+
+|France, ?       |   8.67  |
++----------------+---------+
+|Italy, ?        |   8.35  |
++----------------+---------+
+|Netherlands, ?  |   8.48  |
++----------------+---------+
+|UK, BTopenworld |   0.38  |
++----------------+---------+
+|US, BellSouth   |   8.35  |
++----------------+---------+
+
+EOF
+
+read -p "Your Vpi      : " VPI
+read -p "Your Vci      : " VCI
+
+cat << EOF
+
+
+Now you will be prompted for some pppd options
+Answer Y/y or N/n
+
+EOF
+
+read -p "Do you want pppd to reconnect automatically ? : " PERSISTA
+read -p "Do you want pppd to use peer DNS ? : " DNSPEERA
+read -p "Do you want to set the adsl connection as your default route ? : " DEFA
+echo "Do you want pppd to be in debug mode ?"
+read -p "(usefull if you install this package for the 1st time) : " DEBUGA
+
+if [ $PERSISTA == "Y" ] || [ $PERSISTA == "y" ] ; then
+  PERSIST="persist"
+else
+  PERSIST="#persist"
+fi
+
+if [ $DNSPEERA == "Y" ] || [ $DNSPEERA == "y" ] ; then
+  DNSPEER="usepeerdns"
+else
+  DNSPEER="#usepeerdns"
+fi
+
+if [ $DEFA == "Y" ] || [ $DEFA == "y" ] ; then
+  DEF="defaultroute"
+else
+  DEF="#defaultroute"
+fi
+
+if [ $DEBUGA == "Y" ] || [ $DEBUGA =="y" ] ; then
+  DEBUG1="debug"
+  DEBUG2="kdebug 1"
+else
+  DEBUG1="#debug"
+  DEBUG2="#kdebug 1"
+fi
+
+# Generates chap/pap-secrets line
+SECRETLINE="\"$LOGIN\" \"*\" \"$PASSWORD\" \"*\""
+
+# Generates the user line needed in /etc/ppp/peers/adsl
+USERLINE="user \"$LOGIN\""
+
+# Creates /etc/ppp/peers
+if [ ! -d $PEER_DIRECTORY ] ; then
+  echo "Creating /etc/ppp/peers directory"
+  mkdir /etc/ppp/peers
+fi
+
+# Check /etc/ppp/peers/adsl existence
+if [ -f $PEER_FILE ] ; then
+  read -p "Do you want to overwrite $PEER_FILE (y/n) : " ANSWER
+  if [ $ANSWER == "n" ] || [ $ANSWER == "N" ] ; then
+     exit 1
+  fi
+  rm -f $PEER_FILE
+  touch $PEER_FILE
+fi
+
+#
+# Generates /etc/ppp/peers/adsl file
+#
+
+echo Generating $PEER_FILE
+echo "PPPoA3 is located there : $PPPOA3"
+cat > $PEER_FILE <<EOF
+# ##########################################################################
+#
+# Automatically generated on $(date)
+# by adsl-conf-pppd for User space Speedtouch USB driver
+#
+# This file could be rename but its place is under $PEER_DIRECTORY
+# To connect to Internet using this configuration file
+# pppd call $PEER
+#
+# ##########################################################################
+
+#
+# Put your ISP login name here and update your chap-secrets
+# (This example is a typical Wanadoo.fr login)
+#
+
+$USERLINE
+
+#
+# PPPoA3 daemon is the default one but you can use the old PPPoA2
+#
+# To help you for your choice :
+#
+# pppoa3 is multithreaded, has more features, has a better design.
+# pppoa2 is simpler but is deprecated due to its limited design.
+#
+# pppoa2 is still in this driver set because BSD systems have a
+# problem with usb+multithreading but all GNU/Linux systems should
+# use pppoa3
+#
+
+#
+# Comment only one of those pty option
+#
+# Don't forget to adapt the vpi.vci couple to your ISP/country settings
+# Read the FAQ for some vpi.vci couples
+#
+# If you installed from a rpm or deb package the right path is /usr/sbin
+# instead of /usr/local/sbin
+#
+
+
+#pty "$PPPOA3 -vpi $VPI -vci $VCI"
+pty "$PPPOA3 -c -m 1 -vpi $VPI -vci $VCI"
+
+#
+# pppoa2 must run in sync mode, this option must be set.
+#
+# pppoa3 can run in either sync or async mode
+#
+# In order to use the async mode with pppoa3 :
+#   - comment this option
+#   - replace the pty "..." line with this one
+#     pty "$PPPOA3 -a -c -m 1 -vpi $VPI -vci $VCI"
+#
+
+sync
+
+#
+# We don't need a default ip, and we don't need the peer to auth itself
+#
+
+noauth
+noipdefault
+
+#
+# We don't want to negociate compression schemes at all
+#
+
+noaccomp
+nopcomp
+noccp
+novj
+
+#
+# Makes pppd "dial again" when the connection is lost
+#
+
+$PERSIST
+
+#
+# pppd will try to connect "maxfail" times and wait "holdoff" seconds
+# between each try.
+#
+
+holdoff 4
+maxfail 25
+
+#
+# Asks your ISP for its DNS ip
+# (look at the /etc/ppp/resolv.conf)
+#
+
+$DNSPEER
+
+#
+# Makes this ppp link the default inet route
+# (route -n to check it)
+#
+
+$DEF
+
+#
+# If something goes wrong try uncommenting this
+#
+
+$DEBUG1
+$DEBUG2
+
+#
+# LCP requests are not mandatory plus they fail
+# on some systems
+#
+#lcp-echo-interval 600
+#lcp-echo-failure 10
+EOF
+
+echo Saving your pppd options file
+cp -f /etc/ppp/options /etc/ppp/options.bak
+echo Creating the new one
+cat > $PPP_DIR"/options" << EOF
+lock
+noauth
+noipdefault
+usepeerdns
+EOF
+
+#
+# Generates user/password entry in chap and pap secrets files
+#
+
+# Creates the chap file if needed
+if [ ! -f $CHAP_FILE ] ; then
+  echo Creating $CHAP_FILE
+  touch $CHAP_FILE
+  chmod 600 $CHAP_FILE
+  echo "# Secrets for authentication using CHAP" > $CHAP_FILE
+  echo "# client        server         secret         IP addresses" >> $CHAP_FILE
+fi
+
+# Creates the pap file if needed
+if [ ! -f $PAP_FILE ] ; then
+  echo Creating $PAP_FILE
+  touch $PAP_FILE
+  chmod 600 $PAP_FILE
+  echo "# Secrets for authentication using PAP" > $PAP_FILE
+  echo "# client        server         secret         IP addresses" >> $PAP_FILE
+fi
+
+# Saves old files
+echo Saving old $CHAP_FILE to $CHAP_FILE.old
+cp -f $CHAP_FILE $CHAP_FILE.old
+chmod 600 $CHAP_FILE.old
+
+echo Saving old $PAP_FILE to $PAP_FILE.old
+cp -f $PAP_FILE  $PAP_FILE.old
+chmod 600 $PAP_FILE.old
+
+# Remove old login entry from pap and chap file
+echo Removing old $LOGIN entry from $CHAP_FILE
+grep -v $LOGIN $CHAP_FILE.old > $CHAP_FILE
+echo Removing old $LOGIN entry from $PAP_FILE
+grep -v $LOGIN $PAP_FILE.old  > $PAP_FILE
+
+# Add the new entry
+echo Adding new $LOGIN entry to $CHAP_FILE
+echo $SECRETLINE >> $CHAP_FILE
+echo Adding new $LOGIN entry to $PAP_FILE
+echo $SECRETLINE >> $PAP_FILE
+
+#
+# Add ppp entries to /etc/modules.conf
+#
+
+if [ -f /etc/conf.modules ] ; then
+  MODULE_CONF="/etc/conf.modules"
+fi
+
+if [ -f /etc/modules.conf ] ; then
+  MODULE_CONF="/etc/modules.conf"
+fi
+
+#
+# We handle the Debian way here
+#
+if [ -f /etc/debian_version ]; then
+  MODULE_CONF="/etc/modutils/hdlc"
+  echo "Configuring the modules.conf the debian way !"
+fi
+
+echo "Adding ppp entries to your $MODULE_CONF"
+
+# This bunch of aliases are already defined in debian systems
+if [ ! -f /etc/debian_version ]; then
+
+  echo >> $MODULE_CONF
+  grep -q "char-major-108" $MODULE_CONF
+  if [ $? -ne 0 ] ; then
+    echo "alias char-major-108  ppp_generic" >> $MODULE_CONF
+  fi 
+  grep -q "tty-ldisc-3" $MODULE_CONF
+  if [ $? -ne 0 ] ; then
+    echo "alias tty-ldisc-3     ppp_async" >> $MODULE_CONF
+  fi
+
+fi
+
+# This one needs to be added in every case
+grep -q "tty-ldisc-13" $MODULE_CONF
+if [ $? -ne 0 ] ; then
+  echo "alias tty-ldisc-13    n_hdlc" >> $MODULE_CONF
+fi
+
+# This bunch of aliases are also already defined in debian systems
+if [ ! -f /etc/debian_version ]; then
+
+  grep -q "tty-ldisc-14" $MODULE_CONF
+  if [ $? -ne 0 ] ; then
+    echo "alias tty-ldisc-14    ppp_synctty" >> $MODULE_CONF
+  fi
+  grep -q "ppp-compress-21" $MODULE_CONF
+  if [ $? -ne 0 ] ; then
+    echo "alias ppp-compress-21 bsd_comp" >> $MODULE_CONF
+  fi
+  grep -q "ppp-compress-24" $MODULE_CONF
+  if [ $? -ne 0 ] ; then
+    echo "alias ppp-compress-24 ppp_deflate" >> $MODULE_CONF
+  fi
+  grep -q "ppp-compress-26" $MODULE_CONF
+  if [ $? -ne 0 ] ; then
+    echo "alias ppp-compress-26 ppp_deflate" >> $MODULE_CONF
+  fi
+
+fi
+
+#
+# We update the /etc/modules.conf with the debian tool
+#
+if [ -f /etc/debian_version ]; then
+  echo "Updating /etc/modules.conf using update-modules"
+  update-modules
+fi
+
+# Finished...
+echo
+echo PPPD configuration done.

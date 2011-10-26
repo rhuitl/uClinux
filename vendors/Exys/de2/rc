@@ -1,0 +1,12 @@
+hostname deII
+echo "Mounting /proc filesystem"
+mount -t proc proc /proc
+echo "Mounting /var filesystem"
+gunzip -c /lib/varramfs.img.gz > /dev/ram0 2> /dev/null
+mount -t ext2 /dev/ram0 /var
+echo "Starting network interface"
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+dhcpcd -c /etc/ifup.sh eth0 &
+portmap &
+cat /etc/motd

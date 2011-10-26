@@ -1,0 +1,103 @@
+Installation:
+After unpacking the archive, there's a src-directory with the sourcecode for 
+the applet and a bin-directory with the sample html-file, the jar-archive and 
+the shell-script to gather the information from the proc-filesystem. 
+The jar-archive and the html-file should go into the root directory of your 
+webserver (htdocs/ for Apache) or any other directory the webserver has access 
+to. They should not go into the cgi-bin/ directory. The shell-script (stat.sh) 
+can go wherever you want, /usr/local/bin or /usr/bin or whatever. 
+Don't forget to set the executable bit on the script, in case that got lost by 
+gzip/pkzip. 
+
+Configuration:
+This section only describes how to proceed for the statistics-gathering 
+script. If you define actions that should trigger a script by opening a port, 
+you'll have to make the corresponding changes for that script 
+
+Add the following line to /etc/services: 
+
+stat      1024/tcp                       # check network stats
+
+Add the following line to /etc/inetd.conf (this assumes you copied the script 
+to /sbin/): 
+
+stat    stream  tcp     nowait  root    /usr/sbin/tcpd  /sbin/stat.sh
+
+That's all. Of course, this only works if you have inetd running...
+
+I'm not aware of any security holes being opened by adding this to inetd 
+(aside from running inetd at all). If you know of any problems this approach 
+might cause, please let me know. 
+
+You should probably also take a look at /etc/hosts.allow and also your 
+firewall-rules to make sure that connections from your client to that host are 
+actually allowed. 
+
+EigerStein users: LrpStat will not work with the default hosts.allow file on 
+EigerStein. You'll have to change 
+
+sh-httpd: 192.168.1.0/255.255.255.0
+to 
+
+ALL: 192.168.1.0/255.255.255.0
+
+Example for a data-generating script on the server-side:
+(this script works with ash and bash; I don't know about any other shells. If 
+it works for you using a different shell, please let me know) 
+
+#!/bin/sh -e
+trap "exit 1" 1
+trap "exit 1" 2
+sleepTime=1;
+if [ -n "$1"  ] ; then
+	sleepTime=$1
+fi
+while [ 1 ]
+do
+        cat /proc/net/dev
+        echo "#"
+        sleep $sleepTime
+done
+
+This version of the script accepts a parameter that specifies the time (in 
+seconds) between measurements. The default is 1. If you want 5 seconds between 
+measurements, you would specify 
+
+stat    stream  tcp     nowait  root    /usr/sbin/tcpd  /sbin/stat.sh 5
+
+in inetd.conf
+
+Note: since there are no timestamps sent with the data (for the shell script, 
+the C-program does send a timestamp), specifying the time is not very 
+accurate, since this doesn't say when the java program actually receives the 
+data (and for data without a timestamp, it uses the time since the last packet 
+has arrived to build its own timestamp). 
+
+C-program to generate the data on the server:
+Since version 0.6 there's also a c-program that can be used instead of the 
+script. This program should generate a little less unnecessary data and might 
+also be a little easier on the server (concerning processor and ram usage).
+Thanks to Dirk Gfrörer, there is a new version of this program since version 
+0.8 with added functionality (especially for ISDN users). 
+
+If you want to use this, you'll have to change the program-name specified in 
+/etc/inetd.conf, since the instructions above assume you're using the script. 
+
+The makefile creates two versions (at least on my system, probably not on 
+yours, unless you have SuSE Linux with the glibc 2.0 compatibility package 
+installed). The first version, that is copied into glibc/ and is compiled with 
+the standard cc and linked against whatever libraries you have on your system. 
+
+The second, which is put in glibc20/ uses the compiler from the glibc20 
+compatibility package and is linked against glibc2.0 (so it works on lrp). 
+
+There are also isdn-versions, with special isdn-features enabled (check the 
+makefile if you want to build those yourself). 
+
+Since version 0.11, the c-program also formats the cpu-usage as a "virtual" 
+interface (name cpu0), which can be used to display cpu-usage in a graph. See 
+also the DEVx_PERCENT parameter in the html-file.
+
+If you have more than one cpu, the first two are displayed as device "cpu0" (the
+first cpu will be presented as "incoming traffic", the second as "outgoing
+traffic"). The next two as device "cpu1" and so on. 

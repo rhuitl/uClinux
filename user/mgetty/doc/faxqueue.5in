@@ -1,0 +1,132 @@
+.TH faxqueue 5 "23 Nov 02" "greenie" "mgetty+sendfax manual"
+.IX faxqueue
+.SH NAME
+faxqueue \- sendfax fax spool queue control files
+.SH SYNOPSIS
+.B @FAX_SPOOL_OUT@/F*/JOB
+.SH DESCRIPTION
+The
+.I JOB
+files in the subdirectories of the outgoing fax spool directory, 
+.I @FAX_SPOOL_OUT@
+build up a queue of faxes to be sent by faxrunq(1). They are created by
+faxspool(1), can be viewed with faxq(1), and be deleted by faxrm(1).
+
+.SH FORMAT
+The format of the JOB file is as follows:
+
+Each line consists of a leading keyword and associated data (rest of the
+line). Some are required, some others are optional. The currently
+implemented keywords are:
+.TP
+.B phone <number>
+The telephone number to send the fax to. Required.
+.TP
+.B user <user>
+The originating user name (on the local machine). If no "mail" field is
+present, this user will get the status mail about the fax. Required.
+.TP
+.B mail <email>
+If this field is present, faxrunq(1) will send its status mail to the
+address given here. If not, faxrunq(1) will use the "user" field.
+Optional.
+.TP
+.B input <file(s)>
+The file names passed to faxspool(1). Optional, used only by faxq(1).
+.TP
+.B pages <file(s)>
+The file names, relative to the directory where the JOB file is found,
+that are to be sent with sendfax(8). The files have to exist, and be
+readable by the user that runs faxrunq(1). Required, except if "poll" is
+used, then it's optional.
+.TP
+.B priority <0-9>
+This can be used to set the priority for this job in the fax queue (higher
+priority jobs get sent before all lower-pri jobs). So far, only
+.I faxrunqd
+uses this field, 
+.I faxrunq
+does NOT. 9 is the highest, 0 the lowest priority. 5 is the default.
+.TP
+.B Status <message>
+Automatically appended by faxrunq(1) after each run, tells the reader
+about successful and unsuccessful tries to send this job. If more than
+five "FATAL" errors are listed, the fax job is removed from the queue.
+.TP
+.B verbose_to <blurb>
+A plain-text description of the receiver of the fax. Is returned, if
+present, in the mail messages "your fax to <blurb>". Optional.
+.TP
+.B time <hhmm>
+If present, 
+.I 
+faxrunq
+won't send this job before the given time. The format must be exactly
+"hhmm", in 24-hr-format, otherwise faxrunq won't understand it. Optional.
+.TP
+.B poll
+Flag token.  If present, faxrunq will try to poll the given phone
+number for documents (see "sendfax -p").
+.TP
+.B normal_res
+Flag token.  If present, faxrunq will transmit all pages using normal
+resolution (see "sendfax -n").
+.TP
+.B acct_handle <arbitrary string>
+This is a pure comment field, but sendfax(8) will log it into
+its transaction log file. So this can be used as a customer handle,
+a job number, whatever you need to get the phone bills charged to the
+customer (the programs won't look at it, just pass it through). Optional.
+.TP
+.B subject <arbitrary string>
+This is also a pure comment field, used only for informational purposes.
+.I
+faxrunq
+will return it in the sucess/failure mail. If you use 
+.I
+faxspool -s <subj>,
+it will put this string on the cover page and in the JOB file.
+
+.SH PERMISSIONS
+Starting with mgetty 1.1.29, the fax spool directory @FAX_SPOOL_OUT@
+is no longer world-writeable.  It should be owned by the 
+user '@FAX_OUT_USER@' and be mode 755.  The faxrunq(1) and faxrunqd(1) 
+programs should also be run under that user ID if possible.
+
+If the fax spool directory is world- or group-writeable, there are a
+number of denial of service or file overwrite / file access attacks 
+possible that it's very hard to guard against. So don't do this!
+
+If the fax spool directory has the proper permissions, there are currently
+no known attacks against faxrunq/faxrunqd, even if they run as "root", but
+it's always more safe to run as untrusted user.
+
+
+.SH PROCESSING
+
+While a given JOB file is processed by faxrunq(1), it's locked against
+sending it multiple times by temporarily renaming it to
+.I JOB.locked,
+thus it may happen that a faxq(1) command doesn't show this job. (
+.I faxrunqd(8)
+is a bit smarter and does the locking by creating a hard link).
+
+When a job is successfully sent, it's not deleted but the JOB file is
+renamed to
+.I JOB.done.
+Because of this, you can still see old jobs with "faxq -o". You should
+regularly clean up the outgoing fax directory, removing old faxes. If you
+don't want this behaviour, edit the faxrunq(1) config file and enable
+the option
+.I delete-sent-jobs yes
+
+When a job cannot be sent after several tries (excluding normal
+difficulties like the called number being busy or the modem being in
+use), the JOB file is renamed to
+.I JOB.suspended.
+To re-queue this job, call
+.I faxq -r
+-- this renames the JOB file back.
+
+.SH "SEE ALSO"
+faxrunq(1), faxspool(1), faxrm(1), faxq(1), faxrunqd(8)

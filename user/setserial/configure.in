@@ -1,0 +1,51 @@
+AC_INIT(setserial.c)
+dnl
+dnl This is to figure out the version number and the date....
+dnl
+RELEASE_VERSION=`grep SETSERIAL_VERSION ${srcdir}/version.h  \
+	| awk '{print $3}' | tr \" " " | awk '{print $1}'`
+DATE=`grep SETSERIAL_DATE ${srcdir}/version.h | awk '{print $3}' \
+	| tr \" " "`
+MONTH=`echo $DATE | awk -F- '{print $2}'`
+YEAR=`echo $DATE | awk -F- '{print $3}'`
+
+if expr $YEAR ">" 1900 > /dev/null ; then
+	RELEASE_YEAR=$YEAR
+elif expr $YEAR ">" 90 >/dev/null ; then
+	RELEASE_YEAR=19$YEAR
+else
+	RELEASE_YEAR=20$YEAR
+fi
+
+case $MONTH in
+Jan)	RELEASE_MONTH="January" ;;
+Feb)	RELEASE_MONTH="February" ;;
+Mar)	RELEASE_MONTH="March" ;;
+Apr)	RELEASE_MONTH="April" ;;
+May)	RELEASE_MONTH="May" ;;
+Jun)	RELEASE_MONTH="June" ;;
+Jul)	RELEASE_MONTH="July" ;;
+Aug)	RELEASE_MONTH="August" ;;
+Sep)	RELEASE_MONTH="September" ;;
+Oct)	RELEASE_MONTH="October" ;;
+Nov)	RELEASE_MONTH="November" ;;
+Dec)	RELEASE_MONTH="December" ;;
+*)	echo "Unknown month $MONTH??" ;;
+esac
+
+unset DATE MONTH YEAR
+echo "Generating configuration file for setserial version $RELEASE_VERSION"
+echo "Release date is ${RELEASE_MONTH}, ${RELEASE_YEAR}"
+AC_SUBST(RELEASE_YEAR)
+AC_SUBST(RELEASE_MONTH)
+AC_SUBST(RELEASE_VERSION)
+dnl
+dnl End of version number scheme
+dnl
+
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_CHECK_TOOL(STRIP, strip, :)
+AC_CHECK_HEADERS(asm/ioctls.h linux/hayesesp.h)
+
+AC_OUTPUT(setserial.8 Makefile)

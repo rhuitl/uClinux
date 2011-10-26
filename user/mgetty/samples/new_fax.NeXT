@@ -1,0 +1,111 @@
+#!/bin/sh
+#From: Paul Buckley <andrews@creative.net>
+#Date: Tue,  2 Apr 96 07:52:57 -0800
+#To: gert@greenie.muc.de (Gert Doering)
+#Subject: Re: another new_fax script, plain text
+#!/bin/sh
+#
+# This script pepares G3 files for  /usr/lib/NextPrinter/faxcleanup,
+# feed them to faxcleanup, and mails the resulting .fax  file to $MAILTO.
+# (FAX_NOTIFY_PROGRAM in policy.h)
+#
+# This script is a combination of one by  gert@greenie.muc.de which
+# converted G3's to pmb.gzip's and mailed them  (new_fax.mail) and
+# one by <Kevin Peckover>peckover@atlsci.com which  prepped G3 files
+# for faxcleanup and is packaged with his ps2g3 tool.
+#
+# This script calls the attach_mail executable by <Joe Freeman>Joe@FreemanSoft.com
+# which is available from the NeXt archives.
+# ftp://ftp.informatik.uni-muenchen.de/pub/comp/platforms/next/Unix/mail/send_attach.NI.b.tar.gz
+#
+# Much thanks is given to Ben Stuyts <benst@stuyts.nl>  for the following
+# explanation and other tips.
+#
+#	Leading bites that make a G3 file food for faxcleanlup
+#     vres = '0': 98 lpi		can tell from an  mgetty receive fax filename
+#     vres = '1': 196 lpi		fn... for  normal/low (98); ff... for fine/high (196)
+#     halftone = '0': normal line art	this is used
+#     halftone = '1': gray level
+#     coding = '0': 1-d compression		standard  for raw G3 files
+#     coding = '1': 2-d compression
+#
+# faxcleanup
+# usage:  %s [ options ] <numPages> <nameRoot>
+# options:
+#   -d        -- input pages scanned at "detail" density.
+#   -s        -- input pages scanned at "standard" density.
+#   -w        -- width of page images (in pixels)
+#   -c <CSI>  -- provide remote station CSI for FaxCtl file
+#   -X        -- delete input files
+#   -Q        -- suppress all messages
+#   -M        -- MSBF (default is LSBF)
+#
+# <Paul Buckley> buckley@mayo.edu March, 1996.
+
+# Send the fax as NeXT mail to:
+MAILTO="paul"
+
+# be sure to have send_attach around
+SEND="/usr/local/bin/send_attach"
+
+# called by mgetty, this script is fed
+# <program> <result code> "<sender_id>" <#pgs> <pg1> <pg2>...
+#
+
+HUP="$1"
+SENDER="$2"
+PAGES="$3"
+
+shift 3
+P=1
+
+BASE=`basename $1 .01`
+DIR="/tmp/"
+
+while [ $P -le $PAGES ]
+do
+	FILE=$1
+	RES=`basename $FILE | sed 's/.\(.\).*/\1/'`
+	if [ "$RES" = "f" ]
+	then
+		HEADER="100"
+		OPS=-s
+	else
+		HEADER="000"
+		OPS=-d
+	fi
+
+	if [ $P -le 9 ]
+	then
+		echo -n $HEADER > $DIR$BASE'.''00'$P
+		cat $FILE >> $DIR$BASE'.''00'$P
+	elif [ $P -le 99 ]
+	then
+		echo -n $HEADER > $DIR$BASE'.''0'$P
+		cat $FILE >> $DIR$BASE'.''0'$P
+	elif [ $P -le 999 ]
+	then
+		echo -n $HEADER > $DIR$BASE'.'$P
+		cat $FILE >> $DIR$BASE'.'$P
+	else
+		echo "too many pages"
+	fi
+	
+	shift
+	P=`expr $P + 1`
+done
+
+touch $DIR$BASE.fax
+
+# run faxcleanup.
+# $PAGES is required.
+/usr/lib/NextPrinter/faxcleanup -M -Q $OPS $PAGES $DIR$BASE
+
+# send mail
+$SEND -s "A Fax from $SENDER. Total pages: $PAGES."  
+$MAILTO  $DIR$BASE.fax
+
+# remove the /tmp files; The original G3 files persist.
+rm -f $DIR$BASE.*
+
+exit 0

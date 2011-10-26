@@ -1,0 +1,41 @@
+The following is a list of files and features that are going to be
+removed in the mtd-utils source tree.  Every entry should contain what
+exactly is going away, why it is happening, and who is going to be doing
+the work.  When the feature is removed from the utils, it should also
+be removed from this file.
+
+---------------------------
+1. Kill --squash-rino-perm and --nosquash-rino-perm parameters of mkfs.ubifs.
+
+Originally, mkfs.ubifs did not have these parameters, and it always set
+permissions for the UBIFS root inode to be {uid=gid=root, u+rwx,go+rx}. This was
+a bug which was found too late, when mkfs.ubifs had already been used in
+production. To fix this bug, 2 new options were introduced:
+--squash-rino-perm which preserves the old behavior and --nosquash-rino-perm
+which makes mkfs.ubifs use the right permissions for the root
+inode. For now --squash-rino-perm is the default, and if neither
+--squash-rino-perm nor --nosquash-rino-perm are used, mkfs.ubifs prints a
+warning. This was introduced in mtd-utils-1.4.0 (13 Sep 2010).
+
+So the plan is (to be done by Artem Bityutskiy):
+
+1. keep the warning for few releases to make sure users start using one of the
+   options. Update the mkfs.ubifs documentation at the web site.
+2. make --nosquash-rino-perm to be the default, and remove the warning.
+   Update the mkfs.ubifs documentation at the web site.
+3. eventually deprecate both options by:
+3.1 adding a warning to make users stop using them
+3.2 removing both options.
+---------------------------
+2. nanddump: fail when the -s parameter is not page aligned
+
+nanddump should be consistent with nandwrite, and refuse accepting non page
+aligned start addresses. These dumps are most likely useless, since nandwrite
+won't write then at this location. Currently only a warning is issued to keep
+backward compatibility during a transition period. This should become an error
+one release after the next release (current is mtd-utils-1.4.0, 18 Sep 2010).
+
+To be done by Artem Bityutskiy.
+---------------------------
+3.
+---------------------------

@@ -1,0 +1,267 @@
+<!-- French translation from routing.sgml v1.2 -->
+
+<sect>Configuration du Routage
+<p>
+Les sections suivantes du fichier de configuration peuvent &#234;tre utilis&#233;es
+pour configurer comment les appels sont rout&#233;s.
+
+<sect1>Section &lsqb;RoutingPolicy&rsqb;
+<label id="routingpolicy">
+<p>
+Cette section explique comment les diverses politiques de routage possibles du
+gatekeeper fonctionnenet.
+
+Les demandes d'appel peuvent &#234;tre rout&#233;es en utilisant un certain nombre
+de fournisseurs de routage:
+
+<itemize>
+
+<item><tt/explicit/<newline>
+<p>
+La destination est explicitement indiqu&#233;e dans la demande de routage.
+
+<item><tt/internal/<newline>
+<p>
+La r&#232;gle classique; cherche la destination dans la RegistrationTable
+
+<item><tt/parent/<newline>
+<p>
+Route l'appel en utilisant des informations envoy&#233;es par le GK parent en
+r&#233;ponse &#224; un ARQ que le gatekeeper enverra.
+
+<item><tt/neighbor/<newline>
+<p>
+Route l'appel en utilisant les voisins en &#233;changeant des messages LRQ
+
+<item><tt/dns/<newline>
+<p>
+La destination est r&#233;solue par DNS, &#224; condition qu'elle soit r&#233;solvable
+
+<item><tt/vqueue/<newline>
+<p>
+Utilise le m&#233;canisme de queue virtuelle et g&#233;n&#232;re un
+&#233;v&#233;nement RouteRequest pour laisser une application externe faire le routage
+(ne peut &#234;tre utilis&#233; qu'avec OnARQ)
+
+<item><tt/numberanalysis/<newline>
+<p>
+Fournit un support pour l'envoi des chiffres recouverts(?) pour les messages ARQ.
+
+</itemize>
+
+Si une politique ne correspond pas, la politique suivante est essay&#233;e.
+
+Ces politiques peuvent &#234;tre appliqu&#233;es &#224; un certain nombre de types de
+requ&#234;tes de routage et de donn&#233;es d'entr&#233;e de routage. Les
+diff&#233;rents types sont:
+ARQ, LRQ, Setup et Facility (avec la raison callForwarded)
+Il y a aussi la politique de routage g&#233;n&#233;rale, qui est une sorte de valeur
+par d&#233;faut pour les autres types.
+
+<descrip>
+<tag/Exemple:/
+<quote><tt>[RoutingPolicy]<newline>
+h323_ID=dns,internal<newline>
+002=neighbor,internal<newline>
+Default=internal,neighbor,parent</tt></quote>
+</descrip>
+
+Quand un des messages est re&#231;u qui demande une d&#233;cision de routage, tous les
+appels &#224; un alias du type h323_ID seront r&#233;solus en utilisant le DNS. Si le
+DNS &#233;choue &#224; d&#233;terminer l'alias, il est compar&#233; &#224; la table
+interne d'enregistrement. Si un appel est demand&#233; pour un alias commen&#231;ant
+par 002, les voisins sont d'abord v&#233;rifi&#233;s puis la table interne
+d'enregistrement. Si l'alias demand&#233; n'est par un h323_ID ou un alias
+commen&#231;ant par 002, la politique par d&#233;faut est utilis&#233;e en recherchant
+dans la table interne d'enregistrement, puis les voisins, et si &#231;&#224;
+&#233;choue le parent.
+
+Pour les messages ARQ, LRQ, Setup et Facility on peut utiliser les sections
+[RoutingPolicy::OnARQ], [RoutingPolicy::OnLRQ],
+[RoutingPolicy::OnSetup] et [RoutingPolicy::OnFacility]
+en utilisant la syntaxe expliqu&#233;e ci-dessus.
+
+<descrip>
+<tag/Exemple:/
+<quote><tt>[RoutingPolicy::OnARQ]<newline>
+default=numberanalysis,internal,neighbor</tt></quote>
+</descrip>
+
+
+<sect1>Section &lsqb;RasSrv::RewriteE164&rsqb;
+<label id="rewrite">
+<p>
+Cette section d&#233;finit les r&#232;gles de r&#233;&#233;criture pour
+dialedDigits (num&#233;ro E.164).
+
+<descrip>
+<tag/Format:/
+<tt>[!]original-prefix=target-prefix</tt>
+<p>
+Si le num&#233;ro commence avec <tt/original-prefix/, il est r&#233;&#233;crit en
+<tt/target-prefix/.
+Si le drapeau `<tt/!/' pr&#233;c&#232;de le <tt/original-prefix/, le sens est
+invers&#233; et le target-prfix est ajout&#233; au d&#233;but du num&#233;ro
+compos&#233;. Les caract&#232;res jokers sp&#233;ciaux (<tt/'.'/ et <tt/'%'/) sont
+disponibles.
+<tag/Exemple:/
+<tt/08=18888/
+<p>
+Si vous composez <tt/08345718/, il est r&#233;&#233;crit en <tt/18888345718/.
+<tag/Exemple:/
+<tt/!08=18888/
+<p>
+Si vous composez <tt/09345718/, il est r&#233;&#233;crit en <tt/1888809345718/.
+</descrip>
+
+Option:
+<itemize>
+<item><tt/Fastmatch=08/<newline>
+Default: <tt>N/A</tt>
+<p>
+R&#233;&#233;crit uniquement les dialDigits commen&#231;ant par le pr&#233;fixe
+indiqu&#233;.
+</itemize>
+
+
+<sect1>Section &lsqb;RasSrv::GWRewriteE164&rsqb;
+<label id="gwrewrite">
+<p>
+Cette section d&#233;crit la r&#233;&#233;criture des dialedDigits des num&#233;ros
+E.164 en fonction de la passerelle d'o&#249; provient l'appel ou vers o&#249; est
+envoy&#233; l'appel. Ceci permet une manipulation beaucoup plus flexible des
+dialedDigits pour le routage, etc. En combinaison avec le
+<ref id="rewrite" name="RasSrv::RewriteE164"> vous pouvez avoir une
+r&#233;&#233;criture en trois &#233;tapes:
+
+<tscreen><verb>
+Appel de "gw1", dialedDigits 0867822
+		|
+		|
+		V
+R&#232;gles d'entr&#233;e pour "gw1", dialedDigits now 550867822
+		|
+		|
+		V
+R&#232;gles g&#233;n&#233;rales, dialedDigits maintenant 440867822
+		|
+		|
+		V
+S&#233;lection de passerelle, dialedDigits maintenant 440867822, passerelle de sortie "gw2"
+		|
+		|
+		V
+R&#232;gles de sortie pour "gw2", dialedDigits maintenant 0867822
+		|
+		|
+		V
+Appel de "gw2", dialedDigits 0867822
+</verb></tscreen>
+
+<descrip>
+<tag/Format:/
+<tt>gw-alias=in|out=[!]original-prefix=target-prefix[;in|out...]</tt>
+<p>
+Si l'appel correspond &#224; la passerelle, la direction et commence par
+<tt/original-prefix/ il est r&#233;&#233;crit en <tt/target-prefix/.
+Si le drapeau `<tt/!/' pr&#233;c&#232;de le <tt/original-prefix/, le sens est
+invers&#233;.
+Les caract&#232;res jokers sp&#233;ciaux (<tt/'.'/ and <tt/'%'/) sont disponibles.
+Des r&#232;gles multiple pour une m&#234;me passerelle doivent &#234;tre
+s&#233;par&#233;es par ';'.
+<tag/Exemple:/
+<tt/gw1=in=123=321/
+<p>
+Si un appel est re&#231;u de "gw1" &#224; <tt/12377897/, il est r&#233;&#233;crit
+en <tt/32177897/ avant qu'une action suppl&#233;mentaire ne soit prise.
+</descrip>
+
+
+<sect1>Section &lsqb;Endpoint::RewriteE164&rsqb;
+<p>
+Une fois que vous avez d&#233;fini le(s) pr&#233;fixe(s) pour votre terminal gatekeeper,
+le gatekeeper parent routera les appels avec <bf/dialedDigits/ commen&#231;ant par ces
+pr&#233;fixes.
+Le gatekeeper fils peut r&#233;&#233;crire la destination en accord avec les
+r&#232;gles d&#233;finies dans cette section. Par contraste, quand un terminal interne
+appelle un terminal enregistr&#233; dans le gatekeeper parent, la source sera
+r&#233;&#233;crite &#224; l'envers.
+
+<descrip>
+<tag/Format:/
+<tt/external prefix=internal prefix/
+</descrip>
+
+Par exemple, si vous avez la configuration suivante,
+
+<tscreen><verb>
+                        [Parent GK]
+                        ID=CitronGK
+                        /         \
+                       /           \
+                      /             \
+                     /               \
+                [Child GK]          [EP3]
+                ID=ProxyGK          E164=18888200
+                Prefix=188886
+                /       \
+               /         \
+              /           \
+           [EP1]         [EP2]
+           E164=601      E164=602
+</verb></tscreen>
+
+Avec cette r&#232;gle:
+<tscreen><verb>
+188886=6
+</verb></tscreen>
+
+Quand EP1 appelle EP3 avec <tt/18888200/, le CallingPartyNumber dans le Q.931 Setup
+sera r&#233;&#233;crit en <tt/18888601/. Inversement, EP3 peut atteindre EP1 et EP2
+en appelant <tt/18888601/ et <tt/18888602/, respectivement. En cons&#233;quence, un
+terminal enregistr&#233; aupr&#232;s du GK fils avec le pr&#233;fixe '<tt/6/'
+appara&#238;tra comme un terminal avec le pr&#233;fixe '<tt/188886/', pour les
+terminaux enregistr&#233;s aupr&#232;s du gatekeeper parent.
+
+Cette section ne se rapporte pas &#224; la section
+<ref id="rewrite" name="RasSrv::RewriteE164">,
+bien que le plus r&#233;cent prendra effet en premier.
+
+<sect1>Section &lsqb;Routing::NumberAnalysis&rsqb;
+<label id="numberanalysis">
+<p>
+Cette section d&#233;finit les r&#232;gles pour la politique de routage
+<tt/numberanalysis/. La politique contr&#244;le un num&#233;ro compos&#233; pour un
+nombre minimum et/ou maximum de chiffres et envoie ARJ, si n&#233;cessaire (le nombre
+de chiffres est en dehors de la plage), pour supporter l'envoi de chiffres qui se
+recouvrent.
+
+<descrip>
+<tag/Format:/
+<tt>prefix=MIN_DIGITS[:MAX_DIGITS]</tt>
+<p>
+Si le num&#233;ro correspond au <tt/prefix/, il est v&#233;rifi&#233; qu'il est
+compos&#233; d'au moins <tt/MIN_DIGITS/ chiffres et (si MAX_DIGITS est pr&#233;sent)
+d'au plus <tt/MAX_DIGITS/ chiffres. Les caract&#232;res joker sp&#233;ciaux
+(<tt/!/, <tt/'.'/ et <tt/'%'/) sont disponibles.
+Si le num&#233;ro est trop court, un ARJ est envoy&#233; avec <tt/rejectReason/
+fix&#233; &#224; <tt/incompleteAddress/.
+Si le num&#233;ro est trop long, un ARJ est envoy&#233; avec <tt/rejectReason/
+fix&#233; &#224; <tt/undefinedReason/.
+La liste de pr&#233;fixes est parcourue du pr&#233;fixe le plus long au plus court
+pour une correspondance.
+
+<tag/Exemple:/
+<tscreen><verb>
+[RoutingPolicy::OnARQ]
+default=numberanalysis,internal
+
+[Routing::NumberAnalysis]
+0048=12
+48=10
+.=6:20
+</verb></tscreen>
+<p>
+Les appels aux destinations commen&#231;ant par 0048 ont besoin d'au moins 12 chiffres,
+par 48 - 10 chiffres et pour tous les autres au moins 6 et au plus 20 chiffres.
+</descrip>

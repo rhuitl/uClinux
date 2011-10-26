@@ -1,0 +1,36 @@
+
+EXEC = pppd
+OBJS = main.o magic.o fsm.o lcp.o ipcp.o ccp.o  upap.o chap.o \
+	md5.o auth.o options.o utils.o sys-linux.o random.o
+
+EXINCS = -I../include -I.
+DEFS += -D_linux_=1 -DNO_DRAND48 -DHAVE_PATHS_H -DXDEBUGALL
+CFLAGS = $(ARCH) $(DEFS) $(CCFLAGS) $(EXINCS) $(INCS)
+FLTFLAGS += -s 8192
+
+MPPE=y
+#DYNAMIC=y
+#CBCP_SUPPORT=y
+
+ifdef MPPE
+OBJS += md4.o chap_ms.o cbcp.o mppe.o sha1dgst.o extra_crypto.o
+CFLAGS += -DCHAPMS=1 -DMSLANMAN=1 -DMPPE=1 -DUSE_CRYPT=1
+LDLIBS += -lcrypt
+ifdef DYNAMIC
+CFLAGS += -DDYNAMIC=1
+endif
+ifdef CBCP_SUPPORT
+CFLAGS += -DCBCP_SUPPORT=1
+endif
+
+endif
+
+
+all: $(EXEC)
+
+$(EXEC): $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
+
+clean:
+	-rm -f $(EXEC) *.elf *.o
+

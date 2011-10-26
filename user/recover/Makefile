@@ -1,0 +1,57 @@
+#
+#	Makefile -- build for boot recovery program
+#
+
+vpath %.c ../netflash
+RECOVER = recover
+OBJS    = arp.o buildmsg.o client.o dhcpcd.o peekfd.o signals.o udpipgen.o \
+          main.o
+OBJS   += tftpmain.o tftp.o tftpsubs.o http.o netflash.o
+
+DEFS    = -DPACKAGE=\"recover\" -DVERSION=\"1.0.0\" \
+          -DSTDC_HEADERS=1 -DHAVE_FCNTL_H=1 -DHAVE_PATHS_H=1 \
+          -DHAVE_SYS_IOCTL_H=1 -DHAVE_SYS_TIME_H=1 -DHAVE_SYSLOG_H=1 \
+          -DHAVE_UNISTD_H=1 -DTIME_WITH_SYS_TIME=1 -DHAVE_SELECT=1 \
+          -DHAVE_SOCKET=1 -DHAVE_UNAME=1 -DEMBED -DCONFIG_NETtel \
+		  -DRECOVER_PROGRAM
+CFLAGS += -O2 $(DEFS)
+
+ifdef CONFIG_USER_RECOVER_ETHERNET_INTERFACE
+CFLAGS += -DETHER_INTERFACE='$(CONFIG_USER_RECOVER_ETHERNET_INTERFACE)'
+endif
+ifdef CONFIG_USER_RECOVER_BIOS
+CFLAGS += -DBOOT_RECOVER=1
+endif
+ifdef CONFIG_USER_RECOVER_USE_STATIC_SERVER
+CFLAGS += -DSTATIC_SERVER_IP='$(CONFIG_USER_RECOVER_STATIC_SERVER)'
+endif
+ifdef CONFIG_USER_RECOVER_PRESERVE_CONFIG_FS
+CFLAGS += -DPRESERVE_CONFIG_FS='$(CONFIG_USER_RECOVER_PRESERVE_CONFIG_FS)'
+endif
+ifdef CONFIG_USER_NETFLASH_HMACMD5
+CFLAGS += -DHMACMD5_KEY='$(CONFIG_USER_NETFLASH_HMACMD5_KEY)'
+OBJS   += md5.o hmacmd5.o
+endif
+
+CFLAGS += -DCONFIG_VERSION=\"$(VERSIONPKG)\"
+OBJS   += versioning.o
+
+ifdef CONFIG_USER_NETFLASH_DECOMPRESS
+ADD_LIBZ = -lz
+endif
+
+ifdef CONFIG_USER_NETFLASH_CRYPTO
+ADD_LIBZ += $(LIBCRYPTO)
+endif
+
+all: $(RECOVER)
+
+$(RECOVER): $(OBJS)
+	$(CC) $(LDFLAGS$(LDFLAGS_$@)) -o $(RECOVER) $(OBJS) $(ADD_LIBZ) $(LDLIBS$(LDLIBS_$@))
+
+romfs:
+	$(ROMFSINST) /bin/recover
+
+clean:
+	-rm -f $(RECOVER) *.elf *.gdb *.o
+

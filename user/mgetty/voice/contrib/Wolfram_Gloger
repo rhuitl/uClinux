@@ -1,0 +1,244 @@
+From wmglo@dent.med.uni-muenchen.de  Tue Apr 13 11:11:07 1999
+Return-Path: <wmglo@dent.med.uni-muenchen.de>
+Received: from md.dent.med.uni-muenchen.de (md.dent.med.uni-muenchen.de [138.245.179.2])
+	by vulcan.alphanet.ch (8.9.1a/8.9.1) with SMTP id LAA15974
+	for <schaefer@alphanet.ch>; Tue, 13 Apr 1999 11:11:05 +0200
+Received: (qmail 6547 invoked by uid 211); 13 Apr 1999 09:11:04 -0000
+Date: 13 Apr 1999 09:11:04 -0000
+Message-ID: <19990413091104.6546.qmail@md.dent.med.uni-muenchen.de>
+From: Wolfram Gloger <wmglo@dent.med.uni-muenchen.de>
+To: schaefer@alphanet.ch
+Subject: vgetty-1.1.20 patch for old ZyXEL U1496
+Status: RO
+X-Status: 
+
+Oops, forgot the patch, here it goes.
+
+--- voice/libvoice/detect.c.orig	Fri Nov 20 11:03:00 1998
++++ voice/libvoice/detect.c	Fri Apr  2 14:16:01 1999
+@@ -29,6 +29,7 @@
+      {ati, "1443",                 NULL,   &Dolphin},
+      {ati, "1445",                 NULL,   &US_Robotics},
+      {ati, "1496",                 NULL,   &ZyXEL_1496},
++     {ati, "U1496E*",              NULL,   &ZyXEL_1496},
+      {ati, "247",                  NULL,   &Multitech_2834ZDXv},
+      {ati, "248",                  NULL,   &Sierra},
+      {ati, "249",                  NULL,   &Rockwell},
+@@ -150,12 +151,19 @@
+                 ((*s == ' ') || (*s == '\t'))); s++)
+                     ;
+ 
+-               for (i = 0; ((modem_database[i].at_cmnd != NULL) &&
+-                (voice_modem == &no_modem)); i++)
++               for (i = 0;
++		    ((modem_database[i].at_cmnd != NULL) &&
++		     (voice_modem == &no_modem));
++		    i++)
+                     {
++			size_t len = strlen(modem_database[i].at_answr);
++			int is_wild = len>0 &&
++			    (modem_database[i].at_answr[len-1] == '*');
+ 
+                     if ((strcmp(modem_database[i].at_cmnd, cmnd) == 0) &&
+-                     (strcmp(modem_database[i].at_answr, s) == 0))
++			((strcmp(modem_database[i].at_answr, s) == 0) ||
++			 (is_wild &&
++			  strncmp(modem_database[i].at_answr, s, len-1)==0)))
+                          {
+ 
+                          if (modem_database[i].next_cmnd != NULL)
+--- voice/libvoice/ZyXEL_1496.c.orig	Wed Sep  9 23:07:25 1998
++++ voice/libvoice/ZyXEL_1496.c	Fri Apr  2 17:59:40 1999
+@@ -9,6 +9,8 @@
+ 
+ #include "../include/voice.h"
+ 
++static char ZyXEL_1496_intr_play_cmnd[] = {DLE, DC4, 0x00};
++
+ static int ZyXEL_1496_init (void)
+      {
+      char buffer[VOICE_BUF_LEN];
+@@ -18,43 +20,55 @@
+      voice_command("ATI1", "");
+      voice_read(buffer);
+      voice_read(buffer);
+-     voice_command("", "OK");
+-     rom_release = 100 * (buffer[10] - '0') + 10 *
+-      (buffer[12] - '0') + (buffer[13] - '0');
++     if(strlen(buffer) > 13) {
++	 voice_command("", "OK");
++	 rom_release = 100 * (buffer[10] - '0') + 10 *
++	     (buffer[12] - '0') + (buffer[13] - '0');
++     } else
++	 rom_release = 505;
+      lprintf(L_MESG, "ROM release %4.2f detected", rom_release / 100.0);
+      lprintf(L_MESG, "initializing ZyXEL 1496 voice modem");
+ 
+-     /*
+-      * ATS40.3=1 - Enable distincitve ring type 1 (RING)
+-      * ATS40.4=1 - Enable distincitve ring type 2 (RING 1)
+-      * ATS40.5=1 - Enable distincitve ring type 3 (RING 2)
+-      * ATS40.6=1 - Enable distincitve ring type 4 (RING 3)
+-      */
+-
+-     if (voice_command("ATS40.3=1 S40.4=1 S40.5=1 S40.6=1", "OK") !=
+-      VMA_USER_1)
+-          lprintf(L_WARN, "coudn't initialize distinctive RING");
+-
+-     /*
+-      * ATS39.6=1 - Enable DTMF detection after AT+VLS=2
+-      * ATS39.7=0 - Don't include resynchronization information
+-      *             in recorded voice data
+-      * AT+VIT=60 - Set inactivity timer to 60 seconds
+-      */
+-
+-     if (voice_command("ATS39.6=1 S39.7=0 +VIT=60", "OK") != VMA_USER_1)
+-          lprintf(L_WARN, "voice init failed, continuing");
+-
+-     /*
+-      * AT+VDH=x - Set the threshold for DTMF detection (0-32)
+-      * AT+VDD=x - Set DTMF tone duration detection
+-      */
+-
+-     sprintf(buffer, "AT+VDH=%d +VDD=%d", cvd.dtmf_threshold.d.i *
+-      31 / 100, cvd.dtmf_len.d.i / 5);
+-
+-     if (voice_command(buffer, "OK") != VMA_USER_1)
+-          lprintf(L_WARN, "setting DTMF preferences didn't work");
++     if (rom_release >= 600) {
++	 /*
++	  * ATS40.3=1 - Enable distincitve ring type 1 (RING)
++	  * ATS40.4=1 - Enable distincitve ring type 2 (RING 1)
++	  * ATS40.5=1 - Enable distincitve ring type 3 (RING 2)
++	  * ATS40.6=1 - Enable distincitve ring type 4 (RING 3)
++	  */
++
++	 if (voice_command("ATS40.3=1 S40.4=1 S40.5=1 S40.6=1", "OK") !=
++	     VMA_USER_1)
++	     lprintf(L_WARN, "couldn't initialize distinctive RING");
++
++	 /*
++	  * ATS39.6=1 - Enable DTMF detection after AT+VLS=2
++	  * ATS39.7=0 - Don't include resynchronization information
++	  *             in recorded voice data
++	  * AT+VIT=60 - Set inactivity timer to 60 seconds
++	  */
++
++	 if (voice_command("ATS39.6=1 S39.7=0 +VIT=60", "OK") != VMA_USER_1)
++	     lprintf(L_WARN, "voice init failed, continuing");
++
++	 /*
++	  * AT+VDH=x - Set the threshold for DTMF detection (0-32)
++	  * AT+VDD=x - Set DTMF tone duration detection
++	  */
++
++	 sprintf(buffer, "AT+VDH=%d +VDD=%d", cvd.dtmf_threshold.d.i *
++		 31 / 100, cvd.dtmf_len.d.i / 5);
++
++	 if (voice_command(buffer, "OK") != VMA_USER_1)
++	     lprintf(L_WARN, "setting DTMF preferences didn't work");
++     } else {
++	 /*
++	  * AT+VAT=60 - Set inactivity timer to 60 seconds
++	  */
++	 if (voice_command("AT+VAT=60", "OK") != VMA_USER_1)
++	     lprintf(L_WARN, "voice init failed, continuing");
++	 ZyXEL_1496_intr_play_cmnd[1] = 'p';
++     }
+ 
+      /*
+       * AT+VSD=x,y - Set silence threshold and duration.
+@@ -66,29 +80,31 @@
+      if (voice_command(buffer, "OK") != VMA_USER_1)
+           lprintf(L_WARN, "setting recording preferences didn't work");
+ 
+-     /*
+-      * AT+VGT - Set the transmit gain for voice samples.
+-      */
++     if(rom_release >= 600) {
++	 /*
++	  * AT+VGT - Set the transmit gain for voice samples.
++	  */
+ 
+-     if (cvd.transmit_gain.d.i == -1)
+-          cvd.transmit_gain.d.i = 75;
++	 if (cvd.transmit_gain.d.i == -1)
++	     cvd.transmit_gain.d.i = 75;
+ 
+-     sprintf(buffer, "AT+VGT=%d", cvd.transmit_gain.d.i * 255 / 100);
++	 sprintf(buffer, "AT+VGT=%d", cvd.transmit_gain.d.i * 255 / 100);
+ 
+-     if (voice_command(buffer, "OK") != VMA_USER_1)
+-          lprintf(L_WARN, "setting transmit gain didn't work");
++	 if (voice_command(buffer, "OK") != VMA_USER_1)
++	     lprintf(L_WARN, "setting transmit gain didn't work");
+ 
+-     /*
+-      * AT+VGR - Set receive gain for voice samples.
+-      */
++	 /*
++	  * AT+VGR - Set receive gain for voice samples.
++	  */
+ 
+-     if (cvd.receive_gain.d.i == -1)
+-          cvd.receive_gain.d.i = 75;
++	 if (cvd.receive_gain.d.i == -1)
++	     cvd.receive_gain.d.i = 75;
+ 
+-     sprintf(buffer, "AT+VGR=%d", cvd.receive_gain.d.i * 255 / 100);
++	 sprintf(buffer, "AT+VGR=%d", cvd.receive_gain.d.i * 255 / 100);
+ 
+-     if (voice_command(buffer, "OK") != VMA_USER_1)
+-          lprintf(L_WARN, "setting receive gain didn't work");
++	 if (voice_command(buffer, "OK") != VMA_USER_1)
++	     lprintf(L_WARN, "setting receive gain didn't work");
++     }
+ 
+      /*
+       * AT+VNH=1 - Disable autohangup
+@@ -197,7 +213,6 @@
+ 
+ static char ZyXEL_1496_pick_phone_answr[] = "VCON";
+ #define     ZyXEL_1496_beep_timeunit 100
+-static char ZyXEL_1496_intr_play_cmnd[] = {DLE, DC4, 0x00};
+ static char ZyXEL_1496_intr_play_answr[] = "VCON";
+ static char ZyXEL_1496_stop_play_answr[] = "VCON";
+ static char ZyXEL_1496_stop_rec_answr[] = "VCON";
+
+From wmglo@dent.med.uni-muenchen.de  Tue Apr 13 11:10:19 1999
+Return-Path: <wmglo@dent.med.uni-muenchen.de>
+Received: from md.dent.med.uni-muenchen.de (md.dent.med.uni-muenchen.de [138.245.179.2])
+	by vulcan.alphanet.ch (8.9.1a/8.9.1) with SMTP id LAA15969
+	for <schaefer@alphanet.ch>; Tue, 13 Apr 1999 11:10:17 +0200
+Received: (qmail 6544 invoked by uid 211); 13 Apr 1999 09:10:13 -0000
+Date: 13 Apr 1999 09:10:13 -0000
+Message-ID: <19990413091013.6543.qmail@md.dent.med.uni-muenchen.de>
+From: Wolfram Gloger <wmglo@dent.med.uni-muenchen.de>
+To: schaefer@alphanet.ch
+Subject: vgetty-1.1.20 patch for old ZyXEL U1496
+Status: RO
+X-Status: A
+
+Hello,
+
+A while ago I `ported' vgetty-1.1.20 to my old ZyXEL U1496 modem with
+ROM release 5.05.  It has a completely different ATI2 answer (the
+patch below adds a simple wildcard functionality that may be useful
+for other models, too) and slightly different voice commands.
+
+At least, the simple answer-machine functionality seems to
+work fine for me now, so I'm quite happy.
+
+I just noticed your mgetty-1.1.20-to-current-plus-called-id,
+so the patch may not apply cleanly to your current sources.
+If that is an obstacle I can provide a new patch.
+
+Of course, you may consider ROM 5.x too old to support -- just
+ignore this mail, then.
+
+Regards,
+Wolfram.
+-- 
+`Surf the sea, not double-u three...'
+wmglo@dent.med.uni-muenchen.de
+

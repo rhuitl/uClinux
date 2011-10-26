@@ -1,0 +1,603 @@
+#!/bin/sh
+# the next line restarts using wish \
+exec wish "$0" "$@"
+
+# User tunable parameters
+set default_FIFO "/etc/diald/diald.ctl"
+
+# Default globals
+set monfifo ""
+set monfd ""
+set fifofd ""
+
+# strip chart code
+proc stripchart {win x y label} {
+    upvar #0 var$win type
+    set type(scale) 1
+    set type(entry) 1
+    set type(height) $y
+    set type(label) $label
+
+    frame $win -bor 0
+    canvas $win.canv -width $x -height $y -bor 0 -highlightthickness 0
+    pack $win.canv -expand 1 -fill both -pady 0
+}
+
+# add a new line to the strip chart, moving it left if needed
+proc addtick {w val} {
+    set win $w.canv
+    upvar #0 var$w type
+    set e $type(entry)
+    set s $type(scale)
+    set o $type(height)
+    set h [winfo height $win]
+    set w [expr "[winfo width $win]"]
+
+    $win delete ticks
+
+    if {$val > $s} {
+    	# adjust the window for a larger value than currently displayed.
+	# get the new scale
+	set ns [expr "int($val)"]
+	if {$val > $ns} { incr ns }
+	set r [expr "($s+0.0)/$ns"]
+	$win scale all 0 $o 1 $r
+	set s $ns
+    } else {
+    	# Also trim the window down for a smaller value if needed.
+	# figure out how many ticks are currently spanned by the image
+	set t [expr "$h-([lindex [$win bbox all] 1]+1)"]
+	set fs [expr "($t*$s*1.0)/$h"]
+	set ns [expr "int($fs)"]
+	if {$fs > $ns} {incr ns}
+	if {$ns != $s} {
+		set r [expr "($s+0.0)/$ns"]
+		$win scale all 0 $o 1 $r
+		set s $ns
+	}
+    }
+
+    set v [expr "($val*$h)/$s"]
+
+    # rescale vertically if needed
+    if {"$o"!="$h"} {
+	set sc [expr "($h+0.0)/$o"]
+	$win scale all 0 0 1 $sc
+	set type(height) $h
+    }
+
+    # Create a new line
+    $win create line $e $h $e [expr "$h-$v+1"]
+
+    # Check if we can shrink or expand the tick count
+
+    # scroll left if needed
+    if {"$e">="$w"} {
+	set diff [expr "$w-($e+1)"]
+    	$win move all $diff 0
+	set e $w
+    } else {
+	incr e
+    }
+
+    # kill window elements outside of the visible window and draw tick marks
+    $win addtag extra all
+    $win addtag ok enclosed 0 0 [expr "$w+1"] [expr "$h+1"]
+    $win dtag ok extra
+    $win delete extra
+    $win dtag all ok
+    set x 1
+    while {$x < $s} {
+	set th [expr "($x*$h)/$s"]
+	$win create line 1 $th $w $th -tag ticks -fill red
+	incr x
+    }
+    $win create text 2 2 -anchor nw -fill blue -tags ticks -text $type(label)
+
+    $win addtag deltag closest 0 [winfo height $win]
+    set type(scale) $s
+    set type(entry) $e
+}
+
+# If this is 1 the icon will be an active window.
+# If this is 2 then there will be a seperate top level window,
+#	named dctrlIcon that can be swallowed by FVWM Goodstuff,
+#	or the Bowman/Afterstep Wharf.
+# If this is 0 then there will be neither.
+
+set fancy_icon 0
+
+set trans(DOWN) Down
+set trans(CONNECT) Connect
+set trans(CLOSE) Close
+set trans(START_LINK) Start
+set trans(UP) Up
+set trans(HALF_DEAD) HalfDead
+set trans(STOP_LINK) StopLink
+set trans(KILL_LINK) KillLink
+set trans(STOP_DIAL) StopDial
+set trans(KILL_DIAL) KillDial
+set trans(DISCONNECT) Disconnect
+set trans(RETRY) Retry
+set trans(ERROR) Error
+set trans(ZOMBIE) Zombie
+
+set colors(DOWN)	{{} {} red}
+set colors(CONNECT)	{{} yellow red}
+set colors(START_LINK)	{{} yellow {}}
+set colors(STOP_DIAL)	{{} red red}
+set colors(KILL_DIAL)	{{} black red}
+set colors(UP) 		{green {} {}}
+set colors(HALF_DEAD) 	{yellow {} {}}
+set colors(DISCONNECT)	{green yellow {}}
+set colors(STOP_LINK)	{green red {}}
+set colors(KILL_LINK)	{green black {}}
+set colors(CLOSE)	{{} yellow yellow}
+set colors(RETRY)	{yellow yellow yellow}
+set colors(ERROR)	{red red red}
+set colors(ZOMBIE)	{black black black}
+
+# Set up the basic data for the app
+
+wm title . "Diald Control"
+wm iconname . "Diald"
+wm minsize . 1 1
+
+proc print_usage {} {
+	puts {Usage dctrl [-i|-animated-icon] [-c|-control-window] [-iconic] [-fifo <name>] [-dstatus] [-tload] [-gload] [-pqueue] [-dlog]}
+	exit
+}
+
+# Deal with command line options
+set previous ""
+foreach i $argv {
+	if {"$previous"=="-fifo"} {
+		set default_FIFO $i
+		set previous ""
+	} elseif {"$i"=="-i"} { set fancy_icon 1 } \
+	elseif {"$i"=="-animated-icon"} { set fancy_icon 1 } \
+	elseif {"$i"=="-c"} { set fancy_icon 2 } \
+	elseif {"$i"=="-control-window"} { set fancy_icon 2 } \
+	elseif {"$i"=="-fifo"} { set previous $i } \
+	elseif {"$i"=="-iconic"} {wm iconify .} \
+        elseif {"$i"=="-dstatus"} { set dstatus 1 } \
+	elseif {"$i"=="-tload"} { set tload 1 } \
+	elseif {"$i"=="-gload"} { set gload 1 } \
+	elseif {"$i"=="-pqueue"} { set pqueue 1 } \
+	elseif {"$i"=="-dlog"} { set dlog 1 } \
+	else { print_usage }
+}
+if {"$previous"!=""} { print_usage }
+
+proc make_icon {} {
+	toplevel .dctrlIcon -class DctrlIcon -width 50 -height 50
+	canvas .dctrlIcon.canv -width 50 -height 32
+	.dctrlIcon.canv create text 2 2 \
+		-font -adobe-times-medium-r-*-*-12-*-*-*-*-*-*-* \
+        	-text "Diald" -anchor nw
+	.dctrlIcon.canv create text 2 15 \
+		-font -adobe-times-medium-r-*-*-12-*-*-*-*-*-*-* \
+        	-text "Status" -anchor nw
+	.dctrlIcon.canv create rectangle 35 2 45 32 -fill grey75
+	.dctrlIcon.canv create oval 37 4 43 10 -tag top
+	.dctrlIcon.canv create oval 37 14 43 20 -tag mid
+	.dctrlIcon.canv create oval 37 24 43 30 -tag bot
+	label .dctrlIcon.message -textvar status(fsm_trans) -border 0 -width 50 \
+		-font -adobe-times-bold-r-*-*-12-*-*-*-*-*-*-*
+	pack propagate .dctrlIcon 0
+	pack .dctrlIcon.canv -padx 0 -pady 0 -fill x -expand 1
+	pack .dctrlIcon.message -padx 0 -pady 0 -fill x -expand 1
+	bind .dctrlIcon <Destroy> {
+		if {$fancy_icon=="1"} {
+			if {"%W"==".dctrlIcon"} {after idle make_icon}
+		} else {
+			dctrlQuit
+		}
+	}
+
+	bind .dctrlIcon <Button-1> {wm deiconify .}
+}
+
+if {"$fancy_icon" != 0} { make_icon }
+if {"$fancy_icon"==1} { wm iconwindow . .dctrlIcon }
+
+#
+# MONITOR_STATE           0x0001
+# MONITOR_INTERFACE       0x0002
+# MONITOR_STATUS          0x0004
+# MONITOR_LOAD            0x0008
+# MONITOR_MESSAGE         0x0010
+# MONITOR_QUEUE           0x0020
+#
+
+proc openFifo {} {
+    global fifofd monfifo monfd default_FIFO
+
+    # Turn off any previous monitoring
+    if {$monfd!=""} {close $monfd}
+    if {$monfifo!=""} {catch {exec rm -f $monfifo}}
+
+    # get new monitoring fifo
+    set fifofd [open $default_FIFO w]
+
+    set monfifo /tmp/dctrl.[pid]
+    catch {exec mkfifo -m 0600 $monfifo}
+    fifoCmd "monitor $monfifo"
+    set monfd [open $monfifo r]
+    fileevent $monfd readable {stateChange}
+}
+
+proc fifoCmd {cmd} {
+    global fifofd
+    if {$fifofd!=""} {
+	puts $fifofd $cmd
+	catch {flush $fifofd}
+    }
+}
+
+proc cmp {a b} {
+    if {[lindex $a 3]<[lindex $b 3]} {
+	return 1;
+    }
+    if {[lindex $a 3]>[lindex $b 3]} {
+	return -1;
+    }
+    return 0;
+}
+
+proc updateIcon {} {
+    global colors status trans fancy_icon
+
+    set status(fsm_trans) [set trans($status(fsm))]
+    set clist [set colors($status(fsm))]
+    set tcol [lindex $clist 0]
+    set mcol [lindex $clist 1]
+    set bcol [lindex $clist 2]
+    if {"$fancy_icon" != 0} {
+	.dctrlIcon.canv itemconfig top -fill $tcol
+	.dctrlIcon.canv itemconfig mid -fill $mcol
+	.dctrlIcon.canv itemconfig bot -fill $bcol
+    }
+}
+
+
+
+proc stateChange {} {
+    global monfd status trans colors gload tload
+    set foo [gets $monfd]
+    if {$foo=="STATE"} {
+	set status(fsm) [gets $monfd]
+	if {$status(fsm)=="CONNECT"} {.message.vis.text delete 0.0 end}
+        if {$status(fsm)=="UP"} { load_init }
+	updateIcon
+    }
+    if {$foo=="STATUS"} {
+	set status(up) [gets $monfd]
+	set status(force) [gets $monfd]
+	set status(impmode) [gets $monfd]
+	set status(imp_itime) [gets $monfd]
+	set status(imp_time) [gets $monfd]
+	set status(imp_fuzz) [gets $monfd]
+	set status(imp_timeout) [gets $monfd]
+	set status(force_timeout) [gets $monfd]
+	set status(timeout) [gets $monfd]
+    }
+    if {$foo=="QUEUE"} {
+    	set foo [gets $monfd]
+	set lst [list]
+	.queue.vis.text delete 0.0 end
+	while {$foo!="END QUEUE"} {
+	    lappend lst $foo
+	    set foo [gets $monfd]
+	}
+	foreach i $lst {
+	    .queue.vis.text insert end $i
+	    .queue.vis.text insert end "\n"
+	}
+    }
+    if {$foo=="MESSAGE"} {
+	set message [gets $monfd]
+	.message.vis.text insert end $message
+	.message.vis.text insert end "\n"
+    }
+    if {$foo=="INTERFACE"} {
+	set status(iface) [gets $monfd]
+	set status(lip) [gets $monfd]
+	set status(rip) [gets $monfd]
+    }
+    if {$foo=="LOAD"} {
+	if {$status(fsm)=="UP"} {
+	    set txtotal [gets $monfd]
+	    set rxtotal [gets $monfd]
+	    set e5 ".81873075307798185867"
+	    set e150 ".99335550625503441537"
+	    set fp "1"
+	    set status(rx_load5) [expr {$status(rx_load5)*$e5+$rxtotal*($fp-$e5)}]
+	    set status(tx_load5) [expr {$status(tx_load5)*$e5+$txtotal*($fp-$e5)}]
+	    if {$tload} {
+	    set status(rx_load150) [expr {$status(rx_load150)*$e150+$rxtotal*($fp-$e150)}]
+	    set status(tx_load150) [expr {$status(tx_load150)*$e150+$txtotal*($fp-$e150)}]
+	    set status(rx_load) [format "%.3f %.3f" [expr {$status(rx_load5)/1000}] [expr {$status(rx_load150)/1000}]]
+	    set status(tx_load) [format "%.3f %.3f" [expr {$status(tx_load5)/1000}] [expr {$status(tx_load150)/1000}]]
+	    }
+	    if {$gload} {
+		    update
+		    addtick .lm.tx [expr {$status(tx_load5)/1000}]
+		    addtick .lm.rx [expr {$status(rx_load5)/1000}]
+	    }
+	    set status(tx_total) [expr {$status(tx_total)+$txtotal}]
+	    set status(rx_total) [expr {$status(rx_total)+$rxtotal}]
+	}
+    }
+    update
+}
+
+proc dctrlQuit {} {
+    global fifofd monfifo fancy_icon
+
+    if {$fifofd!=""} {
+    	if {$monfifo!=""} {catch {exec rm -f $monfifo}}
+    	catch {flush $fifofd}
+    }
+    if {"$fancy_icon" != 0} {
+        bind .dctrlIcon <Destroy> {}
+    }
+    exit
+#    destroy .
+}
+
+# Create menu bar.
+
+
+frame .menu -relief raised -bd 2
+pack .menu -side top -fill x -expand 0
+
+frame .spacer -width 480 -height 0
+pack .spacer -side top
+
+menubutton .menu.file -text "File" -menu .menu.file.m -underline 0
+menu .menu.file.m
+.menu.file.m add command -label "Restart monitoring" \
+	-command openFifo -underline 0
+.menu.file.m add command -label "Quit" -command dctrlQuit -underline 0
+pack .menu.file -side left
+
+menubutton .menu.control -text "Control" -menu .menu.control.m -underline 0
+menu .menu.control.m
+.menu.control.m add check -label "Block connection" -underline 0 \
+    -variable blocked -command {
+   	 if {$blocked} {fifoCmd "block"} {fifoCmd "unblock"}
+    }
+.menu.control.m add check -label "Forced up" -underline 0 \
+    -variable forced -command {
+   	 if {$forced} {fifoCmd "force"} {fifoCmd "unforce"}
+    }
+.menu.control.m add sep
+.menu.control.m add command -label "Up request" -underline 0 \
+	-command "fifoCmd up"
+.menu.control.m add command -label "Down request" -underline 0 \
+	-command "fifoCmd down"
+.menu.control.m add command -label "Terminate on idle" -underline 0 \
+	-command "fifoCmd delayed-quit"
+.menu.control.m add command -label "Quit diald" -underline 0 \
+	-command "fifoCmd quit"
+pack .menu.control -side left
+
+menubutton .menu.options -text "Options" -menu .menu.options.m -underline 0
+menu .menu.options.m
+.menu.options.m add check -label "Detailed Status" -underline 0 \
+	-variable dstatus -command { repack }
+.menu.options.m add check -label "Numeric Load Monitor" -underline 0 \
+	-variable tload -command { repack }
+.menu.options.m add check -label "Graphical Load Monitor" -underline 0 \
+	-variable gload -command { repack}
+.menu.options.m add check -label "Packet Queue" -underline 0 \
+	-variable pqueue -command { repack }
+.menu.options.m add check -label "Dialing Log" -underline 8 \
+	-variable dlog -command { repack }
+pack .menu.options -side left
+
+# Basic status display
+frame .basic
+label .basic.p1 -text "Interface "
+label .basic.p2 -textvar status(iface)
+label .basic.p3 -text " from "
+label .basic.p4 -textvar status(lip)
+label .basic.p5 -text " to "
+label .basic.p6 -textvar status(rip)
+label .basic.p7 -text " in state "
+label .basic.p8 -textvar status(fsm)
+pack .basic.p1 -side left
+pack .basic.p2 -side left
+pack .basic.p3 -side left
+pack .basic.p4 -side left
+pack .basic.p5 -side left
+pack .basic.p6 -side left
+pack .basic.p7 -side left
+pack .basic.p8 -side left
+
+frame .bar1 -bor 1 -rel sunken -height 2
+
+
+# Link status display
+frame .status -bor 0
+
+set col1 {"Link Status" "Next Alarm" "Forcing Rule"}
+set col2 {status(up) status(timeout) status(force)}
+set col3 {"Forcing Timeout" "Impulse State" "Initial Impulse"}
+set col4 {status(force_timeout) status(impmode) status(imp_itime)}
+set col5 {"Impulse Length" "Impulse Fuzz" "Impulse Timeout"}
+set col6 {status(imp_time) status(imp_fuzz) status(imp_timeout)}
+
+frame .status.col1
+frame .status.col2
+frame .status.col3
+frame .status.col4
+frame .status.col5
+frame .status.col6
+pack .status.col1 -side left -anchor nw
+pack .status.col2 -side left -expand 0 -fill x -anchor nw
+pack .status.col3 -side left -anchor nw
+pack .status.col4 -side left -expand 0 -fill x -anchor nw
+pack .status.col5 -side left -anchor nw
+pack .status.col6 -side left -expand 0 -fill x -anchor nw
+
+set i0 0
+foreach i $col1 {
+    label .status.col1.$i0 -text $i
+    pack .status.col1.$i0 -side top -anchor nw
+    incr i0
+}
+
+set i0 0
+foreach i $col2 {
+    message .status.col2.$i0 -textvar $i -rel sunken -bor 1 -width 100 -anchor nw
+    pack .status.col2.$i0 -side top -fill x -expand 1 -anchor nw
+    incr i0
+}
+
+set i0 0
+foreach i $col3 {
+    label .status.col3.$i0 -text $i
+    pack .status.col3.$i0 -side top -anchor nw
+    incr i0
+}
+
+set i0 0
+foreach i $col4 {
+    message .status.col4.$i0 -textvar $i -rel sunken -bor 1 -width 100 -anchor nw
+    pack .status.col4.$i0 -side top -fill x -expand 1 -anchor nw
+    incr i0
+}
+
+set i0 0
+foreach i $col5 {
+    label .status.col5.$i0 -text $i
+    pack .status.col5.$i0 -side top -anchor nw
+    incr i0
+}
+
+set i0 0
+foreach i $col6 {
+    message .status.col6.$i0 -textvar $i -rel sunken -bor 1 -width 100 -anchor nw
+    pack .status.col6.$i0 -side top -fill x -expand 1 -anchor nw
+    incr i0
+}
+
+frame .bar2 -bor 1 -rel sunken -height 2
+
+# Textual load monitor...
+
+frame .tlm -bor 0
+label .tlm.l1 -text "RX Load/Total"
+message .tlm.l2l -textvar status(rx_load) -width 100 -bor 1 -rel sunken
+message .tlm.l2t -textvar status(rx_total) -width 100 -bor 1 -rel sunken
+label .tlm.l3 -text "TX Load/Total"
+message .tlm.l4l -textvar status(tx_load) -width 100 -bor 1 -rel sunken
+message .tlm.l4t -textvar status(tx_total) -width 100 -bor 1 -rel sunken
+pack .tlm.l1 -side left -expand 0 -fill x
+pack .tlm.l2l -side left -expand 1 -fill x
+pack .tlm.l2t -side left -expand 1 -fill x
+pack .tlm.l3 -side left -expand 0 -fill x
+pack .tlm.l4l -side left -expand 1 -fill x
+pack .tlm.l4t -side left -expand 1 -fill x
+
+frame .bar3 -bor 1 -rel sunken -height 2
+
+# Graphical load monitor...
+frame .lm -bor 0
+# 60 is a good height. Divisible by 1 through 6 evenly, but high enough to see.
+stripchart .lm.tx 100 60 "TX"
+frame .lm.sep -width 2 -bor 2 -rel sunken
+stripchart .lm.rx 100 60 "RX"
+pack .lm.rx -side left -expand 1 -fill both -pady 0
+pack .lm.sep -side left -fill y -pady 0
+pack .lm.tx -side left -expand 1 -fill both -pady 0
+
+frame .bar4 -bor 1 -rel sunken -height 2
+
+# Connection queue
+frame .queue -bor 0
+label .queue.label -text "Connection Queue"
+frame .queue.bar -height 2 -bor 1 -rel sunken
+frame .queue.vis -bor 0
+text .queue.vis.text -bor 0 -yscrollcommand ".queue.vis.scroll set" -height 6 -width 60 -highlightthickness 0
+scrollbar .queue.vis.scroll -relief sunken -command ".queue.vis.text yview" -highlightthickness 0
+pack .queue.vis.text -side left -fill both -expand 1 -pady 0
+pack .queue.vis.scroll -side right -fill y -pady 0
+pack .queue.label -side top -anchor nw -pady 0
+pack .queue.bar -side top -fill x -pady 0
+pack .queue.vis -side top -fill both -expand 1 -pady 0
+
+frame .bar5 -bor 1 -rel sunken -height 2
+
+#Dialing log
+frame .message -bor 0
+label .message.label -text "Dialing Log"
+frame .message.bar -height 2 -bor 1 -rel sunken
+frame .message.vis
+text .message.vis.text -bor 0 -yscrollcommand ".message.vis.scroll set" -height 8 -width 60 -highlightthickness 0
+scrollbar .message.vis.scroll -relief sunken -command ".message.vis.text yview" -highlightthickness 0
+pack .message.vis.text -side left -fill both -padx 2 -pady 2 -expand 1
+pack .message.vis.scroll -side right -fill y
+pack .message.label -side top -anchor nw -pady 0
+pack .message.bar -side top -fill x -pady 0
+pack .message.vis -side top -fill both -expand 1 -pady 0
+
+proc repack {} {
+    global dstatus tload gload pqueue dlog
+
+    pack forget .basic
+    pack forget .bar1
+    pack forget .status
+    pack forget .bar2
+    pack forget .tlm
+    pack forget .bar3
+    pack forget .lm
+    pack forget .bar4
+    pack forget .queue
+    pack forget .bar5
+    pack forget .message
+
+    pack .basic -anchor nw -expand 0 -fill x -side top
+    if {$dstatus} {
+    	pack .bar1 -fill x -side top
+    	pack .status -side top -fill both -expand 0 -pady 0
+    }
+    if {$tload} {
+        pack .bar2 -fill x -side top
+        pack .tlm -side top -fill both -expand 0 -pady 0
+    }
+    if {$gload} {
+	pack .bar3 -fill x -side top
+    	pack .lm -side top -fill both -expand 0 -pady 0
+    }
+    if {$pqueue} {
+    	pack .bar4 -fill x -side top
+    	pack .queue -side top -fill both -expand 1 -pady 0
+    }
+    if {$dlog} {
+    	pack .bar5 -fill x -side top
+        pack .message -side top -fill both -expand 1 -pady 0
+    }
+}
+
+repack
+
+proc load_init {} {
+    global status
+
+    set status(rx_load5) "0.0"
+    set status(tx_load5) "0.0"
+    set status(rx_load30) "0.0"
+    set status(tx_load30) "0.0"
+    set status(rx_load150) "0.0"
+    set status(tx_load150) "0.0"
+    set status(tx_total) 0
+    set status(rx_total) 0
+}
+
+load_init
+
+update
+openFifo

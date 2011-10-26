@@ -1,0 +1,24 @@
+#!@SHELL@
+#
+# test for correct deactivation of traps
+#   "classic" shells use "trap 0" for that
+#   POSIX specifies "trap - 0" for that
+#
+# bash3 is gratituously incompatible, forcing POSIX only, and thus
+# I need to add code to switch different "styles" - this test file
+# checks whether SHELL_TRAP_POSIX is set correctly in Makefile.
+#
+# If the script fails, change SHELL_TRAP_POSIX to 0 (or to 1) in Makefile
+#
+OUTPUT=`(
+    trap "echo 'this is run at end-of-shell'" 0
+    @TRAP_OFF@ 0
+) 2>&1`
+
+if [ -n "$OUTPUT" ]
+then
+    echo "FAIL: can't disable end-of-shell traps" >&2
+    echo "output:" >&2
+    echo "$OUTPUT" >&2
+    exit 1
+fi

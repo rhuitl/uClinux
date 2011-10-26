@@ -1,0 +1,121 @@
+$Id: INSTALL-nl,v 1.3 2003/07/23 18:06:45 rogler Exp $
+Francois ROGLER, francois@rogler.org, 29/05/2001
+Douwe Kiela, virtus@wanadoo.nl, 11/08/2002 (Nederlandse vertaling)
+Demulder Timothy, syphon@wanadoo.be, 23/07/2003 (Nederlandse vertaling)
+
+
+                         Speedtouch USB Driver voor *BSD
+                               Installatie bestand
+
+--------------------------------------------------------------------------------
+
+0. Officiële website
+1. Download de driver 
+2. Benodigdheden 
+3. Compilatie & Installatie
+4. Configuratie 
+5. Verbinding 
+
+--------------------------------------------------------------------------------
+
+
+0. Officiële website
+
+De officiële website van het project kan je hier vinden:
+   http://speedtouch.sf.net
+Je zal daar de nieuwste informatie, documentatie en bestanden vinden van deze driver.
+
+
+1. Download de driver
+
+Dit zijn de bestanden die je nodig hebt : 
+
+* speedtouch-1.1.tar.gz
+    op http://prdownloads.sourceforge.net/speedtouch/speedtouch-1.1.tar.gz
+    of http://www.xsproject.org/speedtouch/files/speedtouch-1.1.tar.gz
+* speedmgmt.tar.gz van de Thomson Site
+    http://www.speedtouchdsl.com/dvrreg_lx.htm
+
+Gebruikmakend van CVS :
+Je kan de broncode ook via CVS krijgen (met een internet verbinding) via
+sourceforge.net. Typ de volgende regel : 
+cvs -z3 -r -d:pserver:anonymous@cvs.speedtch.sourceforge.net:/cvsroot/speedtch
+co speedtouch
+Dit maakt een map speedtouch aan met de broncode erin. Later kan je
+de broncode updaten met het commando `cvs update`.
+
+2. Benodigdheden
+
+Deze driver werkt onder :
+     * FreeBSD : van 4.2 tot 5.1
+     * OpenBSD : vanaf 2.9
+     * NetBSD  : vanaf 1.5
+Voor FreeBSD 5.0 heb je een patch nodig die je hier kan halen:
+http://docs.freebsd.org/cgi/getmsg.cgi?fetch=947410+0+archive/2003/freebsd-current/20030511.freebsd-current
+
+Je moet al de USB, ugen en ppp ondersteuning in je kernel hebben (zit er standaard in) 
+en al de benodigde inode's voor usb en je modem in de /dev map. (Automatisch aangemaakt door FreeBSD 5.0)
+
+Voor NetBSD heb je de user-ppp versie nodig die ik gemaakt heb en die beschikbaar is vanaf :
+http://www.xsproject.org/speedtouch
+http://prdownloads.sourceforge.net/speedtouch/userppp-013007.tar.gz?download
+
+
+
+3. Compilatie & Installatie
+
+Deze driver is GPL software, dus het beste gedistribueerd in broncode vorm. Dit betekent dat
+je de broncode moet compileren voordat je het kan gebruiken.
+
+* Extraheer de Alcatel tarball :
+
+tar -zxvf speedmgmt.tar.gz 
+
+Kopieer dan 'mgmt.o' naar /usr/local/libdata
+(je kan ook het bestand 'alcaudsl.sys' van de windows editie gebruiken) 
+
+* Extraheer, compileer en installeer de driver :
+
+tar -zxvf speedtouch-1.1.tar.gz
+cd speedtouch-1.1
+./configure
+make
+make install (hiervoor moet je root zijn)
+
+Je moet het bestand ppp.conf kopieren naar /etc/ppp (sla je oude ppp.conf bestand eerst op) :
+cp /usr/local/share/doc/speedtouch/ppp.conf.sample /etc/ppp/ppp.conf
+chmod 600 /etc/ppp/ppp.conf
+
+4. Configuratie
+
+Verander in het bestand /etc/ppp/ppp.conf : 
+    * <login>
+    * <password>
+    * <VPI> en <VCI> : bekijk de volgende waarden
+
+5. Verbinding
+
+Je kan ook het script adsl.sh.sample gebruiken.
+Het is meestal in /usr/local/etc/rc.d geplaatsd.
+Om verbinding te maken bij initialisatie, moet je adsl.sh.sample adsl.sh noemen.
+(mv /usr/local/etc/rc.d/adsl.sh.sample /usr/local/etc/rc.d/adsl.sh)
+
+Om handmatig verbinding te maken, zijn hier twee stappen die je moet nemen :
+
+* Initialisatie
+
+Initialisatie van de modem (dit moet je elke keer doen als je je modem aansluit of 
+als je je computer opnieuw opstart)
+    modem_run -f /usr/local/libdata/mgmt.o -m
+
+
+* Maak verbinding : PPP
+    ppp -background adsl
+(bekijk `man ppp` voor andere opties zoals auto, natd, ddial)
+ 
+Nu zou je verbinding moeten hebben. Om de verbinding te stoppen, typ :
+killall ppp (Voor FreeBSD)
+
+
+Zoniet, geef ons dan feedback (nadat je eerst in het FAQ hebt gekeken).
+Gebruik a.u.b IRC of de mailing list om ons feedback te geven.

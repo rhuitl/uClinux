@@ -1,0 +1,200 @@
+.\" 
+.\" Copyright (c) 2004, Nate Nielsen
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without 
+.\" modification, are permitted provided that the following conditions 
+.\" are met:
+.\" 
+.\"     * Redistributions of source code must retain the above 
+.\"       copyright notice, this list of conditions and the 
+.\"       following disclaimer.
+.\"     * Redistributions in binary form must reproduce the 
+.\"       above copyright notice, this list of conditions and 
+.\"       the following disclaimer in the documentation and/or 
+.\"       other materials provided with the distribution.
+.\"     * The names of contributors to this software may not be 
+.\"       used to endorse or promote products derived from this 
+.\"       software without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+.\" "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
+.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
+.\" COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+.\" BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS 
+.\" OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
+.\" AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+.\" OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
+.\" THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
+.\" DAMAGE.
+.\" 
+.\"
+.\" CONTRIBUTORS
+.\"  Nate Nielsen <nielsen@memberwebs.com>
+.\"
+.Dd September, 2004
+.Dt clamsmtpd.conf 5
+.Os clamsmtp 
+.Sh NAME
+.Nm clamsmtpd.conf
+.Nd the configuration file for 
+.Xr clamsmtpd 8
+.Sh DESCRIPTION
+.Xr clamsmtpd 8
+reads a configuration file when starting up. The location of the file is dependent
+on how you compiled clamsmtp but it should usually be in either the
+.Pa /usr/local/etc/
+or 
+.Pa /etc/
+directories. If 
+.Xr clamsmtpd 8
+does not find its configuration file it'll print a warning when it starts up along
+with the location it's expecting to find it in. You can also specify a different 
+location for a config file by passing the 
+.Fl f
+argument to 
+.Xr clamsmtpd 8
+.Pp
+The settings are specified one per line. The setting names come first, followed
+by a colon and then the value. Comments start with the '#' character on a line 
+of their own. Whitespace is ignored at the beginning of line, end of line and 
+around the colons. 
+.Pp
+A sample configuration file can be found in the 
+.Pa doc/
+directory of the clamsmtp distribution.
+.Sh SETTINGS
+The various settings are as follows:
+.Bl -tag -width Fl
+.It Ar Bounce
+When this flag is set 
+.Xr clamsmtpd 8
+actively rejects messages with viruses. This may cause the sender to receive
+a message back notifying them of the virus. In most cases this is not a good
+idea since many viruses spoof sender addresses. 
+.Pp
+[ Default: off ]
+.It Ar ClamAddress
+Specifies the address to connect to 
+.Xr clamd 8
+on. See syntax of addresses below. 
+.Pp
+[ Default:  
+.Pa /var/run/clamav/clamd
+]
+.It Ar Header
+A header to add to scanned messages. Put an empty value to suppress adding
+a header. You can include the following special formatting characters in the
+string to include special values:
+.Bl -inset
+.It Ar %i 
+Client IP Address
+.It Ar %l 
+Local IP Address
+.It Ar %d 
+Current Date
+.El
+.Pp
+You can also include the standard \\r or \\n escapes.
+.Pp
+[ Default: 'X-Virus-Scanned: ClamAV using ClamSMTP' ]
+.It Ar KeepAlives
+On slow connections the server will sometimes timeout before 
+.Xr clamsmtpd 8 
+is finished scanning the file. This option sends NOOP's to the server
+to keep the connection alive. Specify the number of seconds, or 0
+to disable.
+.Pp
+[ Default: 0 ]
+.It Ar Listen
+The address and port to listen for SMTP connections on. See syntax of 
+addresses below. 
+.Pp
+[ Default: port 10025 on all local IP addresses ] 
+.It Ar PidFile
+Specifies a location for the a process id file to be written to. This file 
+contains the process id of 
+.Nm 
+and can be used to stop the daemon. If the 
+.Fl p
+argument is passed on the command line, then this setting will be ignored.
+.Pp
+[ Default: none ]
+.It Ar Quarantine
+Quarantine files that contain viruses by leaving them in the
+.Ar TempDirectory
+directory. The file names look like this (where X is a random 
+character or number):
+.Pa virus.XXXXXX
+.Pp
+[ Default: off ] 
+.It Ar MaxConnections
+Specifies the maximum number of connections to accept at once. 
+.Xr clamd 8
+also needs to be setup to accept at least this number of connections. 
+.Pp
+[ Default: 64 ]
+.It Ar OutAddress
+The address of the SMTP server to send email to once it's been scanned. See 
+syntax of addreses below. 
+.Pp
+[ Required ]
+.It Ar TempDirectory
+The directory to write temp files to. This directory needs to be 
+accessible to both 
+.Xr clamd 8
+and 
+.Xr clamsmtpd 8
+.Pp
+[ Default:
+.Pa /tmp
+]
+.It Ar TimeOut
+The number of seconds to wait while reading data from network connections.
+.Pp
+[ Default: 180 seconds ]
+.It Ar TransparentProxy
+This option enables transparent proxy support, which allows you to route all 
+SMTP traffic that's going through a gateway through clamsmtp which will then 
+send it on to its final destination. This setup usually involves firewall 
+rules which redirect traffic to clamsmtp, and the setup varies from OS to OS.
+.Pp
+[ Default: off ]
+.It Ar User
+The user to run as. If this option is specified then
+.Xr clamsmtpd 8
+must be started as root. It will then drop root privileges and run as the 
+specified user. The user can either be a name or a numerical user id.
+.Pp
+[ Optional ]
+.It Ar VirusAction
+This is a command to run when a virus is found. See the VIRUS ACTION section 
+in 
+.Xr clamsmtpd 8
+for a discussion of this option. 
+.Pp
+[ Default: off ]
+.It Ar XClient
+Send an XCLIENT command to the receiving server. This is useful for forwarding
+client addresses and connection info to servers that support this feature.
+.Pp
+[ Default: off ]
+.El
+.Sh ADDRESSES
+Addresses can be specified in multiple formats:
+.Bl -bullet
+.It 
+Unix local addresses can be specified by specifying their full path. 
+(ie: '/var/run/clamav/clamd').
+.It 
+IP addresses can be specified using dotted notation with a colon before
+the port number (ie: '127.0.0.1:3310').
+.It 
+IPv6 addresses are implemented but disabled. The code needs testing.
+.El
+.Sh SEE ALSO
+.Xr clamsmtpd 8 
+.Sh AUTHOR
+.An Nate Nielsen Aq nielsen@memberwebs.com

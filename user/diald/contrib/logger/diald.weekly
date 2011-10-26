@@ -1,0 +1,38 @@
+#!/usr/bin/perl
+# diald.weekly - Brian Edmonds <edmonds@cs.ubc.ca> Feb20/95
+
+$LOGDIR = '/var/log';
+$LOG = 'diald.log';
+$LOGREPORTER = '/usr/local/bin/logreporter';
+$TEMPLATE = 'diald.template';
+
+chdir $LOGDIR; require 'getopts.pl';
+&Getopts( 'np' ) || die "usage: $0 [-np]\n";
+
+# rotate the log file
+if( ! defined $opt_n ) {
+  for( $i=6 ; $i>=0 ; $i-- ) {
+    if( -f "$LOG.$i" ) {
+      rename( "$LOG.$i", "$LOG." . ( $i + 1 ) );
+    }
+  }
+}
+
+# print the header information if posting
+if( defined $opt_p ) {
+  open( STDOUT, "|/usr/local/bin/injnews" ) || die "Couldn't injnews!\n";
+  select STDOUT; $| = 1;
+  print <<EOT;
+Newsgroups: gweep.stats
+Followup-To: gweep.general
+From: lios!root (diald weekly usage report script)
+Subject: diald weekly usage report
+
+EOT
+}
+
+# run the log reporter
+exec $LOGREPORTER, $TEMPLATE,
+  "/var/log/$LOG" . ( defined $opt_n ? '.0' : '.1' );
+
+# EOF

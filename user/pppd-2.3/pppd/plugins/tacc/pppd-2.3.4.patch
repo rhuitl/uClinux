@@ -1,0 +1,819 @@
+diff -ruN ppp-2.3.4/README.tacacs ppp-2.3.4.tacacs/README.tacacs
+--- ppp-2.3.4/README.tacacs	Thu Jan  1 01:00:00 1970
++++ ppp-2.3.4.tacacs/README.tacacs	Sat May  9 22:42:29 1998
+@@ -0,0 +1,127 @@
++
++                          TACACS+ support for pppd
++                                      
++   
++    Copyright 1997-98 by Pawel Krawczyk <kravietz@ceti.com.pl>
++    
++                           Distributed under GPL
++                                      
++Introduction
++
++   This module supports subset of TACACS+ functions allowing a Linux
++   dialup server to authenticate, authorize and account users on remote
++   authentication server. This includes:
++   
++     * PAP authentication
++     * authorization for IP protocol
++     * accounting of PPP session beginning and end
++       
++   All above functions are performed from within pppd program with
++   username and password passed with PPP protocol. In addition, there is
++   standalone TACACS+ client program - tacc, which can be used as
++   replacement for login program in getty style dialup server programs.
++   
++Installation
++
++    1. Download the distribution from:
++       http://ceti.com.pl/~kravietz/progs/tacacs.html
++    2. Download and original pppd sources. This program was developed on
++       version 2.3.4. You can find pppd sources on local sunsite.unc.edu
++       mirror, or use http://ftpsearch.ntnu.no/
++    3. Compile tacc. You can find instructions in README in tacc subdirectory.
++    4. Apply the patch to pppd source tree:
++
++        patch -p0 <pppd-2.3.4.patch
++
++    5. Configure pppd sources as described in INSTALL file.
++    6. Run make, with the following extra parameter:
++       
++	make USE_TACACS=1
++
++  	You should also check TACACS_DIR definition in pppd/Makefile.linux.
++   	Its set to /usr/src/tacc-1.6.2 by default, you could need to change
++   	it.
++                
++    7. You should now have two programs: tacc and pppd. You should
++       install them in appropriate directory and configure your dialup
++       server to actually use them. The following is example of my
++       /etc/mgetty/login.conf:
++
++/AutoPPP/ -     autoppp /usr/sbin/pppd auth -chap +pap tacacs debug -detach
++*         -     @       /usr/local/sbin/tacc @
++
++    8. Configure your TACACS+ server. You can get it from
++       ftp://ftpeng.cisco.com/pub/tacacs/. Following options are
++       necessary in tac_plus configuration file:
++       
++        default authentication = file filename
++                passwd(5) file; use /etc/passwd even if you have shadow
++                passwords suite installed
++                
++        key = "string"
++                key used to encrypt TACACS+ packets over the network
++                
++        user = DEFAULT { default service = permit }
++                permit all valid and authenticated users to use PPP
++                
++       For more details about configuring TACACS+ server refer to
++       users_guide in the server distribution.
++    9. Following options are recognized by pppd in /etc/ppp/options
++	   file or command line:
++
++	tacacs
++		        Use TACACS+ functions
++       
++	tacacs-server aaa.bbb.ccc.ddd
++                TACACS+ server IP address (multiple allowed)
++                
++	tacacs-secret string
++                key used to encrypt TACACS+ packets over the network;
++                should be same as the key defined on TACACS+ server
++                
++	-tacacs-encryption
++		notacacs-encryption
++                send packets cleartext; this is for debugging only, do
++                not use in real operations
++                
++	tacacs-accounting
++                if you want pppd to send TACACS+ accounting packets to
++                the server; currently it includes only start and stop
++                messages
++                
++ 	tacacs-authorization
++	tacacs-authorize (deprecated)
++                if you want pppd to request authorization for use of PPP
++                for already authenticated user; currently this is limited
++                to service PPP and protocol IP
++                
++   10. When running pppd (probably from mgetty or similiar software), add
++       tacacs option, e.g.:
++
++        /usr/sbin/pppd auth +pap -chap tacacs
++
++   Note that since current version you should use tacacs option instead
++       of previous login! This option tell pppd to actually use TACACS+
++       functions.
++   11. Test if this works. If not, that's probably because keys on
++       authentication and dialup servers are different. tacc can be used
++       to test if the TACACS+ server is working correctly:
++
++        $ tacc -TRA -u user -p pass -s localhost -k 'secret key' -w
++        Authentication OK
++        Authorization OK: Service granted.
++        Accounting: START ok
++        Accounting: STOP ok
++        $ _
++       In case of problems recompiling auth_tac.c with -DDEBUGTAC will
++       cause every TACACS+ function report its progress and errors to
++       syslog. I'll appreciate such log file very much if you send me a
++       bug report.
++       
++                                     tacc
++                                       
++   tacc documentation was moved to manual page. It was also extended ;)
++     _________________________________________________________________
++   
++   Latest versions of this patch can be found on:
++   http://www.ceti.com.pl/~kravietz/progs/tacacs.html
+Binary files ppp-2.3.4/chat/chat.zip and ppp-2.3.4.tacacs/chat/chat.zip differ
+diff -ruN ppp-2.3.4/pppd/Makefile.linux ppp-2.3.4.tacacs/pppd/Makefile.linux
+--- ppp-2.3.4/pppd/Makefile.linux	Wed Apr  1 04:06:37 1998
++++ ppp-2.3.4.tacacs/pppd/Makefile.linux	Sat May  9 22:35:27 1998
+@@ -26,18 +26,19 @@
+ 
+ # CC = gcc
+ #
+-COPTS = -O2 -pipe -Wall -g
++COPTS = -O2 -pipe -Wall -s
++#COPTS = -ggdb3 -pipe
+ VER = 2.3.4
+ LIBS =
+ 
+-ifneq ($(wildcard /usr/lib/libcrypt*),)
+-LIBS += -lcrypt
+-endif
++#ifneq ($(wildcard /usr/lib/libcrypt*),)
++#LIBS += -lcrypt
++#endif
+ 
+ # Uncomment the next 2 lines to include support for Microsoft's
+ # MS-CHAP authentication protocol.
+-CHAPMS=y
+-USE_CRYPT=y
++#CHAPMS=y
++#USE_CRYPT=y
+ ifneq ($(wildcard /usr/lib/libcrypt*),)
+ HAVE_CRYPT_H=y
+ endif
+@@ -48,7 +49,7 @@
+ 
+ INCLUDE_DIRS= -I../include
+ 
+-COMPILE_FLAGS= -D_linux_=1 -DHAVE_PATHS_H -DIPX_CHANGE
++COMPILE_FLAGS= -D_linux_=1 -DHAVE_PATHS_H -DIPX_CHANGE # -D__inet_ntoa=inet_ntoa -D__inet_addr=inet_addr
+ 
+ CFLAGS= $(COPTS) $(COMPILE_FLAGS) $(INCLUDE_DIRS)
+ 
+@@ -83,6 +84,13 @@
+ ifdef LOCKLIB
+ LIBS     := -llock $(LIBS)
+ CFLAGS   += -DLOCKLIB=1
++endif
++
++# TACACS+ library should be in already compiled in separate directory
++ifdef USE_TACACS
++TACACS_DIR :=	/usr/src/tacc-1.6.3
++CFLAGS	+= -DUSE_TACACS_PLUS -I$(TACACS_DIR)/include
++LIBS    := -ltac $(LIBS) -L$(TACACS_DIR)/lib
+ endif
+ 
+ install: pppd
+diff -ruN ppp-2.3.4/pppd/auth.c ppp-2.3.4.tacacs/pppd/auth.c
+--- ppp-2.3.4/pppd/auth.c	Thu Mar 26 05:46:00 1998
++++ ppp-2.3.4.tacacs/pppd/auth.c	Sun Apr 19 09:34:06 1998
+@@ -55,11 +55,20 @@
+ #include <netdb.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++//#include <linux/if_ppp.h>
+ 
+ #ifdef USE_PAM
+ #include <security/pam_appl.h>
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++#include "tacplus.h"
++#include "libtac.h"
++short int task_id;		/* connection identifier for accounting */
++char *tac_username;	/* storage between tac_login() and logout(), also used
++					   by IPCP */
++#endif
++
+ #ifdef HAS_SHADOW
+ #include <shadow.h>
+ #ifndef PW_PPP
+@@ -529,7 +538,11 @@
+      * Check whether we have appropriate secrets to use
+      * to authenticate the peer.
+      */
++#ifdef USE_TACACS_PLUS
++    can_auth = wo->neg_upap && (usetacacs || uselogin || have_pap_secret());
++#else
+     can_auth = wo->neg_upap && (uselogin || have_pap_secret());
++#endif
+     if (!can_auth && wo->neg_chap) {
+ 	remote = ipwo->accept_remote? 0: ipwo->hisaddr;
+ 	can_auth = have_chap_secret(remote_name, our_name, remote);
+@@ -582,7 +595,11 @@
+     ao->neg_chap = !refuse_chap
+ 	&& have_chap_secret(user, remote_name, (u_int32_t)0);
+ 
++#ifdef USE_TACACS_PLUS
++    if (go->neg_upap && !uselogin && !usetacacs && !have_pap_secret())
++#else
+     if (go->neg_upap && !uselogin && !have_pap_secret())
++#endif
+ 	go->neg_upap = 0;
+     if (go->neg_chap) {
+ 	remote = ipwo->accept_remote? 0: ipwo->hisaddr;
+@@ -656,7 +673,12 @@
+ 	fclose(f);
+     }
+ 
+-    if (uselogin && ret == UPAP_AUTHACK) {
++#ifdef USE_TACACS_PLUS
++    if ((uselogin || usetacacs)
++#else
++    if (uselogin 
++#endif
++					&& ret == UPAP_AUTHACK) {
+ 	ret = plogin(user, passwd, msg, msglen);
+ 	if (ret == UPAP_AUTHNAK) {
+ 	    syslog(LOG_WARNING, "PAP login failure for %s", user);
+@@ -759,6 +781,82 @@
+ }
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++/* do TACACS+ authentication instead of 
++ * checking username and password against local
++ * passwd(5) files
++ *
++ * returns:
++ *	UPAP_AUTHNAK: Login failed.
++ *	UPAP_AUTHACK: Login succeeded.
++ */
++int
++tac_login(auser, apasswd, userlen, passlen, msg, msglen)
++	char *auser;
++	char *apasswd;
++	int userlen;
++	int passlen;
++	char **msg;
++	int *msglen;
++{
++    char *tty;
++    char *tacmsg;
++    int tac_fd;
++    char passwd[256], user[256];
++
++    BCOPY(apasswd, passwd, passlen);
++    passwd[passlen] = '\0';
++    BCOPY(auser, user, userlen);
++    user[userlen] = '\0';
++
++    /* record tty name */
++    tty = devnam;
++    if(strncmp(tty, "/dev/", 5) == 0)
++	tty += 5;
++
++    tac_fd=tac_connect(tac_server, tac_servers);
++
++    if(tac_fd < 0) {
++ 	*msg = "TACACS+ server error";
++	*msglen = strlen(*msg);
++    	return(UPAP_AUTHNAK);
++    }
++
++    if(tac_authen_pap_send(tac_fd, user, passwd, tty) < 0) {
++    	*msg = "TACACS+ error";
++	*msglen = strlen(*msg);
++    	return(UPAP_AUTHNAK);
++    }
++
++    tacmsg=tac_authen_pap_read(tac_fd);
++
++    /* authentication failed, return */
++    if(tacmsg != NULL) {
++     	syslog(LOG_ERR, "TACACS+ authentication failed for `%s': %s",
++								user, tacmsg);
++     	*msg = tacmsg;
++     	*msglen = strlen(*msg);
++     	return(UPAP_AUTHNAK);
++    }
++
++    close(tac_fd);
++
++    syslog(LOG_INFO, "user %s logged in", user);
++    logwtmp(tty, user, "");
++    logged_in = TRUE;
++
++    /* store username for accounting and authorization functions */
++    tac_username = (char *) xcalloc(1, strlen(user)+1);
++    strncpy(tac_username, user, strlen(user));
++    
++    *msg = "Login ok";
++    *msglen = strlen(*msg);
++
++    return (UPAP_AUTHACK);
++
++}
++#endif /* USE_TACACS_PLUS */
++
+ /*
+  * plogin - Check the user name and password against the system
+  * password database, and login the user if OK.
+@@ -904,6 +1002,7 @@
+     logged_in = TRUE;
+ 
+     return (UPAP_AUTHACK);
++
+ }
+ 
+ /*
+@@ -941,6 +1040,7 @@
+ #endif
+ 
+     logged_in = FALSE;
++
+ }
+ 
+ 
+diff -ruN ppp-2.3.4/pppd/ipcp.c ppp-2.3.4.tacacs/pppd/ipcp.c
+--- ppp-2.3.4/pppd/ipcp.c	Wed Mar 25 04:08:48 1998
++++ ppp-2.3.4.tacacs/pppd/ipcp.c	Sat May  9 22:33:54 1998
+@@ -39,6 +39,26 @@
+ #include "ipcp.h"
+ #include "pathnames.h"
+ 
++#ifdef USE_TACACS_PLUS
++#ifdef _linux_
++#include <net/if.h>
++#if __GLIBC__ >= 2
++#include <asm/types.h>
++#endif
++#include <linux/if_ppp.h>
++#endif
++#include <time.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <signal.h>
++#include "tacplus.h"
++#include "libtac.h"
++#include "magic.h"
++extern char *tac_username;
++extern int task_id;
++struct ifpppstatsreq treq;
++#endif
++
+ /* global vars */
+ ipcp_options ipcp_wantoptions[NUM_PPP];	/* Options that we want to request */
+ ipcp_options ipcp_gotoptions[NUM_PPP];	/* Options that peer ack'd */
+@@ -1138,6 +1158,12 @@
+     ipcp_options *go = &ipcp_gotoptions[f->unit];
+     ipcp_options *wo = &ipcp_wantoptions[f->unit];
+ 
++#ifdef USE_TACACS_PLUS
++	char *msg;
++	char *tty;
++	struct tac_attrib *attr;
++#endif
++
+     np_up(f->unit, PPP_IP);
+     IPCPDEBUG((LOG_INFO, "ipcp: up"));
+ 
+@@ -1163,13 +1189,68 @@
+     /*
+      * Check that the peer is allowed to use the IP address it wants.
+      */
+-    if (!auth_ip_addr(f->unit, ho->hisaddr)) {
++    if (!auth_ip_addr(f->unit, ho->hisaddr)
++#ifdef USE_TACACS_PLUS
++					/* if there's TACACS+ authorization it takes
++					   precedence over local authorizaition */
++					&& (!tac_authorize && usetacacs)
++#endif
++					) {
+ 	syslog(LOG_ERR, "Peer is not authorized to use remote address %s",
+ 	       ip_ntoa(ho->hisaddr));
+ 	ipcp_close(f->unit, "Unauthorized remote IP address");
+ 	return;
+     }
+ 
++#ifdef USE_TACACS_PLUS
++	/* Check the TACACS+ authorization for providing IP service */
++
++	if(usetacacs) {
++		/* this is needed both by acct and author */
++		tty=devnam;
++		if(strncmp(tty, "/dev/", 5) == 0) tty+=5;	
++	}
++
++	if(tac_authorize && usetacacs) {
++		/* ask for authorization to provide IP to the peer */
++		int tac_fd;
++		struct areply *arep;
++
++		TACDEBUG((LOG_DEBUG, "ipcp_up: sending author request for %s", \
++						ip_ntoa(ho->hisaddr)))
++		attr=(struct tac_attrib *)xcalloc(1, sizeof(struct tac_attrib));
++		tac_add_attrib(attr, "service", "ppp");
++		tac_add_attrib(attr, "protocol", "ip"); /* ask for IPCP */
++		tac_add_attrib(attr, "addr", ip_ntoa(ho->hisaddr));
++
++		tac_fd=tac_connect(tac_server, tac_servers);
++
++		if(tac_author_send(tac_fd, tac_username, tty, attr) < 0) {
++			ipcp_close(f->unit, "Authorization error");
++			TACDEBUG((LOG_DEBUG, "ipcp_up: error sending request"))
++			return;
++		}
++
++		arep = tac_author_read(tac_fd);
++
++		if(arep->status != AUTHOR_STATUS_PASS_ADD &&
++						arep->status != AUTHOR_STATUS_PASS_REPL) {
++			syslog(LOG_ERR, "IPCP authorization failure: %s", arep->msg);
++			ipcp_close(f->unit, "Authorization failed");
++			return;
++		}
++		TACDEBUG((LOG_DEBUG, "ipcp_up: successful authorization: %s", \
++						arep->msg));
++
++		/* TODO: check arep->attrib and add to
++		 * ipcp_wantoptions[f->unit].hisaddr 
++		 */
++
++		close(tac_fd);
++		tac_free_attrib(attr);
++	}
++#endif
++
+     /* set tcp compression */
+     sifvjcomp(f->unit, ho->neg_vj, ho->cflag, ho->maxslotindex);
+ 
+@@ -1252,6 +1333,40 @@
+ 
+ 	syslog(LOG_NOTICE, "local  IP address %s", ip_ntoa(go->ouraddr));
+ 	syslog(LOG_NOTICE, "remote IP address %s", ip_ntoa(ho->hisaddr));
++
++#ifdef USE_TACACS_PLUS
++	if(tac_accounting && usetacacs) {
++		char buf[40];	
++		int tac_fd;
++
++		TACDEBUG((LOG_NOTICE, "ipcp_up: start accounting"));
++		attr=(struct tac_attrib *)xcalloc(1, sizeof(struct tac_attrib));
++		sprintf(buf, "%lu", time(0));
++  		tac_add_attrib(attr, "start_time", buf);
++		task_id=(short int) magic();
++		sprintf(buf, "%u", task_id);
++		tac_add_attrib(attr, "task_id", buf);
++		tac_add_attrib(attr, "service", "ppp");
++		tac_add_attrib(attr, "protocol", "ip");
++		tac_add_attrib(attr, "addr", ip_ntoa(ho->hisaddr));
++		
++ 		tac_fd=tac_connect(tac_server, tac_servers);
++
++		if(tac_fd) {
++			tac_account_send(tac_fd, TAC_PLUS_ACCT_FLAG_START,
++					 	tac_username, tty, attr);
++	
++			tac_free_attrib(attr);
++
++			if(tac_account_read(tac_fd) != NULL) 
++				syslog(LOG_WARNING,
++					"TACACS+ accounting start failed");
++
++			close(tac_fd);	
++		}
++		TACDEBUG((LOG_NOTICE, "ipcp_up: start accounting done"));
++	}
++#endif
+     }
+ 
+     /*
+@@ -1274,6 +1389,89 @@
+     fsm *f;
+ {
+     IPCPDEBUG((LOG_INFO, "ipcp: down"));
++	
++#ifdef USE_TACACS_PLUS
++    /* get interface statistics for accounting */
++
++    if(tac_accounting && usetacacs) {
++    	char buf[40];
++    	int tac_fd, reqfd;
++    	struct tac_attrib *attr;
++		char *tty;
++
++		tty=devnam;
++		if(strncmp(tty, "/dev/", 5) == 0) tty+=5;	
++
++    	bzero(&treq, sizeof(treq));
++
++    	/* get interface statistics for accounting */
++    	reqfd = socket(AF_INET, SOCK_DGRAM, 0);
++
++#ifdef _linux_
++	treq.stats_ptr = (caddr_t) &treq.stats;
++#endif
++
++    	if(reqfd < 0)
++		syslog(LOG_DEBUG,
++		 "cannot get PPP statistics for %s (socket): %m", ifname);
++    	else {
++		sprintf(treq.ifr__name, "%s", ifname);
++		if(ioctl(reqfd, SIOCGPPPSTATS, &treq) < 0)
++		    syslog(LOG_DEBUG,
++		 	"cannot get PPP statistics for %s (ioctl): %m", ifname);
++		}
++
++     /* send stop accounting packet */
++
++		TACDEBUG((LOG_DEBUG, "ipcp_down: stop accounting"))
++		attr=(struct tac_attrib *) xcalloc(1, sizeof(struct tac_attrib));
++
++		sprintf(buf, "%lu", time(0));
++  		tac_add_attrib(attr, "stop_time", buf);
++		sprintf(buf, "%u", task_id);
++		tac_add_attrib(attr, "task_id", buf);
++		tac_add_attrib(attr, "service", "ppp");
++		tac_add_attrib(attr, "protocol", "ip");
++
++		if(((treq.stats).p).ppp_obytes) {
++			sprintf(buf, "%u", ((treq.stats).p).ppp_obytes);
++			tac_add_attrib(attr, "bytes_out", buf);
++			sprintf(buf, "%u", ((treq.stats).p).ppp_ibytes);
++			tac_add_attrib(attr, "bytes_in", buf);
++			sprintf(buf, "%u", ((treq.stats).p).ppp_opackets);
++			tac_add_attrib(attr, "paks_out", buf);
++			sprintf(buf, "%u", ((treq.stats).p).ppp_ipackets);
++			tac_add_attrib(attr, "paks_in", buf);
++		}
++
++		/* protect from SIGHUP, SIGALRM and SIGCHLD when remote
++		   modem disconnects at this stage */
++		signal(SIGALRM, SIG_IGN);
++		signal(SIGCHLD, SIG_IGN);
++		signal(SIGHUP, SIG_IGN);
++
++		tac_fd=tac_connect(tac_server, tac_servers);
++
++		if(tac_fd > 0) {
++			tac_account_send(tac_fd, TAC_PLUS_ACCT_FLAG_STOP, 
++					tac_username, tty, attr);
++
++			tac_free_attrib(attr);
++
++			if(tac_account_read(tac_fd) != NULL) 
++				syslog(LOG_DEBUG, "TACACS+ accounting stop failed");
++
++			close(tac_fd);
++		}
++		TACDEBUG((LOG_DEBUG, "ipcp_down: stop accounting done"))
++
++		/* reset signals to their default behaviour */
++		signal(SIGALRM, SIG_DFL);
++		signal(SIGCHLD, SIG_DFL);
++		signal(SIGHUP, SIG_DFL);
++    }
++#endif
++	
+     np_down(f->unit, PPP_IP);
+     sifvjcomp(f->unit, 0, 0, 0);
+ 
+diff -ruN ppp-2.3.4/pppd/main.c ppp-2.3.4.tacacs/pppd/main.c
+--- ppp-2.3.4/pppd/main.c	Mon Mar 30 08:25:34 1998
++++ ppp-2.3.4.tacacs/pppd/main.c	Mon Apr 20 17:40:44 1998
+@@ -285,6 +285,12 @@
+     syslog(LOG_NOTICE, "pppd %s.%d%s started by %s, uid %d",
+ 	   VERSION, PATCHLEVEL, IMPLEMENTATION, p, uid);
+   
++#ifdef USE_TACACS_PLUS
++	if(usetacacs)
++			syslog(LOG_NOTICE, "using TACACS+ driver v%d.%d", tac_ver_major,
++							tac_ver_minor);
++#endif
++	
+     /*
+      * Compute mask of all interesting signals and install signal handlers
+      * for each.  Only one signal handler may be active at a time.  Therefore,
+@@ -417,7 +423,10 @@
+ 	 */
+ 	if (lockflag && !default_device) {
+ 	    if (lock(devnam) < 0)
++		die(1);
++/*
+ 		goto fail;
++*/
+ 	    locked = 1;
+ 	}
+ 
+diff -ruN ppp-2.3.4/pppd/options.c ppp-2.3.4.tacacs/pppd/options.c
+--- ppp-2.3.4/pppd/options.c	Thu Mar 26 05:46:07 1998
++++ ppp-2.3.4.tacacs/pppd/options.c	Tue May  5 13:57:03 1998
+@@ -113,6 +113,17 @@
+ int	refuse_pap = 0;		/* Set to say we won't do PAP */
+ int	refuse_chap = 0;	/* Set to say we won't do CHAP */
+ 
++#ifdef USE_TACACS_PLUS
++#include "tacplus.h"
++#include "libtac.h"
++int usetacacs = 0;						/* Use TACACS+ AAA */
++u_long tac_server[TAC_PLUS_MAXSERVERS];	/* TACACS+ server addresses */
++int tac_servers = 0;					/* How many servers are defined */
++int tac_encryption = 1;					/* Do we encrypt packets */
++char *tac_secret;						/* Encryption shared secret */
++int tac_authorize = 0;					/* Authorize services */
++int tac_accounting = 0;					/* Send accounting information */
++#endif
+ #ifdef MSLANMAN
+ int	ms_lanman = 0;    	/* Nonzero if use LanMan password instead of NT */
+ 			  	/* Has meaning only with MS-CHAP challenges */
+@@ -255,6 +266,15 @@
+ static int setmslanman __P((char **));
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++static int settacacsserver __P((char **));
++static int settacacssecret __P((char **));
++static int setnotacacsencryption __P((void));
++static int settacacsauthorize __P((void));
++static int settacacsaccounting __P((void));
++static int setdotacacs __P((void));
++#endif
++
+ static int number_option __P((char *, u_int32_t *, int));
+ static int int_option __P((char *, int *));
+ static int readable __P((int fd));
+@@ -416,6 +436,17 @@
+     {"ms-lanman", 0, setmslanman},	/* Use LanMan psswd when using MS-CHAP */
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++    {"tacacs", 0, setdotacacs},
++    {"tacacs-server", 1, settacacsserver},
++    {"tacacs-secret", 1, settacacssecret},
++    {"-tacacs-encryption", 0, setnotacacsencryption},
++    {"notacacs-encryption", 0, setnotacacsencryption},
++    {"tacacs-authorize", 0, settacacsauthorize},
++    {"tacacs-authorization", 0, settacacsauthorize},
++    {"tacacs-accounting", 0, settacacsaccounting},
++#endif
++
+     {NULL, 0, NULL}
+ };
+ 
+@@ -2084,6 +2115,72 @@
+ {
+     return int_option(*argv, &lcp_fsm[0].maxconfreqtransmits);
+ }
++
++#ifdef USE_TACACS_PLUS
++static int
++settacacsserver(argv)
++    char **argv;
++{
++    	if(tac_servers >= TAC_PLUS_MAXSERVERS) {
++    		fprintf(stderr, "Too many tacacs-server options, max is %d",
++			TAC_PLUS_MAXSERVERS);
++		return(0);
++    	}
++    
++    	tac_server[tac_servers] = inet_addr(*argv);
++
++    	if (tac_server[tac_servers] == -1) {
++		fprintf(stderr, "Invalid TACACS+ server address %s\n", *argv);
++		return 0;
++    	}
++
++	tac_servers++;
++    	return(1);
++}
++
++static int
++settacacssecret(argv)
++    char **argv;
++{
++    tac_secret=(char *) calloc(1, strlen(*argv)+1);
++    strncpy(tac_secret, *argv, strlen(*argv));
++    if(*argv == NULL) {
++     fprintf(stderr, "TACACS+ secret is not specified or invalid: \"%s\" ", *argv);
++     return(0);
++    }
++    return(1);
++}
++
++static int
++setnotacacsencryption(void)
++{
++    tac_encryption=0;
++    return(1);
++      
++}
++
++static int
++setdotacacs(void)
++{
++    usetacacs=1;
++    return(1);
++}
++
++static int
++settacacsauthorize(void)
++{
++    tac_authorize=1;
++    return(1);
++}
++
++static int
++settacacsaccounting(void)
++{
++    tac_accounting=1;
++    return(1);
++}
++
++#endif /* USE_TACACS_PLUS */
+ 
+ static int
+ setlcpfails(argv)
+diff -ruN ppp-2.3.4/pppd/pppd.h ppp-2.3.4.tacacs/pppd/pppd.h
+--- ppp-2.3.4/pppd/pppd.h	Thu Mar 26 05:46:07 1998
++++ ppp-2.3.4.tacacs/pppd/pppd.h	Sun Apr 19 09:34:06 1998
+@@ -71,6 +71,18 @@
+ extern char	**script_env;	/* Environment variables for scripts */
+ extern int	detached;	/* Have detached from controlling tty */
+ 
++#ifdef USE_TACACS_PLUS
++#include "tacplus.h"
++#include "libtac.h"
++extern int usetacacs;		/* Use TACACS+ authentication */
++extern u_long tac_server[TAC_PLUS_MAXSERVERS];	/* TACACS+ server */
++extern int tac_servers;
++extern int tac_encryption;         /* Encrypt TACACS+ packets */
++extern char *tac_secret;		/* Packets encryption key */
++extern int tac_authorize;		/* Authorize user requesting service */
++extern int tac_accounting;		/* Do TACACS+ accounting */
++#endif
++
+ /*
+  * Variables set by command-line options.
+  */
+@@ -412,6 +424,9 @@
+ #define DEBUGIPCP	1
+ #define DEBUGUPAP	1
+ #define DEBUGCHAP	1
++#ifdef USE_TACACS_PLUS
++#define	DEBUGTAC	1
++#endif
+ #endif
+ 
+ #ifndef LOG_PPP			/* we use LOG_LOCAL2 for syslog by default */
+@@ -464,6 +479,12 @@
+ #define CHAPDEBUG(x)	if (debug) syslog x
+ #else
+ #define CHAPDEBUG(x)
++#endif
++
++#ifdef DEBUGTAC
++#define TACDEBUG(x)	syslog x;
++#else
++#define TACDEBUG(x)
+ #endif
+ 
+ #ifdef DEBUGIPXCP
+diff -ruN ppp-2.3.4/pppd/upap.c ppp-2.3.4.tacacs/pppd/upap.c
+--- ppp-2.3.4/pppd/upap.c	Wed Apr 30 07:59:56 1997
++++ ppp-2.3.4.tacacs/pppd/upap.c	Sun Apr 19 09:34:06 1998
+@@ -73,6 +73,11 @@
+ static void upap_sauthreq __P((upap_state *));
+ static void upap_sresp __P((upap_state *, int, int, char *, int));
+ 
++#ifdef USE_TACACS_PLUS
++extern int usetacacs;
++extern int tac_login(char *user, char *passwd, int userlen, int passlen, 
++					char **msg, int *msglen);
++#endif
+ 
+ /*
+  * upap_init - Initialize a UPAP unit.
+@@ -380,7 +385,13 @@
+     /*
+      * Check the username and password given.
+      */
+-    retcode = check_passwd(u->us_unit, ruser, ruserlen, rpasswd,
++    retcode = 
++#ifdef USE_TACACS_PLUS
++			usetacacs ? 
++			tac_login(ruser, rpasswd, ruserlen, rpasswdlen,
++							&msg, &msglen) :
++#endif
++			check_passwd(u->us_unit, ruser, ruserlen, rpasswd,
+ 			   rpasswdlen, &msg, &msglen);
+     BZERO(rpasswd, rpasswdlen);
+ 

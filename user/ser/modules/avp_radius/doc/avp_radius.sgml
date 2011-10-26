@@ -1,0 +1,133 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V4.2//EN">
+
+<book>
+    <bookinfo>
+	<title>avp Module</title>
+	<authorgroup>
+	    <author>
+		<firstname>Juha</firstname>
+		<surname>Heinanen</surname>
+		<email>jh@tutpro.com</email>
+	    </author>
+	</authorgroup>
+	<copyright>
+	    <year>2004</year>
+	    <holder>Juha Heinanen</holder>
+	</copyright>
+	<revhistory>
+	    <revision>
+		<revnumber>$Revision: 1.1.2.1 $</revnumber>
+		<date>$Date: 2005/06/22 23:16:51 $</date>
+	    </revision>
+	</revhistory>
+    </bookinfo>
+    <toc></toc>
+    
+    <chapter>
+	<title>User's Guide</title>
+	
+	<section>
+	    <title>Overview</title>
+	    <para>
+	 	avp_radius module allows loading of user's attributes into AVPs
+  		from Radius. User's name and domain can be based on From URI,
+  		Request URI, or authenticated credentials.
+	    </para>
+	    <para>
+ 		The module assumes that Radius returns the AVPs as values of
+		reply attribute SIP-AVP.  Its value must be a string of form
+		"name:value" or of form "name#value".  In the first case, value
+		is interpreted as a string and in the second case as an int
+		(second case has not been implemented yet).
+	    </para>
+	    <para>
+		The module prefixes each attribute name as returned from Radius
+		by string "caller_" or "callee_" depending if caller's or
+		callee's attributes are loaded.
+	    </para>
+	</section>
+	<section>
+	<title>Dependencies</title>
+	    <para>
+		None.
+	    </para>
+	</section>
+	<section>
+	    <title>Exported Parameters</title>
+	    
+	    <section>
+		<title><varname>radius_config</varname> (string)</title>
+		<para>
+		    This is the location of the configuration file of radius
+		    client libraries.
+		</para>
+		<para>
+		    Default value is
+		    "/usr/local/etc/radiusclient/radiusclient.conf".
+		</para>
+		<example>
+		    <title>radius_config parameter usage</title>
+		    <programlisting format="linespecific">
+modparam("avp_radius", "radius_config", "/etc/radiusclient.conf")
+</programlisting>
+		</example>
+	    </section>
+
+	    <section>
+		<title><varname>caller_service_type</varname> (integer)</title>
+		<para>
+		    This is the value of the Service-Type radius attribute to
+		    be used, when caller's attributes are loaded.
+		</para>
+		<para>
+ 		    Default value is dictionary value of "SIP-Caller-AVPs"
+ 		    Service-Type.
+		</para>
+		<example>
+		    <title>radius_config parameter usage</title>
+		    <programlisting format="linespecific">
+modparam("avp_radius", "caller_service_type", 18)
+</programlisting>
+		</example>
+	    </section>
+
+	</section>
+	
+	<section>
+	    <title>Exported Functions</title>
+
+	    <section>
+		<title><function moreinfo="none">avp_load_radius(user)</function></title>
+		<para>
+		    The functions loads user's attributes from radius and
+		    stores them into AVPs.  Parameter "user" is used to
+		    indicate, whose attributes are loaded.  Possible values are
+		    "caller", "callee", and "digest".
+		</para>
+		<para>
+		    In "caller" case, attributes belong to the user of the From
+ 		    URI, in "callee" case, to the user of the Request URI, and,
+ 		    in "digest" case, to the authenticated user.
+		</para>
+		<para>
+		    AVP name returned from Radius is prefixed by string
+		    "caller_", if avp_load_radius parameter is "caller" or
+		    "digest", and by "callee_", if parameter is "callee".
+		</para>
+		<example>
+		    <title><function moreinfo="none">avp_load_radius</function> usage</title>
+		    <programlisting format="linespecific">
+...
+avp_load_radius("callee")
+...
+</programlisting>
+		</example>
+	    </section>
+	</section>
+    </chapter>
+</book>
+
+<!-- Keep this element at the end of the file
+Local Variables:
+End:
+-->

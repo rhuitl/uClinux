@@ -1,0 +1,128 @@
+# ###############################################################
+#
+# Makfile for the GPL speedtouch USB driver 
+#
+# Written by Francois Rogler <francois@rogler.org>
+# June 2001
+#
+# $Id: Makefile.in,v 1.12 2004/05/18 00:10:48 papillau Exp $
+#
+# ###############################################################
+
+# ###############################################################
+# Makefile variables
+# ###############################################################
+
+# Warning levels
+CWARN0 = @CWARN@
+CWARN1 = $(CWARN0) -Wwrite-strings -Wshadow
+CWARN2 = $(CWARN1) -Wcast-align -Wcast-qual -Waggregate-return
+CWARN3 = $(CWARN2) -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
+CWARN4 = $(CWARN3) -Wconversion -Winline -Wtraditional
+CWARN  = $(CWARN0)
+
+
+# Vrac
+SHELL = @SHELL@
+CONFIGURE_ARGS = @ac_configure_args@
+@SET_MAKE@
+
+rootdir=@PWD@
+
+# Driver version
+VERSION=@VERSION@
+
+# Installation directories
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+sbindir=@sbindir@
+libexecdir=@libexecdir@
+datadir=@datadir@
+sysconfdir=@sysconfdir@
+libdir=@libdir@
+includedir=@includedir@
+oldincludedir=@oldincludedir@
+infodir=@infodir@
+mandir=@mandir@
+doc=${rootdir}/@DOCDIR@
+
+srcdir=${rootdir}/src
+make_bindir=${rootdir}/bin
+include= -I. -I${includedir} -I${oldincludedir}
+INSTALL=@INSTALL@
+installuser=@installuser@
+
+man1dir=${mandir}/man1
+man8dir=${mandir}/man8
+docdir=${datadir}/doc/speedtouch
+
+# C compiler
+CC=@CC@
+
+# C compiler options
+THREAD_LIBS=@THREAD_LIBS@
+USE_SYSLOG=@syslog_flags@
+PUSB_SOURCE=@PUSB_SOURCE@
+
+CFLAGS=@CFLAGS@
+ST_CFLAGS=$(CWARN) $(include) $(CFLAGS)
+ST_COMPILE=@st_compile@
+
+# Linker options
+LINK_OPTS=@link_opts@
+
+LIBS=@LIBS@
+
+DEFS=$(CFLAGS)
+
+#RPM Variables
+RPM_ROOT=@RPM_ROOT@
+
+# ###############################################################
+# Makefile Rules
+# ###############################################################
+
+DIST_FILES = \
+	adsl.sh.sample  FAQ-es   INSTALL-de  INSTALL.in  Makefile.in \
+	ppp.conf.sample FAQ-fr   INSTALL-es  INSTALL-it  patch-usb \
+	vpivci          FAQ      INSTALL     INSTALL-fr  INSTALL-nl \
+	FAQ-nl
+
+all :
+
+install: install-man
+	@test -d "$(prefix)/etc/rc.d" || $(INSTALL) -c -d "$(prefix)/etc/rc.d"
+	$(INSTALL) -m 0744 -o $(installuser) adsl.sh.sample "$(prefix)/etc/rc.d"
+	@test -d "$(docdir)" || $(INSTALL) -c -d "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) INSTALL         "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) INSTALL-de      "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) INSTALL-fr      "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) INSTALL-it      "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) INSTALL-nl      "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) ppp.conf.sample "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) FAQ             "$(docdir)"
+	$(INSTALL) -m 0444 -o $(installuser) FAQ-fr          "$(docdir)"
+
+install-man:
+	@test -d "$(man1dir)" || $(INSTALL) -c -d "$(man1dir)"
+	$(INSTALL) -m 0444 -o $(installuser) ../doc-linux/man/speedtouch-setup.1 "$(man1dir)"
+	$(INSTALL) -m 0444 -o $(installuser) ../doc-linux/man/speedtouch-start.1 "$(man1dir)"
+	$(INSTALL) -m 0444 -o $(installuser) ../doc-linux/man/speedtouch-stop.1  "$(man1dir)"
+	@test -d "$(man8dir)" || $(INSTALL) -c -d "$(man8dir)"
+	$(INSTALL) -m 0444 -o $(installuser) ../doc-linux/man/modem_run.8 "$(man8dir)"
+	$(INSTALL) -m 0444 -o $(installuser) ../doc-linux/man/pppoa2.8    "$(man8dir)"
+	$(INSTALL) -m 0444 -o $(installuser) ../doc-linux/man/pppoa3.8    "$(man8dir)"
+
+uninstall :
+	rm -rf "$(docdir)"
+	rm -rf "$(prefix)/etc/rc.d/adsl.sh.sample"
+
+dist:
+	mkdir "$(rootdir)/speedtouch-$(VERSION)/doc-bsd"
+	cp -f $(DIST_FILES) "$(rootdir)/speedtouch-$(VERSION)/doc-bsd"
+
+clean:
+
+distclean:
+	rm -f Makefile

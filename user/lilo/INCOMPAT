@@ -1,0 +1,546 @@
+Incompatibilities between LILO >= 22 and earlier versions
+=========================================================
+
+Boot loaders
+------------
+
+Starting with version 22, a third boot loader, '/boot/boot-bmp.b' is now
+available.  This loader supports booting from a bitmapped screen, defined in
+a bitmap file referenced from the config file.  This boot loader requires a
+VGA adapter which supports video mode 0x12: 16-color, 640x480 pixels.  It
+will fall back to the teletype-text interface if such an adapter is not
+present.
+
+Chain loaders
+-------------
+
+The chain loader for loading OS/2 from other than the C: drive, 'os2_d.b',
+is now obsolete.  All of the functionality is combined into 'chain.b'.
+
+Disk addressing
+---------------
+
+A Makefile option in version 22, LBA32, makes 32-bit sector addressing the
+default, instead of geometric addressing.  Thus, the 1024 cylinder limit on
+large disks will be avoided on virtually all newer (post 1998) systems. 
+With the fallback to geometric addressing as before, compatibility with
+older systems is extremely likely.  If geometric addressing must be forced
+on older system, there is now the 'geometric' command and '-g' switch.  Not
+all versions of LILO will be compiled with the LBA32 switch to enable this
+feature.
+
+RAID installation
+-----------------
+
+Installation on RAID1 partitions is completely re-written.  Consult the
+tutorial "README.raid1" for details.  The boot loaders are no longer written
+unconditionally to the MBRs of the disks containing the raid set partitions,
+but preferably to the raid partition itself.  Auxiliary records may be
+written to MBRs, but this writing may be controlled with 'raid-extra-boot='.
+A mode of operation compatible with previous versions is available.
+
+
+Incompatibilities between LILO >= 21 and earlier versions
+=========================================================
+
+Serial lines
+------------
+
+Since version 21.7, all IBM standard bit rates from 110 to 9600 are
+supported, as well as extended rates of 19200, 38400, 57600, & 115200.
+
+Boot loaders
+------------
+
+Starting with version 21.5, the default boot loader is '/boot/boot-menu.b',
+referenced as '/boot/boot.b' through a symbolic link.  This boot loader
+allows booting from a text-based menu using the keyboard arrow keys to make
+the kernel/other selection.  For strict compatibility with earlier
+teletype-text based boot loaders, '/boot/boot-text.b' is still available,
+although probably unneeded.
+
+Change Rules
+------------
+
+A more complete set of default partition change-rules is available starting 
+with version 21.6 and later.
+
+A Makefile option allows the automatic insertion of the "CHANGE AUTOMATIC"
+command into the config file.  A comment is now issued when this is done,
+and it is possible to see the partition change rules in force by using a
+verbosity level of 3:  -v3 or verbose=3.  Not all versions of LILO will be
+compiled with the AUTOAUTO switch to enable this feature.
+
+Disk addressing
+---------------
+
+32-bit 0-based sector addressing has been available since version 21.2,
+enabled by the 'lba32' (-L) option.  If the BIOS does not support the EDD
+packet calls on int 0x13 to use this feature, then the boot loader will fall
+back to geometric (Cylinder:Head:Sector) addressing by using int 0x13, fn 8,
+to obtain the disk geometry.  
+
+
+Incompatibilities between LILO >= 20 and earlier versions
+=========================================================
+
+Special chain loaders
+---------------------
+
+The functionality of the chain loaders any_b.b and any_d.b has been
+generalized and integrated into chain.b. any_b.b and any_d.b are
+therefore no longer supported. Their behaviour can be emulated as
+follows:
+
+   other = foo
+     loader = /boot/any_b.b
+
+becomes
+
+   other = foo
+     map-drive = 0
+       to = 1
+     map-drive = 1
+       to = 0
+
+and
+
+   other = foo
+     loader = /boot/any_d.b
+
+becomes
+
+   other = foo
+     map-drive = 0x80
+       to = 0x81
+     map-drive = 0x81
+       to = 0x80
+
+The use of os2_d.b changes as follows:
+
+   other = foo
+     loader = /boot/os2_d.b
+
+becomes
+
+   other = foo
+     loader = /boot/os2_d.b
+     map-drive = 0x80
+       to = 0x81
+     map-drive = 0x81
+       to = 0x80
+
+
+Removal of less common baud rates
+---------------------------------
+
+The baud rates 150 bps and 600 bps are no longer available with the SERIAL
+option.
+
+
+Incompatibilities between LILO >= 18 and earlier versions
+=========================================================
+
+Partition type check
+--------------------
+
+Starting with version 18, LILO checks the type of the partition where it
+stores its boot sector. LILO installation may therefore fail on systems
+where the LILO boot sector resides on a seemingly unsuitable partition.
+This problem can be solved by either changing the partition type of by
+using the IGNORE-TABLE configuration option.
+
+
+disktab
+-------
+
+Is no longer documented and support for it will be removed in a future
+version of LILO. See section "Disk geometry" in the accompanying
+documentation for the right way to configure unusual disk geometry.
+
+
+Booting kernel images from a device
+-----------------------------------
+
+An essentially useless feature of LILO is to be able to boot a kernel
+from a device without file system, e.g.
+
+  image = /dev/fd0
+    range = 1+512
+
+Support for this will be removed in a future version of LILO. Also, new
+functions such as kernels > 512kB are not supported for kernels booted
+from a device.
+
+Note that booting of non-Linux systems (other = /dev/...) will in no
+way be affected by this feature removal.
+
+
+REWRITE-TABLE
+-------------
+
+The REWRITE-TABLE configuration option and the compile-time options
+REWRITE_TABLE, FIX_TYPE, and HIDE_DOS are not available in the current
+version of LILO, because deficiencies were found in the implementation
+in version 17 (e.g. attempts to alter the partition table of the second
+disk resulted in a modification of the partition table of the first
+disk, using the parameters of the second disk), and there was not
+enough time to complete an improved version.
+
+Future versions will use a radically different internal mechanism, but
+no configuration change should be required in most cases. Users who
+depend on REWRITE-TABLE to be available should continue to use their
+current version of LILO and wait for a later version before upgrading.
+
+
+Incompatibilities between LILO >= 17 and earlier versions
+=========================================================
+
+Documentation change
+--------------------
+
+The last traces of "old-style" configuration have been removed.
+
+
+Incompatibilities between LILO >= 0.16 and earlier versions
+===========================================================
+
+Sanity checks
+-------------
+
+When booting an operating system from any device than the first hard or floppy
+disk, specifying the chain loader is now mandatory.
+
+
+Incompatibilities between LILO >= 0.14 and earlier versions
+===========================================================
+
+mkbindist
+---------
+
+... is gone. I don't think anybody used it and I got tired of updating it.
+
+
+Variable-size setup
+-------------------
+
+Kernels >= 1.1.43 support setup segments of variable size. LILO 0.15 is able
+to detect this and act accordingly. However, older kernels could possibly
+contain other information at that place. This can be discovered by running
+the following command:
+
+# /sbin/lilo -t -v -v | grep Setup
+
+If very unusual numbers (e.g. below four or significantly bigger than five)
+are shown, you may have such a kernel.
+
+LILO has to be compiled without the VARSETUP option in such cases. Note that
+later kernels may no longer support running LILO without VARSETUP.
+
+
+Incompatibilities between LILO >= 0.13 and earlier versions
+===========================================================
+
+Possible conflict with /etc/disktab from Shoelace
+-------------------------------------------------
+
+When using the new path names, installation of LILO may fail with
+    Invalid line in /etc/disktab:
+    "w0|wini|Generic hard disk:\"
+if you have an old /etc/disktab file from Shoelace (a different boot loader
+that is quite obsolete nowadays). Remove or rename that file before running
+/sbin/lilo (or QuickInst).
+
+Note: you may have an /etc/disktab file even if you've never used Shoelace,
+because even current versions of SLS still install that file.
+
+
+Removal of support for unstripped kernels
+-----------------------------------------
+
+(Compound) unstripped kernels are no longer supported by LILO, because
+current kernels are expected to be compressed. This change also obsoletes
+/etc/lilo/install (see below).
+
+A new concept to support compressed kernels carrying symbol information may
+be devised later.
+
+
+Removal of /etc/lilo/install
+----------------------------
+
+Early versions of LILO expected to find all parameters on the command line.
+In order to simplify repeated re-installations of LILO, the invocation of
+LILO with all its parameters was stored in /etc/lilo/install.
+
+Because this was messy and introduced syntactical limitations,
+/etc/lilo/config was introduced after a while and support for command-line
+options was drastically reduced later. /etc/lilo/install now typically just
+invoked /etc/lilo/lilo with no options or with -C /etc/lilo/config, which
+became the default. Only when using compound unstripped kernels, one had to
+put additional instructions to build the kernel file into /etc/lilo/install.
+
+Now, that unstripped kernels are gone too (see above), /etc/lilo/install is
+superfluous. Because the kernel Makefile still invokes LILO by calling
+/etc/lilo/install, /etc/lilo/install should be a symbolic link to /sbin/lilo
+or /etc/lilo/lilo until everybody has switched to the new directory
+structure.
+
+
+Directory hierarchy change
+--------------------------
+
+A new Linux directory structure is in the process of being standardized.
+Most distributions will support the new structure. In order to install LILO
+with the new structure, you have to use the .new versions of QuickInst and
+Makefile. Otherwise, you have to use the .old versions.
+
+The locations of the following files change:
+
+  Old location			New location
+  ------------------------	-----------------
+  /etc/lilo/config.defines	/etc/lilo.defines
+  /etc/lilo/config		/etc/lilo.conf
+  /etc/lilo/disktab		/etc/disktab
+  /etc/lilo/lilo		/sbin/lilo
+  /etc/lilo/boot.NNNN		/boot/boot.NNNN
+  /etc/lilo/part.NNNN		/boot/part.NNNN
+  /etc/lilo/map			/boot/map
+  /etc/lilo/*.b			/boot/*.b
+
+/etc/lilo/install should be a symbolic link to /sbin/lilo for backwards
+compatibility. If you already have a (very old) /etc/disktab file from
+Shoelace, you have to delete or replace it. (Note: SLS 1.03 still installs
+that file, so you might have it even if you've never heard of Shoelace.)
+
+The current documentation still uses the old paths.
+
+
+Temporary unavailability of RAM disk size override
+--------------------------------------------------
+
+The RAM disk size override option (RAMDISK) has no effect when using
+0.99pl13 or older kernels, because no corresponding parameter line item
+exists. Support for it may be available in 0.99pl14 or later kernels.
+
+
+Incompatibilities between LILO >= 0.12 and earlier versions
+===========================================================
+
+The first stage boot loader now displays diagnostic codes if loading
+the second stage loader fails. This may create irritating messages
+like L06ILO on systems, where the first read access on a disk after
+booting usually fails. These diagnostics can be disabled by setting
+the compile-time option NO1STDIAG.
+
+
+Incompatibilities between LILO >= 0.11 and earlier versions
+===========================================================
+
+The configuration variable INSTALL is no longer required. If absent, a
+default of /etc/lilo/boot.b is used. This means that it is no longer
+possible to avoid installing a new boot sector when updating the map
+file. The old behaviour can be restored by setting the compile-time
+option NOINSTDEF.
+
+
+Incompatibilities between LILO >= 0.10 and earlier versions
+===========================================================
+
+Version 0.10 of LILO is intentionally incompatible in many ways with
+earlier versions. However, in most cases, there is an easy migration
+path.
+
+LILO 0.10 may not work with versions of the following programs older
+than specified:
+
+  Kernel				0.99pl8
+  Peter Orbaek's poeigl			1.13a
+  Miquel van Smoorenburg's SysV-init	2.1
+  Mike Jagdis' bootsys			version 3 (?)
+
+
+Documentation cleaning and splitting
+------------------------------------
+
+Because the documentation was slowly becoming a multiple-choice test,
+all references to old versions of kernels and other programs have been
+removed. All traces of removed features have vanished too.
+
+The single file "doc.tex" is now split in two parts: the user's guide
+"user.tex" and the technical overview "tech.tex". Reading the
+technical overview is not necessary in order to install LILO.
+
+
+Old-style configuration has been removed
+----------------------------------------
+
+Old-style configuration (e.g. /etc/lilo/lilo /vmlinux,/dev/hda1) is no
+longer supported. New-style configuration uses a configuration file in
+a far better readable format (/etc/lilo/config). There is also space
+for future extensions.
+
+If you're still using old-style configuration, you have to switch to
+new-style configuration before installing LILO 0.10.
+
+For all versions of LILO since 0.7, an automated migration facility is
+provided. See section "Migration" in the documentation of that version
+of LILO. In short, you have to run the following commands _before_
+upgrading to LILO 0.10:
+
+# /etc/lilo/install -D >/etc/lilo/config
+# mv install.new /etc/lilo/install
+
+If you're using an older version of LILO than 0.7 or if you're not
+using /etc/lilo/install, you should either manually create a
+configuration file or use QuickInst to re-install from scratch.
+
+
+No support for dumps
+--------------------
+
+Because LILO 0.10 doesn't understand old-style configuration, the dump
+option (-D) is no longer supported. Therefore, if you need to migrate
+from old-style configuration, you have to use the installed version of
+LILO to do that.
+
+
+No support for not-compound unstripped kernels
+----------------------------------------------
+
+Since LILO 0.9, compound unstripped kernels are supported. They are
+easier to handle and provide the same functionality as not-compound
+unstripped kernels. Note: all this has _nothing_ to do with compressed
+(zipped) kernels. They work fine with all versions of LILO.
+
+
+Suggesting using a link for /etc/lilo/install
+---------------------------------------------
+
+Because not-compound unstripped kernels, which were needing some
+support code in /etc/lilo/install, have been removed, and because the
+-C option is no longer necessary to distinguish between old-style and
+new-style configuration, /etc/lilo/install is unnecessary in most
+cases.
+
+In order to preserve compatibility with older installations and with
+installations that use code for special actions in /etc/lilo/install,
+a symbolic link should be created from /etc/lilo/install to lilo.
+
+
+Removed configuration option NOAUTO
+-----------------------------------
+
+The compile-time configuration option NOAUTO has been removed. This
+means that you have to upgrade to poeigl ?.??? (or later) if you're
+using simpleinit from an earlier version of poeigl. If the option
+NOAUTO is still present, it is ignored.
+
+
+Incompatibilities between LILO >= 0.9 and earlier versions
+==========================================================
+
+Case-insensitive name matching
+------------------------------
+
+By default, LILO is now configured to ignore case when matching image
+names. This can cause problems if labels are being used that differ
+only in case. (Detected at map creation time.) Either change the
+label names or remove -DIGNORECASE from the configuration section of
+the Makefile.
+
+
+New keyword "auto" passed to init
+---------------------------------
+
+If the system boots without manual intervention, the word "auto" is
+passed on the command line to the kernel, which in turn passes it to
+init. Some init programs don't recognize that word and issue an error
+message or fail to process other command-line options (e.g. some
+versions of poeigl init expects "single" to be the only word on the
+command line). The old behaviour can be obtained by setting the build-
+time configuration variable NOAUTO in the configuration section of the
+Makefile.
+
+
+-r implied if environment variable ROOT is set
+----------------------------------------------
+
+The map installer acts as if the option -r was on the command line if
+the environment variable ROOT is set. If you are using ROOT for other
+purposes than indicating the path of the actual root of the file
+system (i.e. it should be set to "/" during normal system operation),
+you have to pass the option  -r /  to the map installer. Typically,
+ROOT is not used for anything but LILO (or possibly programs that are
+aware of how LILO uses it), so this should be no problem.
+
+
+Incompatibilities between LILO >= 0.7 and earlier versions
+==========================================================
+
+There are a number of incompatibilities between LILO 0.7 (or newer)
+and earlier versions that cause working /etc/lilo/install scripts to
+fail or that change earlier behaviour without warning.
+
+
+Root device presetting
+----------------------
+
+The way how the root device is preset differs from LILO >= 0.7 and
+earlier versions if using /etc/lilo/config. If the boot images are
+listed on the command line, LILO >= 0.7 emulates the old behaviour.
+
+Old behaviour:
+  - if the root device was specified after the image descriptor
+    (e.g. foo=/bar,/dev/hda1), that device was used.
+  - if a root device was set in the boot image and no device was
+    specified at the command line, the setting from the boot
+    image was used. Later changes of the settings (e.g. with rdev
+    aka setroot) had no effect.
+  - if no root device was set in the boot image, LILO used the
+    current root partition instead. Again, changing the setting
+    later had no effect.
+
+New behaviour:
+  - if the ROOT variable is set, that value is used and the
+    setting in the boot image is ignored.
+  - otherwise, the value found in the boot image at boot time is
+    used. This means that changing the root device setting after
+    map creation has the desired effect.
+
+
+Swap device settings
+--------------------
+
+Presetting the swap device (e.g. /linux,/dev/root,/dev/swap) is no
+longer supported. Linus has already stopped providing that feature
+in recent kernels.
+
+Kernels that expect swap device settings in the boot sector may no
+longer work. I'm not sure when presettable swap devices were removed,
+but generally 0.96 and early 0.97 kernels may be considered
+incompatible.
+
+The memory location where the swap device preset value used to be
+stored has been occupied by the VGA mode value in 0.98pl6 and
+possibly also in SLS versions of 0.98pl5.
+
+Workaround: Create a /etc/lilo/config file and set the VGA variable
+	    to zero to disable using a swap device at boot time.
+
+
+BIOS code overrides
+-------------------
+
+Appending BIOS codes to file names (e.g. /foo/bar:0x80) is no longer
+supported. /etc/lilo/disktab can be used for most purposes where
+BIOS code overrides might have been useful.
+
+
+Command-line arguments of the map installer
+-------------------------------------------
+
+Older versions of the map installer accepted multiple ocurrences of
+the same flag. LILO 0.7 and later versions are only guaranteed to
+accept repetition of -v. However, variables set in /etc/lilo/config
+can be overridden on the command line in LILO 0.8.

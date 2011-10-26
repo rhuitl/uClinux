@@ -1,0 +1,29 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+CFLAGS-__uClibc_main.c := $(SSP_DISABLE_FLAGS)
+
+CSRC := tempname.c errno.c __errno_location.c __h_errno_location.c
+
+MISC_INTERNALS_DIR := $(top_srcdir)libc/misc/internals
+MISC_INTERNALS_OUT := $(top_builddir)libc/misc/internals
+
+MISC_INTERNALS_SRC := $(patsubst %.c,$(MISC_INTERNALS_DIR)/%.c,$(CSRC))
+MISC_INTERNALS_OBJ := $(patsubst %.c,$(MISC_INTERNALS_OUT)/%.o,$(CSRC))
+
+libc-y += $(MISC_INTERNALS_OBJ)
+libc-shared-y += $(MISC_INTERNALS_OUT)/__uClibc_main.oS
+libc-static-y += $(MISC_INTERNALS_OUT)/__uClibc_main.o
+libc-static-$(UCLIBC_FORMAT_SHARED_FLAT) += \
+  $(MISC_INTERNALS_OUT)/shared_flat_initfini.o \
+  $(MISC_INTERNALS_OUT)/shared_flat_add_library.o
+libc-nomulti-y += $(MISC_INTERNALS_OUT)/__uClibc_main.o
+
+objclean-y += misc_internals_objclean
+
+misc_internals_objclean:
+	$(RM) $(MISC_INTERNALS_OUT)/*.{o,os,oS}

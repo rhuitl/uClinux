@@ -1,0 +1,81 @@
+/*  ulogd.pgsql.table, Version 0.1
+ *
+ *  sample of a postgres table for ulogd
+ *
+ *  All columns except "id" are optional!  Comment all unwanted
+ *  columns out, e.g. by prefixing them with '--'
+ *
+ *  "raw_pkt" is not supported by ulogd_PGSQL
+ */
+
+CREATE SEQUENCE "seq_ulog";
+
+CREATE TABLE "ulog" (
+        "id"             integer DEFAULT nextval('seq_ulog') NOT NULL,
+
+        "oob_prefix"     character varying(32),
+        "oob_time_sec"   integer,
+        "oob_time_usec"  integer,
+        "oob_mark"       bigint,
+        "oob_in"         character varying(32),
+        "oob_out"        character varying(32),
+
+        "raw_mac"        character varying(80),
+        "raw_pktlen"     bigint,
+
+        "ip_ihl"         smallint,
+        "ip_tos"         smallint,
+        "ip_totlen"      integer,
+        "ip_id"          integer,
+        "ip_fragoff"     integer,
+        "ip_ttl"         smallint,
+        "ip_protocol"    smallint,
+        "ip_csum"        integer,
+
+/* log IPs as unsigned int32 (default)                */
+        "ip_saddr"       bigint,
+        "ip_daddr"       bigint,
+
+/* log IPs as string (--with-pgsql-log-ip-as-string)  */
+--      "ip_saddr"       character varying(40),
+--      "ip_daddr"       character varying(40),
+
+/* log IPs as inet   (--with-pgsql-log-ip-as-string)  */
+--      "ip_saddr"       inet,
+--      "ip_daddr"       inet,
+
+
+        "tcp_sport"      integer,
+        "tcp_dport"      integer,
+        "tcp_seq"        bigint,
+        "tcp_ackseq"     bigint,
+        "tcp_urg"        boolean,
+        "tcp_ack"        boolean,
+        "tcp_psh"        boolean,
+        "tcp_rst"        boolean,
+        "tcp_syn"        boolean,
+        "tcp_fin"        boolean,
+        "tcp_window"     integer,
+        "tcp_urgp"       integer,
+
+        "udp_sport"      integer,
+        "udp_dport"      integer,
+        "udp_len"        integer,
+
+        "icmp_type"      smallint,
+        "icmp_code"      smallint,
+        "icmp_echoid"    integer,
+        "icmp_echoseq"   integer,
+        "icmp_gateway"   bigint,
+        "icmp_fragmtu"   integer,
+
+        "pwsniff_user"   character varying(30),
+        "pwsniff_pass"   character varying(30),
+
+        "ahesp_spi"      smallint,
+
+        "local_time"     bigint,
+        "local_hostname" character varying(40)
+);
+
+

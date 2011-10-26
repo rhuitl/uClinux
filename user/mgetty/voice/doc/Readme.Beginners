@@ -1,0 +1,84 @@
+
+                                   vgetty
+                                  --------
+
+              The voice extensions for the mgetty+sendfax package
+
+                    Copyright (C) 1995, 1997 Marc Eberhard.
+
+                               Beginners guide
+
+                    Writen by F.Xavier SURBEZY <fx@pyrenet.fr>
+           (please email me corrections, additional informations ...)
+
+  Installation
+ ------------------------
+
+1. Compile and install mgetty. See the instructions for mgetty how to do
+   that.
+
+2. Compile vgetty. There should be nothing special to do. Just type "make"
+   from within the voice directory. If you managed it to compile mgetty, you
+   should be able to compile vgetty without any problems. If not, please
+   mail me your problems.
+
+3. Do "make install" as root from within the voice directory. Since you are
+   always concerned about hackers, wanting to overtake your system, you will
+   first do a "make -n install" to see all the evil things, the installation
+   procedure will do.
+
+  Configuration
+---------------------
+
+1. Copy the file voice.conf-dist to the same directory as all the mgetty
+   config files. Rename it from voice.conf-dist to voice.conf. This file
+   contain the description of the vgetty config option ... so read it.
+
+2. Replace the invocation of mgetty in your /etc/inittab with vgetty if
+   there is one. If there is no mgetty invocation you just have to insert
+   a line like that: "S1:345:respawn:/usr/local/sbin/vgetty ttyxx" in your
+   /etc/inittab file. (like that vgetty is running at runlevels 3 4 and 5
+   see inittab(5) man page for more)
+
+3. The vgetty logfiles are by default in /var/log/vgetty.ttyxx.log and the
+   vm logfile is in /var/log/vm.log. Read these files if you have problems,
+   they are quite readable and give you many hints, where the problem is. If
+   you want to see more details in the logfile, increase the debug level in
+   your voice.conf file to the highest possible value.
+
+4. Be sure to make the voice_dir directories specified in your voice.conf
+   file (e.g., /var/spool/voice, /var/spool/voice/incoming and
+   /var/spool/voice/messages).
+
+5. Record your gretting message. There are many ways to do that :
+
+     a. Using vm :
+        record your message with "vm record file_name". This can be done
+        using internal microphone or local handset (type vm to see options)
+
+     b. Using an already recorded voice file :
+        you just have to convert your sound file in the modem expected
+        format using the pvf tools.
+        Eg : convert a voc file to Rockwell (compression type 4) format
+          voctopvf file.voc | pvftormd Rockwell 4 > file.rmd
+        (Replace Rockwell by what you need type pvftormd -h for detail)
+
+5. Make vgetty use your message
+   You must add the name of your file in the gretting messages index file
+   (/var/spool/voice/messages/Index by default). See message_list in
+   voice.conf for more.
+
+  Using vgetty
+__________________
+
+Once you've rebooted vgetty is lauched at init and will answer incoming
+call. Incoming messages are stored in receive_dir (see voice.conf)
+
+1. playing incoming messages
+
+   a. using vm :
+      play the message with "vm play file_name" (type vm to see options)
+
+   b. using audio card and sox :
+      rmdtopvf file.rmd | pvfspeed -s 8000 | pvftobasic > /dev/audio
+      (see rmdtopvf -h and rmdtopvf -L for more)

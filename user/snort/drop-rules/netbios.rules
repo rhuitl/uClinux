@@ -1,0 +1,21 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id: netbios.rules,v 1.16.2.1 2003/02/07 22:04:54 cazz Exp $
+#--------------
+# NETBIOS RULES
+#--------------
+
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS nimda .eml"; content:"|00|.|00|E|00|M|00|L"; flow:to_server,established; classtype:bad-unknown; reference:url,www.datafellows.com/v-descs/nimda.shtml; sid:1293; rev:7;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS nimda .nws"; content:"|00|.|00|N|00|W|00|S"; flow:to_server,established; classtype:bad-unknown; reference:url,www.datafellows.com/v-descs/nimda.shtml; sid:1294; rev:7;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS nimda RICHED20.DLL"; content:"R|00|I|00|C|00|H|00|E|00|D|00|2|00|0"; flow:to_server,established; classtype:bad-unknown; reference:url,www.datafellows.com/v-descs/nimda.shtml; sid:1295; rev:6;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS DOS RFPoison"; flow:to_server,established; content: "|5C 00 5C 00 2A 00 53 00 4D 00 42 00 53 00 45 00 52 00 56 00 45 00 52 00 00 00 00 00 01 00 00 00 01 00 00 00 00 00 00 00 FF FF FF FF 00 00 00 00|";reference:arachnids,454; classtype:attempted-dos; sid:529; rev:5;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS NT NULL session"; flow:to_server,established; content: "|00 00 00 00 57 00 69 00 6E 00 64 00 6F 00 77 00 73 00 20 00 4E 00 54 00 20 00 31 00 33 00 38 00 31|"; reference:bugtraq,1163; reference:cve,CVE-2000-0347; reference:arachnids,204; classtype:attempted-recon; sid:530; rev:7;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS RFParalyze Attempt"; flow:to_server,established; content:"BEAVIS"; content:"yep yep"; classtype:attempted-recon; sid:1239; rev:5;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB ADMIN$access"; flow:to_server,established; content:"\\ADMIN$|00 41 3a 00|"; reference:arachnids,340; classtype:attempted-admin; sid:532;  rev:4;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB C$ access"; flow:to_server,established; content: "|5c|C$|00 41 3a 00|";reference:arachnids,339; classtype:attempted-recon; sid:533; rev:5;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB CD.."; flow:to_server,established; content:"\\..|2f 00 00 00|"; reference:arachnids,338; classtype:attempted-recon; sid:534;  rev:4;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB CD..."; flow:to_server,established; content:"\\...|00 00 00|"; reference:arachnids,337; classtype:attempted-recon; sid:535;  rev:4;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB D$access"; flow:to_server,established; content:"\\D$|00 41 3a 00|"; reference:arachnids,336; classtype:attempted-recon; sid:536;  rev:4;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB IPC$access"; flow:to_server,established; content:"\\IPC$|00 41 3a 00|"; reference:arachnids,335; classtype:attempted-recon; sid:537;  rev:4;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS SMB IPC$access"; flow:to_server,established; content:"|5c00|I|00|P|00|C|00|$|000000|IPC|00|"; reference:arachnids,334; classtype:attempted-recon; sid:538;  rev:4;)
+drop tcp $HONEYNET any -> $EXTERNAL_NET 139 (msg:"NETBIOS Samba clientaccess"; flow:to_server,established; content:"|00|Unix|00|Samba"; reference:arachnids,341; classtype:not-suspicious; sid:539;  rev:4;)

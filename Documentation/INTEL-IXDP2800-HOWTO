@@ -1,0 +1,91 @@
+Intel IXDP2800/2850
+-------------------
+
+1. Compiler Tool Chain
+
+   Before you can compile the Linux kernel, libraries and applications to
+   generate an IXP2800 image you must install an appropriate compiler tool
+   chain. I suggest you use the arm-linux tool chain that accompanies this
+   source distribution (the arm-linux-tools-XXXXXXXX.tar.gz package). To
+   install this toolchain do:
+
+   1. login as root
+   2. cd /
+   3. tar xvzf arm-linux-tools-XXXXXXXX.tar.gz
+
+   This package contains binaries of the following tools:
+
+        binutils-2.14
+        gcc-3.3.2
+        glibc-2.2.5
+
+2. Building the Source
+
+   Follow these simple steps to compile binary images ready to run on the
+   Intel IXDP2800 board:
+
+   1.  tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+   2.  cd uClinux-dist
+   3.  make xconfig
+
+       . Choose the "Target Platform Selection" menu item
+       . Select the "Vendor/Product" tab and choose "Intel/IXDP2800"
+       . Select the "Libc version" tab and choose "Glibc"
+       . "Save and Exit" this configuration
+
+   4.  make dep
+   5.  make
+
+   That is it!  The final make step will run through and compile the Linux
+   kernel, glibc library and a sample application set. It will also package
+   the result into two files ready to load onto the IXDP2800 board, zImage
+   and ramdisk.gz.
+
+   Only the linux-2.4.x kernel and glibc libraries can currently be used
+   on the IXDP2800 board. The uClibc library can optionaly be used instead
+   of glibc.
+
+
+3. Loading and Running
+
+   You need to configure the IXDP2800 firmware with appropriate IP
+   addresses on both the Ingress and Egress ports.
+
+   Copy the binary files from uClinux-dist, images/zImage and
+   images/ramdisk.gz to the TFTP area of the download server.
+
+   To load and run Linux on the Intel boot firmware you firstly must
+   load onto both the Ingress and Egress processors:
+
+        Ingress>  load \\A.B.C.D\ramdisk.gz 0x1e000000
+        Ingress>  load \\A.B.C.D\zImage 0x1c008000
+        Egress>  load \\A.B.C.D\ramdisk.gz 0x1e000000
+        Egress>  load \\A.B.C.D\zImage 0x1c008000
+
+   where A.B.C.D is the IP address of you tftp server.
+   Start the kernel on the Ingress processor first, followed by the
+   Egress processor:
+
+        Ingress>  launch 0x1c008000
+        Egress>  launch 0x1c008000
+
+   You should see the Linux boot banner, and then be presented with a
+   bash shell prompt. A reasonable utility set is in place, mostly using
+   the busybox tool set. By default the rc script will run a dhcp client,
+   and so with a local dhcp server in place Linux will acquire an IP
+   address.
+
+
+4. Customizing the Build
+
+   Using "make xconfig" in uClinux-dist you can customize the kernel and
+   application configurations. There is a large selection of packages in
+   the application configuration.
+
+   Consult the README file at the top level of uClinux-dist for some more
+   information about configuration and building.
+
+   Note also that uClinux-dist is just the Linux kernel and normal
+   application set. It does not contain any of the Intel EDK or other
+   support tools for the IXDP2800 platforms.
+

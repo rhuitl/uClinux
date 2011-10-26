@@ -1,0 +1,120 @@
+$Id: debug.txt,v 1.2 2003/04/12 16:16:05 andrew_belov Exp $
+
+ARJ DEBUGGER'S GUIDE
+
+This file is a reference for everyone who has to deal with ARJ technical
+support and debugging.
+
+
+DEBUG CONFIGURATION
+
+        Debugging begins with compiling   ARJ for debug mode.   Supply a
+        DEBUG=1 clause to the make program, as in the following example:
+
+        nmake MODE=OS232 COMPILER=CSET2 DEBUG=1 prepare all 
+
+        This will yield   an unoptimized executable with some   internal
+        assertions and, possibly,  further debugging functionality which
+        is platform-specific (e.g. debug  malloc() in IBM C Set/2 static
+        libraries).
+
+        The debug flavor also   supports a simple malloc() tracing  with
+        "-hdm", probably useful for working  out memory shortages in the
+        16-bit world.
+
+
+TOP 5 TEST CASES
+
+        Whenever a large volume of changes is committed, or ARJ is being
+        tested under  a new  platform,  we  suggest  the following  test
+        scenario:
+
+        1. Ensure  that all  modules  compile   normally, and the  build
+        process finishes without errors  when "make package" is  issued.
+        This warrants basic functionality to be there.
+
+        2. Examine the usual operation of ARJ module  with "arj a -jt1",
+        submitting   a  combination  of  options while   archiving  some
+        "payload" (the volume to be archived is of little importance, 10
+        files totaling 1 megabyte would be enough for testing):
+
+	arj a test -+ -v100K -jt1 -hk5 -i5 -jm -hg -garble
+
+        The "-jt1"  will let you see  if  there are  any major omissions
+        which would result  in  broken  archives. Re-check the   created
+        archive with:
+
+        arj q test.arj  [should report no damage]
+        arj v test.arj
+        arj t -v -garble test.arj
+        arj x -v -garble test.arj
+
+        3. Check the ARJSFX branches:
+
+        ARJSFXV -> arj a test -+ -va -je
+        ARJSFX -> arj a test -+ -je
+        ARJSFXJR -> arj a test -+ -je1 [may need "-2x", see the output]
+
+        Each of   the SFX levels  shares  a  portion of  ARJ  code while
+        bringing in some distinct routines,   so  we put a priority   on
+        testing the SFX.
+
+        4. Check REARJ:
+
+        rearj test.zip
+
+        (need another archiver and a REARJ.CFG for that). REARJ utilizes
+        the platform-specific process creation routines.
+
+        5. Verify the compatibility with the  mainstream versions of ARJ
+        available at the project   download page, or from  ARJ Software,
+        Inc.   Extract    the created  archive by   using    a "branded"
+        distribution of ARJ, then do  quite the contrary by packing  the
+        archive in one version, then extracting it with another one.
+
+        Pay special attention to the encryption issue:
+
+        XOR encryption: arj a test -hg -g...
+        GOST 40-bit cipher: arj a test -hg! -g...
+        GOST 128-bit modular cipher: arj a test -hg -g...
+
+        Supply your  password of choice for   "-g..." when archiving and
+        extracting/testing.
+
+
+APPENDIX: DEBUG OPTIONS
+
+A list of debug options (-hd<opt>, followed by an optional argument):
+
+  .     (ASR) Displays each file being added to a filelist.
+  ?     With ARJ v 2.75.03+, allows use of Extended license keys in standard
+        ARJ. The filelist capacity shall remain the same.
+  a     Rigorous archive handling. Enables detailed information in index
+        files, and forces recovery of ARJ-PROTECTed archives.
+  b<u>  Sets VBUF size. VBUF is used for buffering of archive input stream.
+  c     Skips CRC checking for extracted files, thereby causing CRC errors.
+  d     Sets the dictionary size on compression, thus making ARJ compress
+        better. The archives can still be extracted... with ARJZ only, though.
+  f     Notifies about len_cnt fixes in encoding routine.
+  i<ld> Defines the flist_main capacity in ARJ. Extended license is not
+        required in this case.
+  k     Zeroes compsize after the file has been unpacked.
+  l     Displays the encryption version.
+  m     (ASR, DEBUG builds only) Displays malloc()/farmalloc() arguments.
+  n     Inhibits all kinds of file generation activities.
+  o<s>  Sets archive modification time to the desired timestamp.
+  p<u>  Sets TBUF size. TBUF is used for buffering of archive output stream.
+  q     Reverts to the standard filelist type for flist_main.
+  s     Enables unlimited ranges for numeric switch values.
+  t     Enables the poor man's profiler (displays execution ticks).
+  v     Dumps the command-line tokens as they are processed, shows memory
+        statistics and may have other effects as a "verbose" command.
+  x     Inhibits any sort of hollow file processing.
+  y     Uses a case-preserving way of filename/path storage.
+  z<ld> Sets the physical filelist capacity limit.
+
+Common examples:
+
+* -hdaflmv is a usual bug reporter's test case.
+
+* -hdt may be used for performance measurements.

@@ -1,0 +1,125 @@
+This adds the --source-cd option, which is useful when it is combined with
+the --relative option because it lets you set how much of the source path
+is outside of the transfer.  For instance:
+
+rsync -avR --source-cd=/usr local/bin host:/
+
+For two systems where one uses /usr/local/bin and the other /local/bin.
+
+--- orig/flist.c	2005-07-28 18:48:38
++++ flist.c	2005-03-05 00:31:42
+@@ -57,6 +57,7 @@ extern int copy_unsafe_links;
+ extern int protocol_version;
+ extern int sanitize_paths;
+ extern int orig_umask;
++extern char *source_cd;
+ extern struct stats stats;
+ extern struct file_list *the_file_list;
+ 
+@@ -1089,13 +1090,14 @@ struct file_list *send_file_list(int f, 
+ 
+ 	io_start_buffering_out();
+ 	if (filesfrom_fd >= 0) {
+-		if (argv[0] && !push_dir(argv[0])) {
+-			rsyserr(FERROR, errno, "push_dir %s failed",
+-				full_fname(argv[0]));
+-			exit_cleanup(RERR_FILESELECT);
+-		}
++		source_cd = argv[0];
+ 		use_ff_fd = 1;
+ 	}
++	if (source_cd && !push_dir(source_cd)) {
++		rsyserr(FERROR, errno, "push_dir %s failed",
++			full_fname(source_cd));
++		exit_cleanup(RERR_FILESELECT);
++	}
+ 
+ 	while (1) {
+ 		struct file_struct *file;
+--- orig/options.c	2005-07-28 18:48:38
++++ options.c	2005-03-01 01:37:22
+@@ -82,6 +82,7 @@ char *filesfrom_host = NULL;
+ int eol_nulls = 0;
+ int recurse = 0;
+ int xfer_dirs = 0;
++char *source_cd = NULL;
+ int am_daemon = 0;
+ int daemon_over_rsh = 0;
+ int do_stats = 0;
+@@ -269,6 +270,7 @@ void usage(enum logcode F)
+   rprintf(F," -R, --relative              use relative path names\n");
+   rprintf(F,"     --no-relative           turn off --relative\n");
+   rprintf(F,"     --no-implied-dirs       don't send implied dirs with -R\n");
++  rprintf(F,"     --source-cd=DIR         a relative source path starts in this DIR\n");
+   rprintf(F," -b, --backup                make backups (see --suffix & --backup-dir)\n");
+   rprintf(F,"     --backup-dir=DIR        make backups into hierarchy based in DIR\n");
+   rprintf(F,"     --suffix=SUFFIX         set backup suffix (default %s w/o --backup-dir)\n",BACKUP_SUFFIX);
+@@ -423,6 +425,7 @@ static struct poptOption long_options[] 
+   {"list-only",        0,  POPT_ARG_VAL,    &list_only, 2, 0, 0 },
+   {"relative",        'R', POPT_ARG_VAL,    &relative_paths, 1, 0, 0 },
+   {"no-relative",      0,  POPT_ARG_VAL,    &relative_paths, 0, 0, 0 },
++  {"source-cd",        0,  POPT_ARG_STRING, &source_cd, 0, 0, 0 },
+   {"rsh",             'e', POPT_ARG_STRING, &shell_cmd, 0, 0, 0 },
+   {"block-size",      'B', POPT_ARG_LONG,   &block_size, 0, 0, 0 },
+   {"max-delete",       0,  POPT_ARG_INT,    &max_delete, 0, 0, 0 },
+@@ -927,6 +930,11 @@ int parse_arguments(int *argc, const cha
+ 		} else if (dry_run)
+ 			write_batch = 0;
+ 	}
++	if (source_cd && files_from) {
++		snprintf(err_buf, sizeof err_buf,
++			"--source-cd cannot be used with --files-from\n");
++		return 0;
++	}
+ 	if (read_batch && files_from) {
+ 		snprintf(err_buf, sizeof err_buf,
+ 			"--read-batch cannot be used with --files-from\n");
+@@ -1021,6 +1029,14 @@ int parse_arguments(int *argc, const cha
+ 			partial_dir = sanitize_path(NULL, partial_dir, NULL, 0);
+ 		if (backup_dir)
+ 			backup_dir = sanitize_path(NULL, backup_dir, NULL, 0);
++		if (source_cd)
++			source_cd = sanitize_path(NULL, source_cd, NULL, 0);
++	} else if (source_cd && am_daemon) {
++		int i;
++		for (i = *argc; i-- > 0; ) {
++			if ((*argv)[i][0] == '/')
++				(*argv)[i]++;
++		}
+ 	}
+ 	if (server_filter_list.head && !am_sender) {
+ 		struct filter_list_struct *elp = &server_filter_list;
+@@ -1420,6 +1436,11 @@ void server_options(char **args,int *arg
+ 	} else if (keep_partial)
+ 		args[ac++] = "--partial";
+ 
++	if (source_cd && !am_sender) {
++		args[ac++] = "--source-cd";
++		args[ac++] = source_cd;
++	}
++
+ 	if (ignore_errors)
+ 		args[ac++] = "--ignore-errors";
+ 
+--- orig/rsync.yo	2005-07-28 19:26:48
++++ rsync.yo	2005-02-22 18:20:24
+@@ -302,6 +302,7 @@ to the detailed description below for a 
+  -R, --relative              use relative path names
+      --no-relative           turn off --relative
+      --no-implied-dirs       don't send implied dirs with -R
++     --source-cd=DIR         a relative source path starts in this DIR
+  -b, --backup                make backups (see --suffix & --backup-dir)
+      --backup-dir=DIR        make backups into hierarchy based in DIR
+      --suffix=SUFFIX         backup suffix (default ~ w/o --backup-dir)
+@@ -512,6 +513,11 @@ the bf(--no-implied-dirs) option would o
+ which means that if "/path" was a real directory on one machine and a
+ symlink of the other machine, rsync would not try to change this.
+ 
++dit(bf(--source-cd=DIR)) Set the specified directory as the default dir for
++the source side of the transfer.  This is most useful when combined with
++the bf(--relative) option because it lets you move directories from the
++source path outside the transfer.
++
+ dit(bf(-b, --backup)) With this option, preexisting destination files are
+ renamed as each file is transferred or deleted.  You can control where the
+ backup file goes and what (if any) suffix gets appended using the

@@ -1,0 +1,126 @@
+
+   @PRODUCT_LONG  @{r74}@{d}@{_}
+
+
+   This product is an OS/2-hosted add-on for ARJ v @COUNTERPARTS for DOS. It may be
+   used  separately  from  the DOS  package  but  it doesn't  contain  the
+   documentation found in DOS release.
+
+   ***********************************************************************
+   ***                                                                 ***
+   ***  THIS PRODUCT IS DEVELOPED  SEPARATELY FROM THE MAINSTREAM ARJ  ***
+   ***  PACKAGE AND  THEREFORE IS NOT  UPDATED SYNCHRONOUSLY WITH ARJ  ***
+   ***  FOR DOS.                                                       ***
+   ***                                                                 ***
+   ***********************************************************************
+
+
+   INTRODUCTION
+
+      This file describes the features specific to the OS/2 port. It is
+      suggested that you read the general README file prior to this one.
+
+
+   SYSTEM REQUIREMENTS
+
+   16-bit version:
+
+      *  OS/2 version 1.2 or higher, or Windows NT v 3.10 or higher.
+   For OS/2 systems:
+      *  A 80286 or higher CPU.
+      *  512K of free memory
+   For Windows NT systems:
+      *  1024K of free memory
+
+   32-bit version:
+
+      *  OS/2 version 3.0 with Fixpak 25 or higher
+      *  A 80386SX or higher CPU.
+      *  1024K of free memory (512K for each subsequent  instance after
+         the first one has been started)
+      *  IBM LIBC and Unicode runtime  support (installed by default as
+         a mandatory component)
+
+
+   IMPLEMENTATION ISSUES
+
+      *  External garble modules are provided as OS/2 DLLs. You may not
+         use DOS  modules  with  ARJ/2, or vice  versa. The  encryption
+         algorithm  is  the  same, so  ARJ/2 garbled  archives can   be
+         processed under DOS.
+
+      *  ARJ/2  sets  the  "Host OS" to  "OS/2"  on its  archives. When
+         extracting  any such  archive with ARJ  for DOS,  some unusual
+         behavior  may  occur. Versions  of ARJ  prior to 2.50  convert
+         high-ASCII  characters in  filenames to  7-bit  characters  by
+         ignoring the  high  bit. So, the  filename  "±TEST±"  will  be
+         converted to "1TEST1" on extraction.
+
+         ARJ/DOS also strips high  bit from  archive comments, but only
+         if the archive  was created  by ARJ/2. Archives  created  with
+         ARJ/DOS  and  then  processed   under OS/2  are not  affected.
+
+         Beginning  with version  2.72, ARJ/DOS considers  the ARJSFXJR
+         archives created  under OS/2 to be hostile  to the DOS version
+         of ARJSFXJR and  therefore cannot  modify them. In such cases,
+         it's advised to use the "-2d" switch under OS/2.
+
+      *  ARJ/2 uses the  default OS/2 error  handler that will normally
+         display  pop-up menus  prompting  for action.  The  -&  option
+         installs batch error and  exception handler (new feature since
+         ARJ/2 v 2.62.08). Remember  that the  ampersand  character  is
+         used  in OS/2 to start  two  processes  consequently, so  this
+         switch will actually split  the command line. Type -^& instead
+         of -& to install the error handler.
+
+      *  ARJSFXJR  archives will  display  ANSI sequences  if the  ANSI
+         support is enabled  in the  current OS/2 session (it's enabled
+         by default in OS/2).
+
+      *  By default, ARJ/2 stores extended attributes among with files.
+         To  disable  EA  storage  and thus revert  to  the traditional
+         header format, use  the "-2e" option. See  a special dedicated
+         section in the main README file for details on EA handling.
+
+      *  "-2p<n>:<d>" can be used to adjust the  priority of ARJ/2. The
+         knowledge  of OS/2 scheduling system  is required to  use this
+         option. It can dramatically increase performance but slow down
+         other processes. The <n> can be equal to 1, 2, 3 or 4:
+
+          1 = idle-time priority
+          2 = regular priority
+          3 = time-critical priority
+          4 = fixed-high priority
+
+         Priority delta values can be given in <d> (defaults to 0). The
+         range  for <d> is -31 to 31.  So, "-2p2"  corresponds  to  the
+         regular  process  priority, and "-2p3:31"  gives  the  maximum
+         time-critical priority.
+
+      *  ARJSFXJR does  not  support  long filenames  under Win95  DOS.
+         ARJSFXJR in ARJ/2 supports OS/2 long filenames.
+
+
+   KNOWN PROBLEMS
+
+      *  On FAT volumes under Windows NT, both long filenames and short
+         filenames may be used to specify a filename. If you refer to a
+         file  with its  short name (e.g. "ARJ a lntest LONGFI~1.TXT"),
+         the short filename will be stored as entered from console. So,
+         no LFN equivalent is placed  into the  archive, and if  a file
+         with a  similar long  filename exists in the  archive, it will
+         not be replaced.
+
+      *  REARJ/2 may  behave incorrectly  if  the  command  interpreter
+         (specified   with  COMSPEC=   environment  variable)  is   not
+         compatible with CMD.EXE. It's also unwise to  rename REARJ.EXE
+         since  it  calls itself recursively  when  converting archives
+         within archives (/a).
+
+      *  No LIBC is supplied with fixes prior to XR_W032. For use  with
+         32-bit ARJ/2, the  LIBCS.DLL, LIBUNI.DLL and UCONV.DLL  may be
+         obtained in the OS/2 v 4.00 release (9.023). XR_W032 and later
+         CSDs do not require any special action.
+
+
+      End of document

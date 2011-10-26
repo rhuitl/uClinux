@@ -1,0 +1,2504 @@
+dnl
+dnl  Configuration input file for Squid
+dnl
+dnl  Duane Wessels, wessels@nlanr.net, February 1996 (autoconf v2.9)
+dnl
+dnl  $Id: configure.in,v 1.251.2.92 2005/05/16 22:38:57 hno Exp $
+dnl
+dnl
+dnl
+AC_INIT(src/main.c)
+AC_CONFIG_AUX_DIR(cfgaux)
+AM_INIT_AUTOMAKE(squid, 2.5.STABLE10)
+AM_CONFIG_HEADER(include/autoconf.h)
+AC_REVISION($Revision: 1.251.2.92 $)dnl
+AC_PREFIX_DEFAULT(/usr/local/squid)
+AM_MAINTAINER_MODE
+
+dnl Set default LDFLAGS
+if test -z "$LDFLAGS"; then
+        LDFLAGS="-g"
+fi
+
+PRESET_CFLAGS="$CFLAGS"
+
+dnl Check for GNU cc
+AC_PROG_CC
+AM_PROG_CC_C_O
+AC_CANONICAL_HOST
+
+
+CRYPTLIB=''
+REGEXLIB=''	# -lregex
+LIBREGEX=''	# libregex.a
+
+dnl Check for pkg-config
+AC_PATH_PROG(PKGCONFIG, pkg-config, false)
+
+dnl find out the exe extension for this platform. If it's not empty, use it for CGI's as well.
+AC_EXEEXT
+AC_OBJEXT
+
+AC_HEADER_STDC
+
+if test -z "$EXEEXT"; then
+	CGIEXT=".cgi"
+else
+	# automake automatically adds .exe when installing binaries
+	CGIEXT=""
+fi
+AC_SUBST(CGIEXT)
+
+dnl this should be expanded to a list of platform sensible support requirements.
+dnl (adding an option like --enable-cygwin-support doesn't make sense :]) - R Collins 2001
+case "$host_os" in
+cygwin|cygwin32)
+        AM_CONDITIONAL(ENABLE_WIN32SPECIFIC, true)
+	;;
+*)
+	AM_CONDITIONAL(ENABLE_WIN32SPECIFIC, false)
+	;;
+esac
+
+if test -z "$CACHE_HTTP_PORT"; then
+	CACHE_HTTP_PORT="3128"
+fi
+if test -z "$CACHE_ICP_PORT"; then
+	CACHE_ICP_PORT="3130"
+fi
+
+dnl Substitutions
+AC_DEFINE_UNQUOTED(CACHE_HTTP_PORT, $CACHE_HTTP_PORT)
+AC_DEFINE_UNQUOTED(CACHE_ICP_PORT, $CACHE_ICP_PORT)
+
+AC_DEFINE_UNQUOTED(CONFIG_HOST_TYPE, "$host")
+
+AC_DEFINE_UNQUOTED(SQUID_CONFIGURE_OPTIONS, "$ac_configure_args")
+
+dnl Gerben Wierda <Gerben_Wierda@RnA.nl>
+case "$host" in
+    mab-next-nextstep3)
+	CC="$CC -arch m68k -arch i486 -arch hppa -arch sparc"
+	;;
+esac
+
+dnl Set Default CFLAGS
+if test -z "$PRESET_CFLAGS"; then
+    if test "$GCC" = "yes"; then
+        case "$host" in
+	*-sun-sunos*)
+    	    # sunos has too many warnings for this to be useful
+	    # motorola too
+    	    ;;
+	*m88k*-openbsd*)
+	    ;;
+	*m88k*)
+	    # Motorola cc/ld does not like -02 but is ok on -O
+	    CFLAGS=`echo $CFLAGS | sed -e 's/-O[0-9]/-O/'`
+	    ;;
+        *)
+    	    CFLAGS="$CFLAGS -Wall"
+    	    ;;
+        esac
+    else
+	case "$host" in
+	*mips-sgi-irix6.*)
+	    # suggested by Rafael Seidl <rafaels@cthulhu.engr.sgi.com>
+	    CFLAGS="$CFLAGS -n32 -mips3 -O3 -OPT:Olimit=0:space=OFF \
+		-woff 1009,1014,1110,1116,1185,1188,1204,1230,1233 \
+		-Wl,-woff,85,-woff,84,-woff,134 \
+		-nostdinc -I/usr/include -D_BSD_SIGNALS"
+	    ;;
+	alpha-dec-osf4.*)
+	    # Mogul says DEC compilers take both -g and -O2
+	    CFLAGS=`echo $CFLAGS | sed -e 's/-g/-g3/'`
+	    CFLAGS="$CFLAGS -O2"
+	    ;;
+	*)
+	    ;;
+	esac
+    fi
+fi
+
+dnl Set LDFLAGS
+if test -z "$PRESET_LDFLAGS"; then
+    if test "$GCC" = "yes"; then
+        case "$host" in
+        *)
+    	    # nothing
+	    ;;
+        esac
+    else
+	case "$host" in
+	*mips-sgi-irix6.*)
+	    # suggested by Rafael Seidl <rafaels@cthulhu.engr.sgi.com>
+	    LDFLAGS="-n32 -mips3 -nostdlib -L/usr/lib32"
+	    ;;
+	esac
+    fi
+fi
+
+dnl Enable optional modules
+AC_ARG_ENABLE(dlmalloc,
+[  --enable-dlmalloc[=LIB] Compile & use the malloc package by Doug Lea],
+[
+ case "$enableval" in
+ 'yes')
+    use_dlmalloc="yes"
+    LIBDLMALLOC="libdlmalloc.a"
+    LIB_MALLOC="-L../lib -ldlmalloc"
+    echo "dlmalloc enabled"
+    ;;
+ 'no')
+    use_dlmalloc="no"
+    echo "dlmalloc disabled"
+    ;;
+ *) use_dlmalloc="yes"
+    LIB_MALLOC="$enableval"
+    echo "dlmalloc enabled with $LIB_MALLOC"
+ esac
+])
+if test "${use_dlmalloc-unset}" = unset; then
+    case "$host" in
+	i386-*-solaris2.*)
+		echo "Enabling dlmalloc for $host"
+		use_dlmalloc="yes"
+		LIBDLMALLOC="libdlmalloc.a"
+		LIB_MALLOC="-L../lib -ldlmalloc"
+		;;
+	*-sgi-irix*)
+		echo "Enabling dlmalloc for $host"
+		use_dlmalloc="yes"
+		LIBDLMALLOC="libdlmalloc.a"
+		LIB_MALLOC="-L../lib -ldlmalloc"
+		;;
+    esac
+fi
+if test "x$ac_cv_enabled_dlmalloc" = "xyes"; then
+    # Ok. dlmalloc was enabled before, but state may be changed.
+    # we have to test these again
+    unset ac_cv_func_mallinfo
+    unset ac_cv_func_mallocblksize
+    unset ac_cv_func_free
+    unset ac_cv_func_realloc
+    unset ac_cv_func_memalign
+    unset ac_cv_func_valloc
+    unset ac_cv_func_pvalloc
+    unset ac_cv_func_calloc
+    unset ac_cv_func_cfree
+    unset ac_cv_func_malloc_trim
+    unset ac_cv_func_malloc_usable_size
+    unset ac_cv_func_malloc_stats
+    unset ac_cv_func_mallinfo
+    unset ac_cv_func_mallopt
+    unset ac_cv_lib_gnumalloc
+    unset ac_cv_header_gnumalloc_h
+    unset ac_cv_lib_malloc
+    unset ac_cv_enabled_dlmalloc
+fi
+if test "$use_dlmalloc" = yes; then
+    ac_cv_func_mallinfo="yes"
+    ac_cv_func_mallocblksize="no"
+    ac_cv_func_free="yes"
+    ac_cv_func_realloc="yes"
+    ac_cv_func_memalign="yes"
+    ac_cv_func_valloc="yes"
+    ac_cv_func_pvalloc="yes"
+    ac_cv_func_calloc="yes"
+    ac_cv_func_cfree="yes"
+    ac_cv_func_malloc_trim="yes"
+    ac_cv_func_malloc_usable_size="yes"
+    ac_cv_func_malloc_stats="yes"
+    ac_cv_func_mallopt="yes"
+    ac_cv_lib_gnumalloc="no"
+    ac_cv_header_gnumalloc_h="no"
+    ac_cv_lib_malloc="no"
+    ac_cv_enabled_dlmalloc="yes"
+fi
+
+AC_SUBST(LIBDLMALLOC)
+AC_SUBST(LIB_MALLOC)
+
+AC_ARG_ENABLE(gnuregex,
+[  --enable-gnuregex       Compile GNUregex.  Unless you have reason to use this
+                            option, you should not enable it.  This library file
+                            is usually only required on Windows and very old
+                            Unix boxes which do not have their own regex library
+                            built in.],
+[USE_GNUREGEX=$enableval])
+
+dnl This is a developer only option.. developers know how to set defines
+dnl
+dnl AC_ARG_ENABLE(xmalloc-debug,
+dnl [  --enable-xmalloc-debug  Do some simple malloc debugging],
+dnl [ if test "$enableval" = "yes" ; then
+dnl     echo "Malloc debugging enabled"
+dnl     AC_DEFINE(XMALLOC_DEBUG)
+dnl   fi
+dnl ])
+
+dnl This is a developer only option.. developers know how to set defines
+dnl
+dnl AC_ARG_ENABLE(xmalloc-debug-trace,
+dnl [  --enable-xmalloc-debug-trace
+dnl                           Detailed trace of memory allocations],
+dnl [ if test "$enableval" = "yes" ; then
+dnl     echo "Malloc debug trace enabled"
+dnl     AC_DEFINE(XMALLOC_TRACE)
+dnl     AC_DEFINE(XMALLOC_DEBUG)
+dnl   fi
+dnl ])
+
+AC_ARG_ENABLE(xmalloc-statistics,
+[  --enable-xmalloc-statistics
+                          Show malloc statistics in status page],
+[ if test "$enableval" = "yes" ; then
+    echo "Malloc statistics enabled"
+    AC_DEFINE(XMALLOC_STATISTICS)
+  fi
+])
+
+AC_ARG_ENABLE(carp,
+[  --enable-carp           Enable CARP support],
+[ if test "$enableval" = "yes" ; then
+    echo "CARP support enabled"
+    AC_DEFINE(USE_CARP)
+  fi
+])
+
+AC_ARG_ENABLE(async-io,
+[  --enable-async-io[=N_THREADS]
+                          Shorthand for
+                          --with-aufs-threads=N_THREADS
+                          --with-pthreads
+                          --enable-storeio=ufs,aufs],
+[ case $enableval in
+  yes)
+	with_pthreads="yes"
+	STORE_MODULES="ufs aufs"
+    ;;
+  no)
+    ;;
+  *)
+  	aufs_io_threads=$enableval
+	with_pthreads="yes"
+	STORE_MODULES="ufs aufs"
+    ;;
+  esac
+])
+
+AC_ARG_WITH(aufs-threads,
+[  --with-aufs-threads=N_THREADS
+                          Tune the number of worker threads for the aufs object
+                          store.],
+[ case $withval in
+  [[0-9]]*)
+    aufs_io_threads=$withval
+    ;;
+  *)
+    echo "ERROR: Invalid --with-aufs-threads argument"
+    exit 1
+    ;;
+  esac
+])
+if test "$aufs_io_threads"; then
+    echo "With $aufs_io_threads aufs threads"
+    AC_DEFINE_UNQUOTED(AUFS_IO_THREADS,$aufs_io_threads)
+fi
+
+AC_ARG_WITH(pthreads,
+[  --with-pthreads         Use POSIX Threads])
+if test "$with_pthreads" = "yes"; then
+    echo "With pthreads"
+fi
+
+AC_ARG_WITH(aio,
+[  --with-aio              Use POSIX AIO])
+if test "$with_aio" = "yes"; then
+    echo "With aio"
+fi
+
+AC_ARG_WITH(dl,
+[  --with-dl               Use dynamic linking])
+if test "$with_dl" = "yes"; then
+    echo "With dl"
+fi
+
+AC_ARG_ENABLE(storeio,
+[  --enable-storeio=\"list of modules\"
+                          Build support for the list of store I/O modules.
+                          The default is only to build the "ufs" module.
+                          See src/fs for a list of available modules, or
+                          Programmers Guide section <not yet written>
+                          for details on how to build your custom store module],
+[ case $enableval in
+  yes)
+	for module in $srcdir/src/fs/*; do
+	    if test -f $module/Makefile.in; then
+		STORE_MODULES="$STORE_MODULES `basename $module`"
+	    fi
+	done
+  	;;
+  no)
+  	;;
+  *)	STORE_MODULES="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+	;;
+  esac
+],
+[ if test -z "$STORE_MODULES"; then
+    STORE_MODULES="ufs"
+  fi
+])
+echo "Store modules built: $STORE_MODULES"
+STORE_OBJS="fs/lib`echo $STORE_MODULES|sed -e 's% %.a fs/lib%g'`.a"
+AC_SUBST(STORE_OBJS)
+STORE_LIBS="`echo $STORE_OBJS|sed -e 's%fs/%%g'`"
+AC_SUBST(STORE_LIBS)
+dnl remove all but diskd - its the only module that needs to recurse
+dnl into the sub directory
+STORE_MODULE_SUBDIRS=
+for fs in $STORE_MODULES none; do
+    case "$fs" in
+    diskd)
+        STORE_MODULE_SUBDIRS="$STORE_MODULE_SUBDIRS $fs"
+	;;
+    aufs)
+	if test -z "$with_pthreads"; then
+	    echo "aufs store used, pthreads support automatically enabled"
+	    with_pthreads=yes
+	fi
+	;;
+    coss)
+	if test -z "$with_aio"; then
+	    echo "coss store used, aio support automatically enabled"
+	    with_aio=yes
+	fi
+	;;
+    esac
+done
+AC_SUBST(STORE_MODULES)
+AC_SUBST(STORE_MODULE_SUBDIRS)
+
+dnl --enable-heap-replacement compatibility option
+AC_ARG_ENABLE(heap-replacement,
+[  --enable-heap-replacement
+                          Backwards compatibility option. Please use the
+			  new --enable-removal-policies directive instead.],
+[ if test "$enableval" = "yes" ; then
+    echo "--enable-heap-replacement is obsolete. please use the new"
+    echo "--enable-removal-policies directive instead"
+    sleep 5
+    REPL_POLICIES="heap"
+  fi
+])
+
+AC_ARG_ENABLE(removal-policies,
+[  --enable-removal-policies=\"list of policies\"
+                          Build support for the list of removal policies.
+                          The default is only to build the "lru" module.
+                          See src/repl for a list of available modules, or
+                          Programmers Guide section 9.9 for details on how
+			  to build your custom policy],
+[ case $enableval in
+  yes)
+	for module in $srcdir/src/repl/*; do
+	    if test -f $module/Makefile.in; then
+		REPL_POLICIES="$REPL_POLICIES `basename $module`"
+	    fi
+	done
+  	;;
+  no)
+  	;;
+  *)	REPL_POLICIES="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+	;;
+  esac
+],
+[ if test -z "$REPL_POLICIES"; then
+    REPL_POLICIES="lru"
+  fi
+])
+echo "Removal policies built: $REPL_POLICIES"
+AC_SUBST(REPL_POLICIES)
+REPL_OBJS="repl/lib`echo $REPL_POLICIES|sed -e 's% %.a repl/lib%g'`.a"
+AC_SUBST(REPL_OBJS)
+REPL_LIBS="`echo $REPL_OBJS|sed -e 's%repl/%%g'`"
+AC_SUBST(REPL_LIBS)
+
+AM_CONDITIONAL(ENABLE_PINGER, false)
+AC_ARG_ENABLE(icmp,
+[  --enable-icmp           Enable ICMP pinging],
+[ if test "$enableval" = "yes" ; then
+    echo "ICMP enabled"
+    AC_DEFINE(USE_ICMP)
+    AM_CONDITIONAL(ENABLE_PINGER, true)
+  fi
+])
+
+AM_CONDITIONAL(USE_DELAY_POOLS, false)
+AC_ARG_ENABLE(delay-pools,
+[  --enable-delay-pools    Enable delay pools to limit bandwidth usage],
+[ if test "$enableval" = "yes" ; then
+    echo "Delay pools enabled"
+    AC_DEFINE(DELAY_POOLS)
+    AM_CONDITIONAL(USE_DELAY_POOLS, true)
+  fi
+])
+
+dnl Enable ICAP Support
+AM_CONDITIONAL(USE_ICAP, false)
+AC_ARG_ENABLE(icap-support,
+[  --enable-icap-support   	   Enable iCAP client capability],
+[ if test "$enableval" = "yes" ; then
+    echo "ICAP support enabled"
+    AC_DEFINE(HS_FEAT_ICAP)
+    AM_CONDITIONAL(USE_ICAP, true)
+  fi
+])
+
+dnl This is a developer only option. Developers know how to set defines
+dnl
+dnl AC_ARG_ENABLE(mem-gen-trace,
+dnl [  --enable-mem-gen-trace  Do trace of memory stuff],
+dnl [ if test "$enableval" = "yes" ; then
+dnl     echo "Memory trace (to file) enabled"
+dnl     AC_DEFINE(MEM_GEN_TRACE)
+dnl   fi    
+dnl ])     
+
+AC_ARG_ENABLE(useragent-log,
+[  --enable-useragent-log  Enable logging of User-Agent header],
+[ if test "$enableval" = "yes" ; then
+    echo "User-Agent logging enabled"
+    AC_DEFINE(USE_USERAGENT_LOG)
+  fi
+])
+
+AC_ARG_ENABLE(referer-log,
+[  --enable-referer-log    Enable logging of Referer header],
+[ if test "$enableval" = "yes" ; then
+    echo "Referer logging enabled"
+    AC_DEFINE(USE_REFERER_LOG)
+  fi
+])
+
+AC_ARG_ENABLE(wccp,  
+[  --disable-wccp          Disable Web Cache Coordination Protocol],
+[ if test "$enableval" = "no" ; then
+    echo "Web Cache Coordination Protocol disabled"
+    AC_DEFINE(USE_WCCP, 0)
+  else
+    AC_DEFINE(USE_WCCP, 1)
+  fi
+])      
+
+AC_ARG_ENABLE(kill-parent-hack,
+[  --enable-kill-parent-hack
+                          Kill parent on shutdown],
+[ if test "$enableval" = "yes" ; then
+    echo "Kill parent on shutdown"
+    AC_DEFINE(KILL_PARENT_OPT)
+  fi
+])
+
+AM_CONDITIONAL(USE_SNMP, false)
+AC_ARG_ENABLE(snmp,
+[  --enable-snmp           Enable SNMP monitoring],
+[ if test "$enableval" = "yes" ; then
+    echo "SNMP monitoring enabled"
+    AC_DEFINE(SQUID_SNMP)
+    SNMPLIB='-L../snmplib -lsnmp'
+    AM_CONDITIONAL(USE_SNMP, true)
+    SNMP_MAKEFILE=./snmplib/Makefile
+    makesnmplib=snmplib
+  fi
+])
+AC_SUBST(SNMPLIB)
+AC_SUBST(makesnmplib)
+
+dnl This do not work well.. disable for now so people do not
+dnl enable it and thereby cause problems.. (tired of seeing people
+dnl having enabled this, and then complaining...)
+dnl
+dnl AC_ARG_ENABLE(time-hack,
+dnl [  --enable-time-hack      Update internal timestamp only once per second],
+dnl [ if test "$enableval" = "yes" ; then
+dnl     echo "Update internal timestamp only once per second"
+dnl     AC_DEFINE(ALARM_UPDATES_TIME)
+dnl   fi
+dnl ])
+
+AC_ARG_ENABLE(cachemgr-hostname,
+[  --enable-cachemgr-hostname[=hostname]
+                          Make cachemgr.cgi default to this host],
+[  case $enableval in
+   yes)
+       AC_DEFINE(CACHEMGR_HOSTNAME,[getfullhostname()])
+       echo "Cachemgr default hostname == host where cachemgr runs"
+       ;;
+   no)
+       : # Nothing to do..
+       ;;
+   *)
+       AC_DEFINE_UNQUOTED(CACHEMGR_HOSTNAME,"${enableval}")
+       echo "Cachemgr default hostname set to ${enableval}"
+       ;;
+   esac
+])
+
+AC_ARG_ENABLE(arp-acl,
+[  --enable-arp-acl        Enable use of ARP ACL lists (ether address)],
+[  if test "$enableval" = "yes" ; then
+     echo "ARP ACL lists enabled (ether address)"
+     case "$host" in
+	*-linux-*)
+	    ;;
+	*-solaris*)
+	    ;;
+	*-freebsd*)
+	    ;;
+	*)
+	    echo "WARNING: ARP ACL support probably won't work on $host."
+	    sleep 10
+	    ;;
+     esac
+     AC_DEFINE(USE_ARP_ACL)
+   fi
+])
+
+AM_CONDITIONAL(ENABLE_HTCP, false)
+AC_ARG_ENABLE(htcp,
+[  --enable-htcp           Enable HTCP protocol],
+[ if test "$enableval" = "yes" ; then
+    echo "HTCP enabled"
+    AC_DEFINE(USE_HTCP)
+    AM_CONDITIONAL(ENABLE_HTCP, true)
+  fi
+])
+
+AM_CONDITIONAL(ENABLE_SSL, false)
+
+SSLLIB=''
+SSLFLAGS=''
+
+AC_ARG_ENABLE(ssl,
+[  --enable-ssl            Enable ssl gatewaying support using OpenSSL],
+[ if test "$enableval" != "no"; then
+    echo "SSL gatewaying using OpenSSL enabled"
+    AC_DEFINE(USE_SSL)
+    AM_CONDITIONAL(ENABLE_SSL, true)
+    SSLLIB='-lssl -lcrypto'
+    USE_OPENSSL=1
+  fi
+])
+
+AM_CONDITIONAL(NEED_OWN_MD5, true)
+
+AC_ARG_WITH(openssl,
+[  --with-openssl[=prefix]
+                          Compile with the OpenSSL libraries. The path to
+			  the OpenSSL development libraries and headers
+			  installation can be specified if outside of the
+			  system standard directories],
+[ 
+  case "$with_openssl" in
+  yes)
+    USE_OPENSSL=1
+    ;;
+  no)
+    USE_OPENSSL=
+    ;;
+  *)
+    PKG_CONFIG_PATH="$with_openssl/lib/pkgconfig${PKG_CONFIG_PATH:+:}${PKG_CONFIG_PATH}"
+    export PKG_CONFIG_PATH
+    SSLLIB="-L$with_openssl/lib -lssl -lcrypto"
+    SSLFLAGS="-I$with_openssl/include"
+    USE_OPENSSL=1
+  esac
+])
+
+if test -n "$USE_OPENSSL"; then
+  echo "Using OpenSSL MD5 implementation"
+  AC_DEFINE(USE_OPENSSL)
+  AM_CONDITIONAL(NEED_OWN_MD5, false)
+  if test -z "$SSLLIB"; then
+    SSLLIB="-lcrypto" # for MD5 routines
+  fi
+  if $PKGCONFIG --exists openssl; then
+    SSLLIB="`$PKGCONFIG --libs openssl`"
+    SSLFLAGS="`$PKGCONFIG --cflags openssl`"
+  fi
+  CPPFLAGS="${SSLFLAGS} $CPPFLAGS"
+fi
+AC_SUBST(SSLLIB)
+
+AC_ARG_ENABLE(forw-via-db,
+[  --enable-forw-via-db    Enable Forw/Via database],
+[ if test "$enableval" = "yes" ; then
+    echo "FORW-VIA enabled"
+    AC_DEFINE(FORW_VIA_DB)
+  fi
+])
+
+AC_ARG_ENABLE(cache-digests,
+[  --enable-cache-digests  Use Cache Digests
+                          see http://www.squid-cache.org/FAQ/FAQ-16.html],
+[ if test "$enableval" = "yes" ; then
+    echo "USE_CACHE_DIGESTS enabled"
+    AC_DEFINE(USE_CACHE_DIGESTS)
+  fi
+])
+
+dnl Select Default Error language
+AC_ARG_ENABLE(default-err-language,
+[  --enable-default-err-language=lang
+                          Select default language for Error pages (see
+                          errors directory) ],
+[
+    if test -d $srcdir/errors/$enableval; then
+	ERR_DEFAULT_LANGUAGE=$enableval
+    else
+	echo "ERROR! Unknown language $enableval, see errors/ directory"
+	exit 1
+    fi
+],[ERR_DEFAULT_LANGUAGE="English"])
+AC_SUBST(ERR_DEFAULT_LANGUAGE)
+
+dnl Select languages to be installed
+AC_ARG_ENABLE(err-languages,
+[  --enable-err-languages=\"lang1 lang2..\"
+                          Select languages to be installed. (All will be
+                          installed by default) ],
+[
+    for l in $enableval; do
+        if test -d $srcdir/errors/$l; then :; else
+	    echo "ERROR! Unknown language $$l, see errors/"
+	    exit 1
+	fi
+    done
+    ERR_LANGUAGES=$enableval
+],[
+    ERR_LANGUAGES=
+    for l in $srcdir/errors/*; do
+        if test -f $l/ERR_ACCESS_DENIED; then
+            ERR_LANGUAGES="$ERR_LANGUAGES `basename $l`"
+	fi
+    done
+])
+AC_SUBST(ERR_LANGUAGES)
+
+dnl Size of COSS memory buffer
+AC_ARG_WITH(coss-membuf-size,
+[  --with-coss-membuf-size COSS membuf size (default 1048576 bytes) ],
+[  if test "$with_coss_membuf_size"; then
+      echo "Setting COSS membuf size to $with_coss_membuf_size bytes"
+      AC_DEFINE_UNQUOTED(COSS_MEMBUF_SZ, $with_coss_membuf_size)
+   fi
+])
+
+dnl Enable poll()
+AC_ARG_ENABLE(poll,
+[  --enable-poll           Enable poll() instead of select().  Normally poll
+                          is preferred over select, but configure knows poll
+                          is broken on some platforms.  If you think you are
+                          smarter than the configure script, you may enable
+                          poll with this option.
+  --disable-poll          Disable the use of poll().],
+[ 
+  case "$enableval" in
+  yes)
+    echo "Forcing poll() to be enabled"
+    ac_cv_func_poll='yes'
+    ;;
+  no)
+    echo "Forcing poll() to be disabled"
+    ac_cv_func_poll='no'
+    ;;
+  esac
+])
+
+dnl Disable HTTP violations
+AC_ARG_ENABLE(http-violations,
+[  --disable-http-violations
+                          This allows you to remove code which is known to
+                          violate the HTTP protocol specification.],
+[ if test "$enableval" = "no" ; then
+    echo "Disabling HTTP Violations"
+    AC_DEFINE(HTTP_VIOLATIONS, 0)
+  else
+    AC_DEFINE(HTTP_VIOLATIONS, 1)
+  fi
+])
+
+dnl Enable IP-Filter Transparent Proxy
+AC_ARG_ENABLE(ipf-transparent,
+[  --enable-ipf-transparent
+                          Enable Transparent Proxy support for systems
+                          using IP-Filter network address redirection.],
+[ if test "$enableval" = "yes" ; then
+	echo "IP-Filter Transparent Proxy enabled"
+	AC_DEFINE(IPF_TRANSPARENT)
+	IPF_TRANSPARENT="yes"
+  fi
+])
+
+dnl Enable PF Transparent Proxy
+AC_ARG_ENABLE(pf-transparent,
+[  --enable-pf-transparent
+                          Enable Transparent Proxy support for systems
+                          using PF network address redirection.],
+[ if test "$enableval" = "yes" ; then
+	echo "PF Transparent Proxy enabled"
+	AC_DEFINE(PF_TRANSPARENT)
+	PF_TRANSPARENT="yes"
+  fi
+])
+
+dnl Enable Linux Netfilter (2.4) Transparent Proxy
+AC_ARG_ENABLE(linux-netfilter,
+[  --enable-linux-netfilter
+                          Enable Transparent Proxy support for Linux 2.4.],
+[ if test "$enableval" = "yes" ; then
+	echo "Linux-Netfilter Transparent Proxy enabled"
+	AC_DEFINE(LINUX_NETFILTER)
+	LINUX_NETFILTER="yes"
+  fi
+])
+
+dnl Enable Large file support
+buildmodel=""
+needlargefiles=
+
+AC_ARG_WITH(large-files,
+[  --with-large-files      Enable support for large files (logs etc).],
+[ if test "$withval" = yes; then
+	needlargefiles=1
+  fi
+])
+
+AC_ARG_ENABLE(large-cache-files,
+[  --enable-large-cache-files
+                          Enable support for large cache files (>2GB).
+                          WARNING: on-disk cache format is changed by this option],
+[ if test "$enableval" = "yes" ; then
+	echo "Large cache file support enabled"
+	AC_DEFINE(LARGE_CACHE_FILES, 1, [Support large cache files > 2GB])
+dnl	needlargefiles=1
+  fi
+])
+
+dnl UNIX Build environment
+AC_ARG_WITH(build-environment,
+[  --with-build-environment=model
+                          The build environment to use. Normally one of
+                          POSIX_V6_ILP32_OFF32   32 bits
+                          POSIX_V6_ILP32_OFFBIG  32 bits with large file support
+                          POSIX_V6_LP64_OFF64    64 bits
+                          POSIX_V6_LPBIG_OFFBIG  large pointers and files
+                          XBS5_ILP32_OFF32       32 bits (legacy)
+                          XBS5_ILP32_OFFBIG      32 bits with large file support (legacy)
+                          XBS5_LP64_OFF64        64 bits (legacy)
+                          XBS5_LPBIG_OFFBIG      large pointers and files (legacy)
+                          default                The default for your OS],
+[ case "$enableval" in
+  yes|no)
+	echo "--with-build-environment expects a build environment string as used by getconf"
+	exit 1
+	;;
+  _*)
+	buildmodel="$enableval"
+	;;
+  *)
+	buildmodel="_$enableval"
+	;;
+  esac
+])
+
+if test $needlargefiles && test -z "$buildmodel"; then
+	for model in POSIX_V6_ILP32_OFFBIG XBS5_ILP32_OFFBIG POSIX_V6_LP64_OFF64 XBS5_LP64_OFF64 POSIX_V6_LPBIG_OFFBIG XBS5_LPBIG_OFFBIG; do
+		if test "`getconf _$model 2>/dev/null || true`" = 1 || test "`getconf $model 2>/dev/null || true`" ; then
+			buildmodel=$model
+			break
+		fi
+	done
+	if test -z "$buildmodel"; then
+		echo "WARNING: No suitable build environment found for large files. Trying to use _FILE_OFFSET_BITS=64"
+		sleep 1
+		CFLAGS="-D_FILE_OFFSET_BITS=64 $CFLAGS"
+	fi
+fi
+if test -n "$buildmodel" && test "$buildmodel" != "_default"; then
+	echo "Using $buildmodel build environment"
+	CFLAGS="`getconf ${buildmodel}_CFLAGS` $CFLAGS"
+	LIBS="`getconf ${buildmodel}_LIBS` $LIBS"
+	LDFLAGS="`getconf ${buildmodel}_LDFLAGS` $LDFLAGS"
+fi
+
+AM_CONDITIONAL(MAKE_LEAKFINDER, false)
+dnl Enable Leak Finding Functions
+AC_ARG_ENABLE(leakfinder,
+[  --enable-leakfinder
+                          Enable Leak Finding code.  Enabling this alone
+                          does nothing; you also have to modify the source
+			  code to use the leak finding functions.  Probably
+			  Useful for hackers only.],
+[ if test "$enableval" = "yes" ; then
+	echo "Leak-Finding enabled"
+	AC_DEFINE(USE_LEAKFINDER)
+	USE_LEAKFINDER="yes"
+	AM_CONDITIONAL(MAKE_LEAKFINDER, true)
+  fi
+])
+
+AC_ARG_ENABLE(ident-lookups,
+[  --disable-ident-lookups
+                          This allows you to remove code that performs
+                          Ident (RFC 931) lookups.],
+[ if test "$enableval" = "no" ; then
+    echo "Disabling Ident Lookups"
+    AC_DEFINE(USE_IDENT, 0)
+  else
+    AC_DEFINE(USE_IDENT, 1)
+  fi
+])
+
+AM_CONDITIONAL(USE_DNSSERVER, false)
+use_dnsserver=
+AC_ARG_ENABLE(internal-dns,
+[  --disable-internal-dns  This prevents Squid from directly sending and
+                          receiving DNS messages, and instead enables the
+                          old external 'dnsserver' processes.],
+[ if test "$enableval" = "no" ; then
+    echo "Disabling Internal DNS queries"
+    use_dnsserver="yes"
+  fi
+])
+if test "$use_dnsserver" = "yes"; then
+    AC_DEFINE(USE_DNSSERVERS)
+    AM_CONDITIONAL(USE_DNSSERVER, true)
+fi
+
+AC_ARG_ENABLE(truncate,
+[  --enable-truncate       This uses truncate() instead of unlink() when
+                          removing cache files.  Truncate gives a little
+                          performance improvement, but may cause problems
+                          when used with async I/O.  Truncate uses more
+                          filesystem inodes than unlink..],
+[ if test "$enableval" = "yes" ; then
+    echo "Enabling truncate instead of unlink"
+    AC_DEFINE(USE_TRUNCATE)
+  fi
+])
+
+dnl Disable hostname checks
+AC_ARG_ENABLE(hostname-checks,
+[  --disable-hostname-checks
+                          Squid by default rejects any host names with
+			  odd characters in their name to conform with
+			  internet standards. If you disagree with this
+			  you may use this switch to turn off any such
+			  checks, provided that the resolver used by
+			  Squid does not reject such host names.. This
+			  may be required to participate in testbeds for
+			  international domain names.],
+	[],
+	[enable_hostname_checks=yes])
+if test "$enable_hostname_checks" = "yes"; then
+  echo "Hostname sanity checks enabled"
+  AC_DEFINE(CHECK_HOSTNAMES, 1, [Enable hostname sanity checks])
+else
+  echo "Disabling hostname sanity checks"
+fi
+
+dnl Enable underscore in hostnames
+AC_ARG_ENABLE(underscores,
+[  --enable-underscores    Squid by default rejects any host names with _
+                          in their name to conform with internet standards.
+                          If you disagree with this you may allow _ in
+                          hostnames by using this switch, provided that
+                          the resolver library on the host where Squid runs
+                          does not reject _ in hostnames...],
+[ if test "$enableval" = "yes" ; then
+    echo "Enabling the use of underscores in host names"
+    AC_DEFINE(ALLOW_HOSTNAME_UNDERSCORES, 1)
+  fi
+])
+
+
+dnl Select auth schemes modules to build
+AC_ARG_ENABLE(auth,
+[  --enable-auth=\"list of auth scheme modules\"
+                          Build support for the list of authentication schemes.
+                          The default is to build support for the Basic scheme.
+                          See src/auth for a list of available modules, or
+                          Programmers Guide section authentication schemes
+                          for details on how to build your custom auth scheme
+                          module],
+[ case $enableval in
+  yes)
+        for module in $srcdir/src/auth/*; do
+            if test -f $module/Makefile.in; then
+                AUTH_MODULES="$AUTH_MODULES `basename $module`"
+            fi
+        done
+        ;;
+  no)
+        ;;
+  *)    AUTH_MODULES="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+        ;;
+  esac
+],
+[ if test -z "$AUTH_MODULES"; then
+    AUTH_MODULES="basic"
+  fi
+])
+echo "Auth scheme modules built: $AUTH_MODULES"
+AC_SUBST(AUTH_MODULES)
+AUTH_OBJS="auth/lib`echo $AUTH_MODULES|sed -e 's% %.a auth/lib%g'`.a"
+AC_SUBST(AUTH_OBJS)
+AUTH_LIBS="`echo $AUTH_OBJS|sed -e 's%auth/%%g'`"
+AC_SUBST(AUTH_LIBS)
+
+dnl Select basic auth scheme helpers to build
+BASIC_AUTH_HELPERS=""
+AC_ARG_ENABLE(auth-modules,
+[  --enable-auth-modules=\"list of helpers\"
+                          Backwards compatibility alias for
+                          --enable-basic-auth-helpers],
+[ echo "--enable-auth-modules is obsolete. Please use the new"
+  echo "option --enable-basic-auth-helpers"
+  sleep 5
+  case "$enableval" in
+  yes) 
+    for helper in $srcdir/helpers/basic_auth/*; do
+	if test -f $helper/Makefile.in; then
+	    BASIC_AUTH_HELPERS="$BASIC_AUTH_HELPERS `basename $helper`"
+	fi
+    done
+    ;;
+  no)
+    ;;
+  *)
+    BASIC_AUTH_HELPERS="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+  esac
+])
+AC_ARG_ENABLE(basic-auth-helpers,
+[  --enable-basic-auth-helpers=\"list of helpers\"
+                          This option selects which basic scheme proxy_auth
+                          helpers to build and install as part of the normal 
+                          build process. For a list of available
+                          helpers see the helpers/basic_auth directory.],
+[ case "$enableval" in
+  yes) 
+    BASIC_AUTH_HELPERS=""
+    for helper in $srcdir/helpers/basic_auth/*; do
+	if test -f $helper/Makefile.in; then
+	    BASIC_AUTH_HELPERS="$BASIC_AUTH_HELPERS `basename $helper`"
+	fi
+    done
+    ;;
+  no)
+    ;;
+  *)
+    BASIC_AUTH_HELPERS="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+  esac
+])
+if test -n "$BASIC_AUTH_HELPERS"; then
+    for helper in $BASIC_AUTH_HELPERS; do
+	if test -f $srcdir/helpers/basic_auth/$helper/Makefile.in; then
+		if test "$helper" = "SASL"; then
+			require_sasl=yes
+		fi
+	else
+		echo "ERROR: Basic auth helper $helper does not exists"
+		exit 1
+	fi
+    done
+    echo "Basic auth helpers built: $BASIC_AUTH_HELPERS"
+fi
+AC_SUBST(BASIC_AUTH_HELPERS)
+
+dnl Select ntlm auth helpers to build
+NTLM_AUTH_HELPERS=
+AC_ARG_ENABLE(ntlm-auth-helpers,
+[  --enable-ntlm-auth-helpers=\"list of helpers\"
+                          This option selects which proxy_auth ntlm helpers
+                          to build and install as part of the normal build 
+                          process. For a list of available helpers see
+                          the helpers/ntlm_auth directory.],
+[ case "$enableval" in
+  yes) 
+    for helper in $srcdir/helpers/ntlm_auth/*; do
+	if test -f $helper/Makefile.in; then
+	    NTLM_AUTH_HELPERS="$NTLM_AUTH_HELPERS `basename $helper`"
+	fi
+    done
+    ;;
+  no)
+    ;;
+  *)
+    NTLM_AUTH_HELPERS="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+  esac
+])
+if test -n "$NTLM_AUTH_HELPERS"; then
+    for helper in $NTLM_AUTH_HELPERS; do
+	if test -f $srcdir/helpers/ntlm_auth/$helper/Makefile.in; then
+		:
+	else
+		echo "ERROR: NTLM auth helper $helper does not exists"
+		exit 1
+	fi
+    done
+    echo "NTLM auth helpers built: $NTLM_AUTH_HELPERS"
+fi
+AC_SUBST(NTLM_AUTH_HELPERS)
+
+dnl Select digest auth scheme helpers to build
+DIGEST_AUTH_HELPERS=
+AC_ARG_ENABLE(digest-auth-helpers,
+[  --enable-digest-auth-helpers=\"list of helpers\"
+                          This option selects which digest scheme authentication
+                          helpers to build and install as part of the normal build
+                          process. For a list of available helpers see the
+                          helpers/digest_auth directory.],
+[ case "$enableval" in
+  yes)
+    for helper in $srcdir/helpers/digest_auth/*; do
+        if test -f $helper/Makefile.in; then
+            DIGEST_AUTH_HELPERS="$DIGEST_AUTH_HELPERS `basename $helper`"
+        fi
+    done
+    ;;
+  no)
+    ;;
+  *)
+    DIGEST_AUTH_HELPERS="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+  esac
+])
+if test -n "$DIGEST_AUTH_HELPERS"; then
+    for helper in $DIGEST_AUTH_HELPERS; do
+	if test -f $srcdir/helpers/digest_auth/$helper/Makefile.in; then
+		:
+	else
+		echo "ERROR: digest auth helper $helper does not exists"
+		exit 1
+	fi
+    done
+    echo "Digest auth helpers built: $DIGEST_AUTH_HELPERS"
+fi
+AC_SUBST(DIGEST_AUTH_HELPERS)
+
+dnl Enable "NTLM fail open"
+AC_ARG_ENABLE(ntlm-fail-open,
+[  --enable-ntlm-fail-open Enable NTLM fail open, where a helper that fails one of the
+                          Authentication steps can allow squid to still authenticate
+                          the user.],
+[ if test "$enableval" = "yes" ; then
+    AC_DEFINE(NTLM_FAIL_OPEN)
+  fi
+])
+
+dnl Select external_acl helpers to build
+EXTERNAL_ACL_HELPERS=
+AC_ARG_ENABLE(external-acl-helpers,
+[  --enable-external-acl-helpers=\"list of helpers\"
+                          This option selects which external_acl helpers to
+                          build and install as part of the normal build
+                          process. For a list of available helpers see the
+                          helpers/external_acl directory.],
+[ case "$enableval" in
+  yes)
+    for helper in $srcdir/helpers/external_acl/*; do
+        if test -f $helper/Makefile.in; then
+            EXTERNAL_ACL_HELPERS="$EXTERNAL_ACL_HELPERS `basename $helper`"
+        fi
+    done
+    ;;
+  no)
+    ;;
+  *)
+    EXTERNAL_ACL_HELPERS="`echo $enableval| sed -e 's/,/ /g;s/  */ /g'`"
+  esac
+])
+if test -n "$EXTERNAL_ACL_HELPERS"; then
+    for helper in $EXTERNAL_ACL_HELPERS; do
+	if test -f $srcdir/helpers/external_acl/$helper/Makefile.in; then
+		:
+	else
+		echo "ERROR: external acl helper $helper does not exists"
+		exit 1
+	fi
+    done
+    echo "External acl helpers built: $EXTERNAL_ACL_HELPERS"
+fi
+AC_SUBST(EXTERNAL_ACL_HELPERS)
+
+
+SAMBASOURCES='$(top_srcdir)/include/samba'
+AC_ARG_WITH(samba-sources,
+[  --with-samba-sources=/path/to/samba-source-tree
+                          Path where the correct Samba source files can be
+			  found while building winbind helpers. (defaults to
+			  use internal copies of the headers from Samba-2.2.7)
+			  ],
+[ if test -f $withval/source/nsswitch/winbind_nss_config.h; then
+	echo "Using Samba sources from $withval"
+	SAMBASOURCES="$withval/source"
+    else
+	echo "ERROR: Cannot find Samba sources at $withval"
+	exit 1
+    fi
+])
+AC_SUBST(SAMBASOURCES)
+
+dnl Check for Cyrus SASL
+if test "$require_sasl" = "yes"; then
+	AC_CHECK_HEADERS(sasl/sasl.h sasl.h)
+	if test "$ac_cv_header_sasl_sasl_h" = "yes"; then
+		echo "using SASL2"
+		LIBSASL="-lsasl2"
+	else
+		if test "$ac_cv_header_sasl_h" = "yes"; then
+			echo "using SASL"
+			LIBSASL="-lsasl"
+		else
+			echo "ERROR: Neither SASL nor SASL2 found"
+			exit 1
+		fi
+	fi
+	AC_SUBST(LIBSASL)
+fi
+
+dnl Disable "unlinkd" code
+AC_ARG_ENABLE(unlinkd,
+[  --disable-unlinkd       Do not use unlinkd],
+[ if test "$enableval" = "no" ; then
+    use_unlinkd=no
+  else
+    use_unlinkd=yes
+  fi
+],[
+    # Here we should probably use some magic depending on the selected
+    # storage models
+    use_unlinkd=yes
+])
+if test "$use_unlinkd" = "yes"; then
+    echo "unlinkd enabled"
+    AC_DEFINE(USE_UNLINKD)
+    AM_CONDITIONAL(ENABLE_UNLINKD, true)
+else
+    echo "unlinkd disabled"
+    AM_CONDITIONAL(ENABLE_UNLINKD, false)
+fi
+
+dnl Enable backtraces on fatal errors
+AC_ARG_ENABLE(stacktraces,
+[  --enable-stacktraces    Enable automatic call backtrace on fatal errors],
+[ if test "$enableval" = "yes" ; then
+    echo "Enabling automatic stack backtraces on fatal errors"
+    AC_DEFINE(PRINT_STACK_TRACE, 1)
+  fi
+])
+
+dnl Enable X-Accelerator-Vary for Vary support within an accelerator setup
+AC_ARG_ENABLE(x_accelerator_vary,
+[  --enable-x-accelerator-vary
+                          Enable support for the X-Accelerator-Vary
+                          HTTP header. Can be used to indicate
+                          variance within an accelerator setup.
+                          Typically used together with other code
+                          that adds custom HTTP headers to the requests.],
+[ if test "$enableval" = "yes" ; then
+    echo "Enabling support for X-Accelerator-Vary"
+    AC_DEFINE(X_ACCELERATOR_VARY, 1)
+  fi
+])
+
+# Force some compilers to use ANSI features
+#
+case "$host" in
+    alpha-dec-osf*)
+	if test "$ac_cv_prog_CC" = "cc" ; then
+		echo "adding '-std1' to cc args for $host"
+		CC="cc -std1";
+		ac_cv_prog_CC="$CC"
+	fi
+	;;
+    *-hp-hpux*)
+	if test "$ac_cv_prog_CC" = "cc" ; then
+		echo "adding '-Ae' to cc args for $host"
+		CC="cc -Ae";
+		ac_cv_prog_CC="$CC"
+	fi
+	;;
+esac
+
+dnl Check for programs
+AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AC_PROG_LN_S
+AC_PATH_PROG(SH, sh, /bin/sh)
+AC_PATH_PROG(FALSE, false, /usr/bin/false)
+AC_PATH_PROG(TRUE, true, /usr/bin/true)
+AC_PATH_PROG(RM, rm, $FALSE)
+AC_PATH_PROG(MV, mv, $FALSE)
+AC_PATH_PROG(MKDIR, mkdir, $FALSE)
+AC_PATH_PROG(LN, ln, cp)
+AC_PATH_PROG(PERL, perl, none)
+dnl automake handles this AC_PATH_PROG(MAKEDEPEND, makedepend, $TRUE)
+AC_PATH_PROG(AR, ar, $FALSE)
+
+if test "$ac_cv_path_PERL" = "none"; then
+	echo "Perl is required to compile Squid"
+	echo "Please install Perl and then re-run configure"
+	exit 1
+fi
+
+case "$host" in
+    *-hp-hpux*)
+	echo "Disabling 'ranlib' for HP-UX..."
+	RANLIB=":"
+	;;
+esac
+
+dnl set $(AR)
+AR_R="$AR r"
+case "$host" in
+	*-next-nextstep3)
+		AR="libtool -o"
+		;;
+esac
+AC_SUBST(AR_R)
+
+dnl Check for headers
+AC_HEADER_DIRENT
+
+AC_CHECK_HEADERS( \
+	arpa/inet.h \
+	arpa/nameser.h \
+	assert.h \
+	bstring.h \
+	crypt.h \
+	ctype.h \
+	errno.h \
+	execinfo.h \
+	fcntl.h \
+	fnmatch.h \
+	getopt.h \
+	gnumalloc.h \
+	grp.h \
+	ip_compat.h \
+	ip_fil_compat.h \
+	ip_fil.h \
+	ip_nat.h \
+	libc.h \
+	limits.h \
+	linux/netfilter_ipv4.h \
+	malloc.h \
+	math.h \
+	memory.h \
+	mount.h \
+	net/if.h \
+	net/pfvar.h \
+	netdb.h \
+	netinet/if_ether.h \
+	netinet/in.h \
+	netinet/tcp.h \
+	netinet/ip_compat.h \
+	netinet/ip_fil_compat.h \
+	netinet/ip_fil.h \
+	netinet/ip_nat.h \
+	openssl/err.h \
+	openssl/md5.h \
+	openssl/ssl.h \
+	poll.h \
+	pwd.h \
+	regex.h \
+	resolv.h \
+	sched.h \
+	signal.h \
+	stdarg.h \
+	stddef.h \
+	stdio.h \
+	stdlib.h \
+	string.h \
+	strings.h \
+	sys/bitypes.h \
+	sys/file.h \
+	sys/ioctl.h \
+	sys/mount.h \
+	sys/msg.h \
+	sys/param.h \
+	sys/resource.h \
+	sys/select.h\
+	sys/socket.h \
+	sys/stat.h \
+	sys/statvfs.h \
+	syscall.h \
+	sys/syscall.h \
+	sys/time.h \
+	sys/types.h \
+	sys/un.h \
+	sys/vfs.h \
+	sys/wait.h \
+	syslog.h \
+	time.h \
+	unistd.h \
+	utime.h \
+	varargs.h \
+	byteswap.h \
+	glib.h \
+	stdint.h \
+	inttypes.h \
+	grp.h \
+	nss_common.h \
+	nss.h
+)
+
+AC_C_CONST
+AC_C_BIGENDIAN
+
+AC_CACHE_CHECK(if ANSI prototypes work,ac_cv_have_ansi_prototypes, [
+  AC_TRY_COMPILE([int foo(char *); int foo (char *bar) {return 1;}],
+    [foo("bar")],
+    ac_cv_have_ansi_prototypes="yes",
+    ac_cv_have_ansi_prototypes="no")
+])
+if test $ac_cv_have_ansi_prototypes = "yes" ; then
+  AC_DEFINE(HAVE_ANSI_PROTOTYPES)
+fi
+
+AC_CACHE_CHECK(for tm->tm_gmtoff,ac_cv_have_tm_gmoff, [
+  AC_TRY_COMPILE([#include <time.h>
+#include <sys/time.h>],
+    [struct tm foo;
+      foo.tm_gmtoff = 0;],
+    ac_cv_have_tm_gmoff="yes",
+    ac_cv_have_tm_gmoff="no")
+])
+if test $ac_cv_have_tm_gmoff = "yes" ; then
+  AC_DEFINE(HAVE_TM_GMTOFF)
+fi
+
+AC_CACHE_CHECK(for struct mallinfo,ac_cv_have_struct_mallinfo, [
+  AC_TRY_COMPILE([#include <sys/types.h>
+#if HAVE_MALLOC_H
+#include <malloc.h>
+#endif],
+    [struct mallinfo foo;
+    foo.arena = 0;
+    foo.ordblks = 0;
+    foo.smblks = 0;
+    foo.hblks = 0;
+    foo.hblkhd = 0;
+    foo.uordblks = 0;
+    foo.fordblks = 0;
+    foo.keepcost = 0;],
+    ac_cv_have_struct_mallinfo="yes",
+    ac_cv_have_struct_mallinfo="no")
+])
+if test $ac_cv_have_struct_mallinfo = "yes" ; then
+  AC_DEFINE(HAVE_STRUCT_MALLINFO)
+fi
+
+AC_CACHE_CHECK(for extended mallinfo,ac_cv_have_ext_mallinfo, [
+  AC_TRY_COMPILE([#include <sys/types.h>
+#include <malloc.h>],
+    [struct mallinfo foo;
+      foo.mxfast = 0;],
+    ac_cv_have_ext_mallinfo="yes",
+    ac_cv_have_ext_mallinfo="no")
+])
+if test $ac_cv_have_ext_mallinfo = "yes" ; then
+  AC_DEFINE(HAVE_EXT_MALLINFO)
+fi
+
+AC_CACHE_CHECK(for struct rusage,ac_cv_have_struct_rusage, [
+  AC_TRY_COMPILE([
+#if HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#if HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif],
+    [struct rusage R;],
+    ac_cv_have_struct_rusage="yes",
+    ac_cv_have_struct_rusage="no")
+])
+if test $ac_cv_have_struct_rusage = "yes" ; then
+  AC_DEFINE(HAVE_STRUCT_RUSAGE)
+fi
+
+AC_CACHE_CHECK(for ip->ip_hl, ac_cv_have_ip_hl, [
+  AC_TRY_COMPILE([#include <sys/types.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#if defined (__linux__) || defined (__CYGWIN__)
+#define ip_hl ihl
+#endif
+#ifndef __linux__
+#ifndef __CYGWIN__
+#define iphdr ip
+#endif
+#endif],
+    [struct iphdr ip;
+      ip.ip_hl= 0;],
+    ac_cv_have_ip_hl="yes",
+    ac_cv_have_ip_hl="no")
+])
+if test $ac_cv_have_ip_hl = "yes" ; then
+  AC_DEFINE(HAVE_IP_HL)
+fi
+
+dnl Check for typedefs
+AC_CHECK_SIZEOF(void *)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
+AC_CHECK_SIZEOF_SYSTYPE(__int64, 8)
+AC_CHECK_SIZEOF_SYSTYPE(int16_t, 2)
+AC_CHECK_SIZEOF_SYSTYPE(uint16_t, 2)
+AC_CHECK_SIZEOF_SYSTYPE(u_int16_t, 2)
+AC_CHECK_SIZEOF_SYSTYPE(int32_t, 4)
+AC_CHECK_SIZEOF_SYSTYPE(uint32_t, 4)
+AC_CHECK_SIZEOF_SYSTYPE(u_int32_t, 4)
+AC_CHECK_SIZEOF_SYSTYPE(int64_t, 8)
+AC_CHECK_SIZEOF_SYSTYPE(uint64_t, 8)
+AC_CHECK_SIZEOF_SYSTYPE(u_int64_t, 8)
+
+dnl int16_t
+if test "x$ac_cv_sizeof_short" = "x2"; then
+	AC_CHECK_SYSTYPE(int16_t,short)
+elif test "x$ac_cv_sizeof_int" = "x2"; then
+	AC_CHECK_SYSTYPE(int16_t,int)
+fi
+dnl u_int16t_t
+if test "x$ac_cv_sizeof_uint16_t" = "x2"; then
+	AC_CHECK_SYSTYPE(u_int16_t,uint16_t)
+elif test "x$ac_cv_sizeof_short" = "x2"; then
+	AC_CHECK_SYSTYPE(u_int16_t,unsigned short)
+elif test "x$ac_cv_sizeof_int" = "x2"; then
+	AC_CHECK_SYSTYPE(u_int16_t,unsigned int)
+fi
+dnl int32_t
+if test "x$ac_cv_sizeof_int" = "x4"; then
+	AC_CHECK_SYSTYPE(int32_t,int)
+elif "x$ac_cv_sizeof_long" = "x4"; then
+	AC_CHECK_SYSTYPE(int32_t,long)
+fi
+dnl u_int32_t
+if test "x$ac_cv_sizeof_uint32_t" = "x4"; then
+	AC_CHECK_SYSTYPE(u_int32_t,uint32_t)
+elif test "x$ac_cv_sizeof_int" = "x4"; then
+	AC_CHECK_SYSTYPE(u_int32_t,unsigned int)
+elif test "x$ac_cv_sizeof_long" = "x4"; then
+	AC_CHECK_SYSTYPE(u_int32_t,unsigned long)
+fi
+dnl int64_t
+if test "x$ac_cv_sizeof_long" = "x8"; then
+	AC_CHECK_SYSTYPE(int64_t,long)
+elif test "x$ac_cv_sizeof_long_long" = "x8"; then
+	AC_CHECK_SYSTYPE(int64_t,long long)
+elif test "x$ac_cv_sizeof___int64" = "x8"; then
+	AC_CHECK_SYSTYPE(int64_t,__int64)
+fi
+dnl u_int64_t
+if test "x$ac_cv_sizeof_uint64_t" = "x8"; then
+	AC_CHECK_SYSTYPE(u_int64_t,uint64_t)
+elif test "x$ac_cv_sizeof_long" = "x8"; then
+	AC_CHECK_SYSTYPE(u_int64_t,unsigned long)
+elif test "x$ac_cv_sizeof_long_long" = "x8"; then
+	AC_CHECK_SYSTYPE(u_int64_t,unsigned long long)
+elif test "x$ac_cv_sizeof___int64" = "x8"; then
+	AC_CHECK_SYSTYPE(int64_t,unsigned __int64)
+fi
+
+AC_CHECK_TYPE(pid_t, int)
+AC_CHECK_TYPE(size_t, unsigned int)
+AC_CHECK_TYPE(ssize_t, int)
+AC_CHECK_TYPE(off_t, int)
+AC_CHECK_TYPE(mode_t, unsigned short)
+AC_CHECK_TYPE(fd_mask, int)
+
+AC_CHECK_SIZEOF_SYSTYPE(off_t, 4)
+AC_CHECK_SIZEOF_SYSTYPE(size_t, 4)
+
+dnl Check for special functions
+AC_FUNC_ALLOCA
+
+
+dnl Check for type in sys/socket.h
+AC_CACHE_CHECK(for socklen_t, ac_cv_type_socklen_t, [
+  AC_EGREP_CPP([socklen_t[^a-zA-Z_0-9]], [#include <sys/types.h>
+#include <sys/socket.h>
+#if STDC_HEADERS
+#include <stdlib.h>
+#include <stddef.h>
+#endif],
+    ac_cv_type_socklen_t=yes,
+    ac_cv_type_socklen_t=no)
+])
+if test $ac_cv_type_socklen_t = no; then
+  AC_DEFINE(socklen_t, int)
+fi
+
+dnl Check for mtyp_t in some headers
+AC_CACHE_CHECK(for mtyp_t, ac_cv_type_mtyp_t, [
+  AC_EGREP_CPP([mtyp_t[^a-zA-Z_0-9]], [#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>],
+    ac_cv_type_mtyp_t=yes,
+    ac_cv_type_mtyp_t=no)
+])
+if test $ac_cv_type_mtyp_t = no; then
+  AC_DEFINE(mtyp_t, long)
+ fi
+
+dnl Check for needed libraries
+AC_CHECK_LIB(nsl, main)
+AC_CHECK_LIB(socket, main)
+
+dnl Ripped from the Samba sources
+AC_CACHE_CHECK([for unix domain sockets],squid_cv_unixsocket, [
+    AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <sys/socket.h>
+#include <sys/un.h>],
+[
+  struct sockaddr_un sunaddr; 
+  sunaddr.sun_family = AF_UNIX;
+],
+        squid_cv_unixsocket=yes,squid_cv_unixsocket=no)])
+if test x"$squid_cv_unixsocket" = x"yes"; then
+   AC_DEFINE(HAVE_UNIXSOCKET)
+fi
+dnl end rip
+
+if test "x$ac_cv_enabled_dlmalloc" = "xyes" ; then
+  echo "skipping libmalloc check (--enable-dlmalloc specified)"
+else
+  AC_CHECK_LIB(gnumalloc, main)
+  if test "$ac_cv_lib_gnumalloc_main" = "yes"; then
+		echo "Disabling extended malloc functions when using gnumalloc"
+		ac_cv_func_mallinfo=no
+		ac_cv_func_mallocblksize=no
+		ac_cv_func_mallopt=no
+  else
+		case "$host" in
+			*-sun-solaris*)
+			  echo "skipping libmalloc check for $host"
+				;;
+			i386-*-freebsd*)
+			  echo "skipping libmalloc check for $host"
+				;;
+			*)
+  
+				AC_CHECK_LIB(malloc, main)
+				;;
+		esac
+  fi
+fi
+
+AC_CHECK_LIB(bsd, main)
+AC_CHECK_LIB(regex, main, [REGEXLIB="-lregex"])
+AC_CHECK_LIB(bind, gethostbyname)
+if test $ac_cv_lib_bind_gethostbyname = "no" ; then
+    case "$host" in
+	i386-*-freebsd*)
+		echo "skipping libresolv checks for $host"
+		;;
+	*)
+		AC_CHECK_LIB(resolv, inet_aton, AC_CHECK_LIB(44bsd, inet_aton))
+		AC_CHECK_LIB(resolv, main)
+		;;
+    esac
+fi
+AC_CHECK_LIB(m, main)
+
+dnl Check for libcrypt
+dnl Some of our helpers use crypt(3) which may be in libc, or in
+dnl libcrypt (eg FreeBSD)
+AC_CHECK_LIB(crypt, crypt, [CRYPTLIB="-lcrypt"])
+AC_SUBST(CRYPTLIB)
+
+dnl Check for libdl, used by auth_modules/PAM
+if test "$with_dl" = "yes"; then
+    AC_CHECK_LIB(dl, dlopen)
+fi
+
+dnl Check for pthreads
+dnl We use pthreads when doing ASYNC I/O
+if test "$with_pthreads" = "yes"; then
+    CFLAGS="$CFLAGS -D_REENTRANT"
+    case "$host" in
+    i386-unknown-freebsd*)
+        if test "$GCC" = "yes" ; then
+            if test -z "$PRESET_LDFLAGS"; then
+                LDFLAGS="$LDFLAGS -pthread"
+            fi
+        fi
+    ;;
+    *-solaris2.*)
+        if test "$GCC" = "yes" ; then
+	    CFLAGS="$CFLAGS -pthreads"
+	else
+	    CFLAGS="$CFLAGS -mt"
+        fi
+    ;;
+    esac
+    AC_CHECK_LIB(pthread, main)
+fi
+
+dnl Check for librt
+dnl We use AIO in the coss store
+if test "$with_aio" = "yes"; then
+    AC_CHECK_LIB(rt, aio_read)
+fi
+
+dnl -lintl is needed on SCO version 3.2v4.2 for strftime()
+dnl Robert Side <rside@aiinc.bc.ca>
+dnl Mon, 18 Jan 1999 17:48:00 GMT
+case "$host" in
+	*-pc-sco3.2*)
+		AC_CHECK_LIB(intl, strftime)
+		;;
+esac
+
+dnl LDAP helpers need to know if -llber is needed or not
+AC_CHECK_LIB(lber, main, [LIB_LBER="-llber"])
+AC_SUBST(LIB_LBER)
+
+dnl System-specific library modifications
+dnl
+case "$host" in
+	i386-*-solaris2.*)
+    		if test "$GCC" = "yes"; then
+			echo "Removing -O for gcc on $host"
+			CFLAGS="`echo $CFLAGS | sed -e 's/-O[[0-9]]*//'`"
+		fi
+		;;
+	*-sgi-irix*)
+        	echo "Removing -lsocket for IRIX..."
+        	LIBS=`echo $LIBS | sed -e s/-lsocket//`
+        	echo "Removing -lnsl for IRIX..."
+        	LIBS=`echo $LIBS | sed -e s/-lnsl//`
+		ac_cv_lib_nsl_main=no
+		echo "Removing -lbsd for IRIX..."
+		LIBS=`echo $LIBS | sed -e s/-lbsd//`
+		;;
+dnl From: c0032033@ws.rz.tu-bs.de (Joerg Schumacher)
+dnl Date: Thu, 17 Oct 1996 04:09:30 +0200
+dnl Please change your configure script.  AIX doesn't need -lbsd.
+	*-ibm-aix*)
+		echo "Removing -lbsd for AIX..."
+		LIBS=`echo $LIBS | sed -e s/-lbsd//`
+		case "$host" in
+dnl From: mlaster@metavillage.com (Mike Laster)
+dnl AIX 4.1.4.x does not have header files for snprintf/vsnprintf
+dnl So using the internal versions generates a load of warnings
+dnl during compile.
+			*-ibm-aix4*)
+				echo "disabling snprintf/vsnprintf for $host"
+				ac_cv_func_snprintf=no
+				ac_cv_func_vsnprintf=no
+			;;
+		esac
+		;;
+	*m88k*-openbsd*)
+		;;
+	*m88k*)
+		CFLAGS="$CFLAGS -D_SQUID_MOTOROLA_"
+		AC_DEFINE(GETTIMEOFDAY_NO_TZP)
+		;;
+	[*-*-solaris2.[0-4]])
+		AC_DEFINE(GETTIMEOFDAY_NO_TZP)
+		;;
+	[*-sony-newsos[56]*])
+		AC_DEFINE(GETTIMEOFDAY_NO_TZP)
+		;;
+esac
+
+# Remove optimization for GCC 2.95.[123]
+# gcc -O[2] on *BSD and Linux (x86) causes pointers to magically become NULL
+if test "$GCC" = "yes"; then
+	GCCVER=`$CC -v 2>&1 | awk '$2 ==  "version" {print $3}'`
+	case "$GCCVER" in
+	[2.95.[123]])
+		echo "Removing -O for gcc on $host with GCC $GCCVER"
+		CFLAGS="`echo $CFLAGS | sed -e 's/-O[[0-9]]*//'`"
+		;;
+	esac
+fi
+
+# Recommended by Balint Nagy Endre <bne@CareNet.hu>
+case "$host" in
+	*-univel-sysv4.2MP)
+		if test `uname -v` = "2.03"; then
+			echo "disabling mallinfo for $host"
+			ac_cv_func_mallinfo=no
+		fi
+		;;
+esac
+
+dnl This has to be before AC_CHECK_FUNCS
+# Disable poll() on certain platforms. Override by setting ac_cv_func_poll
+# when running configure.
+if test -z "$ac_cv_func_poll"; then
+	case "$host" in
+		[alpha-dec-osf3.*])
+			# John Kay (jkay@nlanr.net) 19970818
+			echo "disabling poll for $host..."
+			ac_cv_func_poll='no'
+			;;
+		[*-hp-hpux*.*])
+			# Duane Wessels
+			echo "disabling poll for $host..."
+			ac_cv_func_poll='no'
+			;;
+		[*-linux-*])
+			# Henrik Nordstrom (hno@squid-cache.org) 19980817
+			# poll is problematic on Linux.  We disable it
+			# by default until Linux gets it right.
+			# See also bug #932
+			rev=`uname -r | awk -F. '{printf "%03d%03d",$1,$2}'`
+			if test $rev -lt 002004; then
+			    echo "disabling poll for $host < 2.4..."
+			    ac_cv_func_poll='no'
+			fi
+			;;
+		[powerpc-ibm-aix4.1.*])
+			# Mike Laster (mlaster@metavillage.com) 19981021
+			echo "disabling poll for $host..."
+			ac_cv_func_poll='no'
+			;;
+		[*-pc-sco3.2*])
+			# Robert Side <rside@aiinc.bc.ca>
+			# Mon, 18 Jan 1999 17:48:00 GMT
+			echo "disabling poll for $host..."
+			ac_cv_func_poll='no'
+			;;
+	esac
+fi
+
+dnl Check for library functions
+AC_CHECK_FUNCS(\
+	bcopy \
+	backtrace_symbols_fd \
+	crypt \
+	fchmod \
+	getdtablesize \
+	getpagesize \
+	getpass \
+	getrusage \
+	getspnam \
+	lrand48 \
+	mallinfo \
+	mallocblksize \
+	mallopt \
+	memcpy \
+	memmove \
+	memset \
+	mkstemp \
+	mktime \
+	mstats \
+	poll \
+	pthread_attr_setscope \
+	pthread_setschedparam \
+	pthread_attr_setschedparam \
+	pthread_sigmask \
+	putenv \
+	random \
+	regcomp \
+	regexec \
+	regfree \
+	res_init \
+	rint \
+	sbrk \
+	seteuid \
+	setgroups \
+	setpgrp \
+	setrlimit \
+	getrlimit \
+	setsid \
+	sigaction \
+	snprintf \
+	srand48 \
+	srandom \
+	statfs \
+	strnstr \
+	strcasestr \
+	strtoll \
+	sysconf \
+	syslog \
+	timegm \
+	vsnprintf \
+	bswap_16 \
+	bswap_32 \
+)
+
+dnl Yay!  Another Linux brokenness.  Its not good enough
+dnl to know that setresuid() exists, because RedHat 5.0 declares
+dnl setresuid() but doesn't implement it.
+dnl
+AC_CACHE_CHECK(if setresuid is implemented, ac_cv_func_setresuid,
+  AC_TRY_RUN([
+#include <stdlib.h>
+  int main() {
+    if(setresuid(-1,-1,-1)) {
+      perror("setresuid:");
+      exit(1);
+    }
+    exit(0);
+  }
+  ],ac_cv_func_setresuid="yes",ac_cv_func_setresuid="no",ac_cv_func_setresuid="no")
+)
+if test "$ac_cv_func_setresuid" = "yes" ; then
+  AC_DEFINE(HAVE_SETRESUID)
+fi
+
+AM_CONDITIONAL(NEED_OWN_SNPRINTF, false)
+if test "$ac_cv_func_snprintf" = "no" || test "$ac_cv_func_vsnprintf" = "no" ; then
+  AM_CONDITIONAL(NEED_OWN_SNPRINTF, true)
+fi
+
+AM_CONDITIONAL(NEED_OWN_STRNSTR, false)
+if test "$ac_cv_func_strnstr" = "no" || test "$ac_cv_func_vstrnstr" = "no" ; then
+  AM_CONDITIONAL(NEED_OWN_STRNSTR, true)
+fi
+
+AM_CONDITIONAL(NEED_OWN_STRCASESTR, false)
+if test "$ac_cv_func_strcasestr" = "no" || test "$ac_cv_func_vstrcasestr" = "no"; then
+  AM_CONDITIONAL(NEED_OWN_STRCASESTR, true)
+fi
+
+dnl
+dnl Test for va_copy
+dnl
+AC_CACHE_CHECK(if va_copy is implemented, ac_cv_func_va_copy,
+  AC_TRY_RUN([
+      #include <stdarg.h>
+      void f (int i, ...) {
+         va_list args1, args2;
+         va_start (args1, i);
+         va_copy (args2, args1);
+         if (va_arg (args2, int) != 42 || va_arg (args1, int) != 42)
+            exit (1);
+         va_end (args1); va_end (args2);
+      }
+      int main() {
+         f (0, 42);
+         return 0;
+      }
+      ],ac_cv_func_va_copy="yes",ac_cv_func_va_copy="no",ac_cv_func_va_copy="no")
+)
+if test "$ac_cv_func_va_copy" = "yes" ; then
+  AC_DEFINE(HAVE_VA_COPY)
+fi
+
+dnl
+dnl Some systems support __va_copy
+dnl
+AC_CACHE_CHECK(if __va_copy is implemented, ac_cv_func___va_copy,
+  AC_TRY_RUN([
+      #include <stdarg.h>
+      void f (int i, ...) {
+         va_list args1, args2;
+         va_start (args1, i);
+         __va_copy (args2, args1);
+         if (va_arg (args2, int) != 42 || va_arg (args1, int) != 42)
+            exit (1);
+         va_end (args1); va_end (args2);
+      }
+      int main() {
+         f (0, 42);
+         return 0;
+      }
+      ],ac_cv_func___va_copy="yes",ac_cv_func___va_copy="no",ac_cv_func___va_copy="no")
+)
+if test "$ac_cv_func___va_copy" = "yes" ; then
+  AC_DEFINE(HAVE___VA_COPY)
+fi
+
+dnl IP-Filter support requires ipf header files. These aren't
+dnl installed by default, so we need to check for them
+if test "$IPF_TRANSPARENT" ; then
+    AC_MSG_CHECKING(if IP-Filter header files are installed)
+    # hold on to your hats...
+    if test "$ac_cv_header_ip_compat_h" = "yes" ||
+        test "$ac_cv_header_ip_fil_compat_h" = "yes" ||
+        test "$ac_cv_header_netinet_ip_compat_h" = "yes" ||
+        test "$ac_cv_header_netinet_ip_fil_compat_h" = "yes" ; then
+        have_ipfilter_compat_header="yes"
+     fi
+     if test "x$have_ipfilter_compat_header" = "xyes" &&
+       test "$ac_cv_header_ip_fil_h" = "yes" &&
+       test "$ac_cv_header_ip_nat_h" = "yes" ; then
+        IPF_TRANSPARENT="yes"
+        AC_DEFINE(IPF_TRANSPARENT, 1)
+    elif test "$have_ipfilter_compat_header" = "yes" &&
+         test "$ac_cv_header_netinet_ip_fil_h" = "yes" &&
+         test "$ac_cv_header_netinet_ip_nat_h" = "yes" ; then
+        IPF_TRANSPARENT="yes"
+        AC_DEFINE(IPF_TRANSPARENT, 1)
+    else
+        IPF_TRANSPARENT="no"
+        AC_DEFINE(IPF_TRANSPARENT, 0)
+    fi
+    AC_MSG_RESULT($IPF_TRANSPARENT)
+fi 
+if test "$IPF_TRANSPARENT" = "no" ; then
+    echo "WARNING: Cannot find necessary IP-Filter header files"
+    echo "         Transparent Proxy support WILL NOT be enabled"
+    sleep 10
+fi
+
+dnl PF support requires a header file.
+if test "$PF_TRANSPARENT" ; then
+    AC_MSG_CHECKING(if PF header file is installed)
+    # hold on to your hats...
+    if test "$ac_cv_header_net_pfvar_h" = "yes"; then
+        PF_TRANSPARENT="yes"
+        AC_DEFINE(PF_TRANSPARENT, 1)
+    else
+        PF_TRANSPARENT="no"
+        AC_DEFINE(PF_TRANSPARENT, 0)
+    fi
+    AC_MSG_RESULT($PF_TRANSPARENT)
+fi
+if test "$PF_TRANSPARENT" = "no" ; then
+    echo "WARNING: Cannot find necessary PF header file"
+    echo "         Transparent Proxy support WILL NOT be enabled"
+    sleep 10
+fi
+
+dnl Linux-Netfilter support requires Linux 2.4 kernel header files.
+dnl Shamelessly copied from above
+if test "$LINUX_NETFILTER" ; then
+    AC_MSG_CHECKING(if Linux 2.4 kernel header files are installed)
+    # hold on to your hats...
+    if test "$ac_cv_header_linux_netfilter_ipv4_h" = "yes"; then
+        LINUX_NETFILTER="yes"
+        AC_DEFINE(LINUX_NETFILTER, 1)
+    else
+        LINUX_NETFILTER="no"
+        AC_DEFINE(LINUX_NETFILTER, 0)
+    fi
+    AC_MSG_RESULT($LINUX_NETFILTER)
+fi 
+if test "$LINUX_NETFILTER" = "no" ; then
+    echo "WARNING: Cannot find necessary Linux 2.4 kernel header files"
+    echo "         Linux 2.4 Transparent Proxy support WILL NOT be enabled"
+    sleep 10
+fi
+
+if test -z "$USE_GNUREGEX" ; then
+    case "$host" in
+    *-sun-solaris2.[[0-4]])
+	  USE_GNUREGEX="yes"
+	  ;;
+    *-next-nextstep*)
+	  USE_GNUREGEX="yes"
+	  ;;
+    esac
+fi
+AC_MSG_CHECKING(if GNUregex needs to be compiled)
+if test -z "$USE_GNUREGEX"; then
+if test "$ac_cv_func_regcomp" = "no" || test "$USE_GNUREGEX" = "yes" ; then
+	USE_GNUREGEX="yes"
+else
+	AC_TRY_COMPILE([#include <sys/types.h>
+#include <regex.h>],[regex_t t; regcomp(&t,"",0);],
+		USE_GNUREGEX="no",
+		USE_GNUREGEX="yes")
+fi
+fi
+AC_MSG_RESULT($USE_GNUREGEX)
+if test "$USE_GNUREGEX" = "yes"; then
+	REGEXLIB="-lregex"
+	LIBREGEX="libregex.a"
+	AC_DEFINE(USE_GNUREGEX)
+fi
+AC_SUBST(REGEXLIB)
+AC_SUBST(LIBREGEX)
+
+AC_REPLACE_FUNCS(\
+	drand48 \
+	tempnam \
+	strerror \
+	initgroups
+)
+
+dnl Not cached since people are likely to tune this
+AC_MSG_CHECKING(Default FD_SETSIZE value)
+AC_TRY_RUN([
+#if HAVE_STDIO_H
+#include <stdio.h>
+#endif
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#if HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+#if HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+main() {
+	FILE *fp = fopen("conftestval", "w");
+	fprintf (fp, "%d\n", FD_SETSIZE);
+	exit(0);
+}
+],
+DEFAULT_FD_SETSIZE=`cat conftestval`,
+DEFAULT_FD_SETSIZE=256,
+DEFAULT_FD_SETSIZE=256)
+AC_MSG_RESULT($DEFAULT_FD_SETSIZE)
+AC_DEFINE_UNQUOTED(DEFAULT_FD_SETSIZE, $DEFAULT_FD_SETSIZE)
+
+AC_ARG_WITH(maxfd,
+[  --with-maxfd=N          Override maximum number of filedescriptors. Useful
+			  if you build as another user who is not privileged
+			  to use the number of filedescriptors you want the
+			  resulting binary to support],
+[ case $withval in
+  [[0-9]]*)
+    SQUID_MAXFD=$withval
+    echo "Maximum filedescriptors set to $SQUID_MAXFD"
+    ;;
+  *)
+    echo "ERROR: Invalid --with-maxfd argument"
+    exit 1
+    ;;
+  esac
+])
+if test -z "$SQUID_MAXFD"; then
+
+dnl Not cached since people are likely to tune this
+AC_MSG_CHECKING(Maximum number of filedescriptors we can open)
+dnl damn! FreeBSD's pthreads breaks dup2().
+TLDFLAGS="$LDFLAGS"
+case $host in
+i386-unknown-freebsd*)
+    if echo "$LDFLAGS" | grep -q pthread; then
+	LDFLAGS=`echo $LDFLAGS | sed -e "s/-pthread//"`
+    fi
+esac
+AC_TRY_RUN([
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/time.h>	/* needed on FreeBSD */
+#include <sys/param.h>
+#include <sys/resource.h>
+main() {
+	FILE *fp;
+	int i,j;
+#if defined(__CYGWIN32__) || defined (__CYGWIN__)
+    /* getrlimit and sysconf returns bogous values on cygwin32.
+     * Number of fds is virtually unlimited in cygwin (sys/param.h)
+     * __CYGWIN32__ is deprecated.
+     */
+    i = NOFILE;
+#else
+#if HAVE_SETRLIMIT
+    struct rlimit rl;
+#if defined(RLIMIT_NOFILE)
+    if (getrlimit(RLIMIT_NOFILE, &rl) < 0) {
+        perror("getrlimit: RLIMIT_NOFILE");
+    } else {
+        rl.rlim_cur = rl.rlim_max;      /* set it to the max */
+        if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
+            perror("setrlimit: RLIMIT_NOFILE");
+        }
+    }
+#elif defined(RLIMIT_OFILE)
+    if (getrlimit(RLIMIT_OFILE, &rl) < 0) {
+        perror("getrlimit: RLIMIT_OFILE");
+    } else {
+        rl.rlim_cur = rl.rlim_max;      /* set it to the max */
+        if (setrlimit(RLIMIT_OFILE, &rl) < 0) {
+            perror("setrlimit: RLIMIT_OFILE");
+        }
+    }
+#endif /* RLIMIT_NOFILE */
+#endif /* HAVE_SETRLIMIT */
+	/* by starting at 2^14, we will never get higher
+	than 2^15 for SQUID_MAXFD */
+        i = j = 1<<14;
+        while (j) {
+                j >>= 1;
+                if (dup2(0, i) < 0) { 
+                        i -= j;
+                } else {
+                        close(i);
+                        i += j;
+                }
+        }
+        i++;
+#endif /* IF !DEF CYGWIN */
+	fp = fopen("conftestval", "w");
+	fprintf (fp, "%d\n", i & ~0x3F);
+	exit(0);
+}
+],
+SQUID_MAXFD=`cat conftestval`,
+SQUID_MAXFD=256,
+SQUID_MAXFD=256)
+AC_MSG_RESULT($SQUID_MAXFD)
+fi # --with-maxfd SQUID_MAXFD
+AC_DEFINE_UNQUOTED(SQUID_MAXFD, $SQUID_MAXFD)
+if test "$SQUID_MAXFD" -lt 512 ; then
+    echo "WARNING: $SQUID_MAXFD may not be enough filedescriptors if your"
+    echo "         cache will be very busy.  Please see the FAQ page"
+    echo "         http://www.squid-cache.org/FAQ/FAQ-11.html#filedescriptors"
+    echo "         on how to increase your filedescriptor limit"
+    sleep 10
+fi
+LDFLAGS="$TLDFLAGS"
+
+dnl Not cached since people are likely to tune this
+AC_MSG_CHECKING(Default UDP send buffer size)
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+main ()
+{
+	FILE *fp;
+        int fd,val=0,len=sizeof(int);
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) exit(1);
+        if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &val, &len) < 0) exit(1);
+	if (val<=0) exit(1);
+        fp = fopen("conftestval", "w");
+        fprintf (fp, "%d\n", val);
+	exit(0);
+}
+],
+SQUID_UDP_SO_SNDBUF=`cat conftestval`,
+SQUID_UDP_SO_SNDBUF=16384,
+SQUID_UDP_SO_SNDBUF=16384)
+AC_MSG_RESULT($SQUID_UDP_SO_SNDBUF)
+AC_DEFINE_UNQUOTED(SQUID_UDP_SO_SNDBUF, $SQUID_UDP_SO_SNDBUF)
+
+dnl Not cached since people are likely to tune this
+AC_MSG_CHECKING(Default UDP receive buffer size)
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+main ()
+{
+	FILE *fp;
+        int fd,val=0,len=sizeof(int);
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) exit(1);
+        if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &val, &len) < 0) exit(1);
+	if (val <= 0) exit(1);
+	fp = fopen("conftestval", "w"); 
+	fprintf (fp, "%d\n", val);
+	exit(0);
+}
+],
+SQUID_UDP_SO_RCVBUF=`cat conftestval`,
+SQUID_UDP_SO_RCVBUF=16384,
+SQUID_UDP_SO_RCVBUF=16384)
+AC_MSG_RESULT($SQUID_UDP_SO_RCVBUF)
+AC_DEFINE_UNQUOTED(SQUID_UDP_SO_RCVBUF, $SQUID_UDP_SO_RCVBUF)
+
+dnl Not cached since people are likely to tune this
+AC_MSG_CHECKING(Default TCP send buffer size)
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+main ()
+{
+	FILE *fp;
+        int fd,val=0,len=sizeof(int);
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) exit(1);
+        if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &val, &len) < 0) exit(1);
+	if (val <= 0) exit(1);
+	fp = fopen("conftestval", "w"); 
+	fprintf (fp, "%d\n", val);
+	exit(0);
+}
+],
+SQUID_TCP_SO_SNDBUF=`cat conftestval`,
+SQUID_TCP_SO_SNDBUF=16384,
+SQUID_TCP_SO_SNDBUF=16384)
+AC_MSG_RESULT($SQUID_TCP_SO_SNDBUF)
+if test $SQUID_TCP_SO_SNDBUF -gt 32768; then
+    echo "Limiting send buffer size to 32K"
+    SQUID_TCP_SO_SNDBUF=32768
+fi
+AC_DEFINE_UNQUOTED(SQUID_TCP_SO_SNDBUF, $SQUID_TCP_SO_SNDBUF)
+
+dnl Not cached since people are likely to tune this
+AC_MSG_CHECKING(Default TCP receive buffer size)
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+main ()
+{
+	FILE *fp;
+        int fd,val=0,len=sizeof(int);
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) exit(1);
+        if (getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &val, &len) < 0) exit(1);
+	if (val <= 0) exit(1);
+	fp = fopen("conftestval", "w"); 
+	fprintf (fp, "%d\n", val);
+	exit(0);
+}
+],
+SQUID_TCP_SO_RCVBUF=`cat conftestval`,
+SQUID_TCP_SO_RCVBUF=16384,
+SQUID_TCP_SO_RCVBUF=16384)
+AC_MSG_RESULT($SQUID_TCP_SO_RCVBUF)
+if test $SQUID_TCP_SO_RCVBUF -gt 65535; then
+    echo "Limiting receive buffer size to 64K"
+    SQUID_TCP_SO_RCVBUF=65535
+fi
+AC_DEFINE_UNQUOTED(SQUID_TCP_SO_RCVBUF, $SQUID_TCP_SO_RCVBUF)
+AC_CACHE_CHECK(if sys_errlist is already defined, ac_cv_needs_sys_errlist,
+  AC_TRY_COMPILE([#include <stdio.h>],[char *s = sys_errlist;],
+    ac_cv_needs_sys_errlist="no",
+    ac_cv_needs_sys_errlist="yes")
+)
+if test "$ac_cv_needs_sys_errlist" = "yes" ; then
+  AC_DEFINE(NEED_SYS_ERRLIST)
+fi
+
+dnl Not cached since people are likely to change this
+AC_MSG_CHECKING(for libresolv _dns_ttl_ hack)
+AC_TRY_LINK(extern int _dns_ttl_;,return _dns_ttl_;,
+[AC_MSG_RESULT(yes)
+AC_DEFINE(LIBRESOLV_DNS_TTL_HACK)],
+AC_MSG_RESULT(no))
+
+dnl AC_MSG_CHECKING(if inet_ntoa() actually works)
+dnl AC_TRY_RUN([
+dnl #include <stdlib.h>
+dnl #include <stdio.h>
+dnl #include <sys/types.h>
+dnl #include <netinet/in.h>
+dnl #include <arpa/inet.h>
+dnl main ()
+dnl {
+dnl 	FILE *fp;
+dnl 	struct in_addr in;
+dnl 	in.s_addr = inet_addr("1.2.3.4");
+dnl 	fp = fopen("conftestval", "w"); 
+dnl 	fprintf (fp, "%s\n", inet_ntoa(in));
+dnl 	exit(0);
+dnl }
+dnl ],
+dnl INET_NTOA_RESULT=`cat conftestval`,
+dnl INET_NTOA_RESULT="broken",
+dnl INET_NTOA_RESULT="broken")
+dnl if test "$INET_NTOA_RESULT" = "1.2.3.4" ; then
+dnl 	AC_MSG_RESULT("yes")
+dnl else
+dnl 	AC_MSG_RESULT("no")
+dnl 	echo "Will use our own inet_ntoa()."
+dnl 	LIBOBJS="$LIBOBJS inet_ntoa.o"
+dnl #	echo "WARNING: This looks bad, and probably prevents Squid from working."
+dnl #	echo "         If you're on IRIX and using GCC 2.8, you probably need"
+dnl #	echo "         to use the IRIX C compiler instead."
+dnl #	sleep 10
+dnl fi
+
+if test "$ac_cv_header_sys_statvfs_h" = "yes" ; then
+AC_MSG_CHECKING(for working statvfs() interface)
+AC_TRY_COMPILE([
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/statvfs.h>
+],
+[
+struct statvfs sfs;
+sfs.f_blocks = sfs.f_bfree = sfs.f_frsize = 
+sfs.f_files = sfs.f_ffree = 0;
+statvfs("/tmp", &sfs);
+],
+  ac_cv_func_statvfs=yes,
+  ac_cv_func_statvfs=no)
+AC_MSG_RESULT($ac_cv_func_statvfs)
+if test "$ac_cv_func_statvfs" = "yes" ; then
+  AC_DEFINE(HAVE_STATVFS)
+fi
+fi
+
+AC_CACHE_CHECK(for _res.nsaddr_list, ac_cv_have_res_nsaddr_list,
+AC_TRY_COMPILE([
+#if HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#if HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#if HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+#if HAVE_ARPA_NAMESER_H
+#include <arpa/nameser.h>
+#endif
+#if HAVE_RESOLV_H
+#include <resolv.h>
+#endif
+],
+[_res.nsaddr_list[[0]];],
+ac_cv_have_res_nsaddr_list="yes",
+ac_cv_have_res_nsaddr_list="no"))
+if test $ac_cv_have_res_nsaddr_list = "yes" ; then
+  AC_DEFINE(HAVE_RES_NSADDR_LIST)
+fi
+
+if test $ac_cv_have_res_nsaddr_list = "no" ; then
+AC_CACHE_CHECK(for _res.ns_list, ac_cv_have_res_ns_list,
+AC_TRY_COMPILE([
+#if HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#if HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#if HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+#if HAVE_ARPA_NAMESER_H
+#include <arpa/nameser.h>
+#endif
+#if HAVE_RESOLV_H
+#include <resolv.h>
+#endif
+],
+[_res.ns_list[[0]].addr;],
+ac_cv_have_res_ns_list="yes",
+ac_cv_have_res_ns_list="no"))
+if test $ac_cv_have_res_ns_list = "yes" ; then
+  AC_DEFINE(HAVE_RES_NS_LIST)
+fi
+fi
+
+dnl Need the debugging version of malloc if available
+XTRA_OBJS=''
+if test "$ac_cv_lib_malloc_main" = "yes" ; then
+	if test -r /usr/lib/debug/malloc.o ; then
+		XTRA_OBJS="$XTRA_OBJS /usr/lib/debug/malloc.o"
+	fi
+	if test -r /usr/lib/debug/mallocmap.o ; then
+		XTRA_OBJS="$XTRA_OBJS /usr/lib/debug/mallocmap.o"
+	fi
+fi
+
+AC_SUBST(XTRA_OBJS)
+
+if test -z "$XTRA_LIBS"; then
+	XTRA_LIBS="$LIBS"
+	dnl minor cleanup
+	XTRA_LIBS=`echo $XTRA_LIBS | sed -e "s/  */ /g"`
+	LIBS=''
+fi
+AC_SUBST(XTRA_LIBS)
+
+dnl Clean up after OSF/1 core dump bug
+rm -f core 
+
+dnl FS_MAKEFILES=""
+dnl for fs in $STORE_MODULES none; do
+dnl 	if test $fs != none; then
+dnl	    FS_MAKEFILES="$FS_MAKEFILES ./src/fs/$fs/Makefile"
+dnl 	fi
+dnl done
+dnl REPL_MAKEFILES=""
+dnl for repl in $REPL_POLICIES none; do
+dnl 	if test $repl != none; then
+dnl 	    REPL_MAKEFILES="$REPL_MAKEFILES ./src/repl/$repl/Makefile"
+dnl 	fi
+dnl done
+
+dnl This could actually be used to find all the Makefiles..
+dnl One of Automake's limitations is that it needs to know all the created makefiles.
+dnl AUTH_MAKEFILES=""
+dnl for auth in `find $srcdir/src/auth -type d -print`; do
+dnl 	if test -f $auth/Makefile.in; then
+dnl	    dir=`echo $auth | sed -e "s|^$srcdir/||"`
+dnl            AUTH_MAKEFILES="$AUTH_MAKEFILES ./$dir/Makefile"
+dnl	fi
+dnl done
+
+
+dnl     src/fs/aufs/Makefile \
+dnl     src/fs/coss/Makefile \
+dnl     src/fs/diskd/Makefile \
+dnl     src/fs/null/Makefile \
+dnl     src/fs/ufs/Makefile \
+dnl     src/repl/heap/Makefile \
+dnl     src/repl/lru/Makefile \
+AC_OUTPUT([\
+	Makefile \
+	lib/Makefile \
+	scripts/Makefile \
+	scripts/RunCache \
+	scripts/RunAccel \
+	src/Makefile \
+	src/fs/Makefile \
+	src/repl/Makefile \
+	src/auth/Makefile \
+	src/auth/basic/Makefile \
+	src/auth/digest/Makefile \
+	src/auth/ntlm/Makefile \
+	contrib/Makefile \
+	snmplib/Makefile \
+	icons/Makefile \
+	errors/Makefile \
+	src/fs/aufs/Makefile \
+	src/fs/coss/Makefile \
+	src/fs/diskd/Makefile \
+	src/fs/null/Makefile \
+	src/fs/ufs/Makefile \
+	src/repl/heap/Makefile \
+	src/repl/lru/Makefile \
+	doc/Makefile \
+	helpers/Makefile \
+	helpers/basic_auth/Makefile \
+	helpers/basic_auth/LDAP/Makefile \
+	helpers/basic_auth/MSNT/Makefile \
+	helpers/basic_auth/NCSA/Makefile \
+	helpers/basic_auth/PAM/Makefile \
+	helpers/basic_auth/SMB/Makefile \
+	helpers/basic_auth/YP/Makefile \
+	helpers/basic_auth/getpwnam/Makefile \
+	helpers/basic_auth/multi-domain-NTLM/Makefile \
+	helpers/basic_auth/SASL/Makefile \
+	helpers/basic_auth/winbind/Makefile \
+	helpers/digest_auth/Makefile \
+	helpers/digest_auth/password/Makefile \
+	helpers/ntlm_auth/Makefile \
+	helpers/ntlm_auth/fakeauth/Makefile \
+	helpers/ntlm_auth/no_check/Makefile \
+	helpers/ntlm_auth/SMB/Makefile \
+	helpers/ntlm_auth/SMB/smbval/Makefile \
+	helpers/ntlm_auth/winbind/Makefile \
+	helpers/external_acl/Makefile \
+	helpers/external_acl/ip_user/Makefile \
+	helpers/external_acl/ldap_group/Makefile \
+	helpers/external_acl/unix_group/Makefile \
+	helpers/external_acl/wbinfo_group/Makefile \
+	helpers/external_acl/winbind_group/Makefile \
+])

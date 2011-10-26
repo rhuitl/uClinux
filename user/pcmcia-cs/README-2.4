@@ -1,0 +1,159 @@
+
+		Notes about PCMCIA in the 2.4 kernel
+
+PCMCIA kernel driver support is now included in the 2.4 linux kernel
+tree.  While it shares most of the same code with the standalone
+PCMCIA driver package, there are some important differences.  The
+kernel PCMCIA support is also still evolving.  This README is up to
+date as of the 2.4test9-pre* kernels.
+
+The kernel PCMCIA code has the same functionality as the driver side
+of the pcmcia-cs package.  It does not eliminate the need to install
+the pcmcia-cs package, since it requires the same user tools (cardmgr,
+cardctl, /etc/pcmcia/* files).  For now, the drivers in pcmcia-cs can
+still be built for 2.4 kernels, so you have a choice of using either
+the in-kernel PCMCIA drivers, or the drivers included in pcmcia-cs.
+
+To use the kernel PCMCIA drivers, configure the kernel with
+CONFIG_PCMCIA ("CardBus support") enabled.  In this case, "CardBus"
+really refers to the type of host bridge supported: both 16-bit and
+CardBus card support is included.  The drivers can either be built
+into the kernel or built as modules.  For now, only PCI-to-CardBus
+bridges are supported, so there are no options for choosing bridge
+drivers.  PCMCIA client driver options are listed in their regular
+driver categories; thus, PCMCIA network drivers are in a submenu of
+network drivers, and PCMCIA serial drivers are in a submenu of
+character drivers.
+
+The CardBus socket driver in the 2.4 tree is the "yenta_socket"
+driver.  In your PCMCIA startup options, this driver should be
+specified in place of the old i82365 driver.
+
+When compiling the standalone PCMCIA package, the Configure script
+decides whether or not to build any kernel modules by looking at the
+value of the CONFIG_PCMCIA option in your kernel configuration.  If
+CONFIG_PCMCIA is enabled, then no driver components are built.  If
+CONFIG_PCMCIA is disabled, then all the modules will be built and
+installed.  It is safe to compile the user tools (cardmgr, cardctl,
+etc) in a PCMCIA package whose version number differs from the PCMCIA
+version number in the kernel source tree.  The kernel PCMCIA header
+files take precedence over the ones included in the PCMCIA package, if
+CONFIG_PCMCIA is enabled.
+
+The following tables show the correspondence between PCMCIA client
+driver names, and kernel configuration options.
+
+Network drivers:
+
+  3c589_cs     3Com 3c589                CONFIG_PCMCIA_3C589
+  3c574_cs     3Com 3c574                CONFIG_PCMCIA_3C574
+  fmvj18x_cs   Fujitsu FMV-J18x          CONFIG_PCMCIA_FMVJ18X
+  pcnet_cs     NE2000 compatible         CONFIG_PCMCIA_PCNET
+  nmclan_cs    New Media                 CONFIG_PCMCIA_NMCLAN
+  smc91c92_cs  SMC 91Cxx                 CONFIG_PCMCIA_SMC91C92
+  xirc2ps_cs   Xircom 16-bit             CONFIG_PCMCIA_XIRC2PS
+  ibmtr_cs     IBM PCMCIA tokenring      CONFIG_PCMCIA_IBMTR
+  ray_cs       Aviator/Raytheon 2.4MHz   CONFIG_PCMCIA_RAYCS
+  netwave_cs   Xircom Netwave AirSurfer  CONFIG_PCMCIA_NETWAVE
+  wavelan_cs   AT&T/Lucent Wavelan       CONFIG_PCMCIA_WAVELAN
+
+Character drivers:
+
+  serial_cs    PCMCIA serial device      CONFIG_PCMCIA_SERIAL_CS
+  serial_cb    CardBus serial device     CONFIG_PCMCIA_SERIAL_CB
+
+SCSI low-level drivers:
+
+  aha152x_cs   Adaptec AHA152X           CONFIG_PCMCIA_AHA152X
+  qlogic_cs    Qlogic                    CONFIG_PCMCIA_QLOGIC
+  fdomain_cs   Future Domain             CONFIG_PCMCIA_FDOMAIN
+  apa1480_cb   Adaptec APA1480 CardBus   CONFIG_PCMCIA_APA1480
+
+Other drivers:
+  ide_cs       ATA/IDE devices           CONFIG_BLK_DEV_IDECS
+
+The CardBus network drivers (3c575_cb, tulip_cb, epic_cb) have been
+folded into the corresponding PCI drivers using the new "hot plug PCI"
+interface.  The tulip_cb driver has been partially merged into the
+tulip driver ('DECchip Tulip (dc21x4x)', CONFIG_TULIP).  Xircom
+CardBus cards are supported by a separate driver ('Xircom Tulip-like
+CardBus', CONFIG_PCMCIA_XIRTULIP).  The 3c575_cb driver is merged into
+the 3c59x driver ('3C590/3c900 series (592/595/597) "Vortex/Boomerang"
+support', CONFIG_VORTEX).  And the epic_cb driver has been folded into
+the epic100 driver ('SMC EtherPower II', CONFIG_EPIC100).  These
+drivers are not managed by cardmgr; they are managed by the "hotplug"
+subsystem.  See http://linux-hotplug.sourceforge.net for information
+about this new facility.
+
+Known problems and limitations:
+
+o Someone changed the name of the "ide_cs" driver in the 2.4 tree to
+  "ide-cs".  To deal with this annoyance, edit /etc/pcmcia/config and
+  change every instance of "ide_cs" to "ide-cs".  Yes this means that
+  the same config file won't work for 2.2 kernels.  No you cannot just
+  rename the module or add an alias to /etc/modules.conf; the string
+  is also embedded in the module.
+o Some of the less widely used client drivers, like the memory card
+  drivers, have not been ported into the 2.4 driver tree yet.
+o The yenta_socket driver does not have the /proc interface of the
+  i82365 driver, so the dump_exca and dump_cardbus tools do not work.
+  It actually has no debugging support at all.
+o The kernel PCMCIA package cannot be configured to use PnP BIOS calls
+  for resource management.  This will not be fixed, but is rarely a
+  serious issue.
+o With the introduction of the Hot Plug PCI subsystem, some CardBus
+  drivers now no longer act like other PCMCIA drivers; most obviously,
+  they don't interact with the PCMCIA device configuration scripts.
+  These devices are configured using the "hotplug" scripts.
+
+Answers to some common questions:
+
+Q: Are these two versions of PCMCIA both going to continue with active
+   development?
+A: The way I see things now, the kernel PCMCIA subsystem will probably
+   be too unstable for widespread deployment, at least in the early
+   days of 2.4.  So the standalone package will probably be widely
+   used for some time yet.  However, the kernel PCMCIA subsystem
+   should eventually stabilize and be the focus of new development.
+   I expect that development for the standalone kernel modules will
+   shift away from adding functionality, towards mainly bug fixes.
+
+Q: Which should I use / which is better?  The kernel PCMCIA, or the
+   standalone PCMCIA?
+A: It really depends.  The client drivers should generally behave the
+   same.  Some of the internals of the kernel PCMCIA system are very
+   different and less mature than the standalone drivers.  Some legacy
+   hardware is currently only supported by the standalone drivers.  At
+   this point, I'd recommend using the kernel drivers if you have a
+   specific need or if you are interested in helping test and debug.
+   If you mainly just want something that works, then the standalone
+   subsystem is probably a better bet at the moment.
+
+Q: What should I do as a driver developer?
+A: Again it really depends.  I will probably be really picky about
+   including significant new functionality in the standalone PCMCIA
+   package; I expect that the kernel PCMCIA package will stabilize and
+   take over perhaps in the 2.5 kernel timeframe.  It might make the
+   most sense to develop contributed drivers for the standalone
+   package first because it is a stable platform; and then port to
+   2.4.
+
+Q: I'm using the kernel PCMCIA subsystem but want to use a driver that
+   isn't included in the kernel yet.  Why can't I compile that driver
+   from the standalone PCMCIA package?
+A: The Makefiles are set up to discourage this, mainly to prevent
+   people from trying combinations that don't make sense.  Things in
+   the "modules" directory of the standalone package will not work
+   with the kernel PCMCIA subsystem.  However, you can build client
+   drivers by doing a "make" in either the "clients" or "wireless"
+   subdirectories.
+
+Q: Who is maintaining the kernel PCMCIA subsystem?
+A: I am not playing as central a role in maintaining the kernel
+   modules as I have with the standalone package.  I have periodically
+   updated some of the core modules and client drivers with fixes from
+   the standalone package.  Linus Torvalds wrote the yenta_socket
+   driver more or less from scratch and he has been maintaining that
+   bit.  Jeff Garzik has been working on the hot plug PCI adaptations
+   for the tulip_cb, 3c575_cb, and epic_cb drivers.
+

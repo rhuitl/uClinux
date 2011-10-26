@@ -1,0 +1,93 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+include $(top_srcdir)libc/stdlib/malloc/Makefile.in
+include $(top_srcdir)libc/stdlib/malloc-simple/Makefile.in
+include $(top_srcdir)libc/stdlib/malloc-standard/Makefile.in
+
+CSRC := \
+	abort.c getenv.c mkdtemp.c mktemp.c realpath.c mkstemp.c \
+	rand.c random.c random_r.c setenv.c system.c div.c ldiv.c lldiv.c \
+	getpt.c ptsname.c grantpt.c unlockpt.c drand48-iter.c jrand48.c \
+	jrand48_r.c lrand48.c lrand48_r.c mrand48.c mrand48_r.c nrand48.c \
+	nrand48_r.c rand_r.c srand48.c srand48_r.c seed48.c seed48_r.c \
+	valloc.c posix_memalign.c a64l.c l64a.c
+ifeq ($(UCLIBC_HAS_ARC4RANDOM),y)
+CSRC += arc4random.c
+endif
+ifeq ($(UCLIBC_HAS_LFS),y)
+CSRC += mkstemp64.c
+endif
+ifeq ($(UCLIBC_HAS_FLOATS),y)
+CSRC += drand48.c drand48_r.c erand48.c erand48_r.c
+ifeq ($(UCLIBC_SUSV3_LEGACY),y)
+CSRC += gcvt.c
+endif
+endif
+
+# multi source stdlib.c
+CSRC +=	abs.c labs.c atoi.c atol.c strtol.c strtoul.c _stdlib_strto_l.c \
+	qsort.c bsearch.c \
+	llabs.c atoll.c strtoll.c strtoull.c _stdlib_strto_ll.c
+# (aliases) strtoq.o strtouq.o
+ifeq ($(UCLIBC_HAS_FLOATS),y)
+CSRC += atof.c
+endif
+ifeq ($(UCLIBC_HAS_XLOCALE),y)
+CSRC += strtol_l.c strtoul_l.c _stdlib_strto_l_l.c \
+	strtoll_l.c strtoull_l.c _stdlib_strto_ll_l.c
+endif
+ifeq ($(UCLIBC_HAS_WCHAR),y)
+CSRC +=	mblen.c mbtowc.c wctomb.c mbstowcs.c wcstombs.c \
+	_stdlib_mb_cur_max.c _stdlib_wcsto_l.c _stdlib_wcsto_ll.c \
+	wcstol.c wcstoul.c wcstoll.c wcstoull.c
+ifeq ($(UCLIBC_HAS_XLOCALE),y)
+CSRC +=_stdlib_wcsto_l_l.c _stdlib_wcsto_ll_l.c \
+	wcstol_l.c wcstoul_l.c wcstoll_l.c wcstoull_l.c
+endif
+endif
+
+# multi source _strtod.c
+ifeq ($(UCLIBC_HAS_FLOATS),y)
+CSRC += strtod.c strtof.c strtold.c __strtofpmax.c __fp_range_check.c
+ifeq ($(UCLIBC_HAS_XLOCALE),y)
+CSRC += strtod_l.c strtof_l.c strtold_l.c __strtofpmax_l.c
+endif
+ifeq ($(UCLIBC_HAS_WCHAR),y)
+CSRC += wcstod.c wcstof.c wcstold.c __wcstofpmax.c
+ifeq ($(UCLIBC_HAS_XLOCALE),y)
+CSRC += wcstod_l.c wcstof_l.c wcstold_l.c __wcstofpmax_l.c
+endif
+endif
+endif
+# (aliases) wcstoq.o wcstouq.o
+# wcstod wcstof wcstold
+
+# multi source _atexit.c
+CSRC += __cxa_atexit.c __cxa_finalize.c __exit_handler.c exit.c on_exit.c
+ifeq ($(COMPAT_ATEXIT),y)
+CSRC += old_atexit.c
+endif
+
+STDLIB_DIR := $(top_srcdir)libc/stdlib
+STDLIB_OUT := $(top_builddir)libc/stdlib
+
+STDLIB_SRC := $(patsubst %.c,$(STDLIB_DIR)/%.c,$(CSRC))
+STDLIB_OBJ := $(patsubst %.c,$(STDLIB_OUT)/%.o,$(CSRC))
+
+libc-y += $(STDLIB_OBJ)
+libc-static-y += $(STDLIB_OUT)/atexit.o
+# this should always be the PIC version, because it could be used in shared libs
+libc-nonshared-y += $(STDLIB_OUT)/atexit.os
+
+libc-nomulti-y += $(STDLIB_OUT)/labs.o $(STDLIB_OUT)/atol.o $(STDLIB_OUT)/_stdlib_strto_l.o $(STDLIB_OUT)/_stdlib_strto_ll.o
+libc-nomulti-$(UCLIBC_HAS_XLOCALE) += $(STDLIB_OUT)/_stdlib_strto_l_l.o $(STDLIB_OUT)/_stdlib_strto_ll_l.o
+
+objclean-y += stdlib_objclean
+
+stdlib_objclean:
+	$(RM) $(STDLIB_OUT)/*.{o,os,oS}

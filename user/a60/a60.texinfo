@@ -1,0 +1,638 @@
+\input texinfo  @c -*-texinfo-*-
+
+@ifinfo
+ This file documents the use (and the internals) of the NASE A60
+ interpreter.
+
+ Copyright (C) 1991,1992 Erik Schoenfelder (schoenfr@ibr.cs.tu-bs.de)
+
+ This file is part of NASE A60.
+
+ NASE A60 is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2, or (at your option)
+ any later version.
+
+ Permission is granted to make and distribute verbatim copies of
+ this manual provided the copyright notice and this permission notice
+ are preserved on all copies.
+
+ You should have received a copy of the GNU General Public License
+ along with NASE A60; see the file COPYING.  If not, write to the Free
+ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+
+@end ifinfo
+
+@c
+@c a60.texinfo:						dec 1990
+@c
+@c This file documents the Algol60 interpreter NASE A60.
+@c Run it through texinfo-format-buffer within GNU Emacs for an info-file.
+@c Run it through tex for an DVI printable file.
+@c 
+
+
+@settitle Algol 60
+@setfilename a60.info
+
+@c @setchapternewpage odd
+
+@titlepage
+@center @titlefont{Algol 60 Interpreter}
+@sp 1
+@center @titlefont{NASE A60}
+@sp 2
+@center Erik Sch@"o{}nfelder
+@sp 3
+@center last updated Feb 1992
+@sp 1
+@center for Version 0.16
+@c @page
+@vskip 0pt plus 1fill
+Copyright @copyright{} 1991,1992 Erik Sch@"o{}nfelder
+
+@end titlepage
+@page
+
+@ifinfo
+@node Top, Goal, References, (dir)
+@ichapter Introduction
+
+This manual documents how to run, install and use the Algol 60
+Interpreter.
+
+@end ifinfo
+@menu
+* Goal::                The goal of the Interpreter.
+* Install::             About the installation of @samp{a60}.
+* Options::             Command line options supported by @samp{a60}.
+* Implementation::      About the implementation.
+* Examples::            Examples.
+* Error messages::      Parser and Runtime Messages.
+* Bugs::                Known Bugs and more.
+* References::          Bibliography and References.
+@end menu
+
+
+@node Goal, Install, Top, Top
+@chapter The Goal of the Interpreter
+
+
+This Algol 60 interpreter is based upon the ``Revised Report on the
+Algorithmic Language Algol 60'' [RRA60].
+
+At school, a long time ago, I learned Algol 60 in a completely
+theoretical manner.  Later I learned Algol 68 and C (and more ...). 
+
+The concept of call-by-name never left my mind, and so I started to
+write this Algol 60 interpreter:  Made for fun and a call-by-name.
+
+Here is an example:
+
+@example
+        'begin'
+                'integer' 'procedure' one;
+                'begin'
+                        write (`one called \n');
+                        one := 1
+                'end';
+
+                'procedure' foo (n);
+                'integer' n;
+                'if' n > 0 'then'
+                        foo ( n - one );
+
+                foo (5)
+        'end'
+@end example
+
+The parameter `n' in `foo (n)' is called by name.  Every time `n - one'
+is evaluated, `n' is evaluated by name.  Guess how many times `one' is
+called: 5, 10, 15 ?
+
+Guess or prove ? -- I want to run the example and see the result.  And
+now you can do like me.
+
+This was the main goal: call-by-name.
+
+
+Many things were later added, and now the defining description of the
+``Revised Report on the Algorithmic Language Algol 60'' is nearly
+(hopefully) fulfilled.
+
+
+
+@node Install, Options, Goal, Top 
+@chapter Installation of the Algol 60 Interpreter
+
+
+A60 now runs on Un*x machines and PC's.
+
+
+@section Installation for Un*x
+
+
+Glance through the Makefile and change the FLAGS as appropriate:
+
+@table @code
+
+@item USG
+	define this when compiling for a System V Un*x. For a BSD system
+	define nothing; this is the default.
+
+@item VPRINTF_MISSING
+	define this if your system does not provide the vprintf ()
+	function. This is used in err.c.
+
+@item REALLOC_MISSING
+	define this if your system does not provide the realloc ()
+	function. This is used in util.c.
+
+@item ALLOCA_MISSING
+	define this if your system does not provide the alloca ()
+	function. This is only used by bison. If you are not using the bison
+	generated parser, this define is not used.
+
+@item NO_LIMITS_H
+	define this if your system has no header limits.h, defining
+	@code{LONG_MIN} and @code{LONG_MAX}.  (don't care: set it if
+	you're in doubt)
+
+@item NO_ENUMS
+	define this if your compiler bombs on enums and you have
+	changed the enum declarations in the header files. Look to
+	ENUM.README for more about this (normally you will not).
+
+@item DEBUG
+	define this if you would like to include general debug code (normally
+	you will not).
+
+@item PARSEDEBUG
+	define this if you would like to include the debug code for the
+	parser (normally you will not).
+
+@item MEMORY_STATISTICS
+	define this if you would like to include some code for
+	computing statistics about the amount of heap and stack used
+	(normally you will not).
+
+@end table
+
+
+Say @code{make} to compile.
+
+If you would like to make the simple edit-and-go xa60 application, say
+@code{make xa60}.
+
+
+If you would like to run the test suite, say @code{make test}, and hopefully no
+differences between the expected output and the actual output will be found.
+
+
+For installation adjust BINDIR to point to the destination for the
+``a60'' binary, and LIBDIR to point to the destination of the
+``a60-mkc.inc'' file. If you don't want this, set them to `/tmp'; they are only
+used, if C output is being compiled.  MANDIR and MANSUFF are used to
+install the ``a60.man'' manual page.
+
+Say @code{make install} to install the binary, the manpage and the
+include-file.
+
+Say @code{make xa60-install} to install the xa60 binary and the xa60
+manpage. 
+
+
+@section Installation for PC's
+
+
+I've compiled the sources with QuickC v2.0 using qc-makeit.bat. The
+project file is qc-a60.mak. The compiler itself runs short of memory
+when running the optimiser, so the a60-ptab.c module had better be compiled
+without it.
+
+C code generation is possible, but I've tried it only with few examples,
+because the large generated macros cannot be compiled properly.
+
+
+@node Options, Implementation, Install, Top
+@chapter Algol 60 Command Line Options
+
+
+When you invoke Algol 60 ...
+
+Without arguments, the program text is read from standard input, and
+executed upon reaching EOF.
+
+The available options:
+
+@table @samp
+@item -h
+Print the usage message and exit.
+
+@item -V
+Print the Version string and exit.
+
+@item -v
+Be verbose processing the input. The version string is displayed too.
+
+@item -n
+Don't run the input; only parse and check.
+
+@item -i
+Do not check or execute the input; parse only. (This was useful for
+debugging the interpreter.)
+
+@item -t
+Trace line numbers when running the input.
+
+@item -strict
+Follow strict a60 convention. Skip whitespace in entire input, except in
+strings. Keywords must be enclosed in single quotes.
+
+@item -c
+Create C output from the input. This is an experimental option which changes
+a60 into something like a60-to-c.
+
+@item -C
+Create C output from the input, like the option -c, but then invokes the C
+compiler and creates an executable (hopefully). 
+
+@item -o @var{file}
+Place the output in file @var{file}.  This is used, if C code is created
+(via the -c option) or if the input is compiled (via the -C option).
+
+@end table
+
+
+@ifinfo 
+@node Implementation, Examples, Options, Top
+@chapter The Implementation
+
+
+@menu
+* Representation::      About Keywords and recognized input
+* Builtins::            Toplevel functions
+* Make-C::              C-code creation
+@end menu
+
+@end ifinfo
+
+@node Representation, Builtins, Implementation, Implementation
+@chapter Representation of Algol 60 Code
+
+
+There is a strict form of the input which conforms to RRA60
+and also a simple form. 
+
+The strict form:
+
+Keywords are expected to be enclosed in single quotes: '.
+For example: 'begin', 'for', 'if', 'end'.
+
+The case of letters is insignificant in keywords. For example: 'begin' is
+the same as 'Begin', 'integer' loopvar is the same as 'INTEGER' loopvar.
+
+Whitespace characters are skipped in the input, except in strings. For example:
+'integer' greatnumber is the same as 'integer' great number, and the
+same as ' i n t e g e r' great n u m b e r.
+
+Strings are expected to be enclosed in double quotes, or in a backquote
+and a quote. For example: "This is a string", `This is a string'. The
+'\' is recognized as a escape character (like C syntax). "\n" is a
+linefeed, "\"" is a double-quote and "\\" is a backslash.
+
+
+The simple form:
+
+Keywords are written like identifiers. For example: begin, for, if,
+end. White spaces are recognized to separate tokens. Therefore, it is
+illegal to use: integer great number;
+
+The simple form is used if no quoted keyword is scanned. RRA60
+conformance can be forced with the `-strict' option.
+
+
+@node Builtins, Make-C, Representation, Implementation
+@chapter Builtin Functions
+
+@section Mathematical and conversion functions
+
+entier, abs, sign, sqrt, sin, cos, arctan, exp: implemented as described
+in RRA60.
+
+rand, pi: random number generation and the constant ``pi'':
+
+@example
+        'real' 'procedure' rand;
+                'code'
+@end example
+
+        returns a random number between 0.0 (inclusive) and 1.0
+        (exclusive). The randomness of ``rand'' is not very robust.
+
+@example
+        'real' 'procedure' pi;
+                'code
+@end example
+
+        returns the constant ``pi''.
+
+
+@section String related functions
+
+length, outstring, insymbol, outsymbol
+
+
+@example
+        'integer' 'procedure' length (string);
+        'string' string;
+                'code';
+@end example
+        
+        returns the length of the string string.
+
+
+@example
+        'procedure' outstring (channel, value);
+        'value' channel;
+        'integer' channel;
+        'string' value;
+                'code';
+@end example
+
+        send the string value to the channel channel. Currently, 
+	the only channel implemented is 1 (standard output).
+
+
+@example
+        'integer' 'procedure' write (string);
+        'string' string;
+                'code';
+@end example
+
+        Prints the string string to standard output. This is the same
+        behavior as outstring (1, string).
+
+
+@example
+        'integer' 'procedure' insymbol (channel, string, value);
+        'value' channel;
+        'integer' channel, value;
+        'string' string;
+                'code';
+@end example
+
+        A character is read from channel channel. Currently, the only
+        channel implemented is 0 (standard input).
+        If the character is found in string, the index is returned. If
+        the character is not found, the negative character code is
+        returned.  
+
+
+@example
+        'procedure' outsymbol (channel, string, source);
+        'value' channel, source;
+        'integer' channel, source;
+        'string' string;
+                'code';
+@end example
+
+        Prints the character at the source position of string string to
+        channel channel. Currently, the only channel implemented
+        is 1 (standard output). If source is a negative value,
+        -source is used; string is ignored. 
+
+
+@section Output and Input of numbers
+
+
+@example
+        'procedure' print (value, f1, f2);
+        'value' value, f1, f2;
+        'real' value;
+        'integer' f1, f2;
+                'code';
+@end example
+
+        The value value is printed with f1 and f2 used as format.
+        [ still missing: *** describe f1 and f2 *** ] 
+        The output is printed to standard output.
+
+
+@example
+        'procedure' inreal (channel, value);
+        'value' channel;
+        'integer' channel;
+        'real' value;
+                'code';
+@end example
+
+        Reads a real number from channel channel and assigns them to
+        value. Currently, the only channel implemented is 0 (standard
+        input).
+
+
+@example
+        'procedure' outreal (channel, value);
+        'value' channel, value;
+        'integer' channel;
+        'real' value;
+                'code';
+@end example
+
+        Prints the value value to channel channel. Currently, the only
+        channel implemented is 1 (standard output).
+
+
+@example
+        'procedure' outinteger (channel, value);
+        'value' channel, value;
+        'integer' channel, value;
+                'code';
+@end example
+
+        Prints the value value to channel channel. Currently, the only
+        channel implemented is 1 (standard output).
+
+
+@section Variable formatted output
+
+@example
+        'procedure' vprint (...);
+                'code';
+@end example
+
+        Vprint prints the variable arguments to the standard output.
+        The output is terminated with a newline-character. Numbers are
+        printed width a fixed with (about 14 characters). @*
+        For example:  vprint ("Foo: ", 12, 99.9).
+
+
+@c
+@c C-code creation:
+@c 
+
+@node Make-C, Implementation, Builtins, Implementation
+@chapter C-code creation
+
+[** Still not finished **]
+
+C-code creation for less complex programs is now possible.
+The resulting code is somewhat faster (example whetstones: about a factor of
+50).
+
+Call-by-name procedures must be expandable into C macros. The other
+procedures are translated into C functions.
+
+Problems / Restrictions:
+
+@itemize @bullet
+@item
+Run-time checks are simplified or ignored.
+
+@item
+Labels aren't handled correctly in procedures expanded into C macros.
+
+@item
+Switches cannot be translated.
+
+@item
+To be usable, many things will have to be added (or changed). 
+
+@end itemize
+
+
+@c
+@c Examples:
+@c 
+
+@node Examples, Error messages, Implementation, Top
+@chapter Some Examples
+
+Example 1:
+
+@example
+        'begin'
+                write ("Hi!\n")
+        'end'
+@end example
+
+Assume these three lines are in a file named `hi.a60'.
+Run it with the call `a60 hi': It produces the output:
+@example
+Hi!
+@end example
+
+
+Example 2:
+
+@example
+        'begin'
+                'integer' 'procedure' fakul (n);
+                'value' n;
+                'integer' n;
+                'begin'
+                        'if' n < 1 'then' 
+                                fakul := 1
+                        'else'
+                                fakul := n * fakul (n - 1)
+                'end';
+
+                'integer' result;
+
+                outstring (1, "See fakul (5): ");
+                result := fakul (5);
+                outinteger (1, result);
+                outstring (1, "\n");
+        'end'
+@end example
+
+This will produce the output:
+@example
+See fakul (5):  120
+@end example
+
+
+Example 3:
+
+The classic call-by-name example: The ``Jensen Device'':
+
+[ Note: Here the keywords are not quoted; this is not RRA60 compliant, but
+usable as an extension of NASE A60. ]
+
+@example
+        begin
+                procedure jdev ( i, n, s, x );
+                begin
+                        s := 0;
+                        for i := 1 step 1 until n do
+                                s := s + x;
+                end;
+        
+                integer NN;
+        
+                NN := 100;
+        
+                begin
+                        integer i;
+                        real sum;
+                        integer array arr [1 : NN];
+        
+                        for i := 1 step 1 until NN do
+                                arr[i] := i;
+        
+                        jdev (i, NN, sum, arr [i]);
+        
+                        outstring (1, `See the sum: ');
+                        outreal (1, sum);
+                        outstring (1, `\n')
+        
+                end
+        end
+@end example
+
+
+This will produce the output:
+@example
+See the sum:  5050
+@end example
+
+The clever part is the loop-variable used in jdev which is passed
+by name and used as index in the array ``arr [i]''.
+
+
+@node Error messages, Bugs, Examples, Top
+@chapter Parser and Runtime Messages
+
+
+[ *** not yet - sorry *** ]
+
+
+
+@node Bugs, References, Error messages, Top
+@chapter About Bugs and Bug Reports
+
+
+Surely there are many bugs. Of interest are any core dumps:
+regardless of correct input or not and compile-time and run-time
+misbehavior, this should never happen. 
+Secondary are the elegance and efficiency of the implementation.
+
+Please report bugs to Erik Schoenfelder (schoenfr@@ibr.cs.tu-bs.de).
+Hopefully I will have enough time to reply.
+
+
+
+@node References, Top, Bugs, Top
+@chapter Bibliography and References
+
+
+@table @var
+@item [RRA60]
+Revised Report on the Algorithmic Language Algol 60. @*
+Communications of the ACM
+
+@end table
+
+@contents
+@bye

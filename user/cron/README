@@ -1,0 +1,111 @@
+
+Copyright 2001, Lineo Inc.
+All rights reserved.
+
+This is a small version of the cron daemon.
+
+
+
+CRONTAB
+=======
+
+The default crontab file is located in /etc/config/crontab.  This file
+must be a regular file (i.e. not a symbolic link) and it must be both
+owned by root and not be group or world writable.  It is formatted
+as follows.
+
+Lines begining with '#' and blank lines are ignored.
+
+Lines begining with a digit (or '*') are cron job definitions.  The format
+of these lines is described later.
+
+Other lines are treated as environment variable definitions.  These take
+two forms.  The first is "NAME=VALUE" which assigns a value to the
+specified environment variable.  The second is "NAME=" which undefines
+the named variable.  Leading and trailing spaces are trimmed from both
+the name and the value.  There is no support for quoted strings in
+environment variables.
+
+
+The first five space or tab separated fields of the job definition
+lines represent the time and date on which to execute jobs.  They are
+(in order):
+
+* Minute	(0..59)
+* Hour		(0..24)
+* Day of Month	(1..31)
+* Month		(1..12)
+* Day of Week	(0..7)
+
+As is usual the month and day of week can be repesented either as numbers
+or as three character abbreviations.  Sunday is represented by both 0
+and 7.  All fields can be expressed as single values; ranges (e.g. "3-5"
+== 3,4,5); ranges with step values (e.g. "3-10/3" == 3,6,9) or as a comma
+separated list made from these components.  Thus: "2,3-7/2,11,13" is a
+valid list of prime numbers.  The special value '*' means all allowable
+values and this can be supplemented with the step indication.  Thus:
+"*/2" would represent the legal odd values.  A job is executed when *all*
+of the time and date conditions are met.
+
+
+The sixth field is the user to run the job as.  This can be expressed
+as a number (UID) or as a login name.
+
+The final field is the command to execute.  In this field spaces
+are permitted.  The special character '%' maps to a new line and all
+text after the first such character is provided to the command as its
+standard input.  Use the sequence "%%" to get the '%' character.
+
+
+
+ENVIRONMENT
+===========
+
+Interesting environment variables include:
+
+* PATH		This defaults to "/bin:/usr/bin:/etc" but can be
+		overridden.
+* MAILTO	This specifies the user to send notification of job
+		execution to.  This defaults to the user specified in
+		the crontab file.  Unset this variable to disable email
+		notification.
+* MAILHOST	This specifies the SMTP host to send the email
+		notifications via.  It is clear by default and unless set,
+		email notifications will be disabled.
+* HOME		This specifies the initial directory to execute the
+		job in.  It defaults to "/tmp" if not set.
+* HOSTNAME	This allows the sending host name to be overridden in the
+		outgoing email notificiations.	This allows a non-DNS
+		listed host to send emails.
+
+
+
+SIGNALS
+=======
+
+None.  The cron daemon doesn't require signals to be sent to it.
+It automatically detects modifications to its crontab file and reloads
+it as required.
+
+
+
+INTERNALS
+=========
+
+Due to the absence of a real fork() call on our platform, it is necessary
+to break the cron program into two sections.  The first section is
+cron itself and this program manages the crontab file and job spawning.
+The second program cron-parent manages the actual cron job from their
+initial creation through until their death.
+
+When a cron job is due to be executed, the cron program creates a
+cron-parent process which revokes its root permissions; decodes the
+command line and executes the child.  The cron-parent program provides
+standard input if required (or /dev/null if not).  The cron-parent
+program forks another child process to deal with standard output capture
+and forwarding (or /dev/null if no capture is required).
+
+Because of this structure and the fact that in an embedded environment
+the shells tend to be fairly crippled, this version of cron does not use
+any form if shell to execute commands.  They are parsed and processed
+internally.

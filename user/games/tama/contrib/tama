@@ -1,0 +1,47 @@
+#! /bin/sh
+## Simple script to play with a Tamagotchi
+## by Gergely Nagy <algernon@debian.org>
+##
+## This script is in the Public Domain.
+
+host=localhost
+port=9111
+
+if test $# -eq 1; then
+	host=$1
+	shift
+fi
+
+while test $# -gt 0; do
+	opt=$1
+	shift
+
+	case $opt in
+		--host)
+			host=$1
+			shift
+			;;
+		--port)
+			port=$1
+			shift
+			;;
+		--host=*)
+			host=`echo $opt | sed -e "s,--host=,,"`
+			;;
+		--port=*)
+			port=`echo $opt | sed -e "s,--port=,,"`
+			;;
+		--help)
+			echo "tama [host] [--host <host>] [--port <port>]"
+			exit 0
+			;;
+		--*|-*)
+			echo "Invalid option: $opt"
+			exit 1
+			;;
+	esac
+done
+
+telnet $host $port
+
+exit 0

@@ -1,0 +1,1031 @@
+#  -*- mode: Outline; fill-column: 78; fill-prefix: "	" -*-
+#
+#  klips2-design-api-trips.txt
+#	Richard Guy Briggs <rgb@conscoop.ottawa.on.ca>
+#
+#  RCSID $Id: klips2-design-api-trips.txt,v 1.8 2001/05/30 08:00:14 rgb Exp $
+#
+
+# This document outlines various trips that are made through the
+# various APIs for different scenarios.  Please see klips2-design.txt
+# for an overview.
+
+# Several scenario titles are listed.  Under each scenario title is
+# listed point form text to describe what action is happenning and/or
+# the reason for the following calls.  Following the descriptive text
+# is a origin and destination entity interface description.  Within
+# each interface description is a list of specific arguments used or
+# that need to be added to accomplish the action.
+
+Opportunistic encryption:
+	- put a trap in place from KMd
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclevstr
+				char[] -J TRAP
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target TRAP
+		
+	- packet comes
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- packet matches TRAP
+		NetFilter -> TRAP target NetFilter kernel module
+			in:
+				struct sk_buff *skb
+			out:
+				unsigned int = NF_STOLEN
+
+	- send up an ACQUIRE
+		TRAP target NetFilter kernel module -> KMds (PF_KEYv2 ACQUIRE)
+			see RFC2367, PF_KEYv2 ACQUIRE
+
+	- create HOLD target with skb info and store the first packet
+		TRAP target NetFilter kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+			out:
+				boolean
+
+	- next packet comes in while KMd is negotiating SAs.
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- packet matches HOLD so discard previous skb (packet) and store this one
+		NetFilter -> HOLD target NetFilter kernel module
+			in:
+				struct sk_buff *skb
+			out:
+				unsigned int = NF_STOLEN
+				
+	- put the new SAs in place once the negotiations have succeeded
+		KMd -> SADB (PF_KEYv2 ADD/UPDATE)
+			see RFC2367, PF_KEYv2 ADD/UPDATE message for each SA
+
+	- add ENCRYPT target with specific SAs to use
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] -J ENCRYPT
+				char[] --salist SAList
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> ENCRYPT target iptables(8) library
+		ip6tables(8) -> ENCRYPT target ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target ENCRYPT
+				struct ip_said SA[, ...]
+		
+	- add ACCEPT target for once the packet is processed
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK (local SG)
+				char[] -d DADDR/DMASK (remote SG)
+				char[] --proto ESP
+				char[] --salist SAList
+				char[] --espspi SPI
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> sa match iptables(8) library
+		ip6tables(8) -> sa match ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				struct ip_said SA[, ...]
+
+	- replace HOLD target with ENCRYPT target, releasing skb
+		HOLD target NetFilter kernel module -> NetFilter
+				(I don't know the best way to show this
+				on the diagram, since the skb is
+				stored with the eroute and not the HOLD
+				target module)
+			in:
+				struct sk_buff *skb
+
+	- send released packet through newly created ENCRYPT target and SAs
+		NetFilter -> ENCRYPT target NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[, ...]
+			out:
+				unsigned int = NF_STOLEN
+
+	- fetch SAs specified in NetFilter table entry with ENCRYPT args
+		ENCRYPT target NetFilter kernel module -> SADB (SAID)
+			in:
+				struct ip_said SA
+			out:
+				struct tdb *tdbp
+
+	- send skb (packet) back into NF_IP_POST_ROUTE
+		ENCRYPT target NetFilter kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+		
+	- expire SA if a limit is reached
+		SADB -> KMd (PF_KEYv2 EXPIRE)
+			see RFC2367, PF_KEYv2 EXPIRE
+				
+Outgoing w/existing connection specifying SAs
+	- put the new SAs in place once negotiations have succeeded
+		KMd -> SADB (PF_KEYv2 ADD/UPDATE)
+			see RFC2367, PF_KEYv2 ADD/UPDATE message for each SA
+
+	- put in a rule to match packets for that set of SAs
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] -J ENCRYPT
+				char[] --salist SAList
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> ENCRYPT target iptables(8) library
+		ip6tables(8) -> ENCRYPT target ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target ENCRYPT
+				struct ip_said SA[, ...]
+		
+	- add ACCEPT for once the packet is processed
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK (local SG)
+				char[] -d DADDR/DMASK (remote SG)
+				char[] --proto ESP
+				char[] --salist SAList
+				char[] --espspi SPI
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> sa match iptables(8) library
+		ip6tables(8) -> sa match ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				struct ip_said SA[, ...]
+				target ACCEPT
+
+	- outgoing packet is tested on selectors
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- matching packet is sent to ENCRYPT target with SAList
+		NetFilter -> ENCRYPT target NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[, ...]
+			out:
+				unsigned int = NF_STOLEN
+
+	- fetch SAs specified in NetFilter table entry with ENCRYPT args
+		ENCRYPT target NetFilter kernel module -> SADB (SAID)
+			in:
+				struct ip_said SA
+			out:
+				struct tdb *tdbp
+
+	- send skb (packet) back into NF_IP_POST_ROUTE
+		ENCRYPT target NetFilter kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+		
+	- outgoing processed packet is tested on selectors and ACCEPTed
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- expire SA if a limit is reached
+		SADB -> KMd (PF_KEYv2 EXPIRE)
+			see RFC2367, PF_KEYv2 EXPIRE
+				
+Outgoing w/existing connection routing through IPSec device
+	- put the new SAs in place once negotiations have succeeded
+		KMd -> SADB (PF_KEYv2 ADD/UPDATE)
+			see RFC2367, PF_KEYv2 ADD/UPDATE message for each SA
+
+	- put in a rule to match packets for that set of SAs
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] --out-interface IPSECdev
+				char[] -J ENCRYPT
+				char[] --salist SAList
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> ENCRYPT target iptables(8) library
+		ip6tables(8) -> ENCRYPT target ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target ENCRYPT
+				struct ip_said SA[, ...]
+		
+		KMd -> Routing Table (Routing)
+			see route(8) or iproute2(8), currently done by
+				     system(3) calls to _updown.
+			in:
+				char[] IPSECdev
+			out:
+				unsigned char exit_code
+
+	- add ACCEPT for once the packet is processed
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK (local SG)
+				char[] -d DADDR/DMASK (remote SG)
+				char[] --proto ESP
+				char[] --espspi SPI
+				char[] --salist SAList
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> sa match iptables(8) library
+		ip6tables(8) -> sa match ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				struct ip_said SA[, ...]
+
+	- outgoing packet is tested on match modules
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- outgoing packet matches IPSECdev and is sent to ENCRYPT target with SAList
+		NetFilter -> ENCRYPT target NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[, ...]
+			out:
+				unsigned int = NF_STOLEN
+
+	- fetch SAs specified in NetFilter table entry with ENCRYPT args
+		ENCRYPT target NetFilter kernel module -> SADB (SAID)
+			in:
+				struct ip_said SA
+			out:
+				struct tdb *tdbp
+
+	- send skb (packet) back into NF_IP_POST_ROUTE
+		ENCRYPT target NetFilter kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+		
+	- processed packet is tested on match modules and ACCEPTed
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- expire SA if a limit is reached
+		SADB -> KMd (PF_KEYv2 EXPIRE)
+			see RFC2367, PF_KEYv2 EXPIRE
+				
+Incoming w/existing connection specifying SAs
+	- put in the new SAs in place once the negotiations have succeeded
+		KMd -> SADB (PF_KEYv2 ADD/UPDATE)
+			see RFC2367, PF_KEYv2 ADD/UPDATE message for each SA
+
+	- put in a blocking entry to prevent unprotected packets entering
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] -J DROP (or PEEK)
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target DROP (or PEEK)
+		
+	- allow properly processed packets in
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] --salist SAList
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> sa match iptables(8) library
+		ip6tables(8) -> sa match ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				struct ip_said SA[, ...]
+
+	- allow unprocessed packets from IPSec peer in
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK (remote SG)
+				char[] -d DADDR/DMASK (local SG)
+				char[] --proto ESP
+				char[] --espspi SPI
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+
+	- incoming packet is tested on match modules
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- packet arrives via transport layer demux to DECRYPT
+		Transport Layer De-mux -> IPSec DECRYPT kernel module
+			in:
+				struct sk_buff *skb
+
+	- fetch SAs specified by packet in skb
+		IPSec DECRYPT kernel module -> SADB (SAID)
+			in:
+				struct ip_said SA
+			out:
+				struct tdb *tdbp
+
+	- send skb (packet) back into NF_IP_PRE_ROUTE
+		IPSec DECRYPT kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+		
+	- processed packet is tested on match modules and ACCEPTED
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- expire SA if a limit is reached
+		SADB -> KMd (PF_KEYv2 EXPIRE)
+			see RFC2367, PF_KEYv2 EXPIRE
+				
+Incoming w/existing connection specifying IPSec device
+	- put in the new SAs in place once the negotiations have succeeded
+		KMd -> SADB (PF_KEYv2 ADD/UPDATE)
+			see RFC2367, PF_KEYv2 ADD/UPDATE message for each SA
+
+	- put in a blocking entry to prevent unprotected packets entering
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] -J DROP (or PEEK)
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target DROP (or PEEK)
+		
+	- allow properly processed packets in
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --in-interface IPSECdev
+				char[] --seclev seclev
+				char[] --salist SAList
+				       (can we set an --in-interface IPSECdev
+					from this so we can just test
+					in-interface?  This may need two
+					entries, including a target SETDEV)
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> sa match iptables(8) library
+		ip6tables(8) -> sa match ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				struct ip_said SA[, ...]
+
+	- allow unprocessed packets from IPSec peer in
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK (remote SG)
+				char[] -d DADDR/DMASK (local SG)
+				char[] --proto ESP
+				char[] --espspi SPI
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+
+	- incoming packet is tested on match modules
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- packet arrives via transport layer demux to DECRYPT
+		Transport Layer De-mux -> IPSec DECRYPT kernel module
+			in:
+				struct sk_buff *skb
+
+	- fetch SAs specified by packet in skb
+		IPSec DECRYPT kernel module -> SADB (SAID)
+			in:
+				struct ip_said SA
+			out:
+				struct tdb *tdbp
+
+	- send skb (packet) back into NF_IP_PRE_ROUTE
+		IPSec DECRYPT kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+		
+	- processed packet is tested on match modules and ACCEPTED
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- expire SA if a limit is reached
+		SADB -> KMd (PF_KEYv2 EXPIRE)
+			see RFC2367, PF_KEYv2 EXPIRE
+				
+Incoming no connection
+	 - set target for PEEKing at (or TRAPing) incoming packets with no connection
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] -J PEEK (or TRAP)
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				target PEEK (or TRAP)
+
+	- packet comes in and gets tested by match modules
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- packet matches and gets sent to PEEK target
+		NetFilter -> PEEK (or TRAP) target NetFilter kernel module
+			in:
+				struct sk_buff *skb
+			out:
+				unsigned int = NF_ACCEPT (or NF_STOLEN)
+
+	- send up an ACQUIRE
+		PEEK (or TRAP) target NetFilter kernel module -> KMds (PF_KEYv2 ACQUIRE)
+			see RFC2367, PF_KEYv2 ACQUIRE
+
+	- create ACCEPT (or HOLD) target with skb info to prevent KMd overload
+		PEEK (or HOLD) target NetFilter kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+			out:
+				boolean
+
+	- next packet comes in while KMd is negotiating SAs.
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- put the new SAs in place once the negotiations have succeeded
+		KMd -> SADB (PF_KEYv2 ADD/UPDATE)
+			see RFC2367, PF_KEYv2 ADD/UPDATE message for each SA
+
+	- put in a blocking entry to prevent unprotected packets entering
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] -J DROP (or PEEK)
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				(target PEEK)
+		
+	- allow properly processed packets in
+		KMd -> iptables(8) system(3) call (Policy)
+		KMd -> ip6tables(8) system(3) call (Policy)
+			in:
+				char[] -I
+				char[] -s SADDR/SMASK
+				char[] -d DADDR/DMASK
+				char[] --protocol PROTO
+				char[] --sport SPORT
+				char[] --dport DPORT
+				char[] --uid-owner UID
+				char[] --seclev seclev
+				char[] --salist SAList
+				char[] -J ACCEPT
+			out:
+				unsigned char exit_code
+
+		iptables(8) -> seclev match iptables(8) library
+		ip6tables(8) -> seclev match ip6tables(8) library
+			in:
+				char[] --seclev seclevstr
+			out:
+				struct seclev
+
+		iptables(8) -> sa match iptables(8) library
+		ip6tables(8) -> sa match ip6tables(8) library
+			in:
+				char[] --salist SAList
+			out:
+				struct ip_said SA[, ...]
+
+		iptables(8) -> NetFilter
+		ip6tables(8) -> NetFilter
+		I/F is already defined in NetFilter.  In addition, it will
+		need structures to pass the following:
+			in:
+				struct seclev
+				struct ip_said SA[, ...]
+		
+	- incoming packet is tested on match modules
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- packet arrives via transport layer demux to DECRYPT
+		Transport Layer De-mux -> IPSec DECRYPT kernel module
+			in:
+				struct sk_buff *skb
+
+	- fetch SAs specified by packet in skb
+		IPSec DECRYPT kernel module -> SADB (SAID)
+			in:
+				struct ip_said SA
+			out:
+				struct tdb *tdbp
+
+	- send skb (packet) back into NF_IP_PRE_ROUTE
+		IPSec DECRYPT kernel module -> NetFilter
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+		
+	- processed packet is tested on match modules and ACCEPTed
+		NetFilter -> seclev match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct seclev
+			out:
+				boolean
+
+		NetFilter -> sa match NetFilter kernel module
+			in:
+				struct sk_buff *skb
+				struct ip_said SA[,...]
+			out:
+				boolean
+
+	- expire SA if a limit is reached
+		SADB -> KMd (PF_KEYv2 EXPIRE)
+			see RFC2367, PF_KEYv2 EXPIRE
+
+TODO:
+	api trips:
+		Packet w/no route?  how to get to kmd?  default route to IPSECdev which calls TRAP?
+		Nested tunnels, IKE recursion api trip
+		how to know when to stop decapsulating nested tunnels?
+		DHR's routing problem
+		mutli-layer routing environments that both touch and denker need.
+	nail down function calls and/or globals for each I/F, c-like function syntax
+	better api block comments
+	interface, function, args, block comment
+

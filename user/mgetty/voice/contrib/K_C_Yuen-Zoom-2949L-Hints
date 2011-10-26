@@ -1,0 +1,114 @@
+Path: alphanet.ch!not-for-mail
+From: K C Yuen <ykc@kernelhk.com>
+Newsgroups: alphanet.ml.mgetty
+Subject: Zoom 2949L hints and patches
+Date: 8 Apr 2000 11:55:36 +0200
+Organization: ALPHANET NF - Research and information - Not for profit
+Lines: 98
+Distribution: alphanet
+Message-ID: <38EF01C8.B8CEA6BC@kernelhk.com>
+NNTP-Posting-Host: localhost.alphanet.ch
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-Comment: Mail-to-News 1.0 MSC94
+Xref: alphanet.ch alphanet.ml.mgetty:11181
+
+Hello,
+
+After hours of testing, here are some hints on the use of Zoom
+2949L modem. Hope it helps.
+
+- it uses Lucent Venus 1675 chip set.
+- the latest command set document I can find is at
+  http://www.lucent.com/micro/K56flex/v90atcom.pdf
+- Zoom has two models 2949 and 2949L with different chip sets,
+  the 2949 uses Rockwell/Conexant(sp?) chips.
+- 2949 and 2949L are essentailly identical on appearance, including
+  the packing box: read that tiny "L" following "2949" at the bottom
+  side of the modem ! Or open the modem and read the chip markings.
+  (and void warranty !)
+- ATI3
+  Zoom V.90 Serial s052099g -I Z207
+  OK
+- class 1 fax only, no good for mgetty fax. It looks like there're
+  some codes in mgetty for class 1 fax. Did anyone tried that ?
+- to enable caller id display, AT+VCID=1
+- hangs up the line 2+ seconds after DTR dropped. I've tried a number
+  of s-reg settings but couldn't help. Suggestions welcome. Patched
+  mgetty.c (1.1.21-Jul24):
+
+# diff -u mgetty.c mgetty.c.orig
+--- mgetty.c    Sat Apr  8 17:18:38 2000
++++ mgetty.c.orig       Wed Jun 16 04:39:55 1999
+@@ -444,9 +444,7 @@
+     /* drain input - make sure there are no leftover "NO CARRIER"s
+      * or "ERROR"s lying around from some previous dial-out
+      */
+-/* ykc, 00/04/07, looks like zoom 2949L need more time, 1 -> 22 */
+-/* 2.0 second failed intermittently, 1.5 second failed consistently */
+-    clean_line( STDIN, 22);
++    clean_line( STDIN, 1);
+ 
+     /* do modem initialization, normal stuff first, then fax
+      */
+
+- instead of patching mgetty.c, I tried adding in mgetty.config:
+    toggle-dtr-waittime 2000
+  but there are errors (Linux/pentium system). 7 lines with ** appear
+  after the above line is added. Pointers welcome. When the waittime
+  of the above patch is, say 15, the ## line will not clear anything.
+  That "[0d][0a]OK[0d][0a]" will be left over to interfere with the
+  handshakes that follows.
+
+04/07 22:31:06 yS3  mgetty: experimental test release 1.1.21-Jul24
+04/07 22:31:06 yS3  check for lockfiles
+04/07 22:31:06 yS3   checklock: no active process has lock, will remove
+04/07 22:31:06 yS3  locking the line
+04/07 22:31:06 yS3   makelock(ttyS3) called
+04/07 22:31:06 yS3   do_makelock: lock='/var/lock/LCK..ttyS3'
+04/07 22:31:06 yS3   lock made
+04/07 22:31:06 yS3   tio_get_rs232_lines: status: RTS CTS DSR DTR DCD
+04/07 22:31:06 yS3  WARNING: DCD line still active, check modem settings
+(AT&Dx)
+04/07 22:31:06 yS3  lowering DTR to reset Modem
+04/07 22:31:07 yS3**TIOCMBIS failed: I/O error
+04/07 22:31:07 yS3**cannot turn off soft carrier: I/O error
+04/07 22:31:07 yS3**tcgetattr failed: I/O error
+04/07 22:31:07 yS3**cannot get TIO: I/O error
+04/07 22:31:07 yS3**mg_init_device failed, trying again
+04/07 22:31:07 yS3** tio_get_rs232_lines: status: RTS CTS DSR DTR
+04/07 22:31:07 yS3**lowering DTR to reset Modem
+04/07 22:31:07 yS3   tss: set speed to 115200 (10002)
+04/07 22:31:07 yS3   tio_set_flow_control( HARD )
+04/07 22:31:07 yS3## waiting for line to clear (VTIME), read:
+[0d][0a]OK[0d][0a]
+04/07 22:31:09 yS3  send: AT&F[0d]
+04/07 22:31:20 yS3  waiting for ``OK''
+04/07 22:31:20 yS3   got: AT&F[0d]
+04/07 22:31:20 yS3    CND: AT&F[0d][0a]OK ** found **
+04/07 22:31:20 yS3  send: ATL2&D2S30=2S7=50S10=9+VCID=1[0d]
+04/07 22:31:20 yS3  waiting for ``OK''
+
+- caller display format is similar to USR but slightly different:
+
+# diff -u cnd.c*
+--- cnd.c       Fri Apr  7 17:06:21 2000
++++ cnd.c.orig  Sat Apr  8 17:20:07 2000
+@@ -66,13 +66,6 @@
+     {"MESG = ",                        &CallMsg1},
+     {"MESG = ",                        &CallMsg2},
+ 
+-    /* those are for Zoom 2949L Caller ID */
+-    /* ykc, 00/04/07 */
+-    {"DATE=",                  &CallDate},
+-    {"TIME=",                  &CallTime},
+-    {"NMBR=",                  &CallerId},
+-    {"NAME=",                  &CallName},
+-
+     /* yet another incompatible modem... */
+     {"CALLER'S NUMBER: ",      &CallerId},
+
+Hope others will not waste the time like I did.
+
+kc

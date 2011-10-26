@@ -1,0 +1,935 @@
+<!-- 
+    RCSID $Id: modes.html,v 1.9 2001/04/19 18:54:53 rgb Exp $
+-->
+
+<HTML>
+  <HEAD>
+    <TITLE>Klips Manual Key Protected Connection Examples</TITLE>
+  </HEAD>
+  <BODY>
+    <h1>Klips Manual Key Protected Connection Examples</h1>
+    <ul>
+      <li><a href="#intro">Introduction</a>
+      <li><a href="#macros">Macros</a>
+      <li><a href="#setup">Setup</a>
+      <li><a href="#unload">Unload</a>
+      <li><a href="#transport">Transport mode</a>
+      <li><a href="#tunnel">Tunnel mode</a>
+      <li><a href="#transform">Transform examples</a>
+      <li><a href="#proc">IPSEC Status</a>
+    </ul>
+    <hr>
+    <a name="intro"><h2>Introduction</h2>
+    This document is intended to provide some background on what is most easily
+    accomplished with the existing tools.  See 'man ipsec_auto' and 'man ipsec_manual'
+    first.
+    <p>
+    It intended for practical use only beyond the capabilities of 'ipsec auto' and
+    'ipsec manual'.  For now, (981127) that includes extruded subnets.
+    <p>
+    Note:  Be warned that once a route(8) is set via an ipsec? device, packets without
+    an eroute(8) that are sent to that device will be dropped on the floor.
+    <hr>
+    <a name="macros"><h2>Macros</h2>
+    These definitions of macros make the commands more readable and the scripts easier
+    to use by centralising the information.  Obviously, the keys are
+    for example purposes only and cryptographically strong keys should be substituted.
+    <p>
+    <pre>
+	hmask=255.255.255.255
+	nmask0=0.0.0.0
+	nmask16=255.255.0.0
+	nmask24=255.255.255.0
+	nmask28=255.255.255.240
+	nmask29=255.255.255.248
+
+	local_public_ip=207.236.55.216
+	local_public_nexthop=207.236.55.1
+	local_public_bcast=207.236.55.255
+	local_public_nmask=$nmask24
+	local_private_net=192.168.2.0
+	local_private_nmask=$nmask24
+
+	remote_public_ip=209.157.90.146
+	remote_private_net=209.157.90.160
+	remote_private_nmask=$nmask29
+
+	ext_private_ip=209.157.90.198
+	ext_private_net=209.157.90.192
+	ext_private_bcast=209.157.90.199
+	ext_private_nmask=$nmask29
+
+	default_net=0.0.0.0
+	default_bcast=255.255.255.255
+	default_nmask=$nmask0
+
+	ipsecdev=ipsec1
+	aliasdev=eth0:1
+	physdev=eth2
+
+	enckey8=0x0123456789abcdef
+	enckey24=0x0123456789abcdef0123456789abcdef0123456789abcdef
+	authkey16=0x0123456789abcdef0123456789abcdef
+	authkey20=0x0123456789abcdef0123456789abcdef01234567
+    </pre>
+    <hr>
+    <a name="setup"><h2>Setup</h2>
+    These commands must be run before any of the connection-specific commands
+    will work.
+    <p>
+    <pre>
+	depmod -a	# only if klips is compiled as a module
+	modprobe ipsec	# only if klips is compiled as a module
+	ipsec tncfg --attach --virtual $ipsecdev --physical $physdev
+	ifconfig $ipsecdev $local_public_ip \
+		broadcast $local_public_bcast \
+		netmask $local_public_nmask
+    </pre>
+    <hr>
+    <a name="unload"><h2>Unload</h2>
+    These commands must be run before the module can be unloaded.
+    <p>
+    <pre>
+	ipsec tncfg --detach --virtual $ipsecdev
+	ifconfig $ipsecdev down
+	rmmod ipsec	# only if klips is compiled as a module
+    </pre>
+    Warning: Each of the Setup scripts first deletes the route for the destinations it
+    needs to protect, if it exists.  When the route gets deleted with the deletion
+    of the protected connection, that route will no longer exist.  This route must be
+    put back manually, or reboot the network configuration if it was installed automatically.
+    <hr>
+    <a name="transport"><h2>Transport mode</h2>
+    Transport mode is used between two hosts that each have IPSEC capabilities.
+    They don't rely on a security gateway since they are by definition same.  This
+    mode has a lower overhead per packet and is therefore more efficient.  The
+    outside header is protected against modification if authentication is used.
+    <p>
+      Assumptions:  Both machines have had networking set up and can pass packets.
+	<p>
+	<ul>
+	  <li><a href="#transportsetup">Setup</a>
+	  <li><a href="#transportdel">Delete</a>
+	</ul>
+    <ul>
+      <li><a name="transportsetup"><h3>Setup</h3>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto esp
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+	        gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="transportdel"><h3>Delete</h3>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    <hr>
+    <a name="tunnel"><h2>Tunnel mode</h2>
+    Tunnel mode is used between two security gateways to protect their own traffic
+    to another security gateway, or any combination of hosts behind it who may or
+    may not be IPSEC aware.  Only the inner headers are protected if authentication
+    is enabled.  There is extra overhead since there is an internal IP header.  This
+    mode is often preferable to make traffic analysis more difficult.
+    <p>
+      Assumptions:  Any subnets have been set up and all machines can see the internet.
+	<p>
+	<ul>
+	  <li><a href="#sg">Security Gateway to Security Gateway</a>
+	  <li><a href="#subnet">Subnet to subnet</a>
+	  <li><a href="#road">Road warrior mode (Security Gateway to Subnet)</a>
+	  <li><a href="#subnetmasq">Subnet to subnet masqeraded</a>
+	  <li><a href="#subnetextrude">Extruded Subnet to Internet</a>
+	</ul>
+	<p>
+    <ul>
+    <li><a name="sg"><h2>Security Gateway to Security Gateway</h2>
+    This configuration is essentially the same as tunnel mode, except that traffic
+    analysis is not as easy.
+	<p>
+	    <ul>
+	      <li><a href="#sgsetup">Setup</a>
+	      <li><a href="#sgdel">Delete</a>
+	    </ul>
+	<p>
+    <ul>
+      <li><a name="sgsetup"><h3>Setup</h3>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --ip4 \
+		--src $local_public_ip --dst $remote_public_ip
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec spigrp $remote_public_ip 0x223 tun \
+		$remote_public_ip 0x225 esp
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x223 --proto tun
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="sgdel"><h3>Delete</h3>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --del
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+  </ul>
+    <hr>
+      <li><a name="subnet"><h3>Subnet to Subnet</h3>
+    Valid internet subnet to valid internet subnet is the simplest subnet configuration.
+    It processes all traffic from one subnet behind a security gateway to another subnet
+    behind its security gateway with the selected encryption and/or authentication
+    transforms, effectively protecting all that traffic from interference from the internet.
+	<p>
+	    <ul>
+	      <li><a href="#subnetsetup">Setup</a>
+	      <li><a href="#subnetdel">Delete</a>
+	    </ul>
+	<p>
+    <ul>
+    <li><a name="subnetsetup"><h4>Setup</h4>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --ip4 \
+		--src $local_public_ip --dst $remote_public_ip
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec spigrp $remote_public_ip 0x223 tun\
+		$remote_public_ip 0x225 esp
+
+	ipsec eroute --add --src $local_private_net/$local_private_nmask \
+		--dst $remote_private_net/$remote_private_nmask \
+		--edst $remote_public_ip --spi 0x223 --proto tun
+
+	route del $remote_private_net
+	route add -net $remote_private_net netmask $remote_private_nmask \
+		dev $ipsecdev gw $local_public_nexthop
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="subnetdel"><h4>Delete</h4>
+    <pre>
+	route del $remote_private_net
+
+	ipsec eroute --del --src $local_private_net/$local_private_nmask \
+		--dst $remote_private_net/$remote_private_nmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto esp --del
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto tun --del
+    </pre>
+  </ul>
+    <hr>
+    <li><a name="road"><h3>Road warrior mode (Subnet to Security Gateway)</h3>
+    "Road Warriors" are single machines that connect to a protected network via
+    the internet and must keep the tunnel secure.  It acts as a security gateway
+    and speaks to the protected subnet via another security gateway.  This is a
+    hybrid of the security_gateway-to-security_gateway and subnet-to-subnet
+    scenarios.
+    <p>
+      Assumptions: All machines are set up to see each other and the internet.
+	<p>
+	    <ul>
+	      <li><a href="#roadme">Local road warrior to remote subnet</a>
+	      <li><a href="#roadyou">Local subnet to remote road warrior</a>
+	    </ul>
+	<p>
+    <ul>
+      <li><a name="roadme"><h4>Local road warrior to remote subnet</h4>
+		<ul>
+		  <li><a href="#roadmesetup">Setup</a>
+		  <li><a href="#roadmedel">Delete</a>
+		</ul>
+	<p>
+    <ul>
+      <li><a name="roadmesetup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --ip4 \
+		--src $local_public_ip --dst $remote_public_ip
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec spigrp $remote_public_ip 0x223 tun \
+		$remote_public_ip 0x225 esp
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_private_net/$remote_private_nmask \
+		--edst $remote_public_ip --spi 0x223 --proto tun
+
+	route del $remote_private_net
+	route add -net $remote_private_net netmask $remote_private_nmask \
+		dev $ipsecdev gw $local_public_nexthop
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="roadmedel"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_private_net
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_private_net/$remote_private_nmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --del
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    <hr>
+    <li><a name="roadyou"><h4>Local subnet to remote road warrior</h4>
+		<ul>
+		  <li><a href="#roadyousetup">Setup</a>
+		  <li><a href="#roadyoudel">Delete</a>
+		</ul>
+	<p>
+    <ul>
+      <li><a name="roadyousetup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --ip4 \
+		--src $local_public_ip --dst $remote_public_ip
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec spigrp $remote_public_ip 0x223 tun \
+		$remote_public_ip 0x225 esp
+
+	ipsec eroute --add --src $local_private_net/$local_private_nmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x223 --proto tun
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="roadyoudel"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_private_net/$local_private_nmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --del
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+  </ul>
+  </ul>
+    <hr>
+    <li><a name="subnetmasq"><h3>Subnet to Subnet masqueraded</h3>
+    Traffic from a valid internet subnet to a reserved address subnet can still
+    be protected by IPSEC so long as all the reserved subnets that the valid subnet
+    wishes to speak to are unique.  Perhaps some IPMASQ work needs to be done to
+    make this independant.
+    <p>
+      Note:  The ipfwadm command serves to knock a hole in the existing masquerading
+      setup.
+    <p>
+      Assumptions:  The masqueraded subnet has been set up and all machines can see
+      the internet.
+	<p>
+	    <ul>
+	      <li><a href="#subnetmasqsetup">Setup</a>
+	      <li><a href="#subnetmasqdel">Delete</a>
+	    </ul>
+	<p>
+    <ul>
+      <li><a name="subnetmasqsetup"><h4>Setup</h4>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --ip4 \
+		--src $local_public_ip --dst $remote_public_ip
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec spigrp $remote_public_ip 0x223 tun \
+		$remote_public_ip 0x225 esp
+
+	ipsec eroute --add --src $local_private_net/$local_private_nmask \
+		--dst $remote_private_net/$remote_private_nmask \
+		--edst $remote_public_ip --spi 0x223 --proto tun
+
+	route del $remote_private_net
+	route add -net $remote_private_net netmask $remote_private_nmask \
+		dev $ipsecdev gw $local_public_nexthop
+
+	ipfwadm -F -i accept -S $local_private_net/$local_private_nmask \
+		-D $remote_private_net/$remote_private_nmask
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="subnetmasqdel"><h4>Delete</h4>
+    <pre>
+	# forward path
+	ipfwadm -F -d accept -S $local_private_net/$local_private_nmask \
+		-D $remote_private_net/$remote_private_nmask
+
+	route del $remote_private_net
+
+	ipsec eroute --del --src $local_private_net/$local_private_nmask \
+		--dst $remote_private_net/$remote_private_nmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --del
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+  </ul>
+    <hr>
+      <li><a name="subnetextrude"><h3>Extruded Subnet to Internet</h3>
+    Subnet 'Extrusion' may be necessary if one site only has one IP routed to
+    it and more IP's are needed, but the access provider is unable or unwilling
+    to route more.  This will extrude a valid subnet from another location (the
+    site of the other security gateway) to the site needing more valid addresses
+    and protect (encrypt or authenticate) all its traffic.
+    This example combines a masqueraded subnet and the extruded subnet on the
+    same physical media.  Note that the traffic on the remote security gateway
+    will be at least double that of the extruded subnet traffic to the rest of
+    the internet and twice the turnaround time.
+    <p>
+      Assumptions:  A masqueraded subnet has been set up and all machines can see
+      the internet.  Each machine on the extruded subnet will need to route all
+      packets to the remote subnet (in this case the entire internet) via the
+      I/F (direct or aliased) that has been configured with an extruded valid
+      internet address.
+	<p>
+	    <ul>
+	      <li><a href="#subnetextrudesetup">Setup</a>
+	      <li><a href="#subnetextrudedel">Delete</a>
+	    </ul>
+	<p>
+    <ul>
+    <li><a name="subnetextrudesetup"><h4>Setup</h4>
+    <pre>
+	# set up superimposed valid internet subnet with interface aliases
+	ifconfig $aliasdev $ext_private_ip broadcast $ext_private_bcast \
+		netmask $ext_private_nmask
+
+	route add -net $ext_private_net netmask $ext_private_nmask \
+		dev $aliasdev
+
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --ip4 \
+		--src $local_public_ip --dst $remote_public_ip
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec spigrp $remote_public_ip 0x223 tun \
+		$remote_public_ip 0x225 esp
+
+	ipsec eroute --add --src $ext_private_net/$ext_private_nmask \
+		--dst $default_net/$default_nmask \
+		--edst $remote_public_ip --spi 0x223 --proto tun
+
+	route del $default_net
+	route add -net $default_net netmask $default_nmask \
+		dev $ipsecdev gw $local_public_nexthop
+
+	ipfwadm -F -i accept -S $ext_private_net/$ext_private_nmask \
+		-D $default_net/$default_nmask
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="subnetextrudedel"><h4>Delete</h4>
+    <pre>
+	# forward path
+	ipfwadm -F -d accept -S $ext_private_net/$ext_private_nmask \
+		-D $default_net/$default_nmask
+
+	route del $default_net
+
+	ipsec eroute --del --src $ext_private_net/$ext_private_nmask \
+		--dst $default_net/$default_nmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x223 --proto tun --del
+
+	# return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+  </ul>
+  </ul>
+    <a name="transform"><h2>Transform Examples</h2>
+    A number of different transforms can be used to provide the protection intended
+    by the IPSEC protocol suite.  All these examples are using transport mode, but the
+    techniques are equally applicable to tunnel mode, adding the extra SA to the spigrp
+    command as necessary.
+    <p>
+      Assumptions:  Both machines have had networking set up and can pass packets.
+	<p>
+	<ul>
+	  <li><a href="#ah">Authentication</a>
+	  <li><a href="#esp">Encryption</a>
+	</ul>
+    <p>
+    <ul>
+      <li><a name="ah"><h3>Authentication</h3>
+    Authentication provides the service of guaranteeing the identity of the sender.
+    It also provides protection against packet modification in transit.  It does not
+    hide data.
+	<p>
+	    <ul>
+	      <li><a href="#ahmd5">AH-MD5</a>
+	      <li><a href="#ahsha1">AH-SHA1</a>
+	      <li><a href="#espnullmd5">ESP-NULL-MD5</a>
+	    </ul>
+    <p>
+    <ul>
+      <li><a name="ahmd5"><h4>AH-MD5</h4>
+    Authentication Header, using Message Digest-5 can be used to authenticate the
+    contents of the packet and the immutable or predictable parts of the IP header
+    outside the Authentication Header with a 128-bit key.
+	<p>
+		<ul>
+		  <li><a href="#ahmd5setup">Setup</a>
+		  <li><a href="#ahmd5del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="ahmd5setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto ah \
+		--ah hmac-md5-96 \
+		--authkey $authkey16
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto ah
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto ah \
+		--ah hmac-md5-96 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="ahmd5del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto ah --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto ah --del
+    </pre>
+    </ul>
+    <hr>
+      <li><a name="ahsha1"><h4>AH-SHA1</h4>
+    Authentication Header, using Secure Hash Algorithm-1 can be used to authenticate the
+    contents of the packet and the immutable or predictable parts of the IP header
+    outside the Authentication Header with a 160-bit key.
+	<p>
+		<ul>
+		  <li><a href="#ahsha1setup">Setup</a>
+		  <li><a href="#ahsha1del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="ahsha1setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto ah \
+		--ah hmac-sha1-96 \
+		--authkey $authkey20
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto ah
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto ah \
+		--ah hmac-sha1-96 \
+		--authkey $authkey20
+    </pre>
+    <li><a name="ahsha1del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto ah --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto ah --del
+    </pre>
+    </ul>
+    <hr>
+      <li><a name="espnullmd5"><h4>ESP-NULL-MD5</h4>
+    Encapsulation Security Protocol, using the NULL transform with Secure Hash Algorithm-1
+    can be used to authenticate the contents of the packet only with a 160-bit key.
+	<p>
+		<ul>
+		  <li><a href="#espnullmd5setup">Setup</a>
+		  <li><a href="#espnullmd5del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="espnullmd5setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp null-md5-96 \
+		--authkey $authkey20
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto esp
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp null-md5-96 \
+		--authkey $authkey20
+    </pre>
+    <li><a name="espnullmd5del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    </ul>
+    <hr>
+      <li><a name="esp"><h3>Encryption</h3>
+    Encryption provides the service of data hiding using symmetric key methods.
+	<p>
+	    <ul>
+	      <li><a href="#esp3desmd5">ESP-3DES-MD5</a>
+	      <li><a href="#esp3desahmd5">ESP-3DES with AH-MD5</a>
+	      <li><a href="#espdesmd5">ESP-DES-MD5</a>
+	      <li><a href="#esp3dessha1">ESP-3DES-SHA1</a>
+	    </ul>
+    <p>
+    <ul>
+      <li><a name="esp3desmd5"><h4>ESP-3DES-MD5</h4>
+    Encapsulation Security Payload, using triple-Data Encryption Standard for encryption
+    and Message Digest-5 can be used to hide the contents of the packet and authenticate
+    both the contents of the packet and the immutable or predictable parts of the IP header
+    outside the Encapsulation Security Payload with a 168-bit encryption key and a 128-bit
+    authentication key.
+	<p>
+		<ul>
+		  <li><a href="#esp3desmd5setup">Setup</a>
+		  <li><a href="#esp3desmd5del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="esp3desmd5setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto esp
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-md5-96 \
+		--enckey $enckey24 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="esp3desmd5del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    <hr>
+      <li><a name="esp3desahmd5"><h4>ESP-3DES with AH-MD5</h4>
+    The combination of Encapsulation Security Payload, using triple-Data Encryption Standard
+    for encryption with a 168-bit encryption key can be used to hide the contents of the
+    packet with an external Authentication Header using Message Digest-5 can authenticate
+    both the contents of the packet and the immutable or predictable parts of the IP header
+    outside the Encapsulation Security Payload with a 128-bit authentication key.
+	<p>
+		<ul>
+		  <li><a href="#esp3desahmd5setup">Setup</a>
+		  <li><a href="#esp3desahmd5del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="esp3desahmd5setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des \
+		--enckey $enckey24
+	ipsec spi --edst $remote_public_ip --spi 0x226 --proto ah \
+		--ah hmac-md5-96 \
+		--authkey $authkey16
+
+	ipsec spigrp $local_public_ip 0x225 esp\
+		$local_public_ip 0x226 ah
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto esp
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des \
+		--enckey $enckey24
+	ipsec spi --edst $local_public_ip --spi 0x236 --proto ah \
+		--ah hmac-md5-96 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="esp3desahmd5del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    <hr>
+      <li><a name="espdesmd5"><h4>ESP-DES-MD5</h4>
+    Encapsulation Security Payload, using Data Encryption Standard for encryption
+    and Message Digest-5 can be used to hide the contents of the packet and authenticate
+    both the contents of the packet and the immutable or predictable parts of the IP header
+    outside the Encapsulation Security Payload with a 56-bit encryption key and a 128-bit
+    authentication key.
+	<p>
+		<ul>
+		  <li><a href="#espdesmd5setup">Setup</a>
+		  <li><a href="#espdesmd5del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="espdesmd5setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp des-md5-96 \
+		--enckey $enckey8 \
+		--authkey $authkey16
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto esp
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp des-md5-96 \
+		--enckey $enckey8 \
+		--authkey $authkey16
+    </pre>
+    <li><a name="espdesmd5del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    <hr>
+      <li><a name="esp3dessha1"><h4>ESP-3DES-SHA1</h4>
+    Encapsulation Security Payload, using triple-Data Encryption Standard for encryption
+    and Secure Hash Algorithm-1 can be used to hide the contents of the packet and authenticate
+    both the contents of the packet and the immutable or predictable parts of the IP header
+    outside the Encapsulation Security Payload with a 168-bit encryption key and a 160-bit
+    authentication key.
+	<p>
+		<ul>
+		  <li><a href="#esp3dessha1setup">Setup</a>
+		  <li><a href="#esp3dessha1del">Delete</a>
+		</ul>
+    <p>
+    <ul>
+      <li><a name="esp3dessha1setup"><h5>Setup</h5>
+    <pre>
+	# forward path
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp \
+		--esp 3des-sha1-96 \
+		--enckey $enckey24 \
+		--authkey $authkey20
+
+	ipsec eroute --add --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask \
+		--edst $remote_public_ip --spi 0x225 --proto esp
+
+	route del $remote_public_ip
+	route add -host $remote_public_ip dev $ipsecdev \
+		gw $local_public_nexthop
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp \
+		--esp 3des-sha1-96 \
+		--enckey $enckey24 \
+		--authkey $authkey20
+    </pre>
+    <li><a name="esp3dessha1del"><h5>Delete</h5>
+    <pre>
+	# forward path
+	route del $remote_public_ip
+
+	ipsec eroute --del --src $local_public_ip/$hmask \
+		--dst $remote_public_ip/$hmask
+
+	ipsec spi --edst $remote_public_ip --spi 0x225 --proto esp --del
+
+	# Return path
+	ipsec spi --edst $local_public_ip --spi 0x235 --proto esp --del
+    </pre>
+    </ul>
+    <hr>
+    </ul>
+    <a name="proc"><h3>IPSEC Status</h3>
+    The files in /proc/net/ipsec_* will reveal the current status of the Klips subsystem.
+    If they don't exist, then IPSEC is not available.
+    <p>
+    <pre>
+	cat /proc/net/ipsec_*
+    </pre>
+  </BODY>
+</HTML>
+
+<!--
+    $Log: modes.html,v $
+    Revision 1.9  2001/04/19 18:54:53  rgb
+    Fixed HTML comment terminator.
+
+    Revision 1.8  1999/04/06 04:54:23  rgb
+    Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+    patch shell fixes.
+
+-->

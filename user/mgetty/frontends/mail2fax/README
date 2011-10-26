@@ -1,0 +1,271 @@
+
+   mail2fax.pl Readme
+   
+  What is mail2fax.pl ?
+  
+   mail2fax.pl is a perl script that implements a gateway between email
+   and FAX. It translates an email - which has to be in a certain email
+   format - into a FAX file and feeds it into the FAX spool program.
+   
+  Requirements
+  
+   The main requirement for mail2fax.pl is perl. It is tested under
+   version 4.036. It also requires a program to spool a FAX too. It also
+   requires a mailer that is capable to accept a pre-formatted mail
+   message at its standard input. 
+   
+  Installation
+  
+   To install the package you have to copy the mail2fax.pl and
+   mail2fax.rc files into certain directories. You also should install a
+   new user called faxadmin that handles all FAX requests. It might also
+   be a good idea to install a mail filter to process only certain mails.
+   
+   
+    mail2fax.pl
+    
+   To install mail2fax.pl copy it to any directory in your search path. A
+   good place is /usr/local/bin. 
+   
+    mail2fax.rc
+    
+   Copy the configuration file mail2fax.rc into any directory - but make
+   sure that you adapt the location of it in mail2fax.pl (see "In
+   mail2fax.pl"). A good place is /usr/local/etc. 
+   
+    faxadmin
+    
+   For a simple but efficient managing of all FAX requests you should
+   install a new user called "faxadmin". If for any reason you can not do
+   that (e.g. you don't have root privileges) you should at least install
+   the mail filter. 
+   
+    .procmailrc
+    
+   Optionally you can install a filter program to only process mail
+   messages that satisfy specific criteria. The distribution contains a
+   template for a filter rule using procmail. If you don't have procmail
+   but the filter program from the "elm" package (or any other filter
+   program) you can use that. Otherwise just add at least a file named
+   ".forward" into the home directory of the account that handles FAX
+   requests:
+   "|/usr/local/bin/mail2fax.pl" #faxadmin"
+   
+    Test Mail
+    
+   The distribution also contains a test mail message that let you try
+   out the whole setup. For a trial run you should set the Debug option.
+   
+  Configuration
+  
+   In order to use mail2fax.pl you have to go through a few steps of
+   configuration. 
+   
+    In mail2fax.pl
+    
+   Edit mail2fax.pl - somewhere in the top few lines of the script you
+   will find a line that reads:
+   $ConfFile = "mail2fax.rc"
+   Change that to reflect the location of the configuration that you
+   chose in the installation. 
+   
+    In mail2fax.rc
+    
+   This is the main configuration file for mail2fax.pl. In here you
+   define several items that control the behaviour of the script itself. 
+   
+      =FaxSpool=
+      
+   This entry defines the program that the script will use to spool a
+   FAX. It requires a certain invocation syntax:
+   faxspool -D 'Recipient' -f 'email-address' FaxNo FaxFile
+   This happens to be the exact syntax of the faxspool program from the
+   package mgetty+sendfax. If you use any other package you might have to
+   write a little script that emulates the faxspool script of
+   mgetty+sendfax ... 
+   
+      =Mailer=
+      
+   This entry defines the program that the script uses to send a mail
+   message back to the requestor of the FAX. It has to accept a
+   pre-formatted mail message at its standard input:
+   sendmail -t 
+   
+      =Billing=
+      
+   This entry switches the billing on of off. A value of "0" will disable
+   this feature, any value > "0" will enable it.
+   
+   Billing is implemented in a pay-ahead fashion. That means, that any
+   user has to buy a certain amount of units up-front. These credits will
+   then be recorded in the mail2fax.rc (see "Remaining credits"). Every
+   time that a FAX is requested to be sent the cost of the Fax will be
+   subtracted from the remaining credits. If the credits are not
+   sufficient the FAX will be rejected and the requestor will be notified
+   via email. 
+   
+      =Debug=
+      
+   This entry enables an internal DEBUG mode. A value of "0" will disable
+   this feature, any value > "0" will enable it. This is for testing
+   purposes only and should normally be set to "0" since it will not
+   actually spool the FAX. 
+   
+      =Unknown=
+      
+   This entry defines the name of the recipient if it is not specified in
+   the email. By default this name is "unknown".
+   
+      =FaxAdmin=
+      
+   This entry defines the account that handles the FAX administration. By
+   default this name is "faxadmin".
+   
+      =Zone=x
+      
+   These entries define the cost per complete FAX (not per page!) per
+   telephone zone. There are 6 zones that allow a flexible price
+   structure. Each zone definition contains two items:
+   
+    1. Zone prefix
+       This item is a string that let you define a prefix of the FAX
+       number. If the FAX number contains this prefix the associated cost
+       is attached for this FAX.
+       The search for the correct zone is from Zone 2 through 6 - thus
+       making the FAX at least as expensive as Zone 1.
+       
+       Example:
+       =Zone=4 1 defines any FAX number starting with "1" as a zone 4
+       number. 
+    2. Zone cost
+       This item defines the associated cost for each zone in units. Each
+       unit is normally a 1/100 of the currency in your country.
+       
+       Example:
+       =Zone=4 1 100 defines the cost for zone 4 as 100 units (~ $1.00)
+       
+   
+   
+      =User=
+      
+   These entries define the user id, password, a discount multiplier, and
+   the remaining credits for each registered user. It is the FAX
+   administrator's responsibility to create these entries by hand. The
+   following four items make up one entry:
+   
+   
+    1. User ID
+       This item is the ID of a registered user. It is checked against
+       the field "Fax-User:" in the email message. If the IDs do not
+       exactly match the FAX will be rejected and the requestor will be
+       notified via email. 
+    2. Password
+       This item is the password of a registered user. It is checked
+       against the field "Fax-Pass:" in the email message. If the
+       passwords do not exactly match the FAX will be rejected and the
+       requestor will be notified via email. 
+    3. Discount multiplier
+       This item is the an optional discount multiplier for a registered
+       user. It allows you to specify whether a user has to pay full
+       price for a FAX (value "1"), a fraction of it (value between "0"
+       and "1"), or even nothing (value "0"). This multiplier is used in
+       the calculation of the cost for the FAX in such a way that the
+       zone cost is multiplied with this factor. 
+    4. Remaining credits
+       This item reflect the remaining credits for a registered user.
+       Initially this value has to be entered by the FAX maintainer. As
+       FAXes are requested their cost is subtracted from this amount and
+       automatically updated.
+       Whenever the user buys another chunk of credits the FAX maintainer
+       has to update this value.
+       
+   
+   
+  Email format
+  
+   Any FAX requesting email must follow a strict format. It must contain
+   at least the following four header lines, one empty line, and one line
+   of FAX message in the body of the email message. The four header lines
+   must be written exactly like they appear below (incl. lower and upper
+   case).
+   
+   
+    1. Fax-To:
+       This line must contain a valid FAX number. It also determines the
+       cost of the FAX if billing is on. 
+    2. Fax-To:
+       This line should contain the name of the intended recipient of the
+       FAX. It can be left blank - in this value of the option =Unknown=
+       is used. 
+    3. Fax-User:
+       This line specifies the user ID of the requestor. It is compared
+       against the user ID in mail2fax.rc. 
+    4. Fax-Pass:
+       This line specifies the password of the requestor. It is compared
+       against the password in mail2fax.rc.
+    5. FAX Message
+       The actual FAX message must follow the FAX header and has to be
+       separated from them by an empty line. It's end is found at the
+       first line starting with "--".
+       
+  FAX status notification
+  
+   The FAX requestor will be notified by email whether the FAX could be
+   spooled or not. He/she will also be notified via email about the tries
+   to send the FAX.
+   
+    Successful request
+    
+   The FAX requestor will be notified via email if the FAX was
+   successfully spooled. This message will contain the FAX number and FAX
+   recipient. If billing is on the message will also contain the cost for
+   this FAX as well as the remaining credits.
+   
+    Unsuccessful request
+    
+   The FAX requestor will be notified via email if the FAX could not be
+   spooled. This message will contain a detailed reasoning for the
+   failure. In this case the requestor will not be billed for the FAX.
+   
+    FAX send status
+    
+   Depending on the FAX system you are using the FAX requestor might be
+   notified via email about any try to send the FAX. The "mgetty+sendfax"
+   package does that. If the FAX could not be sent the requestor should
+   notify the FAX administrator about that fact so the originally
+   subtracted credits can be refunded.
+   
+  User Administration
+  
+   The User Administration must still be done manually. Fortunately it
+   does not involve too many steps.
+   
+    Register a new user
+    
+   To register a new user the FAX administrator has to insert a new
+   =User= entry into the mail2fx.rc file. The password should be
+   negotiated between the FAX administrator and the new user in some way
+   (e.g. the FAX administrator could assign it to the new user). The new
+   user would have to buy a certain number of credits up front (e.g.
+   through sending a check) if the billing option is on.
+   
+    Update the credits for a registered user
+    
+   If the billing option is on the remaining credits will automatically
+   be updated when a FAX is spooled. If the credits run too low the FAX
+   requestor will be notified via mail with a copy to the FAX
+   administrator. The user then has to buy additional credits in order to
+   maintain his/her status as a registered user.
+   
+    Remove a user
+    
+   To remove a user the FAX administrator can either comment out the
+   corresponding entry in mail2fx.rc file or remove it altogether.
+   
+  Legalese
+  
+   This software is (c) Copyright 1995 Thomas Bullinger. There is no
+   explicit or implicit warranty that it will suit your purposes. Even
+   though this software has been thouroughly tested the author does not
+   accept any responsibility for possible damages.
+   The software itself is coverd by the GNU Copying license.

@@ -1,0 +1,278 @@
+#!@PERL@
+#
+# faxq.pl -- show fax queue
+# 
+# Copyright 1998 Simone Demmel simone@greenie.net
+#
+# CVS: $Id: faxq.in,v 1.15 2001/08/07 20:44:46 neko Exp $
+#
+# $Log: faxq.in,v $
+# Revision 1.15  2001/08/07 20:44:46  neko
+# * File fuer Fax-Q zuletzte bearbeitet nach Vorbild faxspool gesetzt,
+# * kleine Korektur in der Repraesentation des Datums (das 101-Problem
+#   hatte ich an einer Stelle uebersehen)
+#
+# Revision 1.14  2001/07/16 09:21:49  neko
+# correctly display sent jobs (JOB.done).
+#
+# Revision 1.13  2001/06/13 21:10:37  neko
+# Some changes in HTML-Output. </body> at the end of the page, fixed the
+# link in index-Pages to send faxes.
+#
+# Revision 1.12  2000/01/11 21:05:36  gert
+# Y2K bug (100)
+#
+# Revision 1.11  1999/03/12 13:13:41  gert
+# clean up ctime display and @tmp
+#
+# Revision 1.10  1998/12/11 14:41:06  gert
+# show page numbers
+#
+# Revision 1.9  1998/11/20 16:36:05  gert
+# - show time of last 'faxrunq' run
+# - put month names into common array (will go to config file later)
+#
+# Revision 1.8  1998/11/20 10:06:44  gert
+# move check for $fax_spool_out to wwwsub.pl
+#
+# Revision 1.7  1998/11/10 16:26:07  gert
+# use ctime, not atime for "date" column
+#
+# Revision 1.6  1998/10/27 15:37:10  gert
+# if JOB file doesn't exist, just say so, but don't write a red error message
+#
+# Revision 1.5  1998/10/27 14:18:02  gert
+# change comments to English
+# use wwwsub.pl for error reporting
+# check directory settings
+#
+# Revision 1.4  1998/10/13 15:53:36  gert
+# logo/<h1> header adjusted
+#
+# Revision 1.3  1998/10/07 13:06:49  gert
+# added (preliminary) config file
+#
+# Revision 1.2  1998/09/04 15:09:40  gert
+# "faxq-v.pl" is now named "faxq-v.cgi"
+#
+# Revision 1.1  1998/08/28 14:23:24  gert
+# initial release
+#
+
+#
+# Script to generate an overview of faxq state
+#
+
+# sorry, no translation possible
+# Aufgabe:
+# - 1. zusammenfassender Grobueberblick ueber die Stati -> fax.html
+#
+
+#
+# not to forget...
+#
+print "Content-type: text/html\n\n";
+
+# read configuration file
+require "@CONFDIR@/wwwgui.conf";
+
+# read common subroutine file
+require "@LIBDIR@/wwwsub.pl";
+
+#
+# check, if all necessary variables are available
+#
+
+# check, if fax-outgoing is defined
+check_outgoing();
+
+# check, if $indexpage is not empty
+if ($indexpage eq "")
+{
+    errormessage( "\$indexpage : not configured - please look at the configuration-Files and configure the URL for my main-index-page (\$indexpage)");
+}
+
+# set names for months
+@monthnames = (Jan,Feb,Mar,Apr,Mai,Jun,Jul,Aug,Sep,Okt,Nov,Dez);
+
+# last_run
+$last_run = "@VARRUNDIR@/faxqueue_done";
+
+#
+# End of Variables
+#
+
+#
+# start it
+#
+
+
+chdir $fax_outgoing;
+
+# when did we have the last run of faxrunq(d)?
+if (-f $last_run)
+{
+@lastrun = stat $last_run;
+@lastrun = localtime($lastrun[9]);
+$lastrun[4] = $monthnames[$lastrun[4]];
+$lastrun[5] += 1900;
+$lastrun = $lastrun[3].".".$lastrun[4]." ".$lastrun[5]." ".$lastrun[2].":".$lastrun[1].":".$lastrun[0];
+}
+elsif (!defined $last_run) { $lastrun = "$last_run not defined"; }
+else { $lastrun = "no such file $last_run"; }
+
+
+#
+# HTML top part
+#
+
+print <<EOF;
+<html><head>
+<title></title>
+</head>
+<body bgcolor="#ffffff">
+
+$www_logo
+<h1 align="center">Faxmanager - Stati zu sendender Faxe</h1><br clear="all">
+<hr size="5">
+
+<div align="center">
+<table border="1" cellpadding="4">
+<tr>
+	<th>ID</th>
+	<th>Status</th>
+	<th>Datum</th>
+	<th>User</th>
+	<th>Email</th>
+	<th>Fax-Nr.</th>
+	<th>S.</th>
+	<th>Fehler</th>
+	<th>Details</th>
+</tr>
+EOF
+
+
+# generate:
+# <tr>
+# 	<td>9:00</td>
+# 	<td><a href="tmp.html" target="_new">408978645678</a></td>
+# 	<td>waiting</td>
+# 	<td>3</td>
+# </tr>
+
+@datein = ();
+opendir DIRECTORY, "." || print "cannot open $fax_outgoing\n";
+foreach $DATEI ( readdir DIRECTORY )
+{
+  if ($DATEI =~ /^F/) { push @datein, $DATEI; }
+}
+closedir DIRECTORY;
+
+foreach $DATEI (sort(@datein))
+{
+
+# init various Variables
+$status = "unknown";		# state
+$von = "unknown";		# from
+$an = "unknown";		# to
+$zeit = "unknown";		# time
+$pages = "0";			# number of pages
+$fehlversuche = "&nbsp;";	# unsuccessful tries
+$mail = "&nbsp;";		# mail
+
+  if ($DATEI eq "") {next;}
+# DEBUGGING
+# print "bearbeite: $DATEI\n";
+  $fehlversuche = "0";
+
+  if ($DATEI eq "."|| $DATEI eq ".."|| $DATEI eq "locks")
+  {
+    next;
+  }
+
+  elsif (-e $fax_outgoing."/".$DATEI."/JOB" &&
+    !(-e $fax_outgoing."/".$DATEI."/JOB.locked"))
+  {
+    $status = "wartend";
+    $target = $DATEI."/JOB";
+  }
+  elsif (-e $fax_outgoing."/".$DATEI."/JOB" && 
+	 -e $fax_outgoing."/".$DATEI."/JOB.locked")
+  {
+    $status = "<font color=\"#009900\">on modem</font>";
+    $target = $DATEI."/JOB";
+  }
+  elsif (-e $fax_outgoing."/".$DATEI."/JOB.suspended")
+  {
+    $status = "<font color=\"#aa0000\">suspended</font>";
+    $target = $DATEI."/JOB.suspended";
+  }
+  elsif (-e $fax_outgoing."/".$DATEI."/JOB.done")
+  {
+    $status = "<font color=\"#009900\">done</font>";
+    $target = $DATEI."/JOB.done";
+  }
+  else
+  {
+    $status = "<font color=\"#0000ff\">unbekannt</font>"; 
+    $target = "";
+  }
+  # $zeit = -M $fax_outgoing."/".$DATEI."/JOB";
+  $_ = (stat $fax_outgoing."/".$DATEI) [10];
+  @_ = localtime($_);
+  $_[4] = $monthnames[$_[4]];
+  $_[5] += 1900;
+  $zeit = sprintf "$_[3]. $_[4] $_[5] %02d:%02d:%02d", $_[2], $_[1], $_[0];
+
+  if (open (DAT, "$target"))
+  {
+    while(<DAT>) {
+      chomp $_;
+      if (/^phone (.*)/) { $an = $1;}
+      if (/^user (.*)/) { $von = $1;}
+      if (/^mail (.*)/) { $mail = $1;}
+      if (/^pages (.*)/) { @_ = split / /, $1; $pages = $#_; }
+      if (/^Status /) { $fehlversuche++;}
+    }
+    close (DAT);
+
+
+print <<EOF;
+
+<tr>
+	<td><a href="nph-vf-gif.cgi?source=outgoing&size=10&file=$DATEI">$DATEI</a></td>
+	<td>$status</td>
+	<td>$zeit</td>
+	<td>$von</td>
+	<td>$mail</td>
+	<td>$an</td>
+	<td>$pages</td>
+  	<td>$fehlversuche</td>
+  	<td><a href="faxq-v.cgi?name=$DATEI">Details</a></td>
+</tr>
+EOF
+  }
+  elsif (!-f $target)
+  {
+    print "<tr><td>$DATEI</td><td>$status</td><td colspan=\"7\">keine JOB-Datei</td></tr>\n";
+  }
+  else 
+  {
+    print "<tr><td>$DATEI</td><td colspan=\"8\" bgcolor=\"#ff0000\">kann JOB-Datei nicht lesen: $!</td></tr>\n";
+  }
+}
+
+
+print <<EOF;
+</table>
+<p>
+Fax-Queue zuletzt bearbeitet: $lastrun
+</div>
+
+<p>
+<hr size="5">
+<a href="$indexpage">^Hauptmenue</a>
+</body></html>
+EOF
+
+exit 0

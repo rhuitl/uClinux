@@ -1,0 +1,53 @@
+##############################################################################
+
+#
+#	mkflashjffs -- construct an entire NETtel/x86 flash image.
+#
+#	(C) Copyright 1999-2001, Greg Ungerer (gerg@snapgear.com)
+#
+
+##############################################################################
+
+#
+#	Define the files to use.
+#
+FLASH=images/flash.bin
+KERNEL=images/bzImage
+JFFSIMG=images/jffs.img
+
+##############################################################################
+
+usage()
+{
+	echo "usage: mkflashjffs"
+	exit 1
+}
+
+##############################################################################
+
+#
+#	Check for any args...
+#
+if [ $# -gt 0 ]
+then
+	usage
+fi
+
+#
+#	Kernel first.
+#
+cat $KERNEL > $FLASH
+SIZE=`cat $FLASH | wc -c`
+PAD=`expr 1048576 - $SIZE`
+echo "KERNEL: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD 2> /dev/null | tr \\000 \\377 >> $FLASH
+
+#
+#	JFFS filesystem.
+#
+cat $JFFSIMG >> $FLASH
+SIZE=`cat $FLASH | wc -c`
+echo "IMG: flash size=$SIZE"
+
+cp $FLASH /tftpboot
+exit 0

@@ -1,0 +1,152 @@
+dnl Process this file with autoconf to produce a configure script
+AC_INIT(pam_read_conf.c)
+AC_CONFIG_HEADER(config.h)
+
+AC_ARG_ENABLE(encrypt-pass,[ --disable-encrypt-pass Disable Encrypted Passwords],,enableval="yes")
+
+if test "$enableval" != "no"; then
+	AC_DEFINE(PAM_SMB_ENC_PASS)
+	AC_MSG_RESULT(Will compile with encrypted password support)
+else
+	AC_MSG_RESULT(Will compile without encrypted password support)
+fi
+
+dnl autoconf stuff begins here
+AC_DEFUN(AC_PROG_CC_NO_G,
+        [AC_BEFORE([$0], [AC_PROG_CPP])dnl
+        AC_CHECK_PROG(CC, gcc, gcc)
+if test -z "$CC"; then
+        AC_CHECK_PROG(CC, cc, cc, , , /usr/ucb/cc)
+        test -z "$CC" && AC_MSG_ERROR([no acceptable cc found in \$PATH])
+fi
+
+AC_PROG_CC_WORKS
+AC_PROG_CC_GNU
+
+if test $ac_cv_prog_gcc = yes; then
+        GCC=yes
+        dnl Check whether -g works, even if CFLAGS is set, in case the package
+        dnl plays around with CFLAGS (such as to build both debugging and
+        dnl normal versions of a library), tasteless as that idea is.
+        ac_test_CFLAGS="${CFLAGS+set}"
+        ac_save_CFLAGS="$CFLAGS"
+        CFLAGS=
+        dnl   C Begin
+        dnl AC_PROG_CC_G
+        dnl   C End
+        if test "$ac_test_CFLAGS" = set; then
+              CFLAGS="$ac_save_CFLAGS"
+              dnl   C Begin
+              dnl  elif test $ac_cv_prog_cc_g = yes; then
+              dnl    CFLAGS="-g -O2"
+              dnl   C End
+        else
+              CFLAGS="-O2"
+        fi
+else
+        GCC=
+        test "${CFLAGS+set}" = set
+        dnl   C Begin
+        dnl || CFLAGS="-g"
+        dnl   C End
+fi
+])
+dnl autoconf stuff ends here
+
+dnl Checks for programs.
+
+AC_PROG_CC_NO_G
+AC_PROG_CC_WORKS
+AC_PROG_CC_GNU
+
+AC_PROG_MAKE_SET
+AC_PROG_INSTALL
+
+AC_HEADER_STDC
+
+AC_CHECK_HEADERS(shadow.h security/pam_appl.h unistd.h security/pam_modules.h)
+
+AC_MSG_CHECKING(for LOG_AUTHPRIV)
+AC_EGREP_CPP(yes, [#include <syslog.h>
+#ifdef LOG_AUTHPRIV
+ yes
+#endif
+], has_logauthpriv=yes, has_logauthpriv=no)
+AC_MSG_RESULT($has_logauthpriv)
+if test "$has_logauthpriv" != "yes"; then
+	AC_DEFINE(USE_LOGAUTH)
+fi
+
+AC_CHECK_LIB(crypt, main, has_crypt=yes, has_crypt=no)
+if test "$has_crypt" != "no"; then
+	AC_DEFINE(HAVE_LIBCRYPT)
+	LIBS="$LIBS -lcrypt"
+fi
+
+dnl Shared library checking
+
+AC_C_CONST
+
+AC_MSG_CHECKING([system version (for dynamic loading)])
+if test -f /usr/lib/NextStep/software_version; then
+    system=NEXTSTEP-`awk '/3/,/3/' /usr/lib/NextStep/software_version`
+else
+    system=`uname -s`-`uname -r`
+    if test "$?" -ne 0 ; then
+        AC_MSG_RESULT([unknown (can't find uname command)])
+        system=unknown
+    else
+        # Special check for weird MP-RAS system (uname returns weird
+        # results, and the version is kept in special file).
+
+        if test -r /etc/.relid -a "X`uname -n`" = "X`uname -s`" ; then
+            system=MP-RAS-`awk '{print $3}' /etc/.relid`
+        fi
+        if test "`uname -s`" = "AIX" ; then
+            system=AIX-`uname -v`.`uname -r`    
+        fi
+        AC_MSG_RESULT($system)
+    fi
+fi         
+
+# Step 2: check for existence of -ldl library.  This is needed because
+# Linux can use either -ldl or -ldld for dynamic loading.
+
+AC_CHECK_LIB(dl, dlopen, have_dl=yes, have_dl=no) 
+
+case $system in
+	Linux*)
+        SHLIB_CFLAGS="-fPIC"
+        SHLIB_LD_LIBS=""
+        SHLIB_SUFFIX=".so"
+        if test "$have_dl" = yes; then
+            SHLIB_LD="${CC} -shared"
+            LD_FLAGS="-rdynamic"
+            LD_SEARCH_FLAGS=""
+        else
+            AC_CHECK_HEADER(dld.h, [
+                SHLIB_LD="ld -shared"
+                LD_FLAGS=""
+                LD_SEARCH_FLAGS=""])
+        fi
+        ;;                        
+    SunOS-5*)
+        SHLIB_CFLAGS="-KPIC"
+        SHLIB_LD="/usr/ccs/bin/ld -B dynamic -G "
+        SHLIB_LD_LIBS=""
+        SHLIB_SUFFIX=".so"
+        LD_FLAGS=""
+        LD_SEARCH_FLAGS='-R ${LIB_RUNTIME_DIR}'
+        ;;                                         
+esac
+
+if test "$CC" = "gcc" -o `$CC -v 2>&1 | grep -c gcc` != "0" ; then
+                SHLIB_CFLAGS="-fPIC"
+fi
+
+AC_SUBST(SHLIB_CFLAGS)
+AC_SUBST(SHLIB_LD)
+AC_SUBST(SHLIB_LD_LIBS) 
+
+AC_OUTPUT(Makefile)
+

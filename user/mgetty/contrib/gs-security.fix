@@ -1,0 +1,70 @@
+From owner-mgetty Thu Aug 24 11:13:35 1995
+Return-Path: <owner-mgetty>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0slYLu-0004cxC@greenie.muc.de>; Thu, 24 Aug 95 11:13 MEST
+Return-Path: <l-mgetty-owner@muc.de>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0slYLt-0000srC@greenie.muc.de>; Thu, 24 Aug 95 11:13 MEST
+Received: from tarsier.cv.nrao.edu ([192.33.115.50]) by vogon.muc.de with SMTP id <93325-1>; Thu, 24 Aug 1995 11:13:04 +0200
+Received: (from juphoff@localhost) by tarsier.cv.nrao.edu (8.6.12/8.6.9) id FAA07826; Thu, 24 Aug 1995 05:12:23 -0400
+Date: Thu, 24 Aug 1995 11:12:23 +0200
+Message-Id: <199508240912.FAA07826@tarsier.cv.nrao.edu>
+From: Jeff Uphoff <juphoff@tarsier.cv.nrao.edu>
+To: mgetty@muc.de
+Subject: Ghostscript problem.
+X-Spook: Mossad NORML Mossad 
+X-Mailer: VM 5.94 (beta); GNU Emacs 19.29.1
+X-Attribution: Up
+Status: RO
+
+Here's the description of the hole that I mentioned in my previous
+e-mail, which was a CC of a message that I was posting to the Linux
+security list.
+
+I CC'd the 'mgetty' list because we were discussing, and trying to
+compile a list of, software that calls Ghostscript (both "safely" and
+"unsafely") and I had mentioned that 'faxspool' calls it (safely) to do
+file-conversions.  Since there may be people out there FAXing files that
+they have received from the outside--thus opening themselves up to this
+vulnerability--this is of interest here as well.
+
+(Any users of the WWW that view remote Postscript files are of course
+*very* vulnerable!)
+
+The easiest way to demonstrate the problem is to view the following
+Postscript file with either Ghostview or Ghostscript.  Even the
+"-dSAFER" option (which Ghostview v1.5 passes to Ghostscript by default)
+does not prevent the file-write:
+
+%!PS-
+(%pipe%echo hacker@rogue.site >> /tmp/foo) (r) file
+quit
+
+Replace /tmp/foo with /.rhosts (or use Postscript's getenv capabilites
+to write to ~/.rhosts) and you quickly see the dangers...
+
+One fix (thanks go out to Olaf Kirch for this) is to patch the
+gs_init.ps file in your Ghostscript library area in the following
+manner:
+
+--- gs_init.ps.orig	Sun Aug 20 23:22:01 1995
++++ gs_init.ps	Sun Aug 20 23:22:46 1995
+@@ -302,7 +302,8 @@
+ % If we want a "safer" system, disable some obvious ways to cause havoc.
+ SAFER not { (%END SAFER) .skipeof } if
+ /file
+- { dup (r) eq
++ { exch dup /..fname exch def exch
++   dup (r) eq ..fname (%pipe%*) .stringmatch not and
+     { file }
+     { /invalidfileaccess signalerror }
+    ifelse
+
+
+--Up.
+
+-- 
+Jeff Uphoff - systems/network admin.  |  juphoff@nrao.edu
+National Radio Astronomy Observatory  |  jeff.uphoff@linux.org
+Charlottesville, VA, USA              |  http://linux.nrao.edu/~juphoff/
+

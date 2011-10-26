@@ -1,0 +1,126 @@
+#
+#	stndSrc.pak - Files needed for the source installation of appWeb
+#
+#	Copyright (c) Mbedthis LLC, 2003-2004. All Rights Reserved.
+#
+
+#	NOTE: Usage: cpmod src dest [perm] [owner.group]
+
+SrcD=${BLD_TOP}/doc/${BLD_PRODUCT}/release
+DestD=${BLD_SRC_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/COPYRIGHT.TXT
+cpmod ${SrcD}/LICENSE.TXT
+
+SrcD=${BLD_TOP}
+DestD=${BLD_SRC_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/INSTALL.TXT
+cpmod ${SrcD}/README.TXT
+cpmod ${SrcD}/FILES.TXT
+
+patchFile ${DestD}/README.TXT
+
+#
+#	Make required directories
+#
+for type in obj/DEBUG obj/RELEASE bin/DEBUG bin/RELEASE
+do
+	DestD=${BLD_SRC_PREFIX}/${type}
+	mkdir -p ${DestD}
+	#
+	#	Create a dummy file for zip installs so the directory gets created
+	#
+	>${DestD}/dummy.obj
+done
+
+#
+#	Primary configuration files
+#
+SrcD=${BLD_TOP}
+DestD=${BLD_SRC_PREFIX}/conf
+mkdir -p ${DestD}
+cpmod ${SrcD}/conf/Makefile ${DestD} 755
+cpmod ${SrcD}/conf/make.dep ${DestD} 755
+cpmod ${SrcD}/conf/config.guess ${DestD} 755
+cpmod ${SrcD}/conf/config.sub ${DestD} 755
+cpmod ${SrcD}/conf/FILES.TXT
+
+for os in LINUX WIN SOLARIS
+do
+	cpmod ${SrcD}/conf/make.os.$os
+done
+
+SrcD=${BLD_TOP}/conf/${BLD_PRODUCT}
+DestD=${BLD_SRC_PREFIX}/conf/${BLD_PRODUCT}
+mkdir -p ${DestD}
+for f in ${SrcD}/*.defaults 
+do
+	b=`basename $f`
+	cpmod ${f} ${DestD}/${b} 664
+done
+
+SrcD=${BLD_TOP}/conf
+DestD=${BLD_SRC_PREFIX}/conf
+mkdir -p ${DestD}
+if [ -f ${BLD_TOP}/mbedthis ]
+then
+	cpmod ${SrcD}/${BLD_PRODUCT}/normal.defaults \
+		${DestD}/config.defaults 664
+else
+	cpmod ${SrcD}/config.defaults ${DestD}/config.defaults 664
+fi
+cpmod ${SrcD}/template.config.h ${DestD}/template.config.h 444
+cpmod ${SrcD}/template.config.make ${DestD}/template.config.make 444
+cpmod ${SrcD}/template.config.sh ${DestD}/template.config.sh 444
+
+#
+#	Top level make files
+#
+SrcD=${BLD_TOP}
+DestD=${BLD_SRC_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/Makefile
+cpmod ${SrcD}/make.dep
+cpmod ${SrcD}/configure ${DestD} 755
+cpmod ${SrcD}/make.rules ${DestD}/make.rules
+cpmod ${SrcD}/make.os ${DestD}/make.os
+
+SrcD=${BLD_TOP}/bin
+DestD=${BLD_SRC_PREFIX}/bin
+mkdir -p ${DestD}
+cpmod ${SrcD}/bld ${DestD} 775
+cpmod ${SrcD}/incBuild ${DestD} 775
+
+SrcD=${BLD_TOP}/bootstrap
+DestD=${BLD_SRC_PREFIX}/bootstrap
+mkdir -p ${DestD}
+cpmod ${SrcD}/Makefile
+cpmod ${SrcD}/make.dep
+
+SrcD=${BLD_TOP}/bootstrap/genDepend
+DestD=${BLD_SRC_PREFIX}/bootstrap/genDepend
+mkdir -p ${DestD}
+cpmod ${SrcD}/Makefile
+cpmod ${SrcD}/make.dep
+cpmod ${SrcD}/getopt.cpp
+cpmod ${SrcD}/getopt.h
+cpmod ${SrcD}/genDepend.cpp
+
+SrcD=${BLD_TOP}/bootstrap/dumpext
+DestD=${BLD_SRC_PREFIX}/bootstrap/dumpext
+mkdir -p ${DestD}
+cpmod ${SrcD}/Makefile
+cpmod ${SrcD}/make.dep
+cpmod ${SrcD}/dumpext.c
+cpmod ${SrcD}/postBuild.bat
+cpmod ${SrcD}/dumpext.dsp
+
+SrcD=${BLD_TOP}/bootstrap/bldout
+DestD=${BLD_SRC_PREFIX}/bootstrap/bldout
+mkdir -p ${DestD}
+cpmod ${SrcD}/Makefile
+cpmod ${SrcD}/make.dep
+cpmod ${SrcD}/getopt.cpp
+cpmod ${SrcD}/getopt.h
+cpmod ${SrcD}/bldout.cpp

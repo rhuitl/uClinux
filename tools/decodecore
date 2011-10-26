@@ -1,0 +1,355 @@
+#!/usr/bin/tclsh
+#
+# decode as much as possible an application printk core dump
+# to speed debugging, takes an optional romfs-inst.log that is usually
+# created in your images directory in order to provide symbols by name
+# rather than just addresses.  Can handle multiple core dumps in the input
+# file.
+#
+# the output will do the following:
+#
+# 1. Find the PC,  if possible and print the symbol and/or address within
+#    the application or library as required to debug further.
+#
+# 2. Find the return address,  if possible and print the symbol and/or
+#    address within the application or library as required to debug further.
+#
+# 3. for every value on the stack,  see if it lies within the application
+#    and if so print the text/data address and symbol for it if found. The
+#    stack is printed in ascending order so you get a rudimentary stack
+#    backtrace
+#
+# david_mccullough@securecomputing.com
+#
+
+package require cmdline
+set options {
+	{m.arg "" "lsmod output"}
+}
+append usage \
+"\[options\] core-dump-text-file \[romfs-inst.log\]\n" \
+"       Decode as much as possible from a file containing SH\n" \
+"       or ARM core dump traces. The coredump text can be\n" \
+"       prefixed with misc junk, ie., syslog infomation.\n" \
+"options:"
+array set params [::cmdline::getoptions argv $options $usage]
+
+if {[llength $argv] < 1} {
+	puts [::cmdline::usage $options $usage]
+	exit 1
+}
+
+# some globals, "ra" or return address may not be possible on all archs
+set ::coredumps 0
+
+# parse the printk coredump output,  ignoring any leading garbage as found
+# in syslog etc
+
+proc load_coredump {filename} {
+	set f [open $filename]
+
+	set stackdump 0
+	set oops 0
+
+	while {[gets $f line] >= 0} {
+		if {[regexp -nocase {Internal error: Oops:} $line dummy]
+				|| [regexp -nocase {WARNING: at} $line dummy]
+				|| [regexp -nocase {Oops\[.*\]:} $line dummy]
+				|| [regexp -nocase {Unhandled kernel unaligned access\[.*\]:} $line dummy]} {
+			set stackdump 0
+			incr ::coredumps
+			if {[info exists ::segments(lsmod)]} {
+				set ::segments($::coredumps) $::segments(lsmod)
+			} else {
+				set ::segments($::coredumps) {}
+			}
+			load_segment vmlinux
+			if {[info exists ::segments(vmlinux)]} {
+				lappend ::segments($::coredumps) $::segments(vmlinux)
+			}
+			set ::pc($::coredumps) 0
+			set ::ra($::coredumps) 0
+			set ::stack($::coredumps) {}
+			set ::backtrace($::coredumps) {}
+			set oops 1
+			continue
+		}
+		if {[regexp -nocase {STACK DUMP} $line dummy]} {
+			set stackdump 1
+			incr ::coredumps
+			set ::pc($::coredumps) 0
+			set ::ra($::coredumps) 0
+			set ::backtrace($::coredumps) {}
+			set oops 0
+			continue
+		}
+
+		if {$stackdump && [regexp {^.*(0x)*[0-9a-f]+:([0-9a-fA-F ]+)$} $line dummy dummy2 addrs]} {
+			append ::stack($::coredumps) $addrs
+			continue
+		}
+		# MIPS64 stack
+		if {$stackdump && [regexp {^ *([ [:xdigit:]]+)$} $line dummy addrs]} {
+			append ::stack($::coredumps) "$addrs "
+			continue
+		}
+
+		if {$oops} {
+			# things are backwards in a 2.4 oops at least
+			if {[regexp -nocase {Stack:} $line dummy]} {
+				set stackdump 1
+				continue;
+			}
+			# MIPS64 stack start
+			if {[regexp -nocase {Stack : ([ [:xdigit:]]+)$} $line dummy addrs]} {
+				append ::stack($::coredumps) $addrs
+				set stackdump 1
+				continue
+			}
+			if {[regexp -nocase {Backtrace:} $line dummy]} {
+				set stackdump 0
+				continue;
+			}
+		} else {
+			set stackdump 0
+		}
+
+		# The SH program counter
+		if {[regexp {PC *: *([0-9a-f]+)} $line dummy val]} {
+			set ::pc($::coredumps) 0x$val
+		}
+		# The ARM program counter
+		if {[regexp {pc *: *\[<([0-9a-f]+)>\]} $line dummy val]} {
+			set ::pc($::coredumps) 0x$val
+		}
+		# The i386 program counter
+		if {[regexp {EIP:[ 0-9a-fA-F]*:*\[<([0-9a-f]+)>\]} $line dummy val]} {
+			set ::pc($::coredumps) 0x$val
+		}
+		# The MIPS program counter
+		if {[regexp {epc *: *([0-9a-f]+)} $line dummy val]} {
+			set ::pc($::coredumps) 0x$val
+		}
+		# The SH return address
+		if {[regexp {PR *: *([0-9a-f]+)} $line dummy val]} {
+			set ::ra($::coredumps) 0x$val
+		}
+		# The ARM return address
+		if {[regexp {lr *: *[[]<([0-9a-f]+)>\]} $line dummy val]} {
+			set ::ra($::coredumps) 0x$val
+		}
+		# The MIPS return address register
+		if {[regexp {^\$24:.* ([0-9a-f]+)$} $line dummy val]} {
+			set ::ra($::coredumps) 0x$val
+		}
+		# The MIPS64 return address register
+		if {[regexp {ra *: *([[:xdigit:]]+)} $line dummy val]} {
+			set ::ra($::coredumps) 0x$val
+		}
+		# check for an executable dump segment
+		if {[regexp {([0-9a-f]+)-([0-9a-f]+) r[-w][-x]p .* (/[^ 	]*)\W*$} $line dummy from to segment]} {
+			lappend ::segments($::coredumps) [list $segment 0x$from 0x$to]
+		}
+		# Function backtrace
+		if {[regexp {^Function entered at \[<([0-9a-f]+)>\] from \[\<([0-9a-f]+)>\]$} $line dummy at from]} {
+			lappend ::backtrace($::coredumps) [list 0x$at 0x$from]
+		}
+		# MIPS64 Call trace
+		if {[regexp {^(Call Trace:)?\[<([[:xdigit:]]+)>\] 0x([[:xdigit:]]+) *$} $line dummy dummy at from]} {
+			lappend ::backtrace($::coredumps) [list 0x$at 0x$from]
+		}
+	}
+	close $f
+}
+
+# load the lsmod output,  converting the data into segments
+proc load_lsmod {filename} {
+	set f [open $filename]
+	while {[gets $f line] >= 0} {
+		if {[regexp {^([^ ]+)\s+(\d+)\s+.*\s+(0x[0-9a-f]{8})(?:\s+.*)?$} $line dummy name size from]} {
+			set to [format 0x%x [expr $from + $size]]
+			lappend ::segments(lsmod) [list ${name}.ko $from $to]
+		}
+	}
+	close $f
+}
+
+# load the romfs log,  converting the data into actually executable names
+proc load_romfslog {filename} {
+	if {[regexp -nocase {vmlinux} $filename dummy]} {
+		set ::binaries(vmlinux) $filename
+		return
+	}
+	set f [open $filename]
+	while {[gets $f line] >= 0} {
+		if {[regexp {^([^ ]+)\W*/.*/romfs/(.*)$} $line dummy src bin]} {
+			set ::binaries([string tolower /$bin]) $src
+			if {[regexp {.*/(.+)} $bin dummy file]} {
+				set ::binaries([string tolower $file]) $src
+			}
+		}
+	}
+	close $f
+}
+
+# load the symbols from an executable
+proc load_syms {filename} {
+	if {[info exists ::syms($filename)]} {
+		return
+	}
+	set f [open "|nm -nv -C $filename"]
+	set s [list]
+	while {[gets $f line] >= 0} {
+		if {[regexp {^0*([[:xdigit:]]+)\W+\w+\W+([^$].*)$} $line dummy addr sym]} {
+			if {[string length $sym] > 1} {
+				lappend s [list 0x$addr $sym]
+			}
+		}
+	}
+	close $f
+	set ::syms($filename) $s
+
+	set f [open "|strings -t x $filename"]
+	set s [list]
+	while {[gets $f line] >= 0} {
+		if {[regexp {^[0 	]*([[:xdigit:]]+)[ 	]+(.*)$} $line dummy addr str]} {
+			lappend s [list 0x$addr $str]
+		}
+	}
+	close $f
+	set ::strings($filename) $s
+}
+
+proc load_segment {seg} {
+	if {![info exists ::binaries([string tolower $seg])]} {
+		return
+	}
+	set filename $::binaries([string tolower $seg])
+	load_syms $filename
+	if {![info exists ::syms($filename)]} {
+		return
+	}
+	set from [lindex [lindex $::syms($filename) 0] 0]
+	set to [lindex [lindex $::syms($filename) end] 0]
+	set ::segments($seg) [list $seg $from $to]
+}
+
+# find a symbol in the currently loaded data if possible
+proc find_sym {seg addr} {
+	if {![info exists ::binaries([string tolower $seg])]} {
+		return ""
+	}
+	set filename $::binaries([string tolower $seg])
+	load_syms $filename
+	if {![info exists ::syms($filename)]} {
+		return ""
+	}
+	set last ""
+	foreach sym $::syms($filename) {
+		set val [lindex $sym 0]
+		if {$addr < $val} {
+			break
+		}
+		set last [lindex $sym 1]
+	}
+	return $last
+}
+
+# find a symbol in the currently loaded data if possible
+proc find_str {seg addr} {
+	if {![info exists ::binaries([string tolower $seg])]} {
+		return ""
+	}
+	set filename $::binaries([string tolower $seg])
+	load_syms $filename
+	if {![info exists ::syms($filename)]} {
+		return ""
+	}
+	set last ""
+	set ret ""
+	foreach str $::strings($filename) {
+		set val [lindex $str 0]
+		if {$addr < $val} {
+			break
+		}
+		set last "[lindex $str 1]"
+		if {$addr - $val < [string length $last]} {
+			set ret "\"[string range $last [expr $addr - $val] [string length $last]]\""
+		}
+	}
+	return $ret
+}
+
+# given an address find the part of the executable (app/lib) it is in
+proc find_segment {segments addr} {
+	foreach segment $segments {
+		set seg [lindex $segment 0]
+		set from [lindex $segment 1]
+		set to [lindex $segment 2]
+		if {$addr >= $from && $addr < $to} {
+			if {[regexp {\.[ks]o} $seg dummy]} {
+				set saddr [expr $addr - $from]
+			} else {
+				set saddr $addr
+			}
+			set sym "[find_sym $seg $saddr]"
+			set str "[find_str $seg $saddr]"
+			return "[format %x $saddr]($sym) in $seg ($from - $to) $str"
+		}
+	}
+	return ""
+}
+
+# process a printk core dump output giving as much info as possible
+proc examine_coredump {filename} {
+	load_coredump $filename
+
+	for {set i 1} {$i <= $::coredumps} {incr i} {
+		puts "---------------------- dump $i -------------------"
+		puts "Possible PC:     [find_segment $::segments($i) $::pc($i)]"
+		puts "Possible caller: [find_segment $::segments($i) $::ra($i)]"
+		puts ""
+		puts "Possible Backtrace:"
+		foreach addr [split $::stack($i)] {
+			set val [find_segment $::segments($i) 0x$addr]
+			if {$val != ""} {
+				puts "$addr: $val"
+			}
+		}
+		puts "ASCII stack:"
+		foreach addr [split $::stack($i)] {
+			if {[regexp {([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})} $addr all one two three four]} {
+				foreach char "$one $two $three $four" {
+					if {"0x$char" > 0x1f && "0x$char" < 0x7f} {
+						puts -nonewline [format "%c" 0x$char]
+					} else {
+						puts -nonewline "."
+					}
+				}
+			}
+		}
+		puts ""
+		foreach backtrace $::backtrace($i) {
+			set at [find_segment $::segments($i) [lindex $backtrace 0]]
+			set from [find_segment $::segments($i) [lindex $backtrace 1]]
+			if {$at == ""} {
+				set at [lindex $backtrace 0]
+			}
+			if {$from == ""} {
+				set from [lindex $backtrace 1]
+			}
+			puts "Function entered at $at from $from"
+		}
+	}
+}
+
+# main program
+
+set coredump [lindex $argv 0]
+foreach file [lrange $argv 1 end] {
+	load_romfslog $file
+}
+if {$params(m) != ""} {
+	load_lsmod $params(m)
+}
+puts [examine_coredump $coredump]

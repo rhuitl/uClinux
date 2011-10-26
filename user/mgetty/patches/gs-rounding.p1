@@ -1,0 +1,82 @@
+Date: Mon, 22 Feb 1999 22:17:15 +0100 (CET)
+From: Olof S Kylander <olof@frozenriver.com>
+To: Gert Doering <gert@greenie.muc.de>
+Subject: Bug report with fix/patch.
+
+Hello Gert,
+
+There is a bug in ghostscripts gfax "device" driver. This bug will make
+some ps files converted to g3 with "gs -sDEVICE=faxg3" non valid g3 files. 
+
+The error is that the g3 file gets a incorrect line width. This results in
+a 100% error rate when trying to fax the file with sendfax. ( i.e
+Transmission error: +FHNG:54 (No response to EOP repeated 3 times) which
+after some Usenet reading seems to be  very common fax error.
+
+It's not all ps files that is "converted" to g3 with ghostscript that has
+the incorrect line width. But it is very common that ps files produced by
+StarOffice  gets a "incorrect line width"  error when converted to g3.
+Observe that this is not a StarOffice only error other programs that
+also produce ps as output is also effected. 
+
+
+So why does it not effect all ps files? This is because it's a rounding
+error in the gdev_fax_init_state function in the gdevtfax.c file. All
+versions of ghostscript 3.01 and later has this bug. 
+
+Since faxspool depend on a well behaved faxg3 I suggest that you include
+the patch in the patch directory in mgetty.
+
+NOTE: dfaxhigh/dfaxlow has the same type of error so it can be
+advice able to put a not to change from dfaxhig/dfaxlow to faxg3. At
+least faxpr uses dfaxhigh/dfaxlow instead of faxg3.
+
+Here comes the patch to fix the rounding error in gs
+
+-----------------------------cut--------------------------------------
+
+--- gdevtfax.c.orig     Mon Feb 22 20:02:46 1999
++++ gdevtfax.c  Mon Feb 22 20:08:21 1999
+@@ -124,9 +124,17 @@
+ /* These select the same defaults as the CCITTFaxEncode filter, */
+ /* except we set BlackIs1 = true. */
+ void
+-gdev_fax_init_state(stream_CFE_state * ss, const gx_device_printer *
+pdev)
++gdev_fax_init_state(stream_CFE_state *ss, gx_device_printer *pdev)
+ {
+     (*s_CFE_template.set_defaults) ((stream_state *) ss);
++    if ( pdev->width >= 1680 && pdev->width <= 1736 )
++       {     /* Adjust width for A4 paper. */
++             pdev->width = 1728;
++       }
++    else if ( pdev->width >= 2000 && pdev->width <= 2056 )
++       {     /* Adjust width for B4 paper. */
++             pdev->width = 2048;
++       }     /* rounding errors give illegal g3 files */
+     ss->Columns = pdev->width;
+     ss->Rows = pdev->height;
+     ss->BlackIs1 = true;  
+
+
+---------------------------- cut ---------------------------------------  
+
+Best Regards Olof S Kylander
+
+PS: I can take credit for the actual patch I found it in a post on
+Usenet by Martin Huber. But it looks like no one has picked it up and
+submitted it to ghostscript or other effected programs.
+
+
+--
+
+Olof Kylander  Frozenriver Digital Design   http://www.frozenriver.nu
+
+Consultant at Sigma nBiT
+
+Technical writer and coauthor of GUM (the Gimp User Manual)
+
+
+
+
+

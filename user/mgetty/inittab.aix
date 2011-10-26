@@ -1,0 +1,92 @@
+#!/bin/ksh
+#From:	michael@hal6000.thp.uni-duisburg.de (Michael Staats)
+#Subject: AIX inittab installation
+#To:	gert@greenie.muc.de (Gert Doering)
+#Date:	Mon, 29 Nov 1993 11:10:20 +0100
+
+#> Ummm. That would force the user to specify the ttys in the Makefile -
+#> doesn't sound too good. What about a small "inittab.aix" shell script that
+#> sets up only /etc/inittab? With a tty line as an argument?
+#
+#of course, why not? So here it is:
+#
+#======================================================================
+#!/bin/ksh
+# mgetty installscript for AIX
+# (C) 1993 Michael Staats
+# free according to GNU Public License
+#
+# extensive Changes by Chris Lewis, clewis@ferret.ocunix.on.ca
+
+TTY=tty0
+DEBUGLEV=3
+while getopts pm:t:x:n: name; do
+  case $name in
+   m) MGETTY="$OPTARG";;
+   n) NRINGS="-n $OPTARG";;
+   x) DEBUGLEV="$OPTARG";;
+   t) TTY=${OPTARG#/dev/*};;
+   *) echo "unknown option." >&2
+      echo "Usage: $0 [-m full_mgetty_path] [-x debuglevel] [-t tty]" >&2
+      exit 1;;
+  esac
+done
+
+# Try to find MGETTY if not specified
+
+if [ -z "$MGETTY" ]; then
+  eval "$(grep '^BINDIR=' Makefile)"
+  eval "$(grep '^SBINDIR=' Makefile)"
+  MGETTY="$SBINDIR/mgetty"
+  [ ! -x "$MGETTY" ] && MGETTY="$BINDIR/mgetty"
+  [ ! -x "$MGETTY" ] && {
+    MGETTY="$(which mgetty)"
+    case "$MGETTY" in ./*) MGETTY=$PWD/${MGETTY#./*};; esac
+  }
+  [ ! -x "$MGETTY" ] && {
+    echo "Can't find mgetty. Please specify with -m mgettypath." >&2
+  }
+fi
+
+echo
+echo "	Ok, I'll install $MGETTY for use with $TTY."
+echo "	I will change /etc/inittab and update the ODM so that"
+echo "	/etc/getty will not run for this tty."
+echo 
+echo -n "	Is this ok (y/n)? "
+YN=
+while [ -z "$YN" ]; do
+  read YN
+done
+
+if [ "$YN" = y ]; then
+  echo "Installing."
+  if [ -n "`lsitab $TTY`" ]
+  then
+    chdev -l $TTY -a ttyprog_action=off
+    chitab "$TTY:2:off:/etc/getty -u /dev/$TTY"
+  fi
+  if [ -n "`lsitab m$TTY`" ]
+  then
+    chitab "m$TTY:2:respawn:$MGETTY -x $DEBUGLEV $NRINGS $TTY"
+    echo "Changed m$TTY entry in /etc/inittab"
+  else
+    mkitab "m$TTY:2:respawn:$MGETTY -x $DEBUGLEV $NRINGS $TTY"
+    echo "Added m$TTY entry to /etc/inittab"
+  fi
+  # This doesn't appear necessary on AIX, but what the hey:
+  telinit q
+else
+  echo "Try again with \"$0 [ -m full_mgetty_path ] [ -t tty ]\""
+fi
+exit 0
+
+======================================================================
+
+Enjoy,
+	Michael
+
+-- 
+Michael Staats, Theoretical Physics, Uni-GH Duisburg 
+email: michael@hal6000.thp.Uni-Duisburg.DE
+

@@ -1,0 +1,82 @@
+# setserial.mk - makefile for setserial - rick sladkey
+# modified by Michael K. Johnson, johnsonm@stolaf.edu
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+VERSION = @RELEASE_VERSION@
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+STRIP = @STRIP@
+
+CC = @CC@
+RM = rm -f
+CFLAGS = @CFLAGS@
+DEFS = @DEFS@
+INCS = -I.
+TAR = tar
+
+all: setserial setserial.cat
+
+setserial: setserial.c
+	$(CC) $(CFLAGS) $(DEFS) $(INCS) setserial.c -o setserial
+
+setserial.cat: setserial.8
+	nroff -man setserial.8 > setserial.cat
+
+install: setserial setserial.8
+	$(INSTALL_PROGRAM) setserial $(DESTDIR)/bin
+	$(STRIP) $(DESTDIR)/bin/setserial
+	$(INSTALL_DATA) setserial.8 $(DESTDIR)/usr/man/man8
+
+clean:
+	$(RM) setserial setserial.o setserial.cat *~
+
+distclean: clean
+	$(RM) config.status config.log config.cache MCONFIG Makefile \
+		setserial.8
+
+realclean: distclean
+	$(RM) configure
+
+SRCROOT = `echo setserial-$(VERSION) | sed -e 's/-WIP//' \
+			-e 's/pre-//' -e 's/-PLUS//'`
+
+$(srcdir)/.exclude-file:
+	a=$(SRCROOT); \
+	(cd $(srcdir)/.. ; find setserial \( -name \*~ -o -name \*.orig \
+		-o -name CVS -o -name \*.rej \) -print) \
+		| sed -e "s/setserial/$$a/" > $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/Makefile" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/build" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/Attic" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/rpm.log" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/config.log" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/config.cache" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/config.status" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/setserial" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/setserial.cat" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/setserial.o" >> $(srcdir)/.exclude-file
+	echo "$(SRCROOT)/.exclude-file" >> $(srcdir)/.exclude-file
+	echo $(SRCROOT)/e2fsprogs-$(VERSION).tar.gz \
+		>> $(srcdir)/.exclude-file
+	
+source_tar_file: $(srcdir)/.exclude-file
+	(cd $(srcdir)/..; a=$(SRCROOT); rm -f $$a ; ln -sf setserial $$a ; \
+		$(TAR) -c -h -v -f - \
+			-X $$a/.exclude-file $$a | \
+		gzip -9 > setserial-$(VERSION).tar.gz)
+	rm -f $(srcdir)/.exclude-file $(srcdir)/../setserial-$(VERSION)
+
+${srcdir}/configure: configure.in # aclocal.m4
+	cd ${srcdir} && autoconf
+
+Makefile: Makefile.in config.status
+	CONFIG_FILES=Makefile ./config.status
+
+setserial.8: setserial.8.in config.status
+	CONFIG_FILES=setserial.8 ./config.status
+     
+config.status: configure
+	./config.status --recheck

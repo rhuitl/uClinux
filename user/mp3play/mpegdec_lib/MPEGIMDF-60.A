@@ -1,0 +1,961 @@
+;------------------------------------------------------------------------------
+;
+;   File    :   MPEGIMDF.a
+;
+;   Author  :   Stéphane TAVENARD
+;
+;   $VER:   MPEGIMDF.a  0.0  (03/06/1997)
+;
+;   (C) Copyright 1997-1997 Stéphane TAVENARD
+;       All Rights Reserved
+;
+;   #Rev|   Date   |                      Comment
+;   ----|----------|--------------------------------------------------------
+;   0   |03/06/1997| Initial revision                                     ST
+;
+;   ------------------------------------------------------------------------
+;
+;   MPEG IMDCT optimized ! (FPU Version)
+;
+;------------------------------------------------------------------------------
+
+               XDEF     @MPEGIMDF_hybrid
+               XDEF     _MPEGIMDF_hybrid
+
+               XDEF     @MPEGIMDF_long
+               XDEF     _MPEGIMDF_long
+
+               XDEF     @MPEGIMDF_short
+               XDEF     _MPEGIMDF_short
+
+
+               section  ASMCODE,code
+
+SSIZE          equ      4 ; Source size in bytes
+DSIZE          equ      4 ; Destination size in bytes
+TSIZE          equ      4 ; Temp data size in bytes
+WSIZE          equ      4 ; Window data size in bytes
+
+SSLIMIT        equ     18
+SBLIMIT        equ     32
+
+; MOVM <reg>,<ea>
+; MOVM <ea>,<reg>
+; Move a value from/to memory
+MOVM           MACRO
+               fmove.s  \1,\2
+               ENDM
+
+; MOVR <reg1>,<reg2>
+; Move a from register to register
+MOVR           MACRO
+               fmove.x  \1,\2
+               ENDM
+
+; ADDR <imm>,<ea>
+; Add a register value with <ea>
+ADDR           MACRO
+               fadd.x   \1,\2
+               ENDM
+
+; ADDM <ea>,<ea>
+; Add a memory value with <ea>
+ADDM           MACRO
+               fadd.s    \1,\2
+               ENDM
+
+
+; SUBR <imm>,<ea>
+; Sub a register value with <ea>
+SUBR           MACRO
+               fsub.x   \1,\2
+               ENDM
+
+; SUBM <ea>,<ea>
+; Sub a memory value with <ea>
+SUBM           MACRO
+               fsub.s   \1,\2
+               ENDM
+
+; NEGR <reg>
+; Negate a register
+NEGR           MACRO
+               fneg.x   \1
+               ENDM
+
+
+; MULI <imm>,<ea>
+; Multiply immediate value with <ea>
+MULI           MACRO
+               fmul.s   #\1,\2
+               ENDM
+
+; MULR <reg>,<ea>
+; Multiply a register value with <ea>
+MULR           MACRO
+               fmul.x   \1,\2
+               ENDM
+
+; MULM <imm>,<ea>
+; Multiply memory value with <ea>
+MULM           MACRO
+               fmul.s   \1,\2
+               ENDM
+
+; COPY_PREV <i>
+; copy *prev value to out[i*32]
+; clear *prev
+; prev++
+; Note: d0.l must contain 0
+COPY_PREV      MACRO
+               move.l   (a3),32*DSIZE*\1(a1)
+               move.l   d0,(a3)+
+               ENDM
+
+;              Perform an IMDCT
+;
+;              a0:  in array (float *)
+;              a1:  out array (float *)
+;              a2:  prev block (float *)
+;              d0.w: block type
+;              d1.w: mixed
+;              d2.w: sb_max
+;
+@MPEGIMDF_hybrid
+_MPEGIMDF_hybrid
+               movem.l  d2-d7/a2-a6,-(sp)
+               fmovem.x fp0-fp7,-(sp)
+
+               move.l   a2,a3 ; a3 = prev block
+               move.l   d0,d3 ; d3 = block type
+               clr.l    d4 ; d4 = sb
+               move.l   #SSLIMIT*SSIZE,d5
+
+               tst.w    d1
+               beq.b      MPEGIMDF_imd0
+               ; mixed block (long block, win = 0)
+               lea      imdct_e_win0,a2 ; even win0
+               bsr.w      imdct_l
+               add.l    d5,a0 ; in += SSLIMIT
+               add.l    d5,a3 ; prev += SSLIMIT
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               cmp.w    d2,d4
+               bge.w      MPEGIMDF_imd9
+               lea      imdct_o_win0,a2 ; odd win0
+               bsr.w      imdct_l
+               add.l    d5,a0 ; in += SSLIMIT
+               add.l    d5,a3 ; prev += SSLIMIT
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               cmp.w    d2,d4
+               bge.b      MPEGIMDF_imd9
+MPEGIMDF_imd0
+               cmp.w    #2,d3
+               bne.b      MPEGIMDF_imd5 ; Long blocks
+MPEGIMDF_imd1  ; Short blocks
+               lea      imdct_e_win2,a2 ; even win2
+               bsr.w      imdct_s
+               add.l    d5,a0 ; in += SSLIMIT
+               add.l    d5,a3 ; prev += SSLIMIT
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               cmp.w    d2,d4
+               bge.b      MPEGIMDF_imd9
+               lea      imdct_o_win2,a2 ; odd win2
+               bsr.w      imdct_s
+               add.l    d5,a0 ; in += SSLIMIT
+               add.l    d5,a3 ; prev += SSLIMIT
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               cmp.w    d2,d4
+               bge.b      MPEGIMDF_imd9
+               bra.b      MPEGIMDF_imd1
+
+MPEGIMDF_imd5  ; Long blocks
+               lea      imdct_e_win,a2
+               move.l   (a2,d3*4),a2 ; even win
+               bsr.w      imdct_l
+               add.l    d5,a0 ; in += SSLIMIT
+               add.l    d5,a3 ; prev += SSLIMIT
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               cmp.w    d2,d4
+               bge.b      MPEGIMDF_imd9
+               lea      imdct_o_win,a2
+               move.l   (a2,d3*4),a2 ; odd win
+               bsr.w      imdct_l
+               add.l    d5,a0 ; in += SSLIMIT
+               add.l    d5,a3 ; prev += SSLIMIT
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               cmp.w    d2,d4
+               bge.b      MPEGIMDF_imd9
+               bra.b      MPEGIMDF_imd5
+
+MPEGIMDF_imd9  ; Fill remaining blocks with help of prev blocks
+               moveq.l  #0,d0
+MPEGIMDF_imd91 cmp.w    #SBLIMIT,d4
+               bge.b      MPEGIMDF_imde
+               COPY_PREV 0
+               COPY_PREV 1
+               COPY_PREV 2
+               COPY_PREV 3
+               COPY_PREV 4
+               COPY_PREV 5
+               COPY_PREV 6
+               COPY_PREV 7
+               COPY_PREV 8
+               COPY_PREV 9
+               COPY_PREV 10
+               COPY_PREV 11
+               COPY_PREV 12
+               COPY_PREV 13
+               COPY_PREV 14
+               COPY_PREV 15
+               COPY_PREV 16
+               COPY_PREV 17
+               addq.l   #DSIZE,a1 ; out++
+               addq.w   #1,d4
+               bra.b      MPEGIMDF_imd91
+MPEGIMDF_imde
+               fmovem.x (sp)+,fp0-fp7
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+
+;              Perform a long IMDCT
+;
+;              a0:  in array (float *)
+;              a1:  out array (float *)
+;              a2:  window (float *)
+;              a3:  prev block (float *)
+;
+@MPEGIMDF_long
+_MPEGIMDF_long
+               movem.l  d2-d7/a2-a6,-(sp)
+               fmovem.x fp0-fp7,-(sp)
+
+               bsr.b      imdct_l
+
+               fmovem.x (sp)+,fp0-fp7
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+;              Perform a short IMDCT
+;
+;              a0:  in array (float *)
+;              a1:  out array (float *)
+;              a2:  window (float *)
+;              a3:  prev block (float *)
+;
+@MPEGIMDF_short
+_MPEGIMDF_short
+               movem.l  d2-d7/a2-a6,-(sp)
+               fmovem.x fp0-fp7,-(sp)
+
+               bsr.w      imdct_s
+
+               fmovem.x (sp)+,fp0-fp7
+               movem.l  (sp)+,d2-d7/a2-a6
+               rts
+
+
+; COS9_x = cos( pi / 18 * x)
+COS9_1         fequ     9.848077530e-1
+COS9_2         fequ     9.396926208e-1
+COS9_3         fequ     8.660254038e-1
+COS9_4         fequ     7.660444431e-1
+COS9_5         fequ     6.427876097e-1
+COS9_6         fequ     5e-1
+COS9_7         fequ     3.420201433e-1
+COS9_8         fequ     1.736481777e-1
+
+; COST36_x = 0.5 / cos( pi * (2x+1) / 36 )
+COST36_0       fequ     5.019099188e-1
+COST36_1       fequ     5.176380902e-1
+COST36_2       fequ     5.516889595e-1
+COST36_3       fequ     6.103872944e-1
+COST36_4       fequ     7.071067812e-1
+COST36_5       fequ     8.717233978e-1
+COST36_6       fequ     1.183100792
+COST36_7       fequ     1.931851653
+COST36_8       fequ     5.736856623
+
+; Get input even samples
+; GET_I0 <num>,<reg>
+GET_I0         MACRO
+               MOVM     \1*2*SSIZE(a0),\2
+               ENDM
+
+; Get input odd samples
+; GET_I1 <num>,<reg>
+GET_I1         MACRO
+               MOVM     \1*2*SSIZE+SSIZE(a0),\2
+               ENDM
+
+; Add input even samples
+; ADD_I0 <num>,<reg>
+ADD_I0         MACRO
+               ADDM     \1*2*SSIZE(a0),\2
+               ENDM
+
+; Add input odd samples
+; ADD_I1 <num>,<reg>
+ADD_I1         MACRO
+               ADDM    \1*2*SSIZE+SSIZE(a0),\2
+               ENDM
+
+; Sub input even samples
+; SUB_I0 <num>,<reg>
+SUB_I0         MACRO
+               SUBM    \1*2*SSIZE(a0),\2
+               ENDM
+
+; Sub input odd samples
+; SUB_I1 <num>,<reg>
+SUB_I1         MACRO
+               SUBM    \1*2*SSIZE+SSIZE(a0),\2
+               ENDM
+
+; Compute CM( I0(i), <cos> ) -> <reg>
+; CM0 i,<cos>,<reg>
+CM0            MACRO
+               GET_I0   \1,\3
+               MULI     \2,\3
+               ENDM
+
+; Compute CM( I1(i), <cos> ) -> <reg>
+; CM1 i,<cos>,<reg>
+CM1            MACRO
+               GET_I1   \1,\3
+               MULI     \2,\3
+               ENDM
+
+; Multiply and Add input even samples
+; fp0 is modified
+; ADCM0 <i>,<cos>,<reg>
+ADCM0          MACRO
+               CM0      \1,\2,fp0
+               ADDR     fp0,\3
+               ENDM
+
+; Multiply and Add input odd samples
+; fp0 is modified
+; ADCM1 <i>,<cos>,<reg>
+ADCM1          MACRO
+               CM1      \1,\2,fp0
+               ADDR     fp0,\3
+               ENDM
+
+; Multiply and Sub input even samples
+; fp0 is modified
+; SUCM0 <i>,<cos>,<reg>
+SUCM0          MACRO
+               CM0      \1,\2,fp0
+               SUBR     fp0,\3
+               ENDM
+
+; Multiply and Sub input odd samples
+; fp0 is modified
+; SUCM1 <i>,<cos>,<reg>
+SUCM1          MACRO
+               CM1      \1,\2,fp0
+               SUBR     fp0,\3
+               ENDM
+
+; Set a value to out block
+; SET_OUT <i>,<reg>
+SET_OUT        MACRO
+               MOVM     \2,32*DSIZE*\1(a1)
+               ENDM
+
+; Set a value to previous block
+; SET_PREV <i>,<reg>
+SET_PREV       MACRO
+               MOVM     \2,DSIZE*\1(a3)
+               ENDM
+
+; Store output pair
+; uses fp0 & fp1 (sum0 & sum1)
+; fp0..fp2 are modified
+; ST_PAIR <v>
+ST_PAIR        MACRO
+               MOVR     fp0,fp2
+               ADDR     fp1,fp2 ; fp2 = tmp = sum0 + sum1
+               SUBR     fp1,fp0 ; fp0 = sum0 - sum1
+               MOVR     fp0,fp1
+               ; ts[SBLIMIT*(8-(v))] = prev[8-(v)] + WIN_MULT( sum0, 8-(v) )
+               MULM     WSIZE*8-WSIZE*\1(a2),fp1
+               ADDM     DSIZE*8-DSIZE*\1(a3),fp1
+               MOVM     fp1,32*DSIZE*8-32*DSIZE*\1(a1)
+               ; prev[8-(v)] = WIN_MULT( tmp, 26-(v) )
+               MOVR     fp2,fp1
+               MULM     WSIZE*26-WSIZE*\1(a2),fp1
+               MOVM     fp1,DSIZE*8-DSIZE*\1(a3)
+               ; ts[SBLIMIT*(9+(v))] = prev[9+(v)] + WIN_MULT( sum0, 9+(v) )
+               MULM     WSIZE*9+WSIZE*\1(a2),fp0
+               ADDM     DSIZE*9+DSIZE*\1(a3),fp0
+               MOVM     fp0,32*DSIZE*9+32*DSIZE*\1(a1)
+               ; prev[9+(v)] = WIN_MULT( tmp, 27+(v) )
+               MULM     WSIZE*27+WSIZE*\1(a2),fp2
+               MOVM     fp2,DSIZE*9+DSIZE*\1(a3)
+               ENDM
+
+; Store low output
+; uses fp4..fp7 (tmp1a..tmp2b)
+; fp0..fp2 are modified
+; ST1 <cost36>, <v>
+ST1            MACRO
+               MOVR     fp4,fp0
+               ADDR     fp6,fp0 ; fp0 = sum0 = tmp1a + tmp2a
+               MOVR     fp5,fp1
+               ADDR     fp7,fp1
+               MULI     \1,fp1 ; fp1 = sum1 = T36_MULT( tmp1b + tmp2b, v )
+               ST_PAIR  \2
+               ENDM
+
+; Store high output
+; uses fp4..fp7 (tmp1a..tmp2b)
+; fp0..fp2 are modified
+; ST2 <cost36>, <v>
+ST2            MACRO
+               MOVR     fp6,fp0
+               SUBR     fp4,fp0 ; fp0 = sum0 = tmp2a - tmp1a
+               MOVR     fp7,fp1
+               SUBR     fp5,fp1
+               MULI     \1,fp1 ; fp1 = sum1 = T36_MULT( tmp2b - tmp1b, v )
+               ST_PAIR  \2
+               ENDM
+
+
+; Add inputs
+; ADD_IN <i1>,<i2> ie <i1> + <i2> -> <i1>
+ADD_IN         MACRO
+               MOVM     \1*SSIZE(a0),fp0
+               ADDM     \2*SSIZE(a0),fp0
+               MOVM     fp0,\1*SSIZE(a0)
+               ENDM
+;
+;              IMDCT for Long blocks
+;
+;              a0: input  array   (float *)
+;              a1: output out     (float *)
+;              a2: window array   (float *)
+;              a3: prev block     (float *)
+imdct_l
+; THERE IS A BUG IN GENAM
+; BAD HANDLE OF FLOATING POINT CONTANTS !!!
+; 0.5 is coded as 0.05 !!!
+
+;               MOVM     #0.5019099188,fp0
+;               MOVM     #5.019099188e-1,fp0
+;               MOVM     #0.05019099188,fp0
+;               MOVM     #5.019099188e-2,fp0
+;               MOVM     #5.019099188,fp0
+
+               link     a6,#-4*4    ; need 4 floats
+               lea      -4*4(a6),a4 ; ta33..tb66 needs 4 floats
+
+               ADD_IN   17,16 ; in[17] += in[16]
+               ADD_IN   16,15
+               ADD_IN   15,14
+               ADD_IN   14,13
+               ADD_IN   13,12
+               ADD_IN   12,11
+               ADD_IN   11,10
+               ADD_IN   10,9
+               ADD_IN   9,8
+               ADD_IN   8,7
+               ADD_IN   7,6
+               ADD_IN   6,5
+               ADD_IN   5,4
+               ADD_IN   4,3
+               ADD_IN   3,2
+               ADD_IN   2,1
+               ADD_IN   1,0
+
+               ADD_IN   17,15
+               ADD_IN   15,13
+               ADD_IN   13,11
+               ADD_IN   11,9
+               ADD_IN   9,7
+               ADD_IN   7,5
+               ADD_IN   5,3
+               ADD_IN   3,1
+
+               ; Calculate ta33, ta66, tb33 & tb66
+               ;   x(a4) -> 0     1     2      3
+               ;
+               CM0      3,8.660254038e-1,fp0
+               MOVM     fp0,0*TSIZE(a4)
+               CM0      6,5e-1,fp0
+               MOVM     fp0,1*TSIZE(a4)
+               CM1      3,8.660254038e-1,fp0
+               MOVM     fp0,2*TSIZE(a4)
+               CM1      6,5e-1,fp0
+               MOVM     fp0,3*TSIZE(a4)
+
+               ; STEP 1
+               ;
+               ; fp4 = tmp1a = CF( CM( I0(1), 1 ) + ta33 + CM( I0(5), 5 ) + CM( I0(7), 7 ) )
+               MOVM     0*TSIZE(a4),fp4
+               ADCM0    1,9.848077530e-1,fp4
+               ADCM0    5,6.427876097e-1,fp4
+               ADCM0    7,3.420201433e-1,fp4
+               ; fp5 = tmp1b = CF( CM( I1(1), 1 ) + tb33 + CM( I1(5), 5 ) + CM( I1(7), 7 ) )
+               MOVM     2*TSIZE(a4),fp5
+               ADCM1    1,9.848077530e-1,fp5
+               ADCM1    5,6.427876097e-1,fp5
+               ADCM1    7,3.420201433e-1,fp5
+               ; fp6 = tmp2a = CF( CM1( I0(0) ) + CM( I0(2), 2 ) + CM( I0(4), 4 ) + ta66 + CM( I0(8), 8 ) )
+               MOVM     1*TSIZE(a4),fp6
+               ADD_I0   0,fp6
+               ADCM0    2,9.396926208e-1,fp6
+               ADCM0    4,7.660444431e-1,fp6
+               ADCM0    8,1.736481777e-1,fp6
+               ; fp7 = tmp2b = CF( CM1( I1(0) ) + CM( I1(2), 2 ) + CM( I1(4), 4 ) + tb66 + CM( I1(8), 8 ) )
+               MOVM     3*TSIZE(a4),fp7
+               ADD_I1   0,fp7
+               ADCM1    2,9.396926208e-1,fp7
+               ADCM1    4,7.660444431e-1,fp7
+               ADCM1    8,1.736481777e-1,fp7
+               ;
+               ST1      5.019099188e-1,0 ; COST36_0
+               ST2      5.736856623,8  ; COST36_8
+
+               ; STEP 2
+               ;
+               ; fp4 = tmp1a = CF( CM( I0(1) - I0(5) - I0(7), 3 ) )
+               GET_I0   1,fp4
+               SUB_I0   5,fp4
+               SUB_I0   7,fp4
+               MULI     8.660254038e-1,fp4
+               ; fp5 = tmp1b = CF( CM( I1(1) - I1(5) - I1(7), 3 ) )
+               GET_I1   1,fp5
+               SUB_I1   5,fp5
+               SUB_I1   7,fp5
+               MULI     8.660254038e-1,fp5
+               ; fp6 = tmp2a = CF( CM( I0(2) - I0(4) - I0(8), 6 ) + CM1( I0(0) - I0(6) ) )
+               GET_I0   2,fp6
+               SUB_I0   4,fp6
+               SUB_I0   8,fp6
+               MULI     5e-1,fp6
+               ADD_I0   0,fp6
+               SUB_I0   6,fp6
+               ; fp7 = tmp2b = CF( CM( I1(2) - I1(4) - I1(8), 6 ) + CM1( I1(0) - I1(6) ) )
+               GET_I1   2,fp7
+               SUB_I1   4,fp7
+               SUB_I1   8,fp7
+               MULI     5e-1,fp7
+               ADD_I1   0,fp7
+               SUB_I1   6,fp7
+               ;
+               ST1      5.176380902e-1,1 ; COST36_1
+               ST2      1.931851653,7  ; COST36_7
+
+               ; STEP 3
+               ;
+               ; fp4 = tmp1a = CF( CM( I0(1), 5 ) - ta33 - CM( I0(5), 7 ) + CM( I0(7), 1 ) )
+               CM0      1,6.427876097e-1,fp4
+               SUBM     0*TSIZE(a4),fp4
+               SUCM0    5,3.420201433e-1,fp4
+               ADCM0    7,9.848077530e-1,fp4
+               ; fp5 = tmp1b = CF( CM( I1(1), 5 ) - tb33 - CM( I1(5), 7 ) + CM( I1(7), 1 ) )
+               CM1      1,6.427876097e-1,fp5
+               SUBM     2*TSIZE(a4),fp5
+               SUCM1    5,3.420201433e-1,fp5
+               ADCM1    7,9.848077530e-1,fp5
+               ; fp6 = tmp2a = CF( CM1( I0(0) ) - CM( I0(2), 8 ) - CM( I0(4), 2 ) + ta66 + CM( I0(8), 4 ) )
+               GET_I0   0,fp6
+               SUCM0    2,1.736481777e-1,fp6
+               SUCM0    4,9.396926208e-1,fp6
+               ADDM     1*TSIZE(a4),fp6
+               ADCM0    8,7.660444431e-1,fp6
+               ; fp7 = tmp2b = CF( CM1( I1(0) ) - CM( I1(2), 8 ) - CM( I1(4), 2 ) + tb66 + CM( I1(8), 4 ) )
+               GET_I1   0,fp7
+               SUCM1    2,1.736481777e-1,fp7
+               SUCM1    4,9.396926208e-1,fp7
+               ADDM     3*TSIZE(a4),fp7
+               ADCM1    8,7.660444431e-1,fp7
+               ;
+               ST1      5.516889595e-1,2 ; COST36_2
+               ST2      1.183100792,6  ; COST36_6
+
+               ; STEP 4
+               ;
+               ; fp4 = tmp1a = CF( CM( I0(1), 7 ) - ta33 + CM( I0(5), 1 ) - CM( I0(7), 5 ) )
+               CM0      1,3.420201433e-1,fp4
+               SUBM     0*TSIZE(a4),fp4
+               ADCM0    5,9.848077530e-1,fp4
+               SUCM0    7,6.427876097e-1,fp4
+               ; fp5 = tmp1b = CF( CM( I1(1), 7 ) - tb33 + CM( I1(5), 1 ) - CM( I1(7), 5 ) )
+               CM1      1,3.420201433e-1,fp5
+               SUBM     2*TSIZE(a4),fp5
+               ADCM1    5,9.848077530e-1,fp5
+               SUCM1    7,6.427876097e-1,fp5
+               ; fp6 = tmp2a = CF( CM1( I0(0) ) - CM( I0(2), 4 ) + CM( I0(4), 8 ) + ta66 - CM( I0(8), 2 ) )
+               GET_I0   0,fp6
+               SUCM0    2,7.660444431e-1,fp6
+               ADCM0    4,1.736481777e-1,fp6
+               ADDM     1*TSIZE(a4),fp6
+               SUCM0    8,9.396926208e-1,fp6
+               ; fp7 = tmp2b = CF( CM1( I1(0) ) - CM( I1(2), 4 ) + CM( I1(4), 8 ) + tb66 - CM( I1(8), 2 ) )
+               GET_I1   0,fp7
+               SUCM1    2,7.660444431e-1,fp7
+               ADCM1    4,1.736481777e-1,fp7
+               ADDM     3*TSIZE(a4),fp7
+               SUCM1    8,9.396926208e-1,fp7
+               ;
+               ST1      6.103872944e-1,3 ; COST36_3
+               ST2      8.717233978e-1,5 ; COST36_5
+
+               ; STEP 5
+               ;
+               ; sum0 =  CF( CM1( I0(0) - I0(2) + I0(4) - I0(6) + I0(8) ) )
+               GET_I0   0,fp0
+               SUB_I0   2,fp0
+               ADD_I0   4,fp0
+               SUB_I0   6,fp0
+               ADD_I0   8,fp0
+               ; sum1 = T36_MULT( CF( CM1( I1(0) - I1(2) + I1(4) - I1(6) + I1(8) ) ), 4  )
+               GET_I1   0,fp1
+               SUB_I1   2,fp1
+               ADD_I1   4,fp1
+               SUB_I1   6,fp1
+               ADD_I1   8,fp1
+               MULI     7.071067812e-1,fp1 ; COST36_4
+               ST_PAIR  4
+
+               unlk     a6
+
+               rts
+
+; COS6_x = cos( pi / 6 * x )
+COS6_1         fequ     8.660254038e-1
+COS6_2         fequ     5e-1
+
+; COST36_x = 0.5 / cos( pi * (2x+1) / 12 )
+COST12_0       fequ     5.176380902e-1
+COST12_1       fequ     7.071067812e-1
+COST12_2       fequ     1.931851653
+
+; Get input *3 samples
+; GET_I3 <num>,<reg>
+GET_I3         MACRO
+               MOVM     \1*3*SSIZE(a0),\2
+               ENDM
+
+;
+DCT12_PART1    MACRO
+               GET_I3   5,fp5    ; in5 = in[5*3]
+               GET_I3   4,fp4
+               ADDR     fp4,fp5  ; in5 += (in4 = in[4*3])
+               GET_I3   3,fp3
+               ADDR     fp3,fp4  ; in4 += (in3 = in[3*3])
+               GET_I3   2,fp2
+               ADDR     fp2,fp3  ; in3 += (in2 = in[2*3])
+               GET_I3   1,fp1
+               ADDR     fp1,fp2  ; in2 += (in1 = in[1*3])
+               GET_I3   0,fp0
+               ADDR     fp0,fp1  ; in1 += (in0 = in[0*3])
+               ADDR     fp3,fp5  ; in5 += in3
+               ADDR     fp1,fp3  ; in3 += in1
+               MULI     8.660254038e-1,fp2 ; COS_MULT( in2, COS6_1 )
+               MULI     8.660254038e-1,fp3 ; COS_MULT( in3, COS6_1 )
+               ENDM
+;
+DCT12_PART2    MACRO
+               MULI     5e-1,fp4  ; in0 += COS_MULT( in4, COS6_2 )
+               ADDR     fp4,fp0
+               MOVR     fp0,fp4  ; in4 = in0 + in2
+               ADDR     fp2,fp4
+               SUBR     fp2,fp0  ; in0 -= in2
+               MULI     5e-1,fp5  ; in1 += COS_MULT( in5, COS6_2 )
+               ADDR     fp5,fp1
+               MOVR     fp1,fp5  ; in5 = T12_MULT( (in1 + in3), 0 )
+               ADDR     fp3,fp5
+               MULI     5.176380902e-1,fp5
+               SUBR     fp3,fp1  ; in1 = T12_MULT( (in1 - in3), 2 )
+               MULI     1.931851653,fp1
+               MOVR     fp4,fp3  ; in3 = in4 + in5
+               ADDR     fp5,fp3
+               SUBR     fp5,fp4  ; in4 -= in5
+               MOVR     fp0,fp2  ; in2 = in0 + in1
+               ADDR     fp1,fp2
+               SUBR     fp1,fp0  ; in0 -= in1
+               ENDM
+
+; Multiply <reg> by window coeff
+; MUL_WIN <i>,<reg>
+;
+MUL_WIN        MACRO
+               MULM     \1*WSIZE(a2),\2
+               ENDM
+
+; Add a <reg> with an out block
+; ADD_OUT <i>,<reg>
+;
+ADD_OUT        MACRO
+               ADDM     32*DSIZE*\1(a1),\2
+               MOVM     \2,32*DSIZE*\1(a1)
+               ENDM
+
+; Add a <reg> with a prev block
+; ADD_PREV <i>,<reg>
+;
+ADD_PREV       MACRO
+               ADDM     \1*DSIZE(a3),\2
+               MOVM     \2,\1*DSIZE(a3)
+               ENDM
+
+; Calculate: tmp0 (fp6)  & tmp1 (fp7)
+;
+CALC_TEMP      MACRO
+               MOVR     fp0,fp7 ; tmp1 = fp7 = (in0 - in4)
+               SUBR     fp4,fp7
+               MOVR     fp1,fp6 ; fp6 = tmp2 = T12_MULT( (in1 - in5), 1 )
+               SUBR     fp5,fp6
+               MULI     7.071067812e-1,fp6
+               SUBR     fp6,fp7 ; fp7 = tmp1 = tmp1 - tmp2
+               ADDR     fp0,fp6 ; fp6 = tmp0 = (in0 - in4) + tmp2
+               SUBR     fp4,fp6
+               MOVM     fp6,0(a5) ; tmp0 *** CAN BE SAVED IN A D REG
+               ENDM
+
+;
+;              IMDCT for Short blocks
+;
+;              a0: input  array   (float *)
+;              a1: output out     (float *)
+;              a2: window array   (float *)
+;              a3: prev block     (float *)
+imdct_s
+               link     a6,#-2*4    ; need 2 floats
+               lea      -2*4(a6),a5 ; tmp0..tmp1
+
+               ; STEP 1
+               ; i=0..5: ts[SBLIMIT*i] = prev[i]
+               ;
+               move.l   a3,a4      ; a4 = prev block
+               move.l   (a4)+,32*DSIZE*0(a1)
+               move.l   (a4)+,32*DSIZE*1(a1)
+               move.l   (a4)+,32*DSIZE*2(a1)
+               move.l   (a4)+,32*DSIZE*3(a1)
+               move.l   (a4)+,32*DSIZE*4(a1)
+               move.l   (a4),32*DSIZE*5(a1)
+               ;
+               DCT12_PART1
+               ;
+               CALC_TEMP
+               ;
+               MUL_WIN  10,fp6 ; ts[(17-1)*SBLIMIT] = prev[17-1] + WIN_MULT( tmp0, 11-1 )
+               ADD_PREV 16,fp6
+               SET_OUT  16,fp6
+               MOVM     0(a5),fp6 ; ts[(12+1)*SBLIMIT] = prev[12+1] + WIN_MULT( tmp0, 6+1 )
+               MUL_WIN  7,fp6
+               ADD_PREV 13,fp6
+               SET_OUT  13,fp6
+               MOVR     fp7,fp6 ; ts[(6 +1)*SBLIMIT] = prev[6 +1] + WIN_MULT( tmp1, 1 )
+               MUL_WIN  1,fp6
+               ADD_PREV 7,fp6
+               SET_OUT  7,fp6
+               MUL_WIN  4,fp7 ; ts[(11-1)*SBLIMIT] = prev[11-1] + WIN_MULT( tmp1, 5-1 )
+               ADD_PREV 10,fp7
+               SET_OUT  10,fp7
+               ;
+               DCT12_PART2
+               ;
+               MOVR     fp2,fp7 ; ts[(17-0)*SBLIMIT] = prev[17-0] + WIN_MULT( in2, 11-0 )
+               MUL_WIN  11,fp7
+               ADD_PREV 17,fp7
+               SET_OUT  17,fp7
+               MUL_WIN  6,fp2 ; ts[(12+0)*SBLIMIT] = prev[12+0] + WIN_MULT( in2, 6+0 )
+               ADD_PREV 12,fp2
+               SET_OUT  12,fp2
+               MOVR     fp3,fp7 ; ts[(12+2)*SBLIMIT] = prev[12+2] + WIN_MULT( in3, 6+2 )
+               MUL_WIN  8,fp7
+               ADD_PREV 14,fp7
+               SET_OUT  14,fp7
+               MUL_WIN  9,fp3 ; ts[(17-2)*SBLIMIT] = prev[17-2] + WIN_MULT( in3, 11-2 )
+               ADD_PREV 15,fp3
+               SET_OUT  15,fp3
+
+               MOVR     fp0,fp7 ; ts[(6+0)*SBLIMIT]  = prev[6+0]  + WIN_MULT( in0, 0 )
+               MUL_WIN  0,fp7
+               ADD_PREV 6,fp7
+               SET_OUT  6,fp7
+               MUL_WIN  5,fp0 ; ts[(11-0)*SBLIMIT] = prev[11-0] + WIN_MULT( in0, 5-0 )
+               ADD_PREV 11,fp0
+               SET_OUT  11,fp0
+               MOVR     fp4,fp7 ; ts[(6+2)*SBLIMIT]  = prev[6+2]  + WIN_MULT( in4, 2 )
+               MUL_WIN  2,fp7
+               ADD_PREV 8,fp7
+               SET_OUT  8,fp7
+               MUL_WIN  3,fp4 ; ts[(11-2)*SBLIMIT] = prev[11-2] + WIN_MULT( in4, 5-2 )
+               ADD_PREV 9,fp4
+               SET_OUT  9,fp4
+
+               ; STEP 2
+               ;
+               addq.l   #SSIZE,a0 ; in++
+               ;
+               DCT12_PART1
+               ;
+               CALC_TEMP
+               ;
+               MUL_WIN  10,fp6 ; prev[5-1] = WIN_MULT( tmp0, 11-1 )
+               SET_PREV 4,fp6
+               MOVM     0(a5),fp6 ; prev[0+1] = WIN_MULT( tmp0, 6+1 )
+               MUL_WIN  7,fp6
+               SET_PREV 1,fp6
+               MOVR     fp7,fp6 ; ts[(12+1)*SBLIMIT] += WIN_MULT( tmp1, 1 )
+               MUL_WIN  1,fp6
+               ADD_OUT  13,fp6
+               MUL_WIN  4,fp7 ; ts[(17-1)*SBLIMIT] += WIN_MULT( tmp1, 5-1 )
+               ADD_OUT  16,fp7
+               ;
+               DCT12_PART2
+               ;
+               MOVR     fp2,fp7 ; prev[5-0] = WIN_MULT( in2, 11-0 )
+               MUL_WIN  11,fp7
+               SET_PREV 5,fp7
+               MUL_WIN  6,fp2 ; prev[0+0] = WIN_MULT( in2, 6+0 )
+               SET_PREV 0,fp2
+               MOVR     fp3,fp7 ; prev[0+2] = WIN_MULT( in3, 6+2 )
+               MUL_WIN  8,fp7
+               SET_PREV 2,fp7
+               MUL_WIN  9,fp3 ; prev[5-2] = WIN_MULT( in3, 11-2 )
+               SET_PREV 3,fp3
+
+               MOVR     fp0,fp7 ; ts[(12+0)*SBLIMIT] += WIN_MULT( in0, 0 )
+               MUL_WIN  0,fp7
+               ADD_OUT  12,fp7
+               MUL_WIN  5,fp0 ; ts[(17-0)*SBLIMIT] += WIN_MULT( in0, 5-0 )
+               ADD_OUT  17,fp0
+               MOVR     fp4,fp7 ; ts[(12+2)*SBLIMIT] += WIN_MULT( in4, 2 )
+               MUL_WIN  2,fp7
+               ADD_OUT  14,fp7
+               MUL_WIN  3,fp4 ; ts[(17-2)*SBLIMIT] += WIN_MULT( in4, 5-2 )
+               ADD_OUT  15,fp4
+
+               ; STEP 3
+               ;
+               addq.l   #SSIZE,a0 ; in++
+               ;
+               ; prev[12]=prev[13]=prev[14]=prev[15]=prev[16]=prev[17]=0
+               lea      12*DSIZE(a3),a4 ; a4 = &prev[12]
+               moveq.l  #0,d0
+               move.l   d0,(a4)+
+               move.l   d0,(a4)+
+               move.l   d0,(a4)+
+               move.l   d0,(a4)+
+               move.l   d0,(a4)+
+               move.l   d0,(a4)
+               ;
+               DCT12_PART1
+               ;
+               CALC_TEMP
+               ;
+               MUL_WIN  10,fp6 ; prev[11-1] = WIN_MULT( tmp0, 11-1 )
+               SET_PREV 10,fp6
+               MOVM     0(a5),fp6 ; prev[6+1] = WIN_MULT( tmp0, 6+1 )
+               MUL_WIN  7,fp6
+               SET_PREV 7,fp6
+               MOVR     fp7,fp6 ; prev[0+1] += WIN_MULT( tmp1, 1 )
+               MUL_WIN  1,fp6
+               ADD_PREV 1,fp6
+               MUL_WIN  4,fp7 ; prev[5-1] += WIN_MULT( tmp1, 5-1 )
+               ADD_PREV 4,fp7
+               ;
+               DCT12_PART2
+               ;
+               MOVR     fp2,fp7 ; prev[11-0] = WIN_MULT( in2, 11-0 )
+               MUL_WIN  11,fp7
+               SET_PREV 11,fp7
+               MUL_WIN  6,fp2 ; prev[6+0] = WIN_MULT( in2, 6+0 )
+               SET_PREV 6,fp2
+               MOVR     fp3,fp7 ; prev[6+2] = WIN_MULT( in3, 6+2 )
+               MUL_WIN  8,fp7
+               SET_PREV 8,fp7
+               MUL_WIN  9,fp3 ; prev[11-2] = WIN_MULT( in3, 11-2 )
+               SET_PREV 9,fp3
+
+               MOVR     fp0,fp7 ; prev[0+0] += WIN_MULT( in0, 0 )
+               MUL_WIN  0,fp7
+               ADD_PREV 0,fp7
+               MUL_WIN  5,fp0 ; prev[5-0] += WIN_MULT( in0, 5-0 )
+               ADD_PREV 5,fp0
+               MOVR     fp4,fp7 ; prev[0+2] += WIN_MULT( in4, 2 )
+               MUL_WIN  2,fp7
+               ADD_PREV 2,fp7
+               MUL_WIN  3,fp4 ; prev[5-2] += WIN_MULT( in4, 5-2 )
+               ADD_PREV 3,fp4
+
+               subq.l   #2*SSIZE,a0 ; restore in
+
+               unlk     a6
+
+               rts
+
+imdct_e_win0
+               dc.s    3.22824270e-2,1.07206352e-1,2.01414257e-1,3.25616330e-1,   5.00000000e-1,7.67774701e-1
+               dc.s    1.24122286,2.33195114,7.74415016,-8.45125675,-3.03905797,-1.94832957
+               dc.s    -1.47488141,-1.20710671,-1.03272307,-9.08520997e-1,-8.14313114e-1,-7.39389181e-1
+               dc.s    -6.77525342e-1,-6.24844432e-1,-5.78791738e-1,-5.37601590e-1,-4.99999970e-1,-4.65028346e-1
+               dc.s    -4.31934267e-1,-4.00099576e-1,-3.68989855e-1,-3.38116914e-1,-3.07007194e-1,-2.75172472e-1
+               dc.s    -2.42078424e-1,-2.07106769e-1,-1.69505134e-1,-1.28315032e-1,-8.22623298e-2,-2.95813959e-2
+imdct_e_win1
+               dc.s    3.22824270e-2,1.07206352e-1,2.01414257e-1,3.25616330e-1,   5.00000000e-1,7.67774701e-1
+               dc.s    1.24122286,2.33195114,7.74415016,-8.45125675,-3.03905797,-1.94832957
+               dc.s    -1.47488141,-1.20710671,-1.03272307,-9.08520997e-1,-8.14313114e-1,-7.39389181e-1
+               dc.s    -6.78170800e-1,-6.30236149e-1,-5.92844486e-1,-5.63690960e-1,-5.41196048e-1,-5.24264514e-1
+               dc.s    -5.07758319e-1,-4.65925813e-1,-3.97054553e-1,-3.04670691e-1,-1.92992792e-1,-6.68476522e-2
+               dc.s       0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000
+imdct_e_win2
+               dc.s    1.07206352e-1,   5.00000000e-1,2.33195114,-3.03905797,-1.20710671,-8.14313114e-1
+               dc.s    -6.24844432e-1,-4.99999970e-1,-4.00099576e-1,-3.07007194e-1,-2.07106769e-1,-8.22623298e-2
+imdct_e_win3
+               dc.s       0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000
+               dc.s    3.01530272e-1,1.46592581,6.97810602,-9.09404469,-3.53905797,-2.29034972
+               dc.s    -1.66275465,-1.30656290,-1.08284020,-9.30579484e-1,-8.21339786e-1,-7.40093589e-1
+               dc.s    -6.77525342e-1,-6.24844432e-1,-5.78791738e-1,-5.37601590e-1,-4.99999970e-1,-4.65028346e-1
+               dc.s    -4.31934267e-1,-4.00099576e-1,-3.68989855e-1,-3.38116914e-1,-3.07007194e-1,-2.75172472e-1
+               dc.s    -2.42078424e-1,-2.07106769e-1,-1.69505134e-1,-1.28315032e-1,-8.22623298e-2,-2.95813959e-2
+imdct_o_win0
+               dc.s    3.22824270e-2,-1.07206352e-1,2.01414257e-1,-3.25616330e-1,   5.00000000e-1,-7.67774701e-1
+               dc.s    1.24122286,-2.33195114,7.74415016,8.45125675,-3.03905797,1.94832957
+               dc.s    -1.47488141,1.20710671,-1.03272307,9.08520997e-1,-8.14313114e-1,7.39389181e-1
+               dc.s    -6.77525342e-1,6.24844432e-1,-5.78791738e-1,5.37601590e-1,-4.99999970e-1,4.65028346e-1
+               dc.s    -4.31934267e-1,4.00099576e-1,-3.68989855e-1,3.38116914e-1,-3.07007194e-1,2.75172472e-1
+               dc.s    -2.42078424e-1,2.07106769e-1,-1.69505134e-1,1.28315032e-1,-8.22623298e-2,2.95813959e-2
+imdct_o_win1
+               dc.s    3.22824270e-2,-1.07206352e-1,2.01414257e-1,-3.25616330e-1,   5.00000000e-1,-7.67774701e-1
+               dc.s    1.24122286,-2.33195114,7.74415016,8.45125675,-3.03905797,1.94832957
+               dc.s    -1.47488141,1.20710671,-1.03272307,9.08520997e-1,-8.14313114e-1,7.39389181e-1
+               dc.s    -6.78170800e-1,6.30236149e-1,-5.92844486e-1,5.63690960e-1,-5.41196048e-1,5.24264514e-1
+               dc.s    -5.07758319e-1,4.65925813e-1,-3.97054553e-1,3.04670691e-1,-1.92992792e-1,6.68476522e-2
+               dc.s       0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000
+imdct_o_win2
+               dc.s    1.07206352e-1,  -5.00000000e-1,2.33195114,3.03905797,-1.20710671,8.14313114e-1
+               dc.s    -6.24844432e-1,4.99999970e-1,-4.00099576e-1,3.07007194e-1,-2.07106769e-1,8.22623298e-2
+imdct_o_win3
+               dc.s       0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000,   0.00000000
+               dc.s    3.01530272e-1,-1.46592581,6.97810602,9.09404469,-3.53905797,2.29034972
+               dc.s    -1.66275465,1.30656290,-1.08284020,9.30579484e-1,-8.21339786e-1,7.40093589e-1
+               dc.s    -6.77525342e-1,6.24844432e-1,-5.78791738e-1,5.37601590e-1,-4.99999970e-1,4.65028346e-1
+               dc.s    -4.31934267e-1,4.00099576e-1,-3.68989855e-1,3.38116914e-1,-3.07007194e-1,2.75172472e-1
+               dc.s    -2.42078424e-1,2.07106769e-1,-1.69505134e-1,1.28315032e-1,-8.22623298e-2,2.95813959e-2
+
+imdct_e_win    dc.l     imdct_e_win0
+               dc.l     imdct_e_win1
+               dc.l     imdct_e_win2
+               dc.l     imdct_e_win3
+
+imdct_o_win    dc.l     imdct_o_win0
+               dc.l     imdct_o_win1
+               dc.l     imdct_o_win2
+               dc.l     imdct_o_win3
+
+               END
+

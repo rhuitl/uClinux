@@ -1,0 +1,1348 @@
+<!DOCTYPE LINUXDOC SYSTEM>
+<article>
+<title>			  ``mgetty+sendfax''
+		Answers to Frequently-Asked Questions
+       regarding Gert Doering's Fax-enabled getty replacement,
+       with Klaus Weidner and Marc Eberhard's voice extensions,
+              which are now maintained by Marc Schaefer
+<author>			 Klaus Lichtenwalder, now maintained by
+                                 Marc Schaefer
+<date>$Date: 2001/12/22 18:59:31 $
+
+<abstract>
+This document attempts to answer the most frequently asked questions
+about mgetty+sendfax/vgetty, Gert Doering's fax-enabled getty
+replacement with Klaus Weidner's and Marc Eberhard's voice processing
+extensions.
+The official release of mgetty is now (at least) 1.0. Gert adopted
+the numbering scheme of the Linux kernel, with even release numbers (1.0,
+1.2,...) being production version and uneven numbers being development
+versions. But the 1.1.27 version is also very much usable.
+I'm glad I can announce a Japanese Version made by chie nakatani
+&lt;jeanne@mbox.kyoto-inet.or.jp&gt;. You can find it at
+&lt;URL:http://epsenewsc.gee.kyoto-u.ac.jp/JF/JF-ftp/euc/mgetty_j.euc&gt;
+This document is copyrighted by the FAQ Maintainer,
+Marc Schaefer. It may not be reproduced in part or in full without
+the written consent of the FAQ Maintainer.
+</abstract>
+
+<toc>
+
+<sect>Part I: "Deciding whether to use it" questions <label id="Deciding whether to use it">
+<p>
+<sect1>What is it? <label id="What is it?">
+<p>
+From: steve@work.bellingham.wa.us (Steve Work)
+<P>
+Mgetty+sendfax is a collection of programs to send and receive faxes
+in a unix environment using a class 2.0 or 2 (they're different)
+faxmodem.  vgetty is an extension to mgetty, distributed with it, that
+implements incoming voice call handling for certain voice-capable
+modems, with new ones added regularly, if specs are available.
+<p>
+More specifically, the program `mgetty' allows you to use a class 2.0
+or 2 fax modem for receiving faxes and handling external logins
+without interfering with outgoing calls.  `sendfax' is a standalone
+program which sends fax files.  `vgetty' is an extended version of
+mgetty that can answer the telephone like an answering machine and
+record a voice-mail message (if it finds one), or perform `mgetty's
+fax or data call handling otherwise.  The mgetty+sendfax distribution
+includes vgetty and a good-sized gob of utility programs that help you
+manage faxes and voice messages.
+<p>
+<p>
+<sect1> What does it look like when it runs? <label id=" What does it look like when it runs?">
+<p>
+From: steve@work.bellingham.wa.us (Steven Work) and the distribution
+CC: clewis@ferret.ocunix.on.ca (Chris Lewis)
+<p>
+Like a smarter `getty'.  getty is the program that manages the
+first step of the login procedure on a Unix computer; when used
+with a modem, it watches for an incoming call and (ordinarily)
+prints the "login:" prompt (and reads the username, and passes off
+to "login").
+<p>
+Unlike traditional versions of getty or uugetty, which will put a
+modem into auto-answer mode, mgetty does not.  When an incoming call
+occurs, mgetty sees the "RING"s when they occur (see note below for
+ISDN/digital modems).  When they do occur, mgetty tells the modem to
+answer, and the modem will tell mgetty what kind of connection
+happens.  If it is FAX, mgetty will receive the FAX.  If data, mgetty
+prompts for a userid, then hands the open line off to login for a
+normal data login.
+<p>
+Note that it's the modem's job to distinguish a FAX call from a data
+call.  Not all fax modems can do this, and if yours _can't_ there is no way
+for mgetty to do this for it.  mgetty can be used with modems that
+cannot distinguish a fax call from a data call, but you must tell it
+ahead of time what type of call to expect.
+<p>
+mgetty is also configurable to select programs other than login for
+special connections (eg: uucico, fido or other programs) depending
+on the login userid.
+<p>
+mgetty also supports caller-id and can deny connections based on
+originating telephone number.
+<p>
+vgetty is an extension to mgetty that works with voice-capable
+modems to provide additional call-handling capabilities.  When the
+modem reports a RING, vgetty has the modem pick up the line and
+play a voice message (the greeting).  If the modem detects a data or
+fax calling tone, it reports this back to vgetty with special codes
+(DLE-sequences) which causes vgetty to switch to either mode. Else
+voice mode is used. This comportment can be modified by using a
+voice script, for example ``mvm'' (see below).
+<p>
+If instead the modem hears nothing following the greeting (a
+certain level of silence that continues for a certain number of
+seconds) it assumes the caller is a data modem and attempts a data
+connection.
+<p>
+vgetty implements the normal answering-machine functions of
+remote message playback as well; its operation is driven from shell
+scripts, so you can extend it to a full voice-mail jail if you
+wish.  (This description of voice modem behavior applies to the
+ZyXELs; I [steve@work.bellingham.wa.us] assume other voice modems
+are similar.)
+<p>
+For an example on how a voice mail system looks like, there is the 
+<url url="http://www-internal.alphanet.ch/~schaefer/mvm/" name="mvm">
+from Marc Schaefer.
+Since the voice shell is independent of the real modem hardware, it
+works on all supported modems, not just ZyXELs. The hardware drivers
+hide the modem specific stuff, so that the voice shell can provide a
+general interface that is completely modem independant. Of course the
+reliability of the whole systems relies on the reliability of the used
+voice modem. And there are quite notably differences between different
+modems. 
+<p>
+mvm offers the following features: multiple voice mailboxes with each
+a number and a password, multiple languages, voice message
+forwarding/copying/notification by e-mail, WWW gateway for reading and
+sending voice messages, English and French number synthesis, multiple
+voice mailboxes instances based on called MSN ID (ISDN), dynamic menu
+system with access levels editable on-line. Some of the features need
+some patches to vgetty (see below). mvm also fixes some of the below
+mentionned modem/voice sharing problems (either by requiring a DTMF to
+be pressed to go into voice modem, or with the called MSN ID).
+<p>
+vgetty is intended for people who want to share a phone line for
+data and voice use, with the main focus being voice calls. It is
+*NOT* intended for a dialup system that occasionally gets a voice
+call, since some modems are confused by hearing a recorded voice
+message and won't connect.
+<p>
+If you have distinctive ring, you still can have one line, but vgetty can
+detect the type of the call from the RING message and switch directly
+to data/fax mode. In countries where distinctive ring is supported,
+you can have dialup and voice on the same line without problems.
+<p>
+Voice extensions were originally written by Klaus Weidner
+(klaus@snarc.greenie.muc.de) and then Marc Eberhard
+(Marc.Eberhard@Uni-Duesseldorf.DE) but are now being maintained by
+Marc Schaefer (schaefer@alphanet.ch).  Direct questions about them to
+that address. This is the <url name="official vgetty server"
+url="http://www-internal.alphanet.ch/~schaefer/vgetty.html">
+There you will find special patches, too.
+ 
+More from the distribution (some edits):
+<p>
+This is what you can do with `sendfax' if you have a standard class
+2.0 or 2 fax modem:
+<p>
+<itemize>
+<item> send faxes directly or using shell scripts (easily integrated into
+  other applications).
+<item> do "fax polling", this means you can call the weather station and
+  get them to send you a fax containing the current weather map.
+  (Not all modem manufacturers implement this feature in their
+  modems!)
+<item> create a "fax queue", outgoing faxes get sent automatically, the
+  user is informed by mail about the result.
+<item>`mgetty' allows you to use a single modem line for receiving calls
+and dialing out.
+<item> `mgetty' knows about "smart" modems, and will make sure that the
+  modem is always in a defined state (specific modem initialization
+  possible)
+<item> Incoming calls are answered manually (`RING' -> `ATA' ->
+  `CONNECT') instead of using auto-answer (`ATS0=1'), this way the
+  modem won't pick up the phone when the machine is down or logins
+  are not allowed. (but see note below for ISDN/digital modems)
+<item> mgetty completely replaces getty and/or uugetty.  Like uugetty,
+  supports lock files in a fashion compatible with almost all known
+  versions of UUCP (HDB/BNU, SVR4, V7, Taylor in various flavours).
+  uugetty has some features mgetty doesn't support; see "How does
+  mgetty differ from uugetty?" below.
+<item> mgetty supports System V style gettydefs terminal configurations.
+ 
+<item> mgetty can receive class 2 faxes (if your modem supports it).
+<item> mgetty knows about incoming FidoNet calls.
+<item> mgetty has extensive logging / debugging features
+<item> do "fax poll sending", that is, you can setup your machine as fax
+  poll server, to send some fax pages to "fax poll" callers. (Send
+  informations about your system, the current wheather map, ...). Be
+  warned, even less modems support this feature.
+<item> mgetty can selectively refuse calls based upon CallerID, if your
+  modem supports it, and you're subscribed to the service. CallerID
+  is also logged.
+<item> mgetty has facilities to allow you to refuse incoming FAXes when
+  available disk space is low.
+<item> mgetty knows about incoming PPP calls, and can hand them off
+  to the PPP-daemon, without requiring a login/password sequence. This
+  feature is also known as AutoPPP
+</itemize>
+<p>
+vgetty inherits all of mgettys features, and offers some additional
+ones:
+<itemize>
+<item> behaves like a normal answering machine for human callers
+<item> automatic fax reception when a T.30 calling tone is detected
+<item> If the caller isn't a human or fax, a data connect is attempted,
+  if this is successful, the caller will get a normal login
+<item> does not interfere with dialouts
+<item> remote playback of messages via a DTMF code
+<item> toll saver -- if there are new messages, pick up the phone
+  earlier, this way you can hang up in time to avoid a useless call
+<item> message light - the autoanswer LED of your modem (if it has one)
+  is turned on if there are new messages
+<item> easy playback - on some modems, you can play back the new messages
+  just by pressing DATA/VOICE
+<item> using a speech synthesizer is possible - add the date and time to 
+  messages (not included by default). The scripts show how to use a 
+  speech synthesizer like rsynth, but it is not included in the 
+  package. To use this feature, you need a voice modem for that; 
+  a converter from the pvf format to the rmd (raw modem data) format
+  exists. This is not true for all supported modems.
+<item> voice conversion utilities - play messages on /dev/audio
+  (Not for all supported modems, some voice modems use a proprietary
+  format)
+<item> and more, more features available through the voice library/mvm
+</itemize>
+<p>
+<sect1> What do I need to use mgetty+sendfax/vgetty? <label id=" What do I need to use mgetty+sendfax/vgetty?">
+<p>
+From: steve@work.bellingham.wa.us (Steve Work), and distribution
+CC: clewis@ferret.ocunix.on.ca (Chris Lewis)
+<p>
+Several things.  A computer running some (most) variants of the Unix
+operating system.  (The operating system must support termio.h or
+termios.h; this generally rules out "pure BSD" systems.)  For support
+of dial-in data connections (a la "getty"), you need a modem (probably
+one somewhat compatable with the H*yes "AT" command set).  For sending
+and receiving faxes, you need a modem that understands the Class 2 (or
+2.0) fax command set.  For voice processing, you need a modem that is
+capable of doing voice.  
+<p>
+Vgetty currently supports Dolphin, Dr. Neuhaus Cybermod, Elsa, IS 101
+compatible, Rockwell, Sierra, US Robotics and all ZyXEL modems.
+<p>
+The Cirrus Logic, ISDN4Linux and UMC drivers are basically working,
+but they need to be updated to the new internal interface between the
+generic vgetty parts and the hardware dirver. This change was
+necessary to be strictly ANSI C compatible. Vgetty now compiles with
+gcc -Wall -pedantic without a warning.
+<p>
+Mgetty has been successfully installed and run on at least the
+following systems, probably more by the time you read this list:
+<p>
+<itemize>
+<item>      SCO Unix 3.2.1 (ODT 1.0)           (very well tested)
+<item>      SCO Unix 3.2.4 (ODT 2.0 + 3.0)     (very well tested)
+<item>      SCO Open Server 5.0		 (Gert uses it ...)
+<item>      Linux 0.99pl1 .. 2.1               (very well tested)
+<item>      ISC Unix 3.0                       (tested)
+<item>      SVR4 Unix                          (well tested)
+<item>      AT&amp;T 3B1 3.51m                     (well tested)
+<item>      HP-UX 8.x                          (well tested)
+<item>      AIX 3.2.5, 4.1.4, 4.2              (mgetty, not vgetty)
+<item>      SunOS 4.1.x                        (well tested)
+<item>      SunOS 5.x                          (at least with USR 33.6
+					    Misha Pavlov &lt;oj@interport.net&gt;)
+<item>      NetBSD / FreeBSD                   (works)
+<item>      BSDI v1.1                          (under work, not done --
+                                                    greg@wwa.com)
+</itemize>
+<p>
+It should be possible to run mgetty on any other Unix with
+<tt/termio.h/ or <tt/termios.h/. For best results, <tt/select(S)/ or
+<tt/poll(S)/ are recommended, but there's a workaround. (Warning: for
+Unix SVR3.1 or earlier, *do not use poll()*, it will not work on
+tty devices.) 
+<p>
+Up to now, it has been successfully used with at least the following
+modems, and probably more:
+<p>
+Here's a short list of often used modems. For an up to date list check
+with doc/modems.db from the distribution:
+<p>
+<itemize>
+ <item> Aceex 1496
+ <item> Boca V.32bis
+ <item> Creatix LC 288 FC
+ <item> Practical Peripherals PM14400FXMT
+ <item> TKR Terbo Line
+ <item> U.S. Robotics Courier V.34 Fax
+ <item> U.S. Robotics Sportster V.34 28.800 Fax Modem
+ <item> Zoltrix Platinum Series 14.4
+ <item> ZyXEL 1496E+, always recommended
+</itemize>
+<p>
+Mgetty *should* work with all class 2 faxmodems. Maybe the <tt/DC2/
+character sent at the beginning of a page by <tt/faxrec.c/ must be
+changed to <tt/XON/, for old class 2 modems (implementing very old drafts
+of the standard).  Unfortunately, each class 2 modem can be a tiny bit
+different.  
+<p>
+Early USR fax modems did a bad job of conforming to the Class 2.0 (and
+maybe Class 2) operating standards.  Reports are that current USR
+modems (Sportster and Courier) work without excuses.
+<p>
+<p>
+<sect1> What other software do I need? <label id=" What other software do I need?">
+<p>
+From: clewis@ferret.ocunix.on.ca (Chris Lewis)
+CC: gert@greenie.muc.de (Gert Doering)
+<p>
+For data only, no other software is needed.
+<p>
+mgetty itself can only send or receive G3 (raster) format.  However,
+the distribution includes tools to convert raw G3 files to or from the
+format used by "<tt/pbmplus/", the Portable Bitmap Toolkit.  The <tt/pbmplus/
+formats support (or are supported by) most raster-image programs and
+file formats generally used in the Unix world.  <tt/pbmplus/ is available
+at this URL (among others): 
+<p>
+  <url name="pbmlus" url="ftp://sunsite.unc.edu/pub/X11/contrib/pbmplus10dec91.tar">
+<p>
+The mgetty+sendfax distribution contains a patch to fix <tt/pbmplus/'s
+broken <tt/pbmtog3/ converter -- using the unpatched <tt/pbmtog3/ can cause
+errors during transmission. 
+<p>
+GhostScript, the free Postscript page description language
+interpreter, can convert PostScript to G3.  Ghostscript is available
+at this URL (among others): 
+<p>
+  <url name="Ghostscript"
+  url="ftp://sunsite.unc.edu/pub/gnu/applications/ghostscript-2.6.1.tar.gz">
+     (also check out patch files in same directory.)
+<p>
+<tt/Hp2pbm/, available from ftp:// ??, can convert text and PCL (HP
+Laserjet language) to G3 or PBM.  It also contains programs for
+converting PBM to PostScript, PCL and Epson printers.
+<p>
+<tt/Pbmplus/ has converters from most existing raster formats or <tt/ASCII/
+to <tt/PBM/, and from <tt/PBM/ to most raster formats.  You'd use the <tt/pbm2g3/
+and <tt/g32pbm/ utilities in mgetty to convert between PBM and G3.
+<p>
+In essence, you can run with <tt/hp2pbm/ or <tt/pbmplus/ alone.  With GhostScript,
+you also need <tt/pbmplus/ or <tt/hp2pbm/ to convert <tt/ASCII/ (used for page headers
+etc.) to G3.
+<p>
+Mgetty+sendfax includes some voice processing utilities in the voice/
+subdirectory. These tools (pvftools) can convert ZyXEL, Rockwell and
+ISDN4Linux voice formats. Other formats are coming. People reported
+success in translating GSM encoded voice formats, so support for that
+will also be added in the future. This means that vgetty currently
+supports the three above and support for more modems is planned.
+<p>
+Note that for some USR modems, the format has been changed to be
+``pure'' with no trailer nor header. More details can be found in
+<tt>voice/contrib/Philip_Hands</tt>.
+<p>
+<sect1> What terms cover my use of mgetty+sendfax/vgetty? <label id=" What terms cover my use of mgetty+sendfax/vgetty?">
+<p>
+<p>
+>From the distribution:
+<p>
+"The mgetty+sendfax package is Copyright (c) 1993 Gert Doering. You
+are permitted to do anything you want with this program -
+redistribute it, use parts of the code in your own programs, ...,
+but you have to give me credit - do not remove my name.
+<p>
+"If the program works for you, and you want to honour my efforts,
+you are invited to donate as much as you want.
+<p>
+"If you make money with mgetty, I want a share. What I mean by that
+is: it's perfectly OK with me to get paid for mgetty installation
+or support, but if you want to actually sell mgetty, or pack mgetty
+with a modem and sell it as "unix fax package", contact me first.
+<p>
+"<bf/*WARNING:*/ This package is still BETA software. Use it at your own
+risk, there is *no* warranty. If it erases all the data on your
+hard disk, damages your hardware, or kills your dog, that is
+entirely your problem. Anyway, the program works for me and quite a
+lot of other people."
+<p>
+Marc put the voice part under the GPL. To avoid misunderstandings,
+Gert decided to not include the GPL text into the distribution,
+though. The copyright for the voice stuff is GPL.
+<p>
+<p>
+<sect1> Where can I get mgetty+sendfax? <label id=" Where can I get mgetty+sendfax?">
+<p>
+<p>
+The home page is at http://www.leo.org/~doering/mgetty/
+<p>
+The official release sites are these URLs:
+<p>
+<url name="The master site is" url="ftp://alpha.greenie.net/pub/mgetty/">
+resp.
+  <url name="here" url="http://alpha.greenie.net/mgetty/">
+<p>
+Mirrors are at:
+<p>
+  ftp://ftp.leo.org/pub/comp/os/unix/networking/mgetty
+<p>
+<p>
+<sect1>How can I integrate it into an office environment? <label id="How can I integrate it into an office environment?">
+<p>
+From: Klaus Lichtenwalder &lt;Lichtenwalder@ACM.org&gt; and the mgetty dist.
+<p>
+With mgetty, you get a subdirectory called <tt>frontends/</tt>. There are a lot
+of more or less documented programs for viewing/printing/organizing
+received faxes, for entering them into the queue from all kinds of
+different programs.
+	
+<p>
+<sect1>What's going on with those Class 1 modems? <label id="What's going on with those Class 1 modems?">
+<p>
+From: Klaus Lichtenwalder &lt;Lichtenwalder@ACM.org&gt;, modifying comments
+	from Gert Doering
+	
+While Class 2 and Class 2.0 modems do most of the dirty work
+themselves, clever modem manufacturers seem to drift toward implementing
+only class 1 fax modes. Probably so they can use smaller proms while
+also integrating voice functionality. Well, they want to see $$$,
+too..
+The bad thing with Class 1 is, the modem expects all the dirty work to
+be done by the host computer. After all, why did you buy a Pentium II
+300MHz? Just for hitting on a few keys from time to time? So you have
+a very fast cpu and there should be no problem to do something every n
+ms? Right? Wrong! Most of the Unix systems out there don't have
+realtime extensions (this *is* a real time job, after all), and if
+they have, there's no real standard to these extensions, so generally
+it's not possible to maintain that strain. Windows knows how to use
+class 1 modems? Yeah, sure, the multitasking is quite different, you
+can quite easily exclude other processes from running, because you
+just want to have that high priority process. And if you insist in
+doing some other time consuming tasks, your fax might no be very
+readable... So, so much prosa for this situation, you still might see
+some class 1 support in the near future. Just hang on and in the
+meantime, boycott modem manufacturers who only support class 1 modes.
+<p>
+<p>
+<sect1>What modems are recommended? <label id="What modems are recommended?">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt; and the List
+<p>
+<p>MODEM Recommendations for use with mgetty/vgetty
+<p>
+What modem to recommend depends on your needs.  There are very few modems
+that handle fax + data + voice perfectly, but quite a number that are
+well suited for two of the categories, and less good (or sometimes not
+at all) for the third.
+<p>
+<descrip>
+<tag/For Fax+Data:  /
+    * USR Courier V.34/X.2 (no voice)
+<tag/For FAX+Voice: /
+    * ZyXEL 1496 (data only up to 19200, but best fax implementation)
+<tag/For Data+Voice:/
+    * USR Sportster VI series (fax implementation is VERY bad)
+<tag/For FAX+DATA+Voice/
+  <itemize>
+   <item> ZyXEL 2864
+   <item> MultiTech MT2834ZDXv
+   <item> ELSA MicroLink TQV series (fax is not perfect, but works ok)
+  </itemize>
+</descrip>
+<p>
+Last updated: February 1998
+<p>
+<p>
+<sect1>Where is the list archived? <label id="Where is the list archived?">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+A pointer to the archive as well as lots of other documentation can be
+found at &lt;URL:http://alpha.greenie.net/mgetty&gt;. The archive itself
+can be found at &lt;URL:http://www.elilabs.com/mgarc/index.html&gt;
+<p>
+<p>
+<sect>Part 2: Other questions<label id="Other questions">
+<p>
+<p>
+<sect1> How can I contact mgetty/vgetty users and developers? <label id=" How can I contact mgetty/vgetty users and developers?">
+<p>
+From: ezmlm at crynwr
+<p>
+A mailing list exists. Due to its international character, the only
+supported language on this list is <bf/*English*/, though it's gated to
+some local newsgroups, <tt/de.alt.comm.mgetty/ for example. To subscribe to
+the list, send mail to <tt/mgetty-subscribe@crynwr.com/, to unsubscribe,
+send a mail to mgetty-unsubscribe@crynwr.com, NOT to mgetty@muc.de.
+If you want to specify a different e-mail address for your
+subscribtion than the address you send your subscribe request, send it
+to mgetty-subscribe-&lt;your e-mail address with @ replaced by
+=&gt;@crynwr.com.  This address gets checked by sending a confirmation
+message. Due to the fact that this list is a *mailing-list*, even
+though you can also see it in newsgroups you *have* to use a valid
+e-mail address. Not complying to this (e.g., you add the dreaded
+-NOSPAM- somewhere in your address) you can't be reached for
+answers. And most of the time people who care to answer don't check
+for rules how to legalize your mail address for lack of time.
+<p>
+Example (from mgetty-help@crynwr.com): to specify God@heaven.af.mil as
+your subscription address, send mail to
+&lt;mgetty-subscribe-God=heaven.af.mil@crynwr.com&gt;.  I'll send a
+confirmation message to that address; when you receive that message,
+simply reply to it to complete your subscription.
+<p>
+The volume on mgetty@muc.de varies from one or two messages a week to
+ten or so a day, depending on development activity.
+<p>
+If you have questions because of a misbehaving mgetty or vgetty, be
+sure to include the relevant parts of your log file, usually obtained
+with a loglevel of 6 The default location of these log files is /tmp/
+for mgetty and /var/log for vgetty.
+<p>
+<p>Subject:  What image file formats can sendfax send?
+From:	gert@greenie.muc.de (Gert Doering)
+<p>
+Fax input format:
+<p>
+   raw G3 data (according to CCITT standard T.4, 1-dimensionally
+   compressed). Can be created by GhostScript's "dfaxhigh" or "dfaxlow"
+   drivers (they will create raw G3 data with a 64 byte header, that
+   sendfax + g3cat + g32pbm will recognize and skip) or by the "pbm2g3"
+   program.
+   Warning: the pbmtog3 program from the "pbmplus" distribution does *not*
+   create valid G3 data according to T.4, to be precise, the lines are
+   shorter than 1728 pixels and the leading EOL code is missing. To fix
+   it, use the patch that is provided in "patches/pbmtog3.p1". Even
+   better, use my own utility. (The patch is *NOT* needed for my pbm2g3
+   program!).
+   Use of a unpatched pbmtog3 will most likely cause +FHNG:50 or +FHNG:54
+   error codes. But see also ``Troubleshooting and answers'' for other
+   causes for these errors.
+<p>
+   Do not use "tiff-G3" data as input. Though the data itself is G3 encoded,
+   it's wrapped into a complex layer of TIFF headers that would
+   require non-trivial parsing that's simply not needed for sendfax.
+   Faxing a TIFF file will result in a warning message from sendfax, and,
+   most likely, in a failed transmission.
+<p>
+
+Fax output format:
+<p>
+   The files that mgetty places into FAX_SPOOL_IN are in the same format
+   as the files that sendfax wants to send, raw G3 data as of CCITT T.4.
+   To convert them to "pbm", use the g32pbm program. To convert them to
+   X-Windows xwd format, use the "contrib/g3toxwd" program.
+<p>
+   If the files are received without transmission errors, it is possibly
+   to send received fax files without any additional conversion. Since
+   some modems insert filling zero-bits, a run through "g3cat" is
+   recommended anyway, this will remove any surplus stuff, and clean up
+   garbled lines.
+<p>
+<p>
+<sect1> Why doesn't mgetty accept other file formats besides G3? <label id=" Why doesn't mgetty accept other file formats besides G3?">
+<p>
+<p>
+Why does mgetty only send raw G3 fax files, instead of converting
+arbitrary image files (like TIFF) on the fly?
+<p>
+>From Chris Lewis:
+<p>
+"As I understand it, in addition to its own formats, TIFF can encapsulate
+some number of other formats.  Put another way, TIFF is, at least to some
+extent, simply a way of getting magic numbers into other formats so that
+TIFF-capable converters can handle multiple formats transparently.
+<p>
+"Yes, you certainly can have TIFF encapsulate a G3, and mgetty wouldn't
+have much trouble with that.  However, that leaves you with the question -
+what does mgetty do if it's not a G3 that's been encapsulated?  It
+would have to convert it.  And then we would encounter situations where
+mgetty's conversion speeds couldn't meet the class II FAX transmission
+timeouts, and you've wasted telephone time...  Ditto on reception.  Indeed,
+there is a real possibility that mgetty would not be able to keep up
+if the input or output file was anything other than a G3.
+<p>
+"Approaching this from another viewpoint, we should also remember that
+mgetty is a transfer protocol and implementation.  *Not* conversion
+software.  mgetty needs to read and write G3s, and that's all.  Leave
+conversions to other software."
+<p>
+And from Gert Doering:
+<p>
+"Well, TIFF is a very complex file format, that can support dozens of
+different page data encodings, different byte / bit orderings,
+multiple pages per file, and so on.  While TIFF is a flexible format,
+parsing it is a complex task.
+<p>
+"In contrast, mgetty's "g3" files are raw G3 data. No headers, no
+formatting, no need for the transmission code to dig around in the file
+to find the actual page data.  One page per file, simplest possible.
+<p>
+"Ignoring TIFF (leaving TIFF conversions to outside software)
+simplifies mgetty and sendfax enormously, but doesn't complicate the
+user interface much, as long as "faxspool" or similar tools are used
+that will hide the internals, that is, how the fax backend expect its
+data, from the user. To be precise, leaving out TIFF support
+*simplifies* mgetty.  Many Unix programs can read pbm and converting
+g3 -> pbm is very easy, while I haven't seen a good *multipage*-Tiff -
+to - PBM converter yet."
+<p>
+<p>
+<sect1> Why doesn't mgetty use the modem's autoanswer capabilities? <label id=" Why doesn't mgetty use the modem's autoanswer capabilities?">
+<p>
+<p>
+1. Because it isn't possible to distinguish a fax from a data call if
+you don't have full modem control. Besides, it will make sure that the
+modem doesn't answer the phone while the host isn't ready for it. (but
+see note below for ISDN and digital modems)
+<p>
+2. And callerid won't work without extreme difficulty.
+ 
+<p>
+<sect1> Why mgetty ignores /dev/tty* dialin, /dev/cua* dialout conventions: <label id=" Why mgetty ignores /dev/tty* dialin, /dev/cua* dialout conventions:">
+<p>
+<p>
+[Under Linux and most other Unices (excepting SunOS) mgetty should be
+set on the tty* devices, and the cua* devices should be ignored
+entirely:]
+<p>
+From: "Theodore Y. Ts'o" &lt;tytso@mit.edu&gt;
+<p>
+/dev/ttySxx devices are fully POSIX-compliant TTY devices.  If you are
+only going to be using one set of tty devices, you should be using
+/dev/ttySxx. 
+<p>
+/dev/cuaXX devices are different from /dev/ttySXX in two ways --- first
+of all, they will allow you to open the device even if CLOCAL is not set
+and the O_NONBLOCK flag was not given to the open device.  This allows
+programs that don't use the POSIX-mondated interface for opening
+/dev/ttySxx devices to be able to use /dev/cuaXX to make outgoing phone
+calls on their modem (cu stands for "callout", and is taken from SunOS).
+<p>
+The second way in which /dev/cuaXX differs from /dev/ttySXX is that if
+they are used, they will trigger a simplistic kernel-based locking
+scheme:  If /dev/ttySXX is opened by one or more processes, then an
+attempt to open /dev/cuaXX will return EAGAIN.  If /dev/cuaXX is opened
+by one or more processes, then an attempt to open /dev/ttySXX will
+result the open blocking until /dev/cuaXX is closed, and the carrier
+detect line goes high.
+<p>
+While this will allow for simple lockouts between a user using a modem
+for callout and a getty listening on the line for logins, it doesn't
+work if you need to arbitrate between multiple programs wanting to do
+dialout --- for example, users wanting to do dialout and UUCP.
+<p>
+I originally implemented the cuaXX/ttySXX lockout mechanism back before
+FSSTND established a standard convention for the use of tty lock files.
+Now that it's there, people should use the tty lock files and not try
+using /dev/cuaXX.  The only reason why /dev/cuaXX hasn't disappeared yet
+is for backwards compatibility reasons.
+						- Ted
+<p>
+[Under SunOS *everything* should use cua*, as follows:]
+From: Gert Doering &lt;gert@muc.de&gt;
+<p>
+The two-device scheme is meant to prevent multiple processes from
+accessing the same physical device at the same time. Since mgetty
+opens the port with O_NDELAY, the kernel sees a process on tty*
+(mgetty) and prevents any open() on cua* (uucico, cu, ...). So, you
+have to use the same device for both program types, and that's cua*.
+<p>
+<p>
+<sect1> Troubleshooting questions & answers <label id=" Troubleshooting questions & answers">
+<p>
+From: gert@greenie.muc.de
+<p>
+Q: I keep getting the error code +FHNG:50 or +FHNG:54 after sending a
+   page. Sometimes it says "page bad, retrain requested" and infinitely
+   resends the page.
+<p>
+A: This error means that something went wrong between the two machines,
+   while your end was sending the page data. In the case of +FHNG:50 or
+   +FHNG:54, the other end most likely simply hung up (so your modem
+   couldn't get any page transfer status at all), in the other case, the
+   receiver complained that it didn't like the data on the page.
+<p>
+   The most common reason for this behaviour is that you used a copy
+   of ``pbmtog3'' that came from the ``pbmplus'' distribution and doesn't
+   have my patch included (Mind you, the pbmtog3 program is required for
+   the page headers that faxspool puts on top of each page!).
+<p>
+   If that is not the reason, there may be flow control problems, or the
+   line have simply has been very noisy, or so. Get in touch with the
+   receiver, and find out whether the page looks good or whether there are
+   lines missing, others corrupted, ... - if there are errors, check your
+   flow control setting.
+<p>
+   If there are no errors whatsoever, and you're sure that you use my
+   version of pbmtog3 (called pbm2g3 or a patched version of pbmplus', 
+   then I'm out of wits - something's broken in the modem. Maybe you 
+   should upgrade your ROM version.
+<p>
+   Bjoern Jacke (bjoern.jacke@gmx.de) reports that there was a bug in
+   gs 5.50 such that if the input file specified a paper size explicitly,
+   the line length was not properly adjusted to 1728 pixels.
+   This bug was fixed in beta version 5.71. This can also cause the
+   same errors.
+<p>
+
+Q: When receiving faxes, I get the +FCON message logged, then mgetty says
+   "starting fax receiver". fax_wait_for(OK) is called, logs some random
+   junk bytes, and gives up after a minute, complaining about "timeout".
+<p>
+A: Most likely, you have a modem that switches baud rate to 19200 bps
+   right after sending the +FCON message to the host, and the normal port
+   speed is something else. Check policy.h whether FAX_RECEIVE_SWITCHBD
+   is defined, and change the setting (if the modem does *not* change
+   speed, but the define is *set*, the effect will be similar).
+   Better yet, with the runtime configurable stuff, is to add the entry
+   switchbd &lt;nnn&gt;" in mgetty.config
+<p>
+
+Q: I keep changing values in policy.h, but nothing changes.
+<p>
+A: maybe you've had an older version of mgetty installed to
+   /usr/local/bin/mgetty and are calling this from /etc/init? Newer
+   versions are installed in /usr/local/sbin/mgetty. Check the time
+   stamp on the mgetty you just compiled vs. the mgetty listed in
+   /etc/inittab.
+<p>
+
+Q: Half of the faxes that I receive are too short, they look as if every
+   second pixel line is missing.
+<p>
+A: Well, they *are* short: most likely, they are received in normal
+   resolution (204x98 dpi) instead of fine resolution (204x196 dpi). You
+   can see it in the filename, if it starts with "ff*", it's fine, if it
+   starts with "fn*", it's normal resolution. To ``stretch'' a normal
+   resolution fax to proper proportions, use ``g32pbm -stretch fn...''
+<p>
+
+Q: login complains with ``no utmp entry, must execute login from the
+   lowest level sh''
+<p>
+A: I *told* you not to fiddle with the ``utmp'' field... - most likely,
+   in your ``login.config'' file, the utmp field for the entry calling
+   /bin/login isn't "-".
+<p>
+   Another reason could be a faulty /etc/init (hits only Linux users) or a
+   corrupted /etc/utmp file. In that case, reboot your machine.
+<p>
+Q: When mgetty is running and I dial out, I do not get "CONNECT" but only
+   junk, as "+FCO", "+FTI:", "+FHS:20"
+<p>
+A: Well, yes, that's a problem with the 2.0 implementation in mgetty. That
+   is: while mgetty is running, the modem is in "AT+FCLASS=2.0" mode and
+   expects to connect to a fax on the remote side. (With class 2, we
+   worked around this by setting +FCLASS=0;+FAA=1, but that will make the
+   modem answer in class 2, not 2.0 [subject to further testing!])
+<p>
+   Solution: in the program dialing out, initialize the modem with
+   "AT+FCLASS=0".  Most likely, a modem reset (ATZ) will also help.
+<p>
+Q: every time mgetty starts up, the permissions of my tty device get
+   changed and I have to issue "chmod +w /dev/ttySx" to be able to
+   dial out.
+<p>
+A: that's not a bug, that's a feature. You don't *want* to allow anybody
+   using your machine to be able to dial out (think of your phone costs!),
+   so it's a security issue.
+   If you *want* to allow dialout for everyone, #define FILE_MODE 0666
+   in policy.h. I would not recommend it, I would give access to a
+   special group, and put every one that may dial out into this group.
+<p>
+Q: I have a Linux system, and while trying to dial out on /dev/cua1
+   (mgetty is running on /dev/ttyS1), it says "device busy" (EBUSY)???
+<p>
+A: use the same device (always!!) for dial-in and dial-out.
+   On Linux, use /dev/ttySx, on SunOS and *BSD use /dev/cuax.
+   And while you're at it, dont' use links like /dev/modem. You'll
+   end up confused and will most certainly forget it. But you have to
+   not only use the same device for all those programs but in fact
+   also the same *name*, for the lock file will be named appropriately.
+<p>
+Q: If I create a fax file with "gs -sDEVICE=dfaxhigh ..." and send it with
+   sendfax, everything works *great*. If I run it through "faxspool", the
+   receiving side reports an error. Is the "g3cat" program broken?
+<p>
+A: No, g3cat isn't the problem. The real problem is "pbmtog3", and I bet
+   you have the pbmtog3 program from the pbmplus distribution installed.
+   This program is *broken* (patch is in mgetty/patches/pbmtog3.p1), that
+   is, it doesn't create proper T.4/G3 fax data. Thus, the receiving fax
+   machine will get a fax that has some corrupt lines (the page header)
+   and will complain about it.
+   Patch pbmtog3, or use mgetty's pbm2g3. It's faster anyway.
+<p>
+Q: mgetty doesn't accept FidoNet calls. I get log entries like this:
+<p>
+     10/30 01:54:54 ##### data dev=ttyS1, pid=3401, caller=none,
+     conn='38400/V32b 14400/V42b', name='', cmd='/bin/login',
+     user='**EMSI_INQC816**EMSI_INQC816q.'
+<p>
+   or this:
+<p>
+     10/30 05:31:03 ##### data dev=ttyS1, pid=7238, caller=none,
+     conn='38400/ZyX  16800/V42b', name='', cmd='/bin/login', user='q.q.q.'
+<p>
+A: did you compile mgetty with -DFIDO defined? I don't think so. If
+   -DFIDO isn't set, mgetty doesn't know about fido.
+<p>
+Q: Some of my programs use binary lockfiles and some use ASCII
+   lockfiles.  Why does mgetty complain?  Can't it recognize both?
+<p>
+A: Mgetty complains because your system configuration is _wrong_.
+   These error messages are there to help the system administrator
+   notice a *severe configuration error* on his site.
+<p>
+   If all programs would understand both types of Locking, the
+   messages would be silly, but since kermit usually simply ignores
+   ascii locks, and uucico does so for binary locks, the situation is
+   *highly* error-prone, and sysadmins should *SEE* this.
+<p>
+   Recompile your applications that use the modem so that all agree on
+   the lockfile types.
+<p>
+Q: My modem and I share one phone line. Now I answered the phone
+   and a modem greets me. How can I make mgetty take over?
+<p>
+A: Send the signal SIGUSR1 to the mgetty process. It will then answer
+   the phone.
+<p>
+
+Q: I can fax only one page, then I get an error
+<p>
+A: When you see something like this in your log:
+  > 03/22 19:15:58 yS1  fax_wait_for: string 'OK'** found **
+  > 03/22 19:15:58 yS1  fax_send: 'AT+FET=0'
+  > 03/22 19:15:58 yS1  fax_wait_for(OK)
+  > 03/22 19:15:58 yS1  fax_read_byte: read returned 0: Unknown error
+  > 03/22 19:15:58 yS1  fax_get_line: cannot read byte, return: Unknown error
+  > 03/22 19:15:58 ##### failed transmitting f1.g3: +FHS:-4, time=55s
+  or (the newer log entries)
+  > sendfax: FAILED to transmit 'f1.g3'.
+  > Transmission error: +FHNG:-5 (Unexpected hangup / read() error / write()
+  > error (int.))
+<p>
+  you should define ''ignore-carrier yes'' in your sendfax.config file.
+<p>
+Q: The message "WARNING: DSR is off - modem turned off or bad cable?" keeps
+   showing up in the mgetty logfile.
+<p>
+A: If you see this message, it basically means that mgetty can't get
+   the status of dsr (data set ready). This can be because the cable
+   is bad or because you are using mgetty on solaris. Solaris doesn't
+   give you the status of dsr. If you are running mgetty on a different
+   platform, you might consider checking your cable or the modem
+   setting. Note that the Multitech modems (especially 2834) don't
+   seem to be able to force DSR to be on, giving this
+   annoying message but no other problem.
+<p>
+Q: How many slashes do I need to put into mgetty.config to have mgetty
+   send a \N3 to the modem?
+<p>
+A: Well, four. Why did you ask? The syntax for a \N3 is \\\\N3
+  (Tnx to: Ruud van Tol &lt;rvtol@isolution.nl&gt;)
+<p>
+<p>
+<sect1>Programs generating "invalid" Postscript that can't converted <label id="Programs generating invalid Postscript that can't converted">
+<p>
+         to the G3 format for sendfax
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+Right now the list of programs generating "invalid" postscript (causing
+Ghostscript to create G3 files with wrong line width, in turn causing
+sendfax to fail) includes:
+<p>
+FrameMaker 4.0
+WinWord (dunno which version)
+dvipsk 5.58f 
+<p>
+Gert Doering wrote on Sun, 22 Dec 1996 00:26:55 +0100 in message
+   &lt;m0vbaoh-0004B5C@greenie.muc.de&gt;:
+<p>
+Interesting enough, I tried dvipsk 5.58f today, and it does *NOT* emit any
+of those bad "setpagedevice" commands, and thus the resulting postscript
+*will* generate correct page sizes. So maybe it's sufficient to upgrade
+your dvips program to the most recent version.
+<p>
+Maybe it's necessary to tell *ghostscript* what the "right" paper size is
+supposed to be (A4 -- but you must make sure that dvips makes "a4" as
+well!), by specifying "gs -sPAPERSIZE=a4". 
+<p>
+For some people, even that does not suffice (some strange interaction
+between different paper sizes in different programs), so it may help to
+post-process the G3 files with "g3cat" (from mgetty 0.99*, versions 
+after July 96!), or with "g32pbm badfile.g3  | pbm2g3 >goodfile.g3". The
+latter will definitely help.
+<p>
+
+<p>
+<sect1> My ZyXEL doesn't work right after a ROM upgrade: What's wrong? <label id=" My ZyXEL doesn't work right after a ROM upgrade: What's wrong?">
+<p>
+From: felix@escape.vsse.in-berlin.de
+<p>
+Do a full modem reset after upgrading the firmware. This is not
+described in the German ZyXEL manual (is it described in the
+English one?) but should be done in any case.
+<p>
+<p>
+<sect1>Why the occasional "tcsetattr failed: I/O error" message? <label id="Why the occasional tcsetattr failed: I/O error message?">
+<p>
+From: gert@greenie.muc.de
+<p>
+Q: Occasionally, mainly after "clean" user logouts (that is, the user
+   typed "exit" instead of just hanging up), I get the message
+	09/08 21:26:26 yS2  lowering DTR to reset Modem
+	09/08 21:26:27 yS2  tcsetattr failed: I/O error
+   in the mgetty log file, and a similar I/O error message in the syslog
+   file.
+<p>
+A: Well, this is a Linux and SunOS specific problem: if the modem is still
+   connected to the other end when mgetty starts, mgetty will force it to
+   hangup by lowering DTR (and sending +++ATH, in case DTR drop won't
+   suffice).  This will make the modem lower the DCD (carrier detect)
+   line.  Unfortunately, this will trigger a security mechanism in the
+   Linux kernel, which will prevent all further access via that file
+   descriptor.  This is done to prevent one well-known password hack
+   (I won't that explain in detail).
+<p>
+   Mgetty knows about that problem, and, upon noticing an error at this
+   point during modem initialization, will simply reopen the port and
+   redo all modem / port setup stuff.
+<p>
+   Because suppressing that error message would be messy, it keeps
+   appearing, but it is harmless (... "trying again").
+<p>
+
+<p>
+<p>
+<sect1>When is mgetty actually running? (i.e. what can mgetty control?) <label id="When is mgetty actually running? (i.e. what can mgetty control?)">
+<p>
+From: Klaus Lichtenwalder &lt;Lichtenwalder@ACM.org&gt;
+<p>
+At what moments can mgetty exert control over the line? Let's
+consider mgetty's life span: at some time (e.g. system boot, init
+assumes the specified run level and starts mgetty) mgetty starts and
+(simplified) checks for the lock file on the device it has to
+control. If there's no lock file, it initializes the modem and wait's
+for an event on the line. If a character arrives, mgetty does not read
+it but first checks the lock file. 
+<p>
+* If a lock file is present, mgetty knows some{body,thing} wants to
+dial out and periodically checks for the existence of the lock
+file. After the lock file is gone, the device is free and mgetty
+simply exits. It'll get restarted by init, so the modem line will
+get reinitialized. 
+* If no lock file is present, the modem most probably sent a RING, so
+we go check for the expected word (= RING) and send our
+answer_chat. If it's a fax call (and the modem can receive faxes and
+we allow receiving them) we get the pages, store 'em away and exit,
+thus restarting mgetty, see above. If it's a data call (I ignore
+DISTINGIVE_RING and Caller_ID features for now), we prompt for the
+login and wait for an answer. After the answer is read, it's checked
+against the login.config file and the appropriate program get's exec'd
+by mgetty, which means, there's *no* mgetty for that line. Only after
+the termination of the connection, when the other process(es) exit(s),
+mgetty will be restarted by init.
+<p>
+<p>
+<sect1>The user's shell doesn't get killed after the line drops <label id="The user's shell doesn't get killed after the line drops">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+> why doesn't mgetty kill the user's shell when the user just hangs up
+> the modem, without doing 'logout'? [Mod: or the line simply crashes]
+<p>
+How should mgetty kill a user's shell? While the user is logged in, mgetty
+is *not running*.
+<p>
+The kernel will signal the shell via the SIGHUP signal when the DCD line
+on the modem drops. Then the shell will exit, and init will re-start
+mgetty. Unfortunately, the BASH shell is very broken in various versions
+and will ignore the SIGHUP signal, so that could be one reason why it
+isn't exiting. 
+<p>
+Another reason could be an improper modem setup (AT&amp;C0), make sure
+that the modem raises and lowers the DCD line properly (check with the
+modem manual) and that your serial cable is OK (swap it with another
+one for testing).
+<p>
+The last cause could be incorrect tty settings. A quick fix could be
+to add a stty command (with arguments hup -clocal crtscts, e.g.) to
+/etc/profile.
+
+<p>
+<sect1>AutoPPP appears in the "who" listing <label id="AutoPPP appears in the who listing">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+If you use the /AutoPPP/ option for automatically creating a ppp 
+connection, the user name does not appear in the who list. Instead,
+something like AutoPPP or ppp is displayed. Solution: you have to
+patch pppd, that's not mgetty's issue and thus can't resolved patching
+mgetty. 
+If you have the patched pppd, this is how it works. You have
+to add the option "login" to pppd in login.config and change the third
+column to "-" (in the example it's a_ppp or ppp).
+<p>
+<p>
+<sect1>Things to think of if using AutoPPP, or, as you might call it, <label id="Things to think of if using AutoPPP, or, as you might call it,">
+<p>
+	ppp connections
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+You can't get a ppp connection going. So, what should you check before
+calling for help in the list.
+<p>
+Run mgetty with a debug level high enough to see what login it will
+try. It might not be wrong to just use level 9 to see everything
+happening.
+<p>
+Scenario 1: mgetty recognizes AutoPPP:
+<p>
+<tscreen><verb>
+  03/11 12:06:31 yS1   match: user='/AutoPPP/', key='/AutoPPP/'*** hit!
+  03/11 12:06:31 yS1   login: utmp entry: ppp
+  03/11 12:06:31 yS1    looking for utmp entry... (my PID: 5313)
+  03/11 12:06:31 yS1   utmp + wtmp entry made
+  03/11 12:06:31 yS1   calling login: cmd='/usr/sbin/pppd', argv[]='pppd...
+  03/11 12:06:31 ##### data dev=ttyS1, pid=5313, caller=none, conn='LAPM', name=''
+</verb></tscreen>
+<p>
+At this point, <tt/mgetty/ executes <tt/pppd/ and has nothing to do with
+connection failures, failing authorization, the police banging at your
+door or anything else. Check <tt/pppd/'s logs for any trouble.
+<p>
+If you use "<tt/who/" and the only thing you can see is "<tt/a_ppp/", go check
+your <tt/pppd/ sources. It's <tt/pppd/'s job to forge a <tt/utmp/ entry
+<p>
+It looks like some unix clients should explicitely send the string
+"<tt>/AutoPPP/</tt>" as there seems to be a problem in connecting. Mgetty
+doesn't seem to get ppp-frames and waits for something it can decide
+what to do. As you are most probably using a script for the
+connection, there should be no problem to send that string.
+<p>
+
+<p>
+<sect1>Viewing received faxes from a PC running windows <label id="Viewing received faxes from a PC running windows">
+<p>
+From: Amadeu Pi &lt;AmadeuP@santiveri.es&gt;
+<p>
+Software needed:
+Unix side: <url name="libtiff" url="ftp://ftp.sgi.com/graphics/tiff">
+PC side: MS Imaging 
+<descrip>
+  <tag/W95/    http://www.microsoft.com/windows/windows95/info/wang.htm
+  <tag/WNT4/   It comes with standard distribution
+  <tag/WNT3.51/ NT4 version can be made to work here (contact me if interested)
+</descrip>
+Howto:
+Probably from <tt/FAX_NOTIFY_PROGRAM/ run <tt/fax2tiff/ to generate a single tif file
+from all the received g3 page files, example:
+<tscreen><verb>
+     fax2tiff -M -R 98 -o fax.tif fn54d6e4eS1.01 fn54d6e4eS1.02
+</verb></tscreen>
+where <tt/-M/ means Treat input data as having bits filled from MSB to LSB,
+      <tt/-R/ is the vertical resolution (196 for fine 98 for low),
+      <tt/-o/ is the name of the output file
+<p>
+One interesting point of this approach is that g3 to tiff conversion is
+very, very fast (a lot faster the g3 to gif or g3 to pbm).
+Once you have generated the tiff file you can place it in a samba share so a
+PC can access it or you can mail it to a PC user (see <tt>samples/new_fax.mime</tt>)
+or any other thing that suits you.
+When you have the tiff file on the PC side use wangimg.exe (MS Imaging) to
+view it (or just doble click on the file). This program developed by Wang
+has several fancy features that will allow you change page orientation,
+print several or all pages, annotate...
+<p>
+<sect1>Howto setup MSN/distinctive rings mappings <label id="Howto setup MSN/distinctive rings mappings">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+To define the list of msns and map them to the distinctive rings add
+the parameter <tt>msn-list &lt;nrs&gt;+</tt> to <tt/mgetty.config/, i.e.
+<tscreen><verb>
+  msn-list 35655071 023 025 024
+</verb></tscreen>
+
+the list is matched left-to-right, the numbers themselves right-to-left.
+The &lt;n&gt;th number in the list will be mapped to dist-ring &lt;n&gt;, for example,
+a call to 35655025 will be treated as "distinctive ring 3".
+<p>
+(Counting starts from 1, because dist-ring 0 is "unspecified RING").
+<p>
+
+<p>
+<sect1>Howto convert wav's to rmd's for mgetty <label id="Howto convert wav's to rmd's for mgetty">
+<p>
+From: Andy Fraser &lt;andy@bramble.force9.co.uk&gt;
+<p>
+Q: I am trying to convert a file that I have recorded in <tt/WAV/ to the
+<tt/RMD/ type required by my modem. However, when I convert it using
+<tt/wavtopvf/ and then <tt/pvfspeed/ to adjust the sampling rate to 7200
+required by my modem and then listen to the file it sounds as if the
+message has been slowed down.
+<p>
+A: Your <tt/WAV/ file may be in stereo and this will mean that it won't
+convert properly. Simply convert your <tt/WAV/ file to mono and then try
+the process again.
+<p>
+
+<p>
+<sect1>Where can I get hp2pbm? <label id="Where can I get hp2pbm?">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+hp2pbm can be found at &lt;URL:ftp://alpha.greenie.net/pub/mgetty/&gt; or at
+&lt;URL:ftp://ftp.leo.org/pub/comp/os/unix/networking/mgetty/&gt;
+<p>
+
+<p>
+<p>
+<sect1>My (ISDN/digital) modem doesn't say <tt/RING/ when being called <label id="My (ISDN/digital) modem doesn't say RING when being called">
+<p>
+From: Jason Spence &lt;thalakan@technologist.com&gt;
+<p>
+Try <tt/ATS0/=3.  It used to be a safe assumption that all modems would say
+"<tt/RING/", even if auto-answer is turned off.  However, many newer
+digital modems (like the Digi RasFire series) can tell the switch at
+your phone company's central office that it's not going to answer the
+phone, so anyone who tries to call the number your modem is attached
+to will just get a busy signal.  You <bf/MUST/ change the default init
+string in <tt/login.config/ to <tt/ATS0=3/ (or some other number > 1).
+<p>
+This behaviour is almost guaranteed for ISDN PRI (23B + 1D) modem bank cards.
+<p>
+
+<p>
+<sect1>Is mgetty Y2K compliant? <label id="Is mgetty Y2K compliant?">
+<p>
+From: Gert Doering &lt;gert@greenie.muc.de&gt;
+<p>
+Yes, mgetty is Y2K compliant. Rationale: Mgetty has no idea what a
+"date" might be.  All programs use date only for logging, and even
+then, only mm/dd is used, no year in any form.  Time stamps / time
+differences are done based on time() values, that is, seconds since
+the epoch, so there is no calculation based on dates that could go
+wrong.
+<p>
+Weird things might happen in 2038 (if the time field used is still 32
+bits and if fax will still be used).
+<p>
+<p>
+<sect>Part 3: Compatibility Issues <label id="Compatibility Issues">
+<p>
+<p>
+<sect1> Suspicious fax machines <label id=" Suspicious fax machines">
+<p>
+From: hm@ix.de (Harald Milz)
+<p>
+I'm collecting all data concerning suspective fax
+machines, i.e. those which made problems in cooperating
+with sendfax. The main reason is to find out whether
+there are specific fax machines that refuse to work
+with sendfax and/or your fax modem. As a goal, we will
+be able to track down the bug(s). 
+<p>
+To contribute, please fill in the following template
+and send it to me (hm@ix.de):
+<p>
+<enum>
+<item> &lt;fax machine's brand and model&gt;
+<item> &lt;corresponding fax number&gt; (optional)
+<item> &lt;fax modem brand and model&gt;
+<item> &lt;fax modem's firmware revision&gt;      # tbd from ATI1
+<item> &lt;protocol parameters&gt;		# tbd from Faxlog
+<item> &lt;errlog line from Faxlog&gt;		# tbd from Faxlog
+<item> &lt;remarks&gt;
+</enum>
+<p>
+If you encounter problems with a fax machine, please
+call the receiving party and ask them for their fax
+machine's brand & model and if they are willing to
+offer their machine for some (limited) testing. 
+<p>
+The more exact your data is (the first 3 entries aren't
+too good :-} ), the better the result will be,
+hopefully.
+ 
+This list is posted once a month (automatically) and if
+five new entries were added to it (manually).
+<p>
+Here's what's already in the list:
+<p>
+
+<p>
+<tscreen><verb>
+1. Panasonic Panafax UF311
+2. +49 89 74824899
+3. ZyXEL U1496EG+
+4. U1496EG V 6.10g P
+5. +FDCS:1,3,0,2,0,0,0,4
+6. +FHNG:50 (Unspecified Transmit Phase D error)
+7. when sending 15 pg, connection broke after 6 pg. 
+<p>
+
+1. NEC Nefax 17
+2. +49 2242 82114
+3. ZyXEL U1496EG+
+4. U1496EG V 6.10g P
+5. +FDCS:1,3,0,2,1,0,0,4
+6. +FHNG:50 (Unspecified Transmit Phase D error)
+7. machine didn't refuse when sending only 3 pages
+   earlier. This time, 15 pg were sent.
+<p>
+
+1. Telekom AF-310
+2. +49 7231 560851
+3. ZyXEL U1496 E / 6.10a, E+ / 6.01, E+ / 6.11a
+4. 
+5. +FDCS:1,3,0,2,0,0,0,4
+6. +FTPS:2 -> page bad, retrain requested
+7. sendfax hangs up after three tries.
+   received fax shows black and white boxes at the
+   footer, such as,
+   ###   ###   ###   ###   ###
+   ###   ###   ###   ###   ###  ...
+   ###   ###   ###   ###   ###
+</verb></tscreen>
+<p>
+<p>
+<sect1> Caller ID <label id=" Caller ID">
+<p>
+From: the list &lt;mgetty@muc.de&gt;
+<p>
+This is a delicate issue, as the format for caller id is different
+from country to country. So, as a rule of thumb, you have to check
+with the modem-{manual,manufacturer} whether the national format of
+caller id is supported. Most of the time it will only support the
+american format for caller id, if not otherwise specified
+<p>
+
+<p>
+<sect1>Referral for Zyxel in US <label id="Referral for Zyxel in US">
+<p>
+<p>
+I've got my Zyxel 1496E modem, after much trouble in locating a vendor.
+<p>
+So, for your information, if someone asks you about where to get these
+in the USA, refer them to www.modemstore.com.  Zyxel points to this company
+also.
+<p>
+
+Forrest
+(Sorry, I don't know the full name of Forrest nor his e-mail address. This quote was forwarded by Marc Schaefer for inclusion)
+<p>
+<p>
+<sect>Part 4: Compiling, installing and using vgetty<label id="Compiling, installing and using vgetty">
+<p>
+<p>
+<sect1>Compiling vgetty <label id="Compiling vgetty">
+<p>
+From: Marc Eberhard &lt;marc@poseidon.thphy.uni-duesseldorf.de&gt;,
+      Klaus Lichtenwalder &lt;Lichtenwalder@ACM.org&gt;
+<p>
+After having set up mgetty for compile (i.e. copying policy.h-dist to
+policy.h and editing it), you change to the voice/ directory and type
+make. For installation (make install) be sure to copy voice.conf-dist
+to the mgetty configuration directory (usually
+<tt>/usr/local/etc/mgetty+sendfax</tt>) as <tt/voice.conf/
+and edit it, using the
+comments in that file.
+<p>
+<p>
+<sect1>US Robotics voice format converter <label id="US Robotics voice format converter">
+<p>
+From: Scott Hutton &lt;shutton@indiana.edu&gt;
+<p>
+There's a script I wrote in <tt>voice/pvftools</tt> called "<tt/extract_gsm/" that
+extracts the GSM data from a US Robotics "<tt/rmd/" file.  Once you have
+that, and you have a version of "<tt/sox/" that can convert <tt/.gsm/ files in
+to <tt/.au/ (or other format) files, you're in business.
+<p>
+I found the necessary patches for sox after a bit of digging:
+<p>
+  http://kbs.cs.tu-berlin.de/~jutta/toast.html
+<p>
+You'll need the GSM library before you try to apply the sox patches.
+It's too bad sox doesn't come with GSM support--it seems to have
+about everything else...
+<p>
+Also, Thomas Hellstroem (thomas@vtd.volvo.se) had some C programs to
+extract GSM data and to "pack" GSM data into rmd files off of his page.
+Unfortunately, I didn't save the URL.
+<p>
+ -Scott Hutton, UCS Messaging Team, Indiana Univeristy
+<p>
+(alternatively, here is a <url name="a utility converting WAV to GSM and back"
+url="http://www2.sienanet.it/users/guido/gsm_6_10.htm">).
+
+<sect1>vgetty disables voice mode after initialization <label id="vgetty voice mode off">
+<p>
+From: miscellaenous
+<p>
+Because leaving the modem in voice mode breaks RING handling, vgetty
+disables voice mode while waiting for a call. Normally it isn't required
+to do anything about it. However, for very rare setup, e.g. for getting
+CALLER ID on some specific modems, you might want to add the following
+in post-init-chat: 
+<p>
+post-init-chat "" AT#CID=1 OK
+
+<sect1>Garbage instead of RINGs with vgetty<label id="speed mismatch">
+<p>
+From: Marc SCHAEFER
+<p>
+Garbage instead of RINGs with vgetty usually mean that the mgetty and
+vgetty speed do not match. Set both to 115200.
+<p>
+
+<sect1>Can you dialout and play a voice message on phone pickup with vm? <label id="vm dialout">
+<p>
+From: Marc SCHAEFER
+<p>
+Yes, with scripts/message.sh
+<p>
+This assumes the voice modem is capable of detecting when the
+other side picks up the phone (e.g.: ZyXEL 2864I). If not,
+you have to revert to tricks involving ringback options in
+voice.conf (you configure a timeout after which, if there
+wasn't any RINGING result from the modem, and no other
+error, we consider the phone being answered).
+<p>
+As of 0.9.12, it is only implemented for Elsa, US_Robotics,
+ZyXEL 1496 and Omni56k. There is some generic support in
+IS_101, too.
+<p>
+More information on this `ringback' feature:
+<p>
+there are two variables in voice.conf: ringback_goes_away
+andringback_never_came.
+<p>
+Dialout works as follows when the modem cannot detect when the
+other side picks up:
+<p>
+1. The modem needs a little time to dial the number
+<p>
+2. The modem tries in _voice_ to detect that the other part is off hook.
+For this it listens to the line and waits that the ringback tone
+disappear (the tone which indicate that it rings at the other side)
+For this the ring_back_goes_away value shut be a little bit longer than
+the pause between 2 ringback tones.
+After the ringback is gone the modem reports "CONNECT" "VCON" or "OK"
+(depending on the modem :-)
+And vm could send the play command (earlier it would considered as a
+keyabort)
+<p>
+This mechanism can be disabled with setting ringback_never_came 0 (you
+can't be sure that the other party is connected!)
+
+</article>

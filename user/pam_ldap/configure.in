@@ -1,0 +1,155 @@
+AC_INIT(pam_ldap.c)
+AC_CANONICAL_SYSTEM
+AC_PREFIX_DEFAULT()
+
+AM_INIT_AUTOMAKE(pam_ldap, 179)
+AM_CONFIG_HEADER(config.h)
+
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_INSTALL
+
+AC_ARG_ENABLE(ypldapd, [  --enable-ypldapd        enable PADL ypldapd specific features], [AC_DEFINE(YPLDAPD)])
+AC_ARG_ENABLE(ssl, [  --disable-ssl           disable SSL/TSL support])
+AC_ARG_WITH(ldap-lib, [  --with-ldap-lib=type    select ldap library [auto|netscape5|netscape4|netscape3|umich|openldap]])
+AC_ARG_WITH(ldap-dir, [  --with-ldap-dir=DIR     base directory of ldap SDK])
+AC_ARG_WITH(ldap-conf-file, [  --with-ldap-conf-file     path to LDAP configuration file], [AC_DEFINE_UNQUOTED(PAM_LDAP_PATH_CONF, "$with_ldap_conf_file")])
+AC_ARG_WITH(ldap-secret-file, [  --with-ldap-secret-file   path to LDAP root secret file], [AC_DEFINE_UNQUOTED(PAM_LDAP_PATH_ROOTPASSWD, "$with_ldap_secret_file")])
+
+if test "$ac_cv_prog_gcc" = "yes"; then CFLAGS="$CFLAGS -Wall -fPIC"; fi
+
+dnl This is needed for the native Solaris LDAP SDK
+CPPFLAGS="$CPPFLAGS -DLDAP_REFERRALS -DLDAP_DEPRECATED"
+
+case "$target_os" in
+freebsd*) CPPFLAGS="$CPPFLAGS -DPIC -D_REENTRANT" ;;
+aix*) CPPFLAGS="$CPPFLAGS -D_THREAD_SAFE" ;;
+*) CPPFLAGS="$CPPFLAGS -D_REENTRANT" ;;
+esac
+
+case "$target_os" in
+aix*) if test "$ac_cv_prog_gcc" = "yes"; then
+    pam_ldap_so_LD="/usr/ccs/bin/ld"
+  fi
+  LDFLAGS="$LDFLAGS -Wl,-brtl"
+  pam_ldap_so_LDFLAGS="-bM:SRE -bnoentry -bE:\$(srcdir)/exports.aix -brtl -lc"
+  TARGET_OS="AIX" ;;
+darwin*) pam_ldap_so_LDFLAGS="-bundle" ;;
+hpux*) pam_ldap_so_LD="/bin/ld"
+  pam_ldap_so_LDFLAGS="-b -dynamic -G `cat exports.hpux`"
+  TARGET_OS="HPUX" ;;
+solaris*) pam_ldap_so_LD="/usr/ccs/bin/ld"
+  pam_ldap_so_LDFLAGS="-B dynamic -M \$(srcdir)/exports.solaris -G -B group -lc" ;;
+linux*) pam_ldap_so_LDFLAGS="-shared -Wl,-Bdynamic -Wl,--version-script,\$(srcdir)/exports.linux" ;;
+*) pam_ldap_so_LDFLAGS="-shared" ;;
+esac
+
+AC_SUBST(pam_ldap_so_LD)
+AC_SUBST(pam_ldap_so_LDFLAGS)
+
+AM_CONDITIONAL(USE_NATIVE_LINKER, test -n "$pam_ldap_so_LD")
+AM_CONDITIONAL(EXTENSION_SO, test "$target_os" = "linux" -o "$target_os" = "linux-gnu")
+AM_CONDITIONAL(EXTENSION_1, test "$TARGET_OS" = "HPUX")
+
+if test -n "$with_ldap_dir"; then
+  CPPFLAGS="$CPPFLAGS -I$with_ldap_dir/include"
+  LDFLAGS="$LDFLAGS -L$with_ldap_dir/lib"
+  case "$target_os" in  
+  aix*) LDFLAGS="$LDFLAGS -Wl,-blibpath:$with_ldap_dir/lib"
+    pam_ldap_so_LDFLAGS="$pam_ldap_so_LDFLAGS -L$with_ldap_dir/lib -blibpath:$with_ldap_dir/lib" ;;
+  hpux*) LDFLAGS="$LDFLAGS -Wl,+b$with_ldap_dir/lib"
+    pam_ldap_so_LDFLAGS="$pam_ldap_so_LDFLAGS -L$with_ldap_dir/lib +b$with_ldap_dir/lib" ;;
+  solaris*) LDFLAGS="$LDFLAGS -R$with_ldap_dir/lib" 
+    pam_ldap_so_LDFLAGS="$pam_ldap_so_LDFLAGS -L$with_ldap_dir/lib -R$with_ldap_dir/lib" ;;
+  *) LDFLAGS="$LDFLAGS -Wl,-rpath,$with_ldap_dir/lib" ;;
+  esac  
+fi
+
+AC_CHECK_HEADERS(security/pam_appl.h security/pam_misc.h security/pam_modules.h)
+AC_CHECK_HEADERS(pam/pam_appl.h pam/pam_misc.h pam/pam_modules.h)
+AC_CHECK_HEADERS(des.h crypt.h)
+AC_CHECK_HEADERS(lber.h)
+AC_CHECK_HEADERS(ldap.h, , AC_MSG_ERROR(could not locate <ldap.h>))
+AC_CHECK_HEADERS(ldap_ssl.h)
+AC_CHECK_HEADERS(sasl/sasl.h)
+AC_CHECK_HEADERS(sasl.h)
+
+AC_CHECK_LIB(dl, main)
+AC_CHECK_LIB(pam, main)
+dnl AC_CHECK_LIB(pthread, main)
+AC_CHECK_LIB(resolv, main)
+AC_CHECK_LIB(crypt, main)
+AC_CHECK_LIB(nsl, main)
+
+AC_CHECK_FUNCS(gethostbyname)
+if test "$ac_cv_func_gethostbyname" = "no"; then
+  unset ac_cv_func_gethostbyname
+  AC_CHECK_LIB(nsl, main)
+  AC_CHECK_FUNCS(gethostbyname)
+fi
+
+
+dnl check which ldap library we have
+if test -z "$with_ldap_lib"; then
+  with_ldap_lib=auto
+fi
+
+if test -z "$found_ldap_lib" -a \( $with_ldap_lib = auto -o $with_ldap_lib = umich -o $with_ldap_lib = openldap \); then
+  AC_CHECK_LIB(lber, main)
+  AC_CHECK_LIB(ldap, main, LIBS="-lldap $LIBS" found_ldap_lib=yes)
+fi
+
+if test -z "$found_ldap_lib" -a \( $with_ldap_lib = auto -o $with_ldap_lib = netscape5 \); then
+  AC_CHECK_LIB(ldap50, main, LIBS="-lldap50 -lssldap50 -lssl3 -lnss3 -lnspr4 -lprldap50 -lplc4 -lplds4 $LIBS" found_ldap_lib=yes need_pthread=yes,, -lpthread)
+fi
+if test -z "$found_ldap_lib" -a \( $with_ldap_lib = auto -o $with_ldap_lib = netscape4 \); then
+  AC_CHECK_LIB(ldapssl41, main, LIBS="-lldapssl41 -lplc3 -lplds3 -lnspr3 $LIBS" found_ldap_lib=yes need_pthread=yes,, -lpthread)
+  if test -z "$found_ldap_lib"; then
+    AC_CHECK_LIB(ldapssl40, main, LIBS="-lldapssl40 $LIBS" found_ldap_lib=yes need_pthread=yes,, -lpthread)
+  fi
+  if test -z "$found_ldap_lib"; then
+    AC_CHECK_LIB(ldap41, main, LIBS="-lldap41 $LIBS" found_ldap_lib=yes need_pthread=no,,)
+  fi
+  if test -z "$found_ldap_lib"; then
+    AC_CHECK_LIB(ldap40, main, LIBS="-lldap40 $LIBS" found_ldap_lib=yes need_pthread=no,,)
+  fi
+fi
+if test -z "$found_ldap_lib" -a \( $with_ldap_lib = auto -o $with_ldap_lib = netscape3 \); then
+  AC_CHECK_LIB(ldapssl30, main, LIBS="-lldapssl30 $LIBS" found_ldap_lib=yes need_pthread=yes,, -lpthread)
+fi
+
+if test -z "$found_ldap_lib"; then
+  AC_MSG_ERROR(could not locate a valid LDAP library)
+fi
+
+if test "$need_pthread" = "yes"; then
+  AC_CHECK_LIB(pthread, main)
+fi
+
+AC_CHECK_FUNCS(ldap_init ldap_get_lderrno ldap_set_lderrno ldap_parse_result ldap_memfree ldap_controls_free ldap_set_option ldap_get_option)
+if test "$enable_ssl" \!= "no"; then
+  AC_CHECK_FUNCS(ldapssl_init ldap_start_tls_s ldap_pvt_tls_set_option)
+fi
+AC_CHECK_FUNCS(ldap_initialize)
+AC_CHECK_FUNCS(ldap_sasl_bind ldap_sasl_interactive_bind_s)
+AC_CHECK_FUNCS(gethostbyname_r)
+
+if test "$ac_cv_func_gethostbyname_r" = "yes"; then
+AC_CACHE_CHECK(whether gethostbyname_r takes 6 arguments, xad_cv_gethostbyname_r_args, [
+AC_TRY_COMPILE([
+#include <netdb.h>], [gethostbyname_r(0, 0, 0, 0, 0, 0);], [xad_cv_gethostbyname_r_args=6], [
+	AC_TRY_COMPILE([
+		#include <netdb.h>],
+		[gethostbyname_r(0, 0, 0, 0, 0);], [xad_cv_gethostbyname_r_args=5], [xad_cv_gethostbyname_r_args=3]
+)]) ])
+AC_DEFINE_UNQUOTED(GETHOSTBYNAME_R_ARGS, $xad_cv_gethostbyname_r_args)
+fi
+
+AC_CHECK_FUNCS(ldap_set_rebind_proc)
+AC_CACHE_CHECK(whether ldap_set_rebind_proc takes 3 arguments, pam_ldap_cv_ldap_set_rebind_proc, [
+AC_TRY_COMPILE([
+#include <lber.h>
+#include <ldap.h>], [ldap_set_rebind_proc(0, 0, 0);], [pam_ldap_cv_ldap_set_rebind_proc=3], [pam_ldap_cv_ldap_set_rebind_proc=2]) ])
+AC_DEFINE_UNQUOTED(LDAP_SET_REBIND_PROC_ARGS, $pam_ldap_cv_ldap_set_rebind_proc)
+
+AC_OUTPUT(Makefile)

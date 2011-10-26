@@ -1,0 +1,346 @@
+Example ARJ commands:
+
+  Add files minus directory structure:        ARJ a -e archive *.*
+  Add two files to archive:                   ARJ a archive name1 name2
+  Add files to archive with verification:     ARJ a -jt archive *.*
+  Add files with maximum compression:         ARJ a -jm archive *.*
+  Add several directories of files:           ARJ a archive ... dir1 dir2 dir3
+  Add thousands of files to an archive:       ARJ a -hm1 -r archive *.*
+  Add a chapter to an archive:                ARJ ac archive c:\dir\*.* -r
+  Comment archive header only:                ARJ c archive -zcmt.fil
+  Convert standard archive to chapter:        ARJ cc archive
+  Convert chapter archive to standard:        ARJ y archive -jb0
+  Delete the last chapter from an archive:    ARJ dc archive *.*
+  Strip archive comment only:                 ARJ c archive -zNUL
+  Extract files from archive:                 ARJ e archive
+  Extract maintaining directory structure:    ARJ x archive
+  Extract new and newer files without query:  ARJ e archive -u -y
+  Extract subdirectory from archive:          ARJ e archive subdir\*.* -p1
+  Extract files to directory:                 ARJ x archive destdir\ *.*
+  Extract files to directory:                 ARJ x archive *.* -htdestdir
+  Extract files to directory with space:      ARJ x archive "Program Files\ "
+  Extract files to directory with space:      ARJ x archive "-htProgram Files"
+  Extract a Win95 archive to plain DOS:       ARJ x archive -hf2
+  List files in archive:                      ARJ l archive
+  Move files to archive:                      ARJ m archive *.doc
+  Move files from archive:                    ARJ e -d archive *.doc
+  Recover files from a damaged archive:       ARJ x archive -jr
+  Test integrity of files in archive:         ARJ t archive
+  Test multiple ARJ archives:                 ARJ t *.ARJ -hr
+  Add files to a multiple volume archive:     ARJ a -va a:archive *.*
+  Create up to 999 archive volumes:           ARJ a -va a:archive.001
+  Extract from a multiple volume archive:     ARJ x -v a:archive
+  Create a multiple volume self-extractor:    ARJ a -va -je a:archive *.*
+  Convert archive to self-extractor:          ARJ y -je1 archive
+
+  Backup drive C to drive A:
+                       ARJ a A:\backup C:\ -a1 -b2 -r -vvas -wC:\ -js -jt -hk
+  Restore backup on drive A to drive C:       ARJ x A:\backup C:\ -vv -y
+
+More detailed ARJ information:
+
+Usage:  ARJ <command> [{/|-}<switch>[-|+|<option>]...] <archive_name>[.ARJ]
+            [<base_directory_name>\] [<!list_name>|<path_name>|<wild_name>...]
+
+        or
+
+        ARJ @response_filename [ -& | -+ | -g? | -hy | -gpassword ]
+
+<Commands>
+ ac: Add Chapter to chapter archive      m: Move files to archive
+ cc: Convert archive to Chapter archive  n: reName files in archive
+ dc: Delete last Chapter from archive    o: Order files in archive
+  a: Add files to archive                p: Print files to standard output
+  b: execute Batch or dos command        q: recover damaged ARJ file
+  c: Comment archive files               r: Remove paths from filenames
+  d: Delete files from archive           s: Sample files to screen with pause
+  e: Extract files from archive          t: Test integrity of archive
+  f: Freshen files in archive            u: Update files to archive
+  g: Garble files in archive             v: Verbosely list contents of archive
+  i: check Integrity of ARJ.EXE          w: Where are text strings in archive
+  j: Join archives to archive            x: eXtract files with full pathname
+  k: remove obsolete bacKup files        y: copY archive with new options
+  l: List contents of archive
+
+
+<Main defaults>
+  Save path information in archive
+  Save long filenames
+  Save/restore extended attributes
+  Save/restore file date-time created and accessed in Win95 and OS/2
+  Save timestamps in the UNIX format under UNIX-like operating systems
+  Don't save drive and root in path information
+  Display comment ANSI sequences with built-in display handler
+  Prompt before overwriting output files
+  Use method 1 compression
+  Use binary mode
+  Use ! as list file symbol
+  The "ac" command is an abbreviation for "u -u2 -jb"
+  The "cc" command is an abbreviation for "y -jb"
+  The "dc" command is an abbreviation for "d -jb"
+
+  ARJ uses OEM codepage by default in Win32 systems. The "-hy" option sets ARJ
+  to use the ANSI codepage which is the Windows graphical environment default.
+  ARJ/Win32 self-extracting archives should be built using the "-hy" option.
+
+  To ensure compatibility with previous versions of ARJ, the "-2d" parameter
+  has to be specified when archiving under UNIX.
+
+
+<User prompt responses>
+  Yes     - yes
+  No      - no
+  Quit    - abort out of ARJ
+  Always  - always assume yes for current type of query
+  Skip    - always assume no for current type of query
+  Global  - always assume yes for all queries except diskette volume prompts
+  Command - prompt for and execute one system command
+
+
+<Switches>
+  -: disables switch char                p: match using full Pathnames
+  +: inhibits ARJ_SW usage              p1: match Pathname with subdirs
+     +var: set environment variable      q: Query on each file
+  @: set 1 token per response file line  r: Recurse subdirectories
+  !: set list char (!)                   s: set archive time-Stamp to newest
+  &: set batch critical error handler   s1: save original time-Stamp
+  #: select files by number             s2: set archive time-Stamp
+  $: add/extract volume label           s3: save both original time-Stamps
+     $A: add/extract label to drive A    t: set file Type (default 0)
+  a: allow any file Attribute               t0: set binary file type
+ a1: any files, directories and UNIX    t1: set C text file type
+     special files                          t1f: force C text file type
+  b: Backup changed files                   t1g: set C text with graphics
+ b1: Backup changed, reset archive bits  u: Update files (new + newer)
+ b2: only reset archive bits            u1: Update files (new + OLDER)
+ b3: reset archive bit during restore   u2: Update files (new + different)
+ b4: do not restore bits, reset arc     u3: Update files (new + CRC mismatch)
+ b5: do not restore any file attributes  v: enable multiple Volumes
+  c: skip time-stamp Check                  v360:  build 362000 byte volumes
+  d: Delete added files                     v50K:  build 50000 byte volumes
+     asks permission before deleting        va:    auto-detect space available
+ d1: Delete without permission (same as     vda:\*.*: delete a:\*.*
+     "arj m")                               ve:    use alternate volume naming
+ d2: Truncate instead of deleting           vi:    inhibit diskette change test
+  e: Exclude paths from names               vr50K: reserve 50000 bytes of
+ e1: Exclude base dir from names                   space on first volume
+  f: Freshen existing files                 vs:    provide command prompt
+ f1: Freshen with OLDER files               vsCMD: execute CMD before each vol
+ f2: Freshen with DIFFERENT files           vv:    beep between volumes
+ f3: Freshen with CRC mismatched files      vw:    keep Whole files in volumes
+  g: Garble with password                   vz:    provide command with no echo
+     gstew: garble with password stew       v360,v720,v1200,v1440: abbrevs
+     g?: prompt for password                Volume options may be in any order
+  i: show no progress Indicator             except s and z which must be last
+ i1: show bar graph Indicator            w: assign Work directory
+ i2: show percentage and bar graph          wTMP: use TMP as work directory
+ i3: total progress percentage           x: eXclude selected files
+ i4: total progress bar graph               x*.EXE: exclude *.EXE files
+ i5: total percentage and bar graph         x!NAMES: exclude files in NAMES
+ i6: total percentage and file graph        multiple exclusions are allowed
+  k: Keep a .BAK of ARJ archive          y: assume Yes on all queries except
+  l: create List_name file                  diskette volume prompts
+     lNAMES.LST: create NAMES.LST           Use this switch for batch mode
+  m: with Method 0, 1, 2, 3, 4           z: supply archive comment file
+     m0: store (no compression)             zARC.CMT: use ARC.CMT for comments
+     m1: good compression (default)         zNUL: use to strip comments
+     m2: less memory and compression     _: convert filenames to lower case
+     m3: FAST! less compression
+     m4: FASTEST! least compression
+  n: only New files (not exist)
+  o: On or after YYYYMMDDHHMMSS
+     o:       on today
+     o19901225: on/after 12/25/1990
+ ob: Before YYYYMMDDHHMMSS
+     ob:       before today
+     ob19901225: before 12/25/1990
+ od: no older than N Days
+     od5: five or less days old
+ oa: After YYYYMMDDHHMMSS (last access)
+     oa:       on today
+     oa19901225: after 12/25/1990
+oab: Before YYYYMMDDHHMMSS (last access)
+     oab:      before today
+     oab19901225: before 12/25/1990
+ oc: After YYYYMMDDHHMMSS (created)
+     oc:       on today
+     oc19901225: after 12/25/1990
+ocb: Before YYYYMMDDHHMMSS
+     ocb:      before today
+     ocb19901225: before 12/25/1990
+
+
+<Shifted switches>
+ h#: append date string to name         hi: detailed display in Index files
+h#1: append time string to name         hk: build data protection record
+h#2: append DHHMMSS to name             hk: default amount of recovery data
+     (custom: h#{Y,M,D,N,h,m,s})       hk1: more recovery data
+     h#YYYY-MMDD: append YYYY-MMDD     hk9: maximum amount of recovery data
+ h$: try to use longnames (Win2000)         Disable ARJ-PROTECT when used with
+ h2: obsolete synonym for -2 group          the "y" command
+     of options                         hl: return error for Listfile error
+ ha: ignore readonly Attribute          hm: increase file list capacity
+ hb: select by file attribute/type     hm!: redirect -hm temp file
+     a - archive bit set                    hm! : move temp file to XMS mem
+     b - archive bit clear                  hm!e:\ : move temp file to e:\
+     r - readonly                       hn: specify non-existent filespec
+     s - system                             hn####: set #### as filespec
+     h - hidden                         ho: Only extract files with matches
+     d - directory                     ho1: Only extract files without matches
+     n - normal file, not d,h,r,s,c,l   hq: ignore open access error on adds
+     c - chapter label                 hq1: ignore open not found error on adds
+     l - volume label                  hq2: ignore access and not found on adds
+     f - abbrev for n,d,r,s,h           hr: try to ignore archive errors
+     u - UNIX special files             hs: disable file Sharing
+     w - win95 long filenames           ht: set Target directory
+     hb: select all types                   htD:\DESTDIR
+     hbsh: select hidden, system only   hu: allow Update of volume archives
+     hbd: select dirs only              hv: check for ARJ version
+ hc: execute Command at ARJ start       hw: scroll save search filename display
+     hcCLS: execute CLS                hw1: display only filenames with matches
+ he: skip test of security Envelope     hx: set default archive extensions
+he1: set error on security Envelope         hx.arj.sdn
+ hf: set short filenames only           hy: set ARJ32 to use ANSI codepage
+hf1: set longnames in file comment          set ARJ to extract ANSI codepage
+     or extract with W95LNAME.nnn           archive
+hf2: use long filenames in DOS         hy1: force ARJ32 to use OEM codepage
+hf3: set longnames in file comment     hy2: force ARJ32 to use ANSI codepage
+     using shortname wildcards          hz: create an ARJ-SECURITY envelope
+hf4: set all files archived in
+     Windows as Windows long
+     filenames
+ hg: specify garble module filename
+     hgGARBLE.COM: set GARBLE.COM as
+     name of garble module
+hg!: specify use of 40 bit encryption
+
+
+ j#: store only CRC and not the file    jp: Pause after each screenful
+j#1: store only date, size, attributes      jp50: pause, set page size to 50
+j#2: restore file attributes            jq: set string parameter
+j#3: restore file dates                     jqstring: set parameter to string
+j#4: restore file attributes and dates  jr: Recover broken archive files
+ j$: do not process file DTA and DTC   jr1: Recover badly broken archive files
+ ja: set P command to display ANSI      js: Store archives by suffix
+ja1: inhibit the display of comments        default is arj, arc, lzh, pak, rar,
+ jb: set chapter backup processing          zip, zoo, j, and uc2.
+jb0: clear chapter archive status           js.zoo: store only .zoo files
+jb*: select all chapter backup files    jt: Test temporary archive by CRC
+ jc: exit after Count of files         jt1: Test CRC and file contents
+     jc5: exit after 5 files           jt2: Test only added file contents
+     jc nam1 nam2: exit after 2 files  jt3: Test only file date-time and size
+ jd: ensure free Disk space             ju: translate UNIX style paths
+     e -jd50K: skip file if<50000 free  jv: set Verbose display
+     l -jd1000: set error if<1000 free jv1: set special verbose list mode
+ je: create self-extracting archive     jw: set extract output filename
+je1: create SFXJR archive                   jwNEW.FIL: output to NEW.FIL
+ jf: store/use Full specified path      jx: start at eXtended position
+jf1: store/use path minus drive             jx10000: start at position 10000
+ jg: [OBSOLETE]                         jy: suppress queries assuming Yes
+jg1: [OBSOLETE]                           a - skip append query
+ jh: set Huffman buffer size              c - skip create directory query
+     jh65535: set to 65535 bytes (max)    d - skip delete files query
+     jh2048: set to 2048 bytes (min)      k - skip disk space available query
+ ji: create Index file                    n - skip new filename prompt
+     jiINDEX.FIL: create INDEX.FIL        o - skip overwrite file query
+ jk: Keep temp archive on error           r - erase all type-ahead before query
+ jl: display only filespecs               s - skip scanned enough text query
+ jm: set Maximum compression mode         v - skip proceed to next volume query
+jm1: set faster Maximum compression       y - accept single character Y/N/A/Q
+ jn: restart volumes at fileName          jycny: skip create, new name queries
+     jnBIN\X.COM: restart at BIN\X.COM           in single character input mode
+     jn: get restart information from   jz: supply file for file comment
+     previously written index file          jzFIL.CMT: use FIL.CMT for comments
+ jo: query when updating archive file       jzNUL: use to strip file comments
+ jo: extract to unique Output names
+jo1: extract to unique Output names
+     keeping file extension
+
+
+ 2a: serialize names on extraction      2i: Ignore the first bytes of archive
+ 2b: [UNIX] restrict to Block devices       2i512: begin from offset 512
+     2b or 2b.: current device only     2k: skip century display in dates        
+     2b-/usr: all except where /usr is 2k1: use a non-ambigous date display      
+              located                       format                               
+ 2c: [OS/2, NT] handle Crit. EAs only   2l: [OS/2, NT] treat .LONGNAME EAs as    
+ 2d: ARJ/DOS compatibility mode             filenames when possible              
+2d1: (OBSOLETE) comment compatibility   2o: [UNIX] store/restore file ownership  
+ 2e: [OS/2, NT] filter Extended attrs  2o1: store numeric UID/GID values         
+     2e.*: pack/unpack system EAs only 2o2: same as -2o but saves group as well  
+     2e.ICON?: pack/unpack icons only   2p: specify process Priority class       
+     2e: disable EAs handling               OS/2, NT: 2p1...2p4                  
+ 2f: disable comment serialization          Linux, FreeBSD: 2p1...2p41           
+     across multiple volumes            2r: Revert directory Recursion order     
+ 2h: [UNIX] Disable hardlink handling   2s: [UNIX] preserve Symlink properties   
+2h1: [UNIX] Extract hardlinks as        2x: [OS/2, NT]: eXclude extended attrs   
+     symlinks                               2x.ICON?: ignore icons
+
+
+Environment variable setting:
+  set ARJ_SW=-jyry -jv -i1
+  set ARJ_SW=c:\arj.cfg
+
+
+ARJ errorlevels:
+
+  0 ->   success
+  1 ->   warning (specified file to add to archive not found,
+                  specified file to list, extract, etc., not found,
+                  or answering negatively to "OK to proceed to next volume..."
+                  prompt)
+  2 ->   fatal error
+  3 ->   CRC error (header or file CRC error or bad password)
+  4 ->   ARJ-SECURITY error or attempt to update an ARJ-SECURED archive
+  5 ->   disk full or write error
+  6 ->   cannot open archive or file
+  7 ->   simple user error (bad parameters)
+  8 ->   not enough memory
+  9 ->   not an ARJ archive
+ 10 ->   [DOS] XMS memory error (read or write)
+ 11 ->   user control break
+ 12 ->   too many chapters (over 250)
+
+  The batch statement IF ERRORLEVEL 0 ...          means
+  if the errorlevel is EQUAL TO or GREATER THAN 0.
+
+If the first two characters of an ARJ comment are "))" in a self-extractor,
+then the self-extractor will accept the appended line as its command line.
+
+)) -o
+will force the self-extractor to overwrite existing files.
+
+
+ARJ is a trademark of ARJ Software, Inc.
+OS/2 is a trademark of International Business Machines Corp.
+UNIX is a registered trademark licensed exlusively through X/Open Company Ltd.
+
+
+ARJ IS DEDICATED TO GOD AND TO THE JUNG FAMILY.  John 15:5
+ARJ/2 IS DEDICATED TO THE MEMORIES OF UNITED GROUP INTERNATIONAL.
+
+
+LICENSE POLICY:
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+The OS/2, Linux and FreeBSD versions were originally conceived and designed
+by:
+
+                      Andrew Belov -- programmer
+              Viatcheslav Odintsov -- head of the testing group.
+
+For more information concerning ARJ, see the accompanying documentation or
+visit the project home page at http://arj.sourceforge.net.

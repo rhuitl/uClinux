@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# The DPCM has two independent 10/100 MBit ethernet interfaces which
+# are named eth0 and eth1; please note that the ports are labeled
+# in wrong order on the box:
+# interface "1" is eth1
+# interface "2" is eth0
+#
+# Either bridge them together (which will make them work like a
+# hub/switch) and give the device a single IP address like this:
+#   ifconfig eth0 up
+#   ifconfig eth1 up
+#   brctl addbr br0
+#   brctl stp br0 off
+#   brctl addif br0 eth0
+#   brctl addif br0 eth1
+#   ifconfig br0 192.168.0.1 netmask 255.255.255.0
+#
+# Or configure them seperately like this:
+#   ifconfig eth0 192.168.0.1 netmask 255.255.255.0
+#   ifconfig eth1 192.168.1.1 netmask 255.255.255.0
+#
+# If you use PPP over ethernet (PPPoE), you should NOT use the bridge
+# config and you should NOT assign an IP address to the ethernet 
+# interface which you use for PPPoE; instead, just enable the PPPoE 
+# ethernet interface by passing the 'up' parameter to ifconfig; if you 
+# use eth0 as your LAN interface and eth1 as your PPPoE interface for 
+# example, use this:
+#   ifconfig eth0 192.168.0.1 netmask 255.255.255.0
+#   ifconfig eth1 up
+#
+ifconfig eth0 up
+ifconfig eth1 up
+brctl addbr br0
+brctl stp br0 off
+brctl addif br0 eth0
+brctl addif br0 eth1
+ifconfig br0 192.168.0.1 netmask 255.255.255.0

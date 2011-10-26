@@ -1,0 +1,110 @@
+#!/bin/ksh
+#
+# fax - interactive tool for creating fax memos
+#
+# relies on "faxmemo" being in the PATH and set up properly
+#
+echo=/usr/local/bin/mg.echo
+
+input()
+{
+    if [ -z "$3" ] ; then
+	$echo "$1: \c"
+    else
+	$echo "$1 [$3]: \c"
+    fi
+    read in
+    out=${in:-$3}
+    eval $2="\"$out\""
+}
+
+fax_phone=""
+verbose_to=""
+documents=""
+
+while true ; do
+
+ok=false
+until $ok
+do
+    input "Fax-Nummer" fax_phone $fax_phone
+    if [ -z "$fax_phone" ] ; then
+	echo "Darf nicht leer sein" ; continue
+    fi
+    fax_phone=`echo $fax_phone | tr -d " 	"`
+    ok=true
+done
+  
+input "Empfaenger (opt)" verbose_to "$verbose_to"
+
+ok=false
+until $ok
+do
+    input "\nZu sendende Dokumente (wildcards erlaubt)" documents "$documents"
+    if [ ! -z "$documents" ] ; then
+      if ls $documents >/dev/null ; then : ; else
+	echo "Dokumente nicht gefunden!"; continue
+      fi
+    fi
+    ok=true
+done
+
+$echo "\nText fuer Titelseite eingeben... Editor wird gestartet..." ; sleep 1
+
+ok=false
+until $ok
+do
+    ed=${EDITOR:-vi}
+    memo_file=/tmp/fax.$LOGNAME.$$
+    $ed $memo_file
+    lines=`wc -l <$memo_file | tr -d " "`
+    if [ $lines -gt 18 ] ; then
+	$echo "\n\nMemo-File zu lang (auf Deckblatt ist nur Platz fuer 18 Zeilen)"
+	input "Nochmal <e>ditieren oder <a>bschneiden?" again e
+	test "$again" = "e" && continue
+	mv $memo_file $memo_file.t
+	head -18 <$memo_file.t >$memo_file
+	rm $memo_file.t
+    fi
+    ok=true
+done
+
+$echo "\f"
+
+if [ -z "$verbose_to" ] ; then
+    $echo "\n\n\nFax an: $fax_phone"
+else
+    $echo "\n\n\nFax an: $verbose_to ($fax_phone)"
+fi
+if [ -z "$documents" ] ; then
+    $echo "\nDokumente: keine"
+else
+    $echo "\nDokumente: "`ls -d $documents`
+fi
+
+$echo "\nText fuer Deckblatt: $memo_file ($lines Zeilen)"
+input "\nFax <s>enden / Eingaben <k>orrigieren / <q>uit ?" doit s
+$echo "\n"
+
+case $doit in
+    s*) break ;;
+    q*) rm $memo_file ; exit ;;
+esac
+
+done
+
+#
+# build command line, call faxmemo
+#
+
+test -z "$verbose_to" || verbose_flag="-D "
+
+$echo "faxmemo $memo_file $verbose_flag\"$verbose_to\" $fax_phone $documents\n"
+
+if [ -z "$verbose_to" ] ; then
+    faxmemo $memo_file $fax_phone $documents
+else
+    faxmemo $memo_file -D "$verbose_to" $fax_phone $documents
+fi
+
+rm $memo_file

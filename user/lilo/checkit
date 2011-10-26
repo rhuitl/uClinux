@@ -1,0 +1,105 @@
+#! /bin/sh
+#
+#  check:
+#	Test for correct versions of utilities
+#	(see the end of the file for bypassing these checks)
+#
+#  Copyright 2005-2006 John Coffman.
+#  All rights reserved.
+#
+#  Licensed under the terms contained in the file 'COPYING' in the 
+#  source directory.
+#
+#
+#
+
+ret=0
+rc=0
+dev="0.16.10"
+
+vers_min() {
+	local M m p N n r
+
+	rc=0
+# get our version major, minor, rev
+	M=`echo $1 | cut -d . -f 1`
+	m=`echo $1 | cut -d . -f 2`
+	p=`echo $1 | cut -d . -f 3`
+	if [ -z $p ]; then p=0; fi
+#echo vers_min1 $M $m $p
+	N=`echo $2 | cut -d . -f 1`
+	n=`echo $2 | cut -d . -f 2`
+	r=`echo $2 | cut -d . -f 3`
+#echo vers_min2 $N $n $r
+	if [ "$M" -lt "$N" ]; then rc=1
+	elif [ "$M" -gt "$N" ]; then rc=0
+	elif [ "$m" -lt "$n" ]; then rc=1
+	elif [ "$m" -gt "$n" ]; then rc=0
+	elif [ -z "$r" ]; then rc=0
+	elif [ $p -lt $r ]; then rc=1
+	fi
+#echo vers_min returns $rc
+	return $rc
+}
+
+#echo
+echo GCC version 2.91 or later is required
+gcc -v 1>foo1 2>foo2
+V=`cat foo1 foo2 | grep version | cut -d " " -f 3`
+rm -f foo1 foo2
+if [ -z $V ]; then
+	echo gcc is not present
+	ret=1
+else
+	vers_min $V 2.91
+	echo gcc version $V
+	if [ $rc = 0 ]; then echo OKAY; else echo ERROR; ret=1; fi
+fi
+
+echo
+echo AS86 version $dev or later is required
+as86 -v 1>foo1 2>foo2
+A=`cat foo1 foo2 | grep version | cut -d " " -f 3`
+rm -f foo1 foo2
+if [ -z $A ]; then
+	echo as86 is not present
+	ret=1
+else
+	vers_min $A $dev
+	echo as86 version $A
+	if [ $rc = 0 ]; then echo OKAY; else echo ERROR; ret=1; fi
+fi
+
+echo
+echo LD86 version $dev or later is required
+ld86 -v 1>foo1 2>foo2
+L=`cat foo1 foo2 | grep version | cut -d " " -f 3`
+rm -f foo1 foo2
+if [ -z $L ]; then
+	echo ld86 is not present
+	ret=1
+else
+	vers_min $L $dev
+	echo ld86 version $L
+	if [ $rc = 0 ]; then echo OKAY; else echo ERROR; ret=1; fi
+fi
+
+echo
+echo BCC version $dev or later is recommended
+bcc -v 1>foo1 2>foo2
+B=`cat foo1 foo2 | grep version | cut -d " " -f 3`
+rm -f foo1 foo2
+if [ -z $B ]; then
+	echo bcc is not present
+	echo You will not be able to make floppy2, diag2.img, or lilo.com
+else
+	vers_min $B $dev
+	echo bcc version $B
+	if [ $rc = 0 ]; then echo OKAY; else echo ERROR; fi
+fi
+
+#
+# Uncomment the line below to bypass all the checks
+#
+#exit 0
+exit $ret

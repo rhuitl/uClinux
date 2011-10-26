@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# get the current settings
+#
+set -e
+
+CUR_DIR=`pwd`
+
+cd $ROOTDIR
+
+echo `pwd`
+
+. ./$LINUXDIR/.config
+
+if [ "$CONFIG_CLEOPATRA" = y ]; then
+	if [ "$CONFIG_M5307" = y ]; then
+		bin/mkflashboot $ROOTDIR/vendors/Feith/boot/Cleopatra/fpga.bin $ROOTDIR/vendors/Feith/boot/Cleopatra/img_c1.dat CLEOPATRA-1
+	else
+		bin/mkflashboot $ROOTDIR/vendors/Feith/boot/Cleopatra2/fpga.bin $ROOTDIR/vendors/Feith/boot/Cleopatra2/img_c2.dat CLEOPATRA-2
+	fi
+else
+	echo "$0: Unknown config !" >&2
+	exit 1
+fi
+
+cd $CUR_DIR
+
+exit 0

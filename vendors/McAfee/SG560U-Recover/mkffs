@@ -1,0 +1,61 @@
+#!/bin/sh
+
+#
+#	mkffs - make flash storage filesystem
+#
+#	Automatically partition a mass flash storage device (typically USB).
+#	And then create a small root filesystem on it (no kernel).
+#
+
+if [ $# -eq 1 ]
+then
+	if [ $1 -le 0 ]
+	then 
+		SIZE=""
+	else
+		SIZE=$1
+	fi
+else
+	SIZE=""
+fi
+
+if mount | grep -q /dev/sda1
+then
+	echo "ERROR: /dev/sda1 already mounted, umount first"
+	exit 1
+fi
+
+dd if=/dev/zero of=/dev/sda bs=512 count=1
+echo 0,${SIZE},L | sfdisk -uM -q -L /dev/sda
+mke2fs -q -j /dev/sda1
+tune2fs -c 0 -i 0 /dev/sda1
+mount -o rw,noatime,data=journal /dev/sda1 /sda1
+
+cd /sda1/
+mkdir bin configs sbin sda1 dev etc lib logs mnt proc usr usr/bin
+
+mknod /sda1/dev/mem c 1 1
+mknod /sda1/dev/kmem c 1 2
+mknod /sda1/dev/null c 1 3
+mknod /sda1/dev/zero c 1 5
+mknod /sda1/dev/tty c 5 0
+mknod /sda1/dev/console c 5 1
+mknod /sda1/dev/ttyS0 c 4 64
+mknod /sda1/dev/loop0 b 7 0
+mknod /sda1/dev/sda b 8 0
+mknod /sda1/dev/sda1 b 8 1
+
+CPLIST="bin/busybox bin/cat bin/chgrp bin/chmod bin/chown bin/cp bin/date bin/dd bin/df bin/echo bin/e2fsck bin/e2label bin/egrep bin/false bin/fdisk bin/fgrep bin/fsck bin/fsck.ext2 bin/grep bin/gunzip bin/gzip bin/init bin/ln bin/ls bin/mkdir bin/mke2fs bin/mkfs.ext2 bin/mknod bin/mktemp bin/more bin/mount bin/mv bin/pidof bin/ps bin/pwd bin/rm bin/rmdir bin/sh bin/sleep bin/stty bin/sync bin/touch bin/true bin/umount bin/vi sbin/freeramdisk sbin/halt sbin/insmod sbin/klogd sbin/losetup sbin/lsmod sbin/modprobe sbin/pivot_root sbin/poweroff sbin/reboot sbin/rmmod sbin/syslogd sbin/watchdog usr/bin/[ usr/bin/head usr/bin/find usr/bin/xargs usr/bin/du usr/bin/tty lib/ld-linux.so.2 lib/ld.so.1 lib/ld-uClibc-0.9.29.so lib/ld-uClibc.so.0 lib/libc.so.0 lib/libm-0.9.29.so lib/libm.so.0 lib/libuClibc-0.9.29.so lib/libcrypt-0.9.29.so lib/libcrypt.so.0"
+
+for FILE in $CPLIST
+do
+	cp -a /$FILE /sda1/$FILE
+done
+
+> /sda1/boot.cfg
+cp /etc/rc.hd /sda1/etc/rc
+dd if=/dev/zero of=/sda1/configs/default.cfg bs=1024 count=1024
+
+sync
+
+exit 0

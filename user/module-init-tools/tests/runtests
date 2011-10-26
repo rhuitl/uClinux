@@ -1,0 +1,122 @@
+#! /bin/sh
+# Shell script to run test suite.
+
+set -e
+
+if [ x"$1" = x"-v" ]; then VERBOSE=1; shift; fi
+if [ x"$1" = x"-v" -o x"$1" = x"-vv" ]; then VERBOSE=1; EXTRA_ARGS=-x; shift; fi
+
+# Creates a temporary file and exports the name of the file to
+# the provided argument.  Exits on error.
+# 
+# Usage: create_tempfile TEMPFILE
+#
+create_tempfile()
+{
+    if test $# = 0
+    then
+       echo "No argument passed to create_tempfile()"
+       exit 1
+    fi
+
+    if [ -x /bin/tempfile ]
+    then
+        # Debian 
+        export $1="`tempfile`"
+    elif [ -x  /bin/mktemp ]
+    then
+        # RedHat et. al.
+        export $1="`mktemp /tmp/modtest.XXXXXX`"
+    else
+        echo "Don't know how to make a temporary file on this "
+        echo "system, sorry."
+        exit 1
+    fi
+
+    if [ $? -ne 0 ]
+    then
+        echo "Can't create temporary file."
+        exit 1
+    fi
+}
+export -f create_tempfile
+
+for config in --enable-zlib --disable-zlib; do
+    echo Building with $config...
+    ./configure $config CFLAGS="-DJUST_TESTING -g -Wall" >/dev/null
+    make clean >/dev/null
+    # ismod.static doesn't build with -DJUST_TESTING and --enable-zlib
+    make insmod.static >/dev/null 2>&1 || touch insmod.static
+    make all >/dev/null
+
+    echo Testing with $config...
+    if grep -q CONFIG_USE_ZLIB=1 Makefile; then
+	CONFIG_HAVE_ZLIB=1
+	export CONFIG_HAVE_ZLIB
+    else
+	unset CONFIG_HAVE_ZLIB
+    fi
+
+    # Create endianness links
+    case `file modprobe` in
+	*MSB*) ENDIAN=be;;
+	*LSB*) ENDIAN=le;;
+	*) echo Unknown endian! >&2; exit 1;;
+    esac
+    ln -sfn 64-$ENDIAN tests/data/64
+    ln -sfn 32-$ENDIAN tests/data/32
+
+    # Make them run the valgrind wrappers, if available.
+    if type valgrind 2>/dev/null; then
+	PATH=`pwd`/tests:$PATH
+    else
+	PATH=`pwd`:$PATH
+    fi
+
+    # By default, we want to look like a new kernel.
+    MODTEST_UNAME=2.5.52
+    MODTEST_OVERRIDE0=/proc/ksyms
+    MODTEST_OVERRIDE_WITH0=/proc/nonexistent-file
+
+    export MODTEST_UNAME MODTEST_OVERRIDE0 MODTEST_OVERRIDE_WITH0
+
+    if [ $# -eq 1 ]; then DOING=0; else DOING=1; fi
+
+    for dir in `find tests/* -type d | sort`
+      do
+    # data and tmp dirs don't contain tests.
+      case "$dir" in tests/data*) continue;; tests/tmp*) continue;; esac
+
+      if [ -z "$VERBOSE" ]; then
+	  echo -n Running tests for $dir.
+      else
+	  echo Running tests for $dir.
+      fi
+      shopt -s nullglob
+      for f in $dir/[0-9]*; do
+	# Ignore backups dir.
+	  case "$f" in *~) continue;; esac
+
+	  if [ $DOING -eq 0 ]; then
+	      case "$f" in *$1*) DOING=1;; *) continue;; esac
+	  fi
+
+	  rm -rf tests/tmp/*
+	  if sh -e $EXTRA_ARGS $f; then
+	      if [ -z "$VERBOSE" ]; then
+		  echo -n .
+	      else
+		  echo Tests $f succeeded.
+	      fi
+	  else
+	      echo Test for $f failed.
+	      # Dangerous to leave these lying around
+	      make distclean >/dev/null
+	      exit 1
+	  fi
+      done
+      if [ -z "$VERBOSE" ]; then echo; fi
+    done
+done
+
+exit 0

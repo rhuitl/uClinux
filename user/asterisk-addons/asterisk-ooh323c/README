@@ -1,0 +1,169 @@
+
+ Copyright (C) 2007, Objective Systems, Inc.
+ 
+ Objective Systems asterisk-ooh323c driver for supporting H323 on asterisk
+
+ Thank you for downloading Objective Systems H323 driver for asterisk. This 
+ package contains a driver which will enable ooh323c, a C based open source 
+ H.323 stack from Objective Systems(www.obj-sys.com/open), to be used with 
+ asterisk, an open source IP-PBX solution, from Digium, Inc.(www.asterisk.org)
+
+ Capabilities supported: ulaw, alaw, gsm, g728, g729, g729a, g723.1, rfc2833
+
+ Package Contents:
+
+    asterisk-ooh323c-0.6
+    |
+    |-src [H323 channel driver code]
+    |
+    |_ooh323c [ooh323c stack code]
+
+
+ How to build:
+ -------------
+ 1. If you hadn't installed asterisk yet, To build this package successfully, 
+    you have to have latest version of asterisk installed on your system. 
+    You can skip to step 2, if you have already installed the asterisk.
+
+      Following procedure help you download and install asterisk 1.4.x
+
+      To get latest asterisk sources from svn branch 1.4:
+      >svn checkout http://svn.digium.com/svn/asterisk/branches/1.4 asterisk-1.4
+
+      To install asterisk.(You will have to be in 'super user' mode for this)
+      >cd asterisk
+      >make install
+      >make samples
+
+ 2. To build asterisk-ooh323c addons
+
+      To update or if you hadn't downloaded the asterisk-ooh323c channel driver
+      code, you can do so using following command (To get the latest 
+      asterisk-addons 1.4 branch source from svn):
+      >svn checkout http://svn.digium.com/svn/asterisk-addons/branches/1.4 asterisk-addons-1.4
+
+      To build & install:
+      >cd asterisk-addons-1.4/asterisk-ooh323c
+      >./configure
+      >make
+
+      For debugging purpose, instead of "make", run "make debug"
+
+      The library will be generated at 
+      asterisk-addons-1.4/asterisk-ooh323c/.libs/libchan_h323.so.1.0.1 
+ 
+      To install libchan_h323.so in /usr/libs/modules/ directory, change to 
+      'super user' mode and then run:
+      >make install
+
+ 3. Open h323.conf.sample in asterisk-ooh323c-0.6 directory. Under [general] 
+    you will see global configuration setting. Modify IP addresses of asterisk 
+    server "bindaddr" to match your configuration.
+
+ 4. To install sample h323.conf in /etc/asterisk
+      >make sample
+
+ 5. Now run asterisk as
+      >/usr/sbin/asterisk -vvvc
+
+ 6. From asterisk console
+    To check whether H323 channel is registered properly
+       CLI>show channeltypes
+
+    To see all the defined H323 users.
+       CLI>ooh323 show users
+   
+    To see details of a specific user
+       CLI>ooh323 show user myuser1
+
+    To see all the defined peers
+       CLI>ooh323 show peers
+    
+    To see details of a specific peer
+       CLI>ooh323 show peer mypeer1
+
+
+Getting Started with some simple examples:
+-----------------------------------------
+ First stop asterisk as follows:
+      CLI>stop now
+
+ Now to run tests, you will have to copy extensions.conf.sample in 
+ asterisk-ooh323c-0.6 directory to /etc/asterisk as extensions.conf. Make
+ sure to save a backup copy of your existing extensions.conf. Now restart
+ the pbx as follows:
+      >/usr/sbin/asterisk -vvvc
+
+ Now you have asterisk with our sample dial plan running.     
+
+ Test1: 
+--------
+    Someone from outside calls into asterisk server and a recorded message is
+    playedback to him.
+
+ 1. Now you need an h323 phone(phone1) to test. You can use any H323 phones 
+    including NetMeeting or OpenH323 based ohphone.
+    You can download ohphone executable
+    from http://www.openh323.org/code.html#linux    or 
+         http://www.openh323.org/code.html#windows
+
+ 2. Now run ohphone as follows:
+     >ohphone -n -ttttt -o trace.log <ip address of asterisk server>
+
+ Test2:
+--------
+   A registered users calls into asterisk server at a particular extension and
+   a different messages is played back to him.
+
+  1. Use ohphone as a registered user myuser1 to call extension 100 in 
+      asterisk as follows:
+
+      >./ohphone -n -u myuser1 -tttt -o trace.log 100@<ip of asterisk server>
+
+      The ohphone will send call to asterisk, which will identify the user as 
+      myuser1, and use the users context to handle extension 100, which 
+      playbacks a pre-recorded message.
+
+ Test3:
+--------
+  A registered user calls an extension which belongs to a peer and the call is
+  routed to the peer's phone
+
+ 1. Use one more h323 phone (phone2)as a peer.
+
+ 2. Stop asterisk as:
+       CLI>stop now
+
+ 3. Open /etc/asterisk/h323.conf. Modify ip/port of mypeer1 to match those of
+     the h323 phone you are going to use as peer.
+
+ 4. Run your peer phone phone2 as follows:
+
+     >./ohphone -n -u mypeer1 -tttttt -o trace.log -l
+
+     This keeps phone2 in listen mode.
+
+ 5. Now run asterisk as follows:
+    
+     >/usr/sbin/asterisk -vvvc
+
+ 6. Check details of peer for ip/port
+    
+     CLI>ooh323 show peer mypeer1
+
+ 7. Now use phone1 to make a call to asterisk at extension 101 as follows.
+
+     >./ohphone -n -u myuser1 -ttttt -o trace.log 101@<ip of asterisk>
+ 
+
+Reporting Problems:
+
+If you have any further questions or comments on what you would like to
+see in the product or what is difficult to use or understand, please 
+communicate them to us. Your feedback is important to us. Please let us
+know how it works out for you - either good or bad. 
+
+For support please use ooh323c mailing list at http://lists.sourceforge.net/lists/listinfo/ooh323c-devel
+ 
+
+ 

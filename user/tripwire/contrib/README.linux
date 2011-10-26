@@ -1,0 +1,187 @@
+From cpage@mv.MV.COM Wed Feb 16 05:35:43 1994
+Received: from optima.CS.Arizona.EDU by quercus.cs.arizona.edu; Wed, 16 Feb 1994 05:35:42 MST
+Received: from arthur.cs.purdue.edu by optima.CS.Arizona.EDU (5.65c/15) via SMTP
+	id AA14969; Wed, 16 Feb 1994 05:35:40 MST
+Received: from barnum.cs.purdue.edu (root@barnum.cs.purdue.edu [128.10.2.70])
+    by arthur.cs.purdue.edu (8.6.4/PURDUE_CS-1.3) with ESMTP
+    id <HAA29221> for <gkim@cs.arizona.edu>; Wed, 16 Feb 1994 07:35:38 -0500
+Received: from arthur.cs.purdue.edu (root@arthur.cs.purdue.edu [128.10.2.1])
+    by barnum.cs.purdue.edu (8.6.4/PURDUE_CS-1.3) with ESMTP
+    id <HAA07276> for <gkim@cs.purdue.edu>; Wed, 16 Feb 1994 07:35:36 -0500
+Received: from mv.mv.com (mv.MV.COM [192.80.84.1])
+    by arthur.cs.purdue.edu (8.6.4/PURDUE_CS-1.3) with ESMTP
+    id <HAA29216> for <gkim@cs.purdue.edu>; Wed, 16 Feb 1994 07:35:33 -0500
+Received: from localhost by mv.mv.com (8.6.4/mem-931109)
+	id HAA01327 for gkim@cs.purdue.edu; Wed, 16 Feb 1994 07:35:25 -0500
+Date: Wed, 16 Feb 1994 07:35:25 -0500
+From: Calvin Page <cpage@mv.MV.COM>
+Message-Id: <199402161235.HAA01327@mv.mv.com>
+To: gkim@cs.purdue.edu
+Status: ORrp
+
+To: Gene Kim - gkim@purdue.edu
+    Eugene Spafford - spaf@cs.purdue.edu
+
+Fr: Cal Page - cpage@mv.MV.COM
+    
+Subj: Installing Tripwire Version 1.1 on Linux
+
+Hi,
+	I installed tripwire on my linux box and came up
+with the following README.linux. At some point, I would like
+to publish it out on the internet on Comp.os.linux.*.
+
+	I am also working on a Linux Security-HOWTO and would like
+to include a reference to your work in it with a copy of this
+attached README.
+
+	Do you have any comments on the README or and suggestions
+before I publish it?
+
+Regards,
+Cal Page
+
+--------------------------- README.linux ----------------------------
+Summary
+	Tripwire installed fairly easily on Linux using the following
+GNU tools; gcc, flex 2.4.5, and bison 1.18. The Linux kernel was
+at level 0.99.14.
+
+Build Problems:
+---------------
+
+	The following problems were encountered during
+the make:
+
+1) yy_flex_realloc, yy_flex_alloc, and yy_flex_free were undefined
+   globals when tripwire was linked. This was solved by adding the
+   following lines to config.pre.tab.c:
+
+	#include <malloc.h>
+
+	void *yy_flex_realloc(void *x,int y) { return realloc(x,y); }
+	void *yy_flex_alloc  (int y        ) { return malloc(y);    }
+	void *yy_flex_free   (void *x      ) { free(x);             }
+
+2) yyin and yyout were undefined during the compile. This was solved
+   by adding the following line after the '#include <stdio.h>'
+   in config.pre.tab.c:
+
+	extern FILE *yyin,*yyout;
+
+3) The 'src/Makefile' had to be changed after the $(YACC) line
+   as follows:
+
+	mv config.pre.tab.c y.tab.c
+
+   This is because GNU's bison creates a different output file from
+   yacc.
+
+4) The 'Makefile' defined CC=gcc, FLEX=flex, and YACC=bison
+
+Run Problems
+-------------
+
+	The following bugs were observed during testing:
+
+1) The '@@include' macro failed in 'tw.config' with the error
+   ---fatal flex scanner internal error--- End of buffer missed.
+   This error showed up while running the acceptance test named
+   'tests/test.twpre.sh'
+
+2) While running tripwire on an 'msdos' mounted partition, the following
+   error was observed:
+
+	...
+	Scanning: /msdos/msm/C&QC
+	sig_md5_get: read(): Is a directory
+	#
+
+   The code is trying to read data from a directory, but gets a read
+   error and then exits.
+ 
+3) The following error was received while doing a '/dev R':
+
+	...
+	Scanning: /dev/ptyqb
+	sig_null_get: lseek(): Illegal seek
+	#
+
+   This is probably because we should not be doing a '/dev R'. It
+   is unfair to expect random devices in '/dev' to lseek properly.
+   The 'tw.config' should be changed.
+
+4) On page 3 of the man page for 'tw.config' when the author states:
+
+	"Note the differeence between pruning (via "!") and
+	ignoring everything (via "N" template):..."
+
+   They probably mean:
+
+	"Note the ...
+	ignoring everything (via "E"):..."
+
+5) When you are creating a new database with the '-initialize'
+   switch, tripwire ignores the '-d' switch. There is no command
+   line error given for this.
+
+6) There are four modes for runnung tripwire that are specified
+   with switches that sometime agree with their functions. Specifically:
+
+	Mode		Switch
+	--------------------------
+	Generate	-initialize
+	Update		-update
+	Integrity	<none>
+	Interactive	-interactive
+
+Samples:
+--------
+
+	Here is a sample tw.config file that works reasonably
+well on Linux:
+
+	#
+	# Only check '/' disk partition with this
+	# config file.
+	#
+	# Define a variable for searching /dev
+	#
+	@@define DEVSEARCH E+pinugsamc
+	#
+	# All Files in '/' disk partition. If you want
+	# to check other mounted partitions, you would
+	# add them after the '/ R' line.
+	#
+	/ R
+	#
+	# Except /proc
+	#
+	=/proc E
+	#
+	# And /dev
+	#
+	/dev @@DEVSEARCH 
+	#
+	# just /tmp
+	#
+	=/tmp
+	#
+	# End
+	#
+
+	For checking, this command works reasonably well:
+
+	./tripwire -v -interactive -loosedir -d databases/tw.db1 -c tw.config
+
+
+
+
+
+
+
+
+
+
+
+

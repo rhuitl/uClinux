@@ -1,0 +1,452 @@
+<sect>Configuración Avanzada
+<p>
+<sect1>Sección &lsqb;CallTable&rsqb;
+<label id="calltable">
+<p>
+<itemize>
+<item><tt/GenerateNBCDR=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Genere CDRs para llamadas que vienen desde zonas vecinas.
+La dirección IP y el ID del endpoint que está llamando se presenta como una cadena vacía.
+Esto es frecuentemente utilizado para propósitos de depuración.
+
+<item><tt/GenerateUCCDR=0/<newline>
+Default: <tt/0/<newline>
+<p>
+Genere CDRs para llamadas que son desconectadas (unconnected). Esto es frecuentemente
+utilizado para propósitos de depuración. Tenga presente que una llamada se considera desconectada (unconnected)
+solamente si el gatekeeper utiliza modo enrutado (routed mode) y no recibe un mensaje 
+de conexión Q.931 (Q.931 Connect). En modo directo (direct mode), siempre una llamada es considerada conectada
+(connected).
+
+<item><tt/DefaultCallDurationLimit=3600/<newline>
+Default: <tt/0/<newline>
+<p>
+Límite máximo de tiempo (por defecto) que durará una llamada (en segundos).
+Establesca esta variable a <tt/0/ para deshabilitar esta característica y no limitar
+la duración de las llamadas.
+
+<item><tt/AcctUpdateInterval=60/<newline>
+Default: <tt/0/<newline>
+<p>
+Un intervalo de tiempo (en segundos) para que la actualización de accounting (accounting update) se registre
+para cada llamada en progreso. Detalles exactos de actualización de accounting (accounting update)
+dependen del módulo de registro de accounting elegido (ver la sección
+<ref id="gkacct" name="[Gatekeeper::Acct]">). En general, la actualización del accounting
+(accounting update) es con la finalidad de tener un servicio de respaldo con el incremento de la duración de la llamada,
+para llamadas establecidas (connected calls).
+El valor por defecto 0 le indica al gatkeeper que no realize actualización de accounting
+en absoluto. Por favor tenga presente que establecer períodos cortos de tiempo podría disminuír el rendimiento del GK.
+
+<item><tt/TimestampFormat=Cisco/<newline>
+Default: <tt/RFC822/<newline>
+<p>
+Formato de presentación de las cadenas de fecha y hora impresas dentro del los CDRs.
+
+<item><tt/IRRFrequency=60/<newline>
+Default: <tt/120/<newline>
+<p>
+Establezca la "irrFrequency" en los mensajes ACF. 0 deshabilita esta opción.
+
+<item><tt/IRRCheck=TRUE/<newline>
+Default: <tt/FALSE/<newline>
+<p>
+Revisa si ambos endpoints en una llamada envían los IRRs pedidos.
+Una llamada terminará si uno de los endpoints no envía
+un IRR después de 2 * irrFrequency.
+
+<item><tt/SingleFailoverCDR=FALSE/<newline>
+Default: <tt/TRUE/<newline>
+<p>
+Cuando failover está activo, se puede probar más de un gateway
+para establecer una llamada. Este cambio define si uno o varios CDRs
+se generan para una llamada.
+
+</itemize>
+
+
+<sect1>Sección &lsqb;Endpoint&rsqb;
+<label id="endpoint">
+<p>
+El gatekeeper puede trabajar como un endpoint registrandose con otro gatekeeper.
+Con esta característica, usted puede construír facilmente jerarquías de gatekeepers.
+Esta sección define las características de un endpoint para el gatekeeper.
+
+<itemize>
+<item><tt/Gatekeeper=10.0.1.1/<newline>
+Default: <tt/no/<newline>
+<p>
+Define un gatekeeper padre (parent gatekeeper) para el endpoint(el gatekeeper), con el cual se va a registrar.
+No trate de registrarse con usted mismo, a menos de que usted desee confundirse.
+Para dehabilitar esta característica, configure este campo para que sea <tt/no/.
+
+<item><tt/Type=Gateway/<newline>
+Default: <tt/Gateway/<newline>
+<p>
+Defina el tipo de terminal para el endpoint.
+Los valores válidos son <tt/Gateway/ o <tt/Terminal/.
+
+<item><tt/Vendor=Cisco | GnuGk | Generic/<newline>
+Default: <tt/GnuGk/<newline>
+<p>
+Seleccione el tipo de gatekeeper padre para habilitar la extensiones específicas
+de un vendedor.
+
+<item><tt/H323ID=CitronProxy/<newline>
+Default: <tt>&lt;Name&gt;</tt><newline>
+<p>
+Especifique el o los alias H.323 ID para el endpoint.
+Múltiples alias pueden separarse con comas.
+
+<item><tt/E164=18888600000,18888700000/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define el alias E.164 (dialedDigits) para el endpoint.
+Múltiples alias pueden separarse con comas.
+
+<item><tt/Password=123456/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Especifique un password para que sea enviado al gatekeeper padre.
+Todas las peticiones RAS contendrán el password en el campo <bf/cryptoTokens/
+(MD5 & HMAC-SHA1-96) y en el campo <bf/tokens/ (CAT).
+Para enviar peticiones RAS sin los campos<bf/cryptoTokens/ y <bf/tokens/,
+establesca el password como vacío.
+Si la opción <tt/EncryptAllPasswords/ está habilitada, o la variable <tt/KeyFilled/ está definida
+en esta sección, el password está en forma encriptada y deberá ser creada utilizando
+la herramienta <tt/addpasswd/.
+<p>
+Además, el password es también utilizado en mensajes LRQs enviados a gatekeepers vecinos.
+
+<item><tt/Prefix=188886,188887/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Registre los prefijos especificados con el gatekeeper padre.
+Solamente tiene efecto cuando el tipo de endpoint es <tt/Gateway/.
+
+<item><tt/TimeToLive=900/<newline>
+Default: <tt>60</tt><newline>
+<p>
+Sugiera un valor time-to-live (en segundos)para el proceso de registro.
+Tenga presente que el contador real para time-to-live es asignado por el
+gatekeeper padre en el mensaje RCF contestando a la petición RRQ.
+
+<item><tt/RRQRetryInterval=10/<newline>
+Default: <tt/3/<newline>
+<p>
+Defina un intervalo de reintento en segundos para reenviar un RRQ si no se ha 
+recibido respuesta desde el gatekeeper padre. Este intervalo es duplicado con cada
+fallo, a un máximo de RRQRetryInterval * 128.
+
+<item><tt/ARQTimeout=2/<newline>
+Default: <tt/2/<newline>
+<p>
+Define un valor de espera en segundos para los ARQs.
+
+<item><tt/UnregisterOnReload=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Define si el gatekeeper hijo se desregistra y re-registra con
+su gatekeeper padre cuando recibe el comando Reload.
+
+<item><tt/NATRetryInterval=60/<newline>
+Default: <tt/60/<newline>
+<p>
+Tiempo que se debe esperar antes de tratar de reconectar el TCP NAT signalling socket (en segundos).
+Esto puede pasar por cualquiera de estas razones: la conexión no puede ser establecida o ésta
+ha sido rota.
+
+<item><tt/NATKeepaliveInterval=86400/<newline>
+Default: <tt/86400/<newline>
+<p>
+Define que tan a menudo es refrescada la conexión de señalización TCP NAT con un gatekeeper 
+padre. Puesto que las NAT box usualmente mantienen TCP mappings solamente por un tiempo definido,
+es bueno establecer éste, con un valor un poco mas pequeño que el de la NAT box.
+El refresco de la conexión es realizado enviando un mensaje Q.931 IncomingCallProceeding.
+Si su NAT realiza traducción de puertos TCP, usted podría necesitar establecer éste a un valor
+cercano a 60 segundos.
+
+<item><tt/Discovery=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Decida si descubre o no el gatekeeper padre enviando primero un GRQ.
+
+<item><tt/UseAlternateGK=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Habilite la característica de alternar gatekeepers. Si los mensajes GRJ/GCF/RFC recibidos 
+desde el gatekeeper padre contienen una lista de gatekeepers alternos, esta
+información es almacenada y puede ser utilizada después para registrarse con otro gatekeeper
+en caso de cualquier falla. Si usted no desea usar esta característica, establezca
+esta variable a <tt/0/.
+
+<item><tt/GatekeeperIdentifier=ParentGK/<newline>
+Default: <tt/Not set/<newline>
+<p>
+Defina este parámetro si usted desea aceptar solamente aquellos gatekeepers que correspondan
+a este identificador de gatekeeper. Es muy utilizado con GRQ discovery y puede prevenir
+una asignación de gatekeeper accidental. No establezca esta variable, si a usted no le
+importa acerca de identificadores de gatekeeper o si usted utiliza gatekeepers alternos que
+pueden tener diferentes identificadores de gatekeeper establecidos.
+
+<item><tt/EndpointIdentifier=OpenH323GK/<newline>
+Default: <tt/Not set/<newline>
+<p>
+Establezca esta característica si usted desea utilizar un identificador de endpoint específico para
+este gatekeeper hijo. Si esta opción no esta establecida (por defecto), el gatekeeper padre
+asignará el identificador en un mensaje GCF/RCF.
+
+</itemize>
+
+
+<sect1>Sección &lsqb;CTI::Agents&rsqb;
+<p>
+Esta sección permite la configuración de las llamadas colas virtuales (virtual queues) para
+permitir distribución de llamadas entrantes por una aplicación externa, mediante el
+puerto de estado.
+Una cola virtual tiene un alias H.323 que puede ser llamado como un endpoint.
+
+En el arrivo de un mensaje ARQ a una cola virtual, el gatekeeper señala
+una RouteRequest en el puerto de estado y espera a que una aplicación externa
+responda ya sea con un RouteReject (entonces el ARQ será rechazado)
+o con un RouteToAlias/RouteToGateway el cual conduce al ARQ a ser reescrito de este modo la llamada
+será ruteada hacia el alias (eg. call center agent) especificado por
+la aplicación externa.
+
+Si no se recibe ninguna respuesta después de un período de tiempo, la llamada es finalizada.
+
+Usted puede definir colas virtuales de tres maneras:
+<itemize>
+<item><tt/nombre exacto de alias/ - Una lista de alias es asignada. Si un alias destino ARQ
+  corresponde a uno de estos nombres, la cola virtual es activada,
+<item><tt/prefijo/ - Una lista de prefijos es dada. Si un alias destino ARQ
+  inicia con uno de estos prefijos, la cola virtual es activada,
+<item><tt/expresión regular/ - Una expresión regular es dada. Si un alias destino ARQ
+  corresponde a la expresión, la cola virtual es activada.
+</itemize>
+
+Ver la sección de monitoreo (monitoring section) para detalles sobre los mensajes y respuestas.
+
+<itemize>
+<item>
+<tt/VirtualQueueAliases/<newline>
+Default: <tt>none</tt><newline>
+<p>
+Este parámetro define una lista de alias H.323 para las colas virtuales (Utilizado con la vqueue RoutingPolicy).
+
+<descrip>
+<tag/Ejemplo:/
+<quote/<tt/VirtualQueueAliases=sales,support//
+<newline>
+</descrip>
+
+<item>
+<tt/VirtualQueuePrefixes/<newline>
+Default: <tt>none</tt><newline>
+<p>
+Este parámetro define una lista de prefijos para las colas virtuales (Utilizado con la vqueue RoutingPolicy).
+
+<descrip>
+<tag/Ejemplo:/
+<quote/<tt/VirtualQueuePrefixes=001215,1215//
+<newline>
+</descrip>
+
+<item>
+<tt/VirtualQueueRegex/<newline>
+Default: <tt>none</tt><newline>
+<p>
+Este parámetro define una expresión regular para las colas virtuales (Utilizado con la vqueue RoutingPolicy).
+
+<descrip>
+<tag/Ejemplo (números que empiezan con 001215 o 1215):/
+<quote/<tt/VirtualQueueRegex=^(001|1)215[0-9]*$//
+<newline>
+</descrip>
+
+<item>
+<tt/RequestTimeout/<newline>
+Default: <tt/10/<newline>
+Tiempo de espera en segundos para que la aplicación externa responda el RouteRequest.
+Si no se recibe ninguna respuesta durante este tiempo un ARJ será enviado hacia el
+enpoint que llama (caller).
+</itemize>
+
+
+<sect1>Sección &lsqb;SQLConfig&rsqb;
+<label id="sqlconf">
+<p>
+Carge configuraciones del gatekeeper desde una base de datos SQL (adicionalmente a las configuraciones
+leidas desde el archivo de configuración). Una <tt/ConfigQuery/ genérica puede ser utilizada
+para leer casi todas las configuraciones desde la base de datos y/o una de <tt/[RasSrv::RewriteE164]/,
+<tt/[RasSrv::PermanentEndpoints]/, <tt/[RasSrv::Neighbors]/, 
+<tt/[RasSrv::GWPrefixes]/ consultas pueden ser utilizadas para cargar configuraciones particulares.
+Los valores leídos desde la base de datos SQL tiene preferencia sobre las configuraciones encontradas
+en el archivo de configuración.
+
+<itemize>
+<item><tt/Driver=MySQL | PostgreSQL | Firebird/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+El driver SQL a utilizar. Actualmente, drivers <tt/MySQL/, <tt/PostgreSQL/ y <tt/Firebird/
+están implementados.
+
+<item><tt/Host=DNS[:PORT] | IP[:PORT]/<newline>
+Default: <tt/localhost/<newline>
+<p>
+Dirección del host servidor SQL. Puede estar en la forma de <tt/DNS[:PORT]/ o <tt/IP[:PORT]/.
+Como <tt/sql.mycompany.com/ o <tt/sql.mycompany.com:3306/ o <tt/192.168.3.100/.
+
+<item><tt/Database=billing/<newline>
+Default: <tt/billing/<newline>
+<p>
+El nombre de la base de datos a la cual se realiza la conexión.
+
+<item><tt/Username=gnugk/<newline>
+<p>
+El nombre de usuario utilizado para conectarse a la base de datos.
+
+<item><tt/Password=secret/<newline>
+<p>
+El password utilizado para conectarse a la base de datos.
+Si el password no está especificado, un intento de conexión a la base de datos 
+sin un password es realizada.
+Si <tt/EncryptAllPasswords/ está habilitada, o una variable <tt/KeyFilled/ esta definida
+en esta sección, el password esta en forma encriptada y puede ser creado utilizando la 
+herramientas <tt/addpasswd/.
+
+<item><tt/ConfigQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defina una consulta SQL utilizada para leer configuraciones del gatekeeper desde la base de datos. 
+La consulta es parametrizada, lo que significa que el remplazo de parámetros ocurre antes
+de que la consulta es ejecutada. Los parámetros están denotados por las cadenas <bf/%1/, <bf/%2/, ... 
+Especifique %% para insertar un caracter de porcentaje antes de un dígito dentro de una cadena 
+(así <bf/%%1/), especifique <bf/%{1}/ para pemitir expansión dentro de expesiones complejas 
+como <bf/%{1}123/. Para <tt/ConfigQuery/ solamente está definido un parámetro:
+<itemize>
+<item><tt/%1/ - El identificador del gatekeeper
+</itemize>
+Se espera que la consulta devuelva cero o mas filas de datos,
+en donde cada fila consiste de <bf/tres/ columnas:
+<itemize>
+<item><tt/columna con índice 0/ - nombre de la sección de configuración (config section name)
+<item><tt/columna con índice 1/ - nombre de la opción (config key)
+<item><tt/columna con índice 2/ - valor de la opción (config value)
+</itemize>
+<p>
+Ejemplos de consultas:
+<tscreen><verb>
+ConfigQuery=SELECT secname, seckey, secval FROM sqlconfig WHERE gk = '%1'
+ConfigQuery=SELECT 'RasSrv::RRQAuth', alias, rule FROM rrqauth WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/RewriteE164Query=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defina una consulta SQL para recuperar desde la base de datos reglas de reescritura (rewrite rules) 
+para la sección <tt/[RasSrv::RewriteE164]/. La consulta es parametrizada, 
+lo que significa que el reemplazo de parámetros ocurre antes de que cada consulta es ejecutada. 
+Los parámetros están denotados por cadenas <bf/%1/, <bf/%2/, ... 
+Especifique %% para insertar un caracter de porcentaje antes de un dígito dentro de una cadena 
+(así <bf/%%1/), especifique <bf/%{1}/ para pemitir expansión dentro de expesiones complejas 
+como <bf/%{1}123/. Para <tt/RewriteE164Query/ solamente está definido un parámetro:
+<itemize>
+<item><tt/%1/ - El identificador del gatekeeper
+</itemize>
+Se espera que la consulta devuelva cero o mas filas de datos,
+en donde cada fila consiste de <bf/dos/ columnas:
+<itemize>
+<item><tt/columna con índice 0/ - nombre de la regla de reescritura (rewrite rule key)
+<item><tt/columna con índice 1/ - valor de la regla de reescritura (rewrite rule value)
+</itemize>
+<p>
+Ejemplos de consulta:
+<tscreen><verb>
+RewriteE164Query=SELECT rkey, rvalue FROM rewriterule WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/NeighborsQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defina una consulta SQL para recuperar desde la base de datos entradas vecinas (neighbor entries)
+para la sección <tt/[RasSrv::Neighbors]/. La consulta es parametrizada, 
+lo que significa que el reemplazo de parámetros ocurre antes de que cada consulta es ejecutada. 
+Los parámetros están denotados por cadenas <bf/%1/, <bf/%2/, ... 
+Especifique %% para insertar un caracter de porcentaje antes de un dígito dentro de una cadena 
+(así <bf/%%1/), especifique <bf/%{1}/ para pemitir expansión dentro de expesiones complejas 
+como <bf/%{1}123/. Para <tt/NeighborsQuery/ está definido un parámetro:
+<itemize>
+<item><tt/%1/ - El identificador del gatekeeper
+</itemize>
+Se espera que la consulta devuelva cero o mas filas de datos,
+en donde cada fila consiste de <bf/seis/ columnas:
+<itemize>
+<item><tt/columna con índice 0/ - nombre del vecino (identificador)
+<item><tt/columna con índice 1/ - dirección IP del vecino
+<item><tt/columna con índice 2/ - número de puerto del vecino
+<item><tt/columna con índice 3/ - prefijos opcionales (separados por comas)
+<item><tt/columna con índice 4/ - password opcional
+<item><tt/columna con índice 5/ - IP dinámica opcional (optional dynamic IP flag)
+</itemize>
+<p>
+Ejemplos de consultas:
+<tscreen><verb>
+NeighborsQuery=SELECT nid, nip, nport, npfx, NULL, 0 FROM neighbor WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/PermanentEndpointsQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defina una consulta SQL para recuperar endpoints permanentes desde la base de datos 
+para la sección <tt/[RasSrv::PermanentEndpoints]/. La consulta es parametrizada, 
+lo que significa que el reemplazo de parámetros ocurre antes de que cada consulta es ejecutada. 
+Los parámetros están denotados por cadenas <bf/%1/, <bf/%2/, ... 
+Especifique %% para insertar un caracter de porcentaje antes de un dígito dentro de una cadena 
+(así <bf/%%1/), especifique <bf/%{1}/ para pemitir expansión dentro de expesiones complejas 
+como <bf/%{1}123/. Para <tt/PermanentEndpointsQuery/ solamente está definido un parámetro:
+<itemize>
+<item><tt/%1/ - El identificador del gatekeeper
+</itemize>
+Se espera que la consulta devuelva cero o mas filas de datos,
+en donde cada fila consiste de <bf/cuatro/ columnas:
+<itemize>
+<item><tt/columna con índice 0/ - dirección IP del endpoint permanente
+<item><tt/columna con índice 1/ - número de puerto del endpoint permanente
+<item><tt/columna con índice 2/ - alias del endpoint permanente
+<item><tt/columna con índice 3/ - prefijos opcionales del endpoint permanente (separados por comas)
+</itemize>
+<p>
+Ejemplos de consultas:
+<tscreen><verb>
+PermanentEndpointsQuery=SELECT peip, 1720, pealias, NULL FROM permanentep WHERE gk = '%1'
+</verb></tscreen>
+
+<item><tt/GWPrefixesQuery=SELECT .../<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Defina una consulta SQL para recuperar prefijos de gateways desde la base de datos 
+para la sección <tt/[RasSrv::GWPrefixes]/. La consulta es parametrizada, 
+lo que significa que el reemplazo de parámetros ocurre antes de que cada consulta es ejecutada. 
+Los parámetros están denotados por cadenas <bf/%1/, <bf/%2/, ... 
+Especifique %% para insertar un caracter de porcentaje antes de un dígito dentro de una cadena 
+(así <bf/%%1/), especifique <bf/%{1}/ para pemitir expansión dentro de expesiones complejas 
+como <bf/%{1}123/. Para <tt/GWPrefixesQuery/ solamente está definido un parámetro:
+<itemize>
+<item><tt/%1/ - El identificador del gatekeeper
+</itemize>
+Se espera que la consulta devuelva cero o mas filas de datos,
+en donde cada fila consiste de <bf/dos/ columnas:
+<itemize>
+<item><tt/columna con índice 0/ - alias del gateway
+<item><tt/columna con índice 1/ - prefijos del gateway (separados por comas)
+</itemize>
+<p>
+Ejemplos de consultas:
+<tscreen><verb>
+GWPrefixesQuery=SELECT gwalias, gwpfx FROM gwprefix WHERE gk = '%1'
+</verb></tscreen>
+
+</itemize>
+

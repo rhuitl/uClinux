@@ -1,0 +1,225 @@
+Developer notes for wpa_supplicant
+==================================
+
+The design goal for wpa_supplicant was to use hardware, driver, and OS
+independent, portable C code for all WPA functionality. Current
+implementation supports only Linux with Host AP driver for
+Prism2/2.5/3, but contributions to add support for other drivers and
+operating systems are welcome.
+
+The goal of this file and the comments in the header files is to give
+enough information for other developers to be able to port the example
+code. If any information is missing, feel free to contact Jouni Malinen
+<jkmaline@cc.hut.fi> for more information. Contributions as patch files
+are also very welcome at the same address.
+
+Structure of the source code
+----------------------------
+
+Main WPA Supplicant implementation is in wpa_supplicant.c. This file
+includes definitions of internal data structures, WPA IE processing,
+Supplicant state machine, EAPOL-Key processing, libpcap (receive
+EAPOL-Key) and libdnet (send EAPOL-Key) initialization and processing,
+driver event processing, interface with Xsupplicant.
+
+Parser for the configuration file is implemented in config.c.
+
+All hardware/driver dependent functionality is implemented in driver*.c
+(see below).
+
+wpa_supplicant uses generic helper functions and cryptographic
+functions some of which are shared with with hostapd. The following C
+files are currently used:
+
+eloop.c
+	event loop (select() loop with registrable timeouts, socket read
+	callbacks, and signal callbacks)
+common.c
+	common helper functions
+md5.c
+	HMAC-MD5 (keyed checksum for message authenticity validation)
+rc4.c
+	RC4 (broadcast/default key encryption)
+sha1.c
+	HMAC-SHA-1 (keyed checksum for message authenticity validation)
+	PRF-SHA-1 (pseudorandom (key/nonce generation) function)
+	PBKDF2-SHA-1 (ASCII passphrase to shared secret)
+aes_wrap.c (and aes.c)
+	AES Key Wrap Algorithm with 128-bit KEK, RFC3394 (broadcast/default
+	key encryption)
+
+
+wpa_supplicant.c
+----------------
+
+main()
+- parse command line
+- call config file parser
+- initialize Supplicant data structures
+- call functions to initialize WPA support in the driver
+- initialize event loop
+- cleanup when exiting
+
+
+wpa_supplicant_dot1x_receive()
+- receive master session key update from Xsupplicant
+
+wpa_supplicant_event()
+- receive driver events (through driver wrapper functions)
+  * wpa_supplicant_scan_results(): process scan result event, BSS selection
+
+wpa_supplicant_receive()
+- receive EAPOL-Key packets from libpcap
+
+wpa_supplicant_rx_eapol()
+- process all received EAPOL-Key packets with helper functions:
+  * wpa_supplicant_process_1_of_4() (message 1 of 4-Way Handshake)
+  * wpa_supplicant_process_3_of_4() (message 3 of 4-Way Handshake)
+  * wpa_supplicant_process_1_of_2() (message 1 of Group Key Handshake)
+
+wpa_supplicant_associate()
+- control association (select cipher and key management suites, initiate
+  association)
+
+
+Driver wrapper implementation (driver.h)
+----------------------------------------
+
+All hardware and driver dependent functionality is implemented in as a
+separate C file(s) implementing defined wrapper functions. Other parts
+of the wpa_supplicant are designed to be hardware, driver, and operating
+system independent.
+
+Driver wrappers need to implement whatever calls are used in the
+target operating system/driver for controlling wireless LAN
+devices. As an example, in case of Linux, these are mostly some glue
+code and ioctl() calls and netlink message parsing for Linux Wireless
+Extensions. Since all features required for WPA are not yet included
+in Wireless Extensions, some driver specific code is used in the
+example implementation for Host AP driver. These driver dependent parts
+are to be replaced with generic code once the needed changes are
+included in the Wireless Extensions. After that, all Linux drivers, at
+least in theory, could use the same driver wrapper code.
+
+A driver wrapper needs to implement all functions defined in driver.h
+(see that file for detailed documentation of the functions). Hardware
+independent parts of wpa_supplicant will call these functions to
+control the driver/wlan card. In addition, support for driver events
+is required. The event callback function, wpa_supplicant_event(), and
+its parameters are documented in wpa_supplicant.h.
+
+When porting to other operating systems, driver wrapper should be
+modified to use the native interface of the target OS. Since only one
+OS is currently supported, it is possible that some extra requirements
+for the interface between the driver wrapper and generic
+wpa_supplicant code is discovered during porting. These will be
+addresses on case by case basic by modifying the interface and
+updating the other driver wrappers for this. The goal is to avoid
+changing this interface without very good reasons in order to limit
+the number of changes needed to other wrappers and hardware
+independent parts of wpa_supplicant.
+
+Generic Linux Wireless Extensions functions are implemented in
+driver_wext.c. All Linux driver wrappers can use these when the kernel
+driver supports the generic ioctl()s and wireless events. Driver
+specific functions are implemented in separate C files, e.g.,
+driver_hostap.c. These files need to define struct wpa_driver_ops
+entry that will be used in wpa_supplicant.c when calling driver
+functions. These entries need to be added to the lists in
+wpa_supplicant_set_driver() and usage() functions in wpa_supplicant.c.
+
+Currently, only Linux is supported. When porting to other operating
+system, the driver wrapper selection would be logically done during
+compilation time. This is not yet implemented.
+
+
+Driver requirements for WPA
+---------------------------
+
+WPA introduces new requirements for the device driver. At least some
+of these need to be implemented in order to provide enough support for
+wpa_supplicant.
+
+TKIP/CCMP
+
+WPA requires that the pairwise cipher suite (encryption algorithm for
+unicast data packets) is TKIP or CCMP. These are new encryption
+protocols and thus, the driver will need to be modified to support
+them. Depending on the used wlan hardware, some parts of these may be
+implemented by the hardware/firmware.
+
+Specification for both TKIP and CCMP is available from IEEE (IEEE
+802.11i draft version 3.0). Fully functional, hardware independent
+implementation of both encryption protocols is also available in Host
+AP driver (driver/modules/hostap_{tkip,ccmp}.c).
+
+The driver will also need to provide configuration mechanism to allow
+user space programs to configure TKIP and CCMP. Current Linux Wireless
+Extensions (v16) does not yet support these algorithms or
+individual/non-default keys. Host AP driver has an example of private
+ioctl()s for this. Eventually, this should be replaced with modified
+Linux Wireless Extensions.
+
+Roaming control and scanning support
+
+wpa_supplicant controls AP selections based on the information
+received from Beacon and/or Probe Response frames. This means that the
+driver should support external control for scan process. In case of
+Linux, use of new Wireless Extensions scan support (i.e., 'iwlist
+wlan0 scan') is recommended. The current driver wrapper (driver_wext.c)
+uses this for scan results.
+
+Scan results must also include WPA information element. This is not
+yet defined in Linux Wireless Extensions and Host AP driver uses a
+custom event to provide the full WPA IE (including element id and
+length) as a hex string that is included in the scan results.
+Eventually, this should be defined as a Wireless Extensions ioctl
+that can be used both with scan results and with configuration of WPA IE
+for association request (and Beacon/Probe Response in case of an
+AP/IBSS).
+
+wpa_supplicant needs to also be able to request the driver to
+associate with a specific BSS. Current Host AP driver and matching
+driver_hostap.c wrapper uses following sequence for this
+request. Similar/identical mechanism should be usable also with other
+drivers.
+
+- set WPA IE for AssocReq with private ioctl
+- set SSID with SIOCSIWESSID
+- set channel/frequency with SIOCSIWFREQ
+- set BSSID with SIOCSIWAP
+  (this last ioctl will trigger the driver to request association)
+
+WPA IE generation
+
+wpa_supplicant selects which cipher suites and key management suites
+are used. Based on this information, it generates a WPA IE. This is
+provided to the driver interface in the associate call. This does not
+match with Windows NDIS drivers which generate the WPA IE
+themselves.
+
+wpa_supplicant allows Windows NDIS-like behavior by providing the
+selected cipher and key management suites in the associate call. If
+the driver generates its own WPA IE and that differs from the one
+generated by wpa_supplicant, the driver has to inform wpa_supplicant
+about the used WPA IE (i.e., the one it used in (Re)Associate
+Request). This notification is done using EVENT_ASSOCINFO event (see
+wpa_supplicant.h).
+
+Driver events
+
+wpa_supplicant needs to receive event callbacks when certain events
+occur (association, disassociation, Michael MIC failure, scan results
+available). These events and the callback details are defined in
+wpa_supplicant.h.
+
+On Linux, association and disassociation can use existing Wireless
+Extensions event that is reporting new AP with SIOCGIWAP
+event. Similarly, completion of scan can be reported with SIOCGIWSCAN
+event.
+
+Michael MIC failure event is not yet included in Wireless Extensions,
+so this needs a custom event. Host AP driver uses custom event with
+following contents: MLME-MICHAELMICFAILURE.indication(keyid=#
+broadcast/unicast addr=addr2). This is the recommended format until
+the event is added to Linux Wireless Extensions.

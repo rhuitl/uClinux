@@ -1,0 +1,44 @@
+############################################################################
+
+#ifeq ($(ROOTDIR)/boot,$(wildcard $(ROOTDIR)/boot))
+#VENDOR_TOPDIRS = boot
+#endif
+
+VENDOR_CFLAGS = -DCONFIG_SNAPGEAR
+
+BUILD_NETtel = 1
+LINUXTARGET = vmlinux.bin
+
+#Get the version.
+include $(ROOTDIR)/vendors/$(CONFIG_VENDOR)/config.version
+
+# To override the vendor-global version do something like:
+# VERSIONPKG = 2.3.5u1
+VERSIONSTR = $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+RELFILES = boot/boot.elf images/image.bin,.sgu $(LINUXDIR)/vmlinux
+
+############################################################################
+
+CPUFLAGS      = -march=octeon -mabi=64 #-muclibc -melf32btsmipn32
+CPUFLAGS      += -msoft-float
+CPU_CFLAGS    = -march=octeon -mabi=64 #-muclibc -melf32btsmipn32
+CPU_CFLAGS    += -msoft-float
+TARGETARCH    = mips64-linux
+CONFIGURE_HOST= mips64-linux
+ENDIAN        = big
+
+CROSS_COMPILE := mips64-octeon-linux-gnu-
+
+OCTEON_MODEL := OCTEON_CN50XX
+OCTEON_ROOT  := /usr/local/Cavium_Networks/OCTEON-SDK
+PATH := $(PATH):/usr/local/Cavium_Networks/OCTEON-SDK/tools/bin:/usr/local/Cavium_Networks/OCTEON-SDK/host/bin
+OCTEON_CPPFLAGS_GLOBAL_ADD :=
+export OCTEON_MODEL OCTEON_ROOT PATH OCTEON_CPPFLAGS_GLOBAL_ADD
+
+############################################################################
+
+include $(ROOTDIR)/vendors/config/mips/config.arch
+
+RELFILES += images/configs.tar.gz
+
+############################################################################

@@ -1,0 +1,77 @@
+Adding User Applications to the uClinux Distribution
+----------------------------------------------------
+
+D. P. Siddons
+9th Dec. 2001
+
+H. Michelfelder
+20th June 2008
+
+
+This document gives simple instructions for adding a user-written application to
+the uClinux configuration system. Entries must be added to three files, and an
+apropriate Makefile must exist in the user application source directory, which
+must be put in user (all directory names here are given relative to the uClinux
+top directory. In my system this is /home/peter/uClinux-dist).  
+
+Files to edit:
+
+user/Makefile
+   Add a line to the file like
+   
+   dir_$(CONFIG_USER_FOO_FOO)            += foo
+   
+   This adds the directory 'foo' to the list of directories to be built. I added
+   mine in alphabetical order. The order doesn't seem to matter.
+  
+user/Kconfig
+   Add lines to the file like
+
+config USER_FOO_FOO
+    bool "foo"
+    help
+      This program does fooey things to your bars.
+
+Next, there needs to be a proper /user/foo/Makefile. The Makefile should follow
+the following template:
+
+   --------------------------------------------   
+   EXEC = foo
+   OBJS = foo.o
+
+   all: $(EXEC)
+
+   $(EXEC): $(OBJS)
+        $(CC) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
+
+   romfs:
+        $(ROMFSINST)    /bin/$(EXEC)
+
+   clean:
+        -rm -f $(EXEC) *.elf *.gdb *.o
+   ---------------------------------------------
+   
+   If more than one executable is built in the foo directory, as above, then the
+   Makefile should look like
+   
+   ------------------------------------------------------------
+   EXECS = foo bar
+   OBJS = foo.o bar.o
+
+   all: $(EXECS)
+
+   $(EXECS): $(OBJS)
+        $(CC) $(LDFLAGS) -o $@ $@.o $(LDLIBS)
+
+   romfs:
+        $(ROMFSINST) -e CONFIG_USER_FOO_FOO             /bin/foo
+        $(ROMFSINST) -e CONFIG_USER_FOO_BAR             /bin/bar
+   --------------------------------------------------------------
+   
+   More complex makefiles are of course possible. The reader is encouraged to
+   browse the user tree for examples.
+   
+   When all this is set up, doing the standard 'make xconfig; make dep; make'
+   should build the app and install it in romfs and hence in the target system
+   image.bin.
+

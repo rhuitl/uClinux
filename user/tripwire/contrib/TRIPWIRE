@@ -1,0 +1,27 @@
+#!/bin/sh
+# run tripwire from safe sources
+# 
+# Lance Bailey <lrb@ctrg.rri.uwo.ca>
+#
+
+umask 077
+HOSTNAME=`hostname`
+EXE=tripwires/${HOSTNAME}
+DB=Databases/tripwire.database_${HOSTNAME}
+SRC=/usr/local/adm/tcheck
+WRK=/tmp 
+
+cd ${WRK}
+rm -rf ./tcheck.run; mkdir tcheck.run; cd tcheck.run;mkdir Databases
+
+if [ ! -s ${SRC}/${EXE} ];then echo cannot access ${SRC}/${EXE}; exit-127; fi
+
+uncompress <${SRC}/${EXE} > ./tripwire; chmod +x tripwire
+uncompress <${SRC}/${DB} > ./Databases/`basename ${DB}`
+
+./tripwire $* 2>&1 | mail root
+cd ${WRK} # ;rm -rf tcheck.run
+
+#
+# EOF
+#

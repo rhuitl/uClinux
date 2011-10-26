@@ -1,0 +1,85 @@
+#!/bin/sh
+##############################################################################
+
+#
+# build-dist -- run some test compilations based on "todays" snapshot
+#
+# (C) Copyright 2008, Greg Ungerer <gerg@snapgear.com>
+#
+
+##############################################################################
+
+cd $HOME
+export PATH=/usr/local/bin:/usr/bin:/bin
+
+DATE=`date +%Y%m%d`
+
+#
+# Back up any existing dist tree
+#
+#if [ -d uClinux-dist ]
+#then
+#	mv uClinux-dist uClinuc-dist.${DATE}
+#fi
+rm -rf uClinux-dist
+
+echo "BUILD: date ${DATE}"
+
+rm -rf /tmp/build/
+mkdir -p /tmp/build
+
+#
+# Un-archive the source
+#
+tar xzf images/uClinux-dist-${DATE}.tar.gz
+
+echo "BUILD: un-archived source"
+
+#
+# Loop around each target we want to build.
+#
+cd uClinux-dist
+
+cat $HOME/build.list | while read vendor board KERNEL LIBC JUNK
+do
+	if [ "$vendor" = "#" ]
+	then
+		continue
+	fi
+
+	make distclean > /dev/null 2>&1
+
+	VENDOR=`echo $vendor | tr "[:lower:]" "[:upper:]"`
+	BOARD=`echo $board | tr "[:lower:]" "[:upper:]"`
+
+	[ "${KERNEL}" = "linux-2.0.x" ] && KERNTYPE="2_0"
+	[ "${KERNEL}" = "linux-2.4.x" ] && KERNTYPE="2_4"
+	[ "${KERNEL}" = "linux-3.x" ] && KERNTYPE="3"
+	[ "${LIBC}" = "uC-libc" ] && LIBCTYPE="UC_LIBC"
+	[ "${LIBC}" = "uC-libc" ] && LIBCDIR="libc"
+	[ "${LIBC}" = "uClibc" ] && LIBCTYPE="UCLIBC"
+	[ "${LIBC}" = "uClibc" ] && LIBCDIR="uClibc"
+	[ "${LIBC}" = "none" ] && LIBCTYPE="NONE"
+	[ "${LIBC}" = "none" ] && LIBCDIR="none"
+
+	(
+		echo 'CONFIG_DISTVERSION="4.0"'
+		echo "CONFIG_DEFAULTS_${VENDOR}=y"
+		echo "CONFIG_DEFAULTS_${VENDOR}_${BOARD}=y"
+		echo "CONFIG_DEFAULTS_KERNEL_${KERNTYPE}=y"
+		echo "CONFIG_DEFAULTS_LIBC_${LIBCTYPE}=y"
+		echo "CONFIG_VENDOR=${vendor}"
+		echo "CONFIG_PRODUCT=${board}"
+		echo "CONFIG_LINUXDIR=${KERNEL}"
+		echo "CONFIG_LIBCDIR=${LIBCDIR}"
+	) > vendors/${vendor}/${board}/config.device
+
+	STATUS="FAILED"
+
+	make ${vendor}/${board}_default > /tmp/build/${vendor}-${board}-${KERNEL}-${LIBC} 2>&1
+	[ "$?" = 0 ] && STATUS="passed"
+	echo -e "BUILD: ${vendor}-${board}-${KERNEL}-${LIBC} -->\t$STATUS"
+done
+
+echo "BUILD: all done"
+exit 0

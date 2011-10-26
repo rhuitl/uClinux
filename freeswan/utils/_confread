@@ -1,0 +1,443 @@
+#!/bin/sh
+# configuration-file reader utility
+# Copyright (C) 1999-2002  Henry Spencer.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: _confread,v 1.47 2002/03/26 17:49:42 henry Exp $
+#
+# Extract configuration info from /etc/ipsec.conf, repackage as assignments
+# to shell variables or tab-delimited fields.  Success or failure is reported
+# inline, as extra data, due to the vagaries of shell backquote handling.
+# In the absence of --varprefix, output is tab-separated fields, like:
+#	=	sectionname
+#	:	parameter	value
+#	!	status (empty for success, else complaint)
+# In the presence of (say) "--varprefix IPSEC", output is like:
+#	IPSEC_confreadsection="sectionname"
+#	IPSECparameter="value"
+#	IPSEC_confreadstatus="status" (same empty/complaint convention)
+#
+# The "--search parametername" option inverts the search:  instead of
+# yielding the parameters of the specified name(s), it yields the names
+# of sections with parameter <parametername> having (one of) the
+# specified value(s).  In this case, --varprefix output is a list of
+# names in the <prefix>_confreadnames variable.  Search values with
+# white space in them are currently not handled properly.
+#
+# Typical usage:
+# eval `ipsec _confread --varprefix IPSEC --type config setup`
+# if test " $IPSEC_confreadstatus" != " "
+# then
+#	echo "$0: $IPSEC_confreadstatus -- aborting" 2>&1
+#	exit 1
+# fi
+
+config=${IPSEC_CONFS-/etc}/ipsec.conf
+include=yes
+type=conn
+fieldfmt=yes
+prefix=
+search=
+export=0
+me="ipsec _confread"
+
+for dummy
+do
+	case "$1" in
+	--config)	config="$2" ; shift	;;
+	--noinclude)	include=		;;
+	--type)		type="$2" ; shift	;;
+	--varprefix)	fieldfmt=
+			prefix="$2"
+			shift			;;
+	--export)	export=1		;;
+	--search)	search="$2" ; shift	;;
+	--version)	echo "$me $IPSEC_VERSION" ; exit 0	;;
+	--)		shift ; break		;;
+	-*)		echo "$0: unknown option \`$1'" >&2 ; exit 2	;;
+	*)		break			;;
+	esac
+	shift
+done
+
+if test "$include"
+then
+	ipsec _include --inband $config
+else
+	cat $config
+fi |
+awk 'BEGIN {
+	type = "'"$type"'"
+	names = "'"$*"'"
+	prefix = "'"$prefix"'"
+	export = "'"$export"'"
+	search = "'"$search"'"
+	searching = 0
+	if (search != "") {
+		searching = 1
+		searchpat = "^[ \t]+" search "[ \t]*=[ \t]*"
+	}
+	fieldfmt = 0
+	if ("'"$fieldfmt"'" == "yes")
+		fieldfmt = 1
+	including = 0
+	if ("'"$include"'" == "yes")
+		including = 1
+	filename = "'"$config"'"
+	lineno = 0
+	originalfilename = filename
+	if (fieldfmt)
+		bq = eq = "\""
+	else
+		bq = eq = "\\\""
+	failed = 0
+	insection = 0
+	indefault = 0
+	outputting = 0
+	sawnondefault = 0
+	OFS = "\t"
+	o_status = "!"
+	o_parm = ":"
+	o_section = "="
+	o_names = "%"
+	o_end = "."
+	n = split(names, na, " ")
+	if (n == 0)
+		fail("no section names supplied")
+	for (i = 1; i <= n; i++) {
+		if (na[i] in wanted)
+			fail("section " bq na[i] eq " requested more than once")
+		wanted[na[i]] = 1
+		pending[na[i]] = 1
+		if (!searching && na[i] !~ /^[a-zA-Z][a-zA-Z0-9._-]*$/)
+			fail("invalid section name " bq na[i] eq)
+	}
+
+	good = "also type auto authby _plutodevel"
+	left = " left leftsubnet leftnexthop leftfirewall leftupdown"
+	akey = " keyexchange auth pfs pfsgroup keylife rekey rekeymargin rekeyfuzz"
+	akey = akey " compress"
+	obs = " lifetime rekeystart rekeytries"
+	akey = akey " keyingtries ikelifetime disablearrivalcheck ike" obs
+	mkey = " spibase spi esp espenckey espauthkey espreplay_window"
+	left = left " leftespenckey leftespauthkey leftahkey"
+	left = left " leftespspi leftahspi leftid leftrsasigkey"
+	left = left " leftcert leftsubnetwithin leftprotoport"
+	mkey = mkey " ah ahkey ahreplay_window"
+	right = left
+	gsub(/left/, "right", right)
+	n = split(good left right akey mkey, g)
+	for (i = 1; i <= n; i++)
+		goodnames["conn:" g[i]] = 1
+
+	good = "also interfaces forwardcontrol syslog klipsdebug plutodebug"
+	good = good " dumpdir dump manualstart pluto plutoload plutostart"
+	good = good " plutowait plutobackgroundload prepluto postpluto"
+	good = good " fragicmp no_eroute_pass opportunistic hidetos uniqueids"
+	good = good " packetdefault overridemtu nocrsend"
+	good = good " nat_traversal keep_alive force_keepalive"
+	good = good " disable_port_floating virtual_private"
+	n = split(good, g)
+	for (i = 1; i <= n; i++)
+		goodnames["config:" g[i]] = 1
+
+	goodtypes["conn"] = 1
+	goodtypes["config"] = 1
+
+	badchars = ""
+	for (i = 1; i < 32; i++)
+		badchars = badchars sprintf("%c", i)
+	for (i = 127; i < 128+32; i++)
+		badchars = badchars sprintf("%c", i)
+	badchar = "[" badchars "]"
+
+	seen[""] = ""
+	default[""] = ""
+	usesdefault [""] = ""
+}
+
+
+
+function output(code, v1, v2) {
+	if (code == o_parm) {
+		if (v2 == "")		# suppress empty parameters
+			return
+		if (privatename(v1))	# and private ones
+			return
+		if (v2 ~ badchar)
+			fail("parameter value " bq v2 eq " contains unprintable character")
+	}
+
+	if (fieldfmt) {
+		print code, v1, v2
+		return
+	}
+
+	if (code == o_status) {
+		v2 = v1
+		v1 = "_confreadstatus"
+	} else if (code == o_section) {
+		v2 = v1
+		v1 = "_confreadsection"
+	} else if (code == o_names) {
+		v2 = v1
+		v1 = "_confreadnames"
+	} else if (code != o_parm)
+		return		# currently no variable version of o_end
+
+	print prefix v1 "=\"" v2 "\""
+	if (export)
+		print "export " prefix v1
+}
+function searchfound(sectionname,    n, i, reflist) {
+	# a hit in x is a hit in everybody who refers to x too
+	n = split(refsto[sectionname], reflist, ";")
+	for (i = 1; i <= n; i++)
+		if (reflist[i] in seen)
+			fail("duplicated parameter " bq search eq)
+		else
+			seen[reflist[i]] = 1
+	seen[sectionname] = 1
+}
+function fail(msg) {
+	output(o_status, ("(" filename ", line " lineno ") " msg))
+	failed = 1
+	while ((getline junk) > 0)
+		continue
+	exit
+}
+function badname(n) {
+	if ((type ":" n) in goodnames)
+		return 0
+	if (privatename(n))
+		return 0
+	return 1
+}
+function privatename(n) {
+	if (n ~ /^[xX][-_]/)
+		return 1
+	return 0
+}
+function addref(from, to) {
+	if (to in refsto)
+		refsto[to] = refsto[to] ";" from
+	else
+		refsto[to] = from
+}
+function chainref(from, to,    i, reflist, listnum) {
+	# referencing is transitive:  xyz->from->to
+	if (from in refsto) {
+		listnum = split(refsto[from], reflist, ";")
+		for (i = 1; i <= listnum; i++)
+			chainref(reflist[i], to)
+	}
+	addref(from, to)
+}
+
+
+
+{
+	lineno++
+	# lineno is now the number of this line
+}
+including && $0 ~ /^#[<>:]/ {
+	# _include control line
+	if ($1 ~ /^#[<>]$/) {
+		filename = $2
+		lineno = $3 - 1
+	} else if ($0 ~ /^#:/) {
+		msg = substr($0, 3)
+		gsub(/"/, "\\\"", msg)
+		fail(msg)
+	}
+	next
+}
+$0 !~ /^[ \t]/ {
+	# any non-leading-white-space line is a section end
+	### but not the end of relevant stuff, might be also= sections later
+	###if (insection && !indefault && !searching && outputting)
+	###	output(o_end)
+	insection = 0
+	indefault = 0
+	outputting = 0
+}
+{
+	# strip trailing comments and space
+	sub(/[ \t]+(#.*)?$/, "")
+}
+$0 == "" || $0 ~ /^#/ {
+	# empty lines and comments are ignored
+	next
+}
+$0 !~ /^[ \t]/ && NF != 2 {
+	# bad section header
+	fail("section header \"" $0 "\" has wrong number of fields (" NF ")")
+}
+$0 !~ /^[ \t]/ && !($1 in goodtypes) {
+	# unknown section type
+	fail("section type \"" $1 "\" not recognized")
+}
+$0 !~ /^[ \t]/ && $1 == type && $2 != "%default" {
+	# non-default section header of our type
+	sawnondefault = 1
+}
+$0 !~ /^[ \t]/ && $1 == type && searching && $2 != "%default" {
+	# section header, during search
+	insection = 1
+	sectionname = $2
+	usesdefault[sectionname] = 1		# tentatively
+	next
+}
+$0 !~ /^[ \t]/ && !($1 == type && ($2 in wanted || $2 == "%default")) {
+	# section header, but not one we want
+	insection = 1
+	next
+}
+$0 !~ /^[ \t]/ && $1 == type && ($2 in wanted) {
+	# one of our wanted section headers
+	if (!($2 in pending))
+		fail("duplicate " type " section " bq $2 eq)
+	delete pending[$2]
+	tag = bq type " " $2 eq
+	outputting = 1
+	insection = 1
+	output(o_section, $2)
+	next
+}
+$0 !~ /^[ \t]/ && $1 == type && $2 == "%default" {
+	# relevant default section header
+	if (sawnondefault)
+		fail("\"" $1 " %default\" sections must precede non-default ones")
+	tag = bq type " " $2 eq
+	indefault = 1
+	next
+}
+$0 !~ /^[ \t]/ {
+	fail("internal error, supposedly cannot happen")
+}
+!insection && !indefault {
+	# starts with white space but not in a section... oops
+	fail("parameter is not within a section")
+}
+searching && $0 ~ searchpat {
+	# search found the right parameter name
+	match($0, searchpat)
+	rest = substr($0, RLENGTH+1)
+	if (rest ~ /^"/)
+		rest = substr(rest, 2, length(rest)-2)
+	if (!indefault)
+		delete usesdefault[sectionname]
+	if (rest in wanted) {	# a hit
+		if (indefault)
+			default[search] = rest
+		else
+			searchfound(sectionname)
+	} else {
+		# rather a kludge, but must check this somewhere
+		if (search == "auto" && rest !~ /^(add|route|start|ignore)$/)
+			fail("illegal auto value " bq rest eq)
+	}
+	next
+}
+!searching && !outputting && !indefault {
+	# uninteresting line
+	next
+}
+$0 ~ /"/ && $0 !~ /^[^=]+=[ \t]*"[^"]*"$/ {
+	if (!searching)
+		fail("mismatched quotes in parameter value")
+	else
+		gsub(/"/, "", $0)
+}
+$0 !~ /^[ \t]+[a-zA-Z_][a-zA-Z0-9_-]*[ \t]*=/ {
+	if (searching)
+		next			# just ignore it
+	fail("syntax error or illegal parameter name")
+}
+{
+	sub(/^[ \t]+/, "")		# get rid of leading white space
+	sub(/[ \t]*=[ \t]*/, "=")	# and embedded white space
+}
+$0 ~ /^also=/ {
+	if (indefault)
+		fail("%default section may not contain \"also\" parameter")
+	sub(/^also=/, "")
+	if ($0 !~ /^[a-zA-Z][a-zA-Z0-9._-]*$/)
+		fail("invalid section name " bq $0 eq)
+	if (!searching) {
+		if ($0 in wanted)
+			fail("section " bq $0 eq " requested more than once")
+		wanted[$0] = 1
+		pending[$0] = 1
+	} else
+		chainref(sectionname, $0)
+	next
+}
+!outputting && !indefault {
+	# uninteresting line even for a search
+	next
+}
+{
+	equal = match($0, /[=]/)
+	name = substr($0, 1, equal-1)
+	if (badname(name))
+		fail("unknown parameter name " bq name eq)
+	value = substr($0, equal+1)
+	if (value ~ /^"/)
+		value = substr(value, 2, length(value)-2)
+	else if (value ~ /[ \t]/)
+		fail("white space within non-quoted parameter " bq name eq)
+}
+indefault {
+	if (name in default)
+		fail("duplicated default parameter " bq name eq)
+	default[name] = value
+	next
+}
+{
+	if (name in seen)
+		fail("duplicated parameter " bq name eq)
+	seen[name] = 1
+	output(o_parm, name, value)
+}
+END {
+	if (failed)
+		exit 1
+	filename = originalfilename
+	unseen = ""
+	for (i in pending)
+		unseen = unseen " " i
+	if (!searching && unseen != "")
+		fail("did not find " type " section(s) " bq substr(unseen, 2) eq)
+	if (!searching) {
+		for (name in default)
+			if (!(name in seen))
+				output(o_parm, name, default[name])
+	} else {
+		if (default[search] in wanted)
+			for (name in usesdefault)
+				seen[name] = 1
+		if (fieldfmt)
+			for (name in seen)
+				output(o_section, name)
+		else {
+			outlist = ""
+			for (name in seen)
+				if (outlist == "")
+					outlist = name
+				else
+					outlist = outlist " " name
+			output(o_names, outlist)
+		}
+	}
+	output(o_status, "")
+}'

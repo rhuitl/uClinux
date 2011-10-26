@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+#	/etc/rc.d/init.d/upnpd
+#
+# Starts the upnpd daemon
+#
+# chkconfig: 345 95 5
+# description: Internet Gateway Device
+# processname: upnpd
+
+# Source function library.
+. /etc/init.d/functions
+
+# defaults
+ALLOW_MULTICAST=no
+
+# Source configuration
+. /etc/sysconfig/upnpd
+
+UPNPD=/usr/sbin/upnpd
+
+test -x "$UPNPD" || exit 0
+
+RETVAL=0
+
+#
+#	See how we were called.
+#
+
+prog="upnpd"
+
+start() {
+	# Check if upnpd is already running
+	if [ ! -f /var/lock/subsys/upnpd ]; then
+	    echo -n $"Starting $prog: "
+	    [ "$ALLOW_MULTICAST" != "no" ] && route add -net 239.0.0.0 netmask 255.0.0.0 $INTIFACE
+	    daemon "$UPNPD" $EXTIFACE $INTIFACE
+	    RETVAL=$?
+	    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/upnpd
+	    echo
+	fi
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc "$UPNPD"
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/upnpd
+	[ "$ALLOW_MULTICAST" != "no" ] && route del -net 239.0.0.0 netmask 255.0.0.0 $INTIFACE
+	echo
+        return $RETVAL
+}
+
+
+restart() {
+	stop
+	sleep 10
+	start
+}	
+
+reload() {
+	restart
+}	
+
+status_at() {
+ 	status "$UPNPD"
+}
+
+case "$1" in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+reload|restart)
+	restart
+	;;
+condrestart)
+	if [ -f /var/lock/subsys/upnpd ]; then
+	    restart
+	fi
+	;;
+status)
+	status_at
+	;;
+*)
+	echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+	exit 1
+esac
+
+exit $?

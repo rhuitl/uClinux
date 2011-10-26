@@ -1,0 +1,44 @@
+'begin'
+	'comment' 
+		perform some calculations with real values and check
+		the result:
+				sqrt (x) * sqrt (x)
+				exp ( ln (x))
+				arctan (sin (x) / cos (x))
+
+		EPS is somewhat great - change for more accuracy.
+	;
+
+	'real' 'procedure' EPS;
+		EPS := '10'-5;
+
+	'procedure' doit (x);
+	'begin'
+		'real' xs, xa, y, yy, xx, zz;
+
+		xs := sign (x);
+		xa := abs (x);
+		xx := sqrt (xa);
+		xx := xs * xx * xx;
+		'if' abs (x - xx) > EPS 'then'
+			vprint ("sqrt differ: ", x, xx, x - xx);
+		y := x - PI * entier(x / PI);
+		'if' y > PI/2 'then' y := y - PI;
+		yy := arctan (sin (x) / cos (x));
+		'if' abs (y - yy) > EPS 'then'
+			vprint ("trig differ: ", y, yy, y - yy);
+		zz := xs * exp (ln (xa));
+		'if' abs (x - zz) > EPS 'then'
+			vprint ("exp  differ: ", x, zz, x - zz)
+	'end';
+
+	'real' x;
+
+	vprint ("first check...");
+	'for' x := -70 'step' 7.7 'until' 70 'do' 
+		doit (x);
+	vprint ("second check...");
+	'for' x := -7 'step' 0.3 'until' 7 'do' 
+		doit (x);
+	vprint ("done.")
+'end'

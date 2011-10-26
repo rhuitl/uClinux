@@ -1,0 +1,130 @@
+############################################################################
+#
+#  A Generic host system config.arch that can be included by other targets
+#  to reduce the number of places that need to be edited when something
+#  common changes.  If you include this file you may provide:
+#
+#  David McCullough <davidm@snapgear.com>
+#
+############################################################################
+
+ifndef LINUXTARGET
+LINUXTARGET = bzImage
+endif
+
+ifndef VERSIONPKG
+VERSIONPKG = 0.0.0b
+endif
+
+ifndef VERSIONSTR
+VERSIONSTR = $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+endif
+
+ifndef EXTRA_MODULE_DIRS
+ifeq ($(ROOTDIR)/modules,$(wildcard $(ROOTDIR)/modules))
+ifneq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules/
+else
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules
+endif
+endif
+endif
+
+VENDOR_TOPDIRS =
+VENDOR_LIBDIRS =
+
+############################################################################
+
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all build
+#
+
+# ARCH = kernel,  TARGET_ARCH = uClibc
+
+MACHINE       ?= i386
+ARCH          ?= i386
+ENDIAN        ?= little
+CROSS_COMPILE ?=
+CROSS         ?= $(CROSS_COMPILE)
+CONFIGURE_HOST ?= 
+
+CC        = $(CROSS_COMPILE)gcc
+AS        = $(CROSS_COMPILE)as
+AS86      = as86
+CXX       = $(CROSS_COMPILE)g++
+AR        = $(CROSS_COMPILE)ar
+LD        = $(CROSS_COMPILE)ld
+LD86      = ld86
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+GCC_DIR = $(shell $(CC) -print-libgcc-file-name 2>&1 | sed -e 's/libgcc.a//')
+GXX_DIR = $(shell $(CC) -print-file-name=libstdc++.a 2>&1 | sed -e 's/libstdc++.a//')
+
+UCLINUX_BUILD_SET = 0			# have we set a special config below
+
+############################################################################
+
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+	CFLAGS  += -pipe
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -I$(ROOTDIR)/include -I$(ROOTDIR)/include/gcc
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CFLAGS)
+
+	SH_LDFLAGS := $(_SH_LDFLAGS) $(SH_CRTI) $(LDPATH)
+	SH_LDLIBS  :=  # -nodefaultlibs -lc -lgcc $(SH_CRTN)
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+	CFLAGS  += -pipe
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -I$(ROOTDIR)/include -I$(ROOTDIR)/include/gcc
+	CXXFLAGS = $(CFLAGS) $(INCCXX)
+
+	LDLIBS   = $(LIBC) $(LIBGCC)
+	CXXLIBS  = $(LIBC) $(LIBGCC)
+
+	LDFLAGS  = -L$(ROOTDIR)/lib
+	_SH_LDFLAGS  = $(LDFLAGS)
+	
+	FLTFLAGS :=
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+
+	SH_LDFLAGS := $(_SH_LDFLAGS) $(SH_CRTI) $(LDPATH)
+	SH_LDLIBS  :=  # -nodefaultlibs -lc -lgcc $(SH_CRTN)
+endif
+
+############################################################################
+
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+endif
+
+############################################################################

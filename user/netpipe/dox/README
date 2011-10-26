@@ -1,0 +1,420 @@
+
+  For more complete information on NetPIPE, visit the webpage at:
+
+http://www.scl.ameslab.gov/Projects/NetPIPE/
+
+NetPIPE was originally developed by Quinn Snell, Armin Mikler,
+John Gustafson, and Guy Helmer.
+
+It is currently being developed and maintained by Dave Turner with
+help from several graduate students (Xuehua Chen, Adam Oline, 
+Brian Smith, Bogdan Vasiliu).
+
+Release 3.6.2 mainly fixes some bugs. A number of portability issues 
+with 64-bit architectures were taken care of, especially in the Infiniband
+module. A small typecasting error was fixed that caused segmentation faults 
+on Red Hat Enterprise and Fedora Core systems (and probably others...). The 
+bi-directional mode was also tested with the Infiniband module, and a subset
+of NetPIPE options are now supported.
+
+Release 3.6.1 adds a bi-directional (-2) mode to allow data to be sent
+in both directions simultaneously. This has been tested with the
+TCP, MPI, MPI-2, and GM modules.  You can also now test
+synchronous MPI communications MPI_SSend/MPI_SRecv using (-S).
+A launch utility (nplaunch) allows you to launch NPtcp, NPgm, 
+NPib, and NPpvm from one side using ssh to start the remote executible.
+
+Version 3.6 adds the ability to test with and without cache effects,
+and the ability to offset both the source and destination buffers.
+A memcpy module has also been added.
+
+Release 3.5 removes the CPU utilization measurements.  Getrusage is
+probably not very accurate, so a dummy workload will eventually be
+used instead.
+The streaming mode has also been fixed.  When run at Gigabit speeds,
+the TCP window size would collapse limit performance of subsequent
+data points.  Now we reset the sockets between trials to prevent this.
+We have also added in a module to evaluate memory copy rates.
+-n now sets a constant number of repeats for each trial.
+-r resets the sockets between each trial (automatic for streaming).
+
+Release 3.3 includes an Infiniband module for the Mellanox VAPI.
+It also has an integrity check (-i), which is still being developed.
+
+Version 3.2 includes additional modules to test
+PVM, TCGMSG, SHMEM, and MPI-2, as well as the GM, GPSHMEM, ARMCI, and LAPI
+software layers they run upon.  
+
+If you have problems or comments, please email netpipe@scl.ameslab.gov
+
+____________________________________________________________________________
+
+NetPIPE Network Protocol Independent Performance Evaluator, Release 2.3
+Copyright 1997, 1998 Iowa State University Research Foundation, Inc.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation.  You should have received a copy of the
+GNU General Public License along with this program; if not, write to the
+Free Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+____________________________________________________________________________
+
+
+Building NetPIPE
+----------------
+
+NetPIPE requires an ANSI C compiler.  You are on your own for 
+installing the various libraries that NetPIPE can be used to
+test.
+
+Review the provided makefile and change any necessary settings, such
+as the CC compiler or CFLAGS flags, required extra libraries, and PVM
+library & include file pathnames if you have these communication
+libraries.  Alternatively, you can specify these changes on the 
+make command line.  The line below would compile the NPtcp module
+using the icc compiler instead of the default cc compiler.
+
+  make CC=icc tcp
+
+Compile NetPIPE with the desired communication interface by using:
+
+  make mpi        (this will use the default MPI on the system)
+  make pvm        (you may need to set some paths in the makefile)
+  make tcgmsg     (you will need to set some paths in the makefile)
+  make mpi2       (this will test 1-sided MPI_Put() functions)
+  make shmem      (1-sided library for Cray and SGI systems)
+
+  make tcp
+  make gm         (for Myrinet cards, you will need to set some paths)
+  make shmem      (1-sided library for Cray and SGI systems)
+  make gpshmem    (SHMEM interface for other machines)
+  make armci      (still under development)
+  make lapi       (for the IBM SP)
+  make ib         (for Mellanox Infiniband adapters, uses VAPI layer)
+  make memcpy     (uses memcpy to copy data between buffers in 1 process)
+  make MP_memcpy  (uses an optimized copy in MP_memcpy.c to copy data between 
+                   buffers.  This requires icc or gcc 3.x.)
+
+
+Running NetPIPE
+---------------
+
+   NetPIPE will dump its output to the screen by default and also
+to the np.out.  The following parameters can be used to change how
+NetPIPE is run, and are in order of their general usefulness.
+
+        -b: specify send and receive TCP buffer sizes e.g. "-b 32768"
+            This can make a huge difference for Gigabit Ethernet cards.
+            You may need to tune the OS to set a larger maximum TCP
+            buffer size for optimal performance.
+
+        -O: specify send and optionally receive buffer offsets, e.g. "-O 1,3"
+
+        -l: lower bound (start value for block size) e.g. "-l 1"
+
+        -u: upper bound (stop value for block size) e.g. "-u 1048576"
+
+        -o: specify output filename e.g. "-o output.txt"
+
+        -z: for MPI, receive messages using ANYSOURCE
+
+        -g: MPI-2: use MPI_Get() instead of MPI_Put()
+
+        -f: MPI-2: do not use a fence call (may not work for all packages)
+
+        -I: Invalidate cache: Take measures to eliminate the effects cache
+            has on performance.
+
+        -a: asynchronous receive (a.k.a. pre-posted receive)
+                May not have any effect, depending on your implementation
+        
+        -B: burst all preposts before measuring performance
+                Normally only one receive is preposted at a time with -a
+
+        -p: set perturbation offset of buffer size, e.g. "-p 3"
+
+        -i: Integrity check: Check the integrity of data transfer instead
+            of performance
+
+        -s: stream option (default mode is "ping pong")
+                If this option is used, it must be specified on both
+                the sending and receiving processes
+
+        -S: Use synchronous sends/receives for MPI.
+
+        -2: Bi-directional communications.  Transmit in both directions
+            simultaneously.
+
+   TCP
+   ---
+
+      Compile NetPIPE using 'make tcp'
+
+      remote_host> NPtcp [options]
+      local_host>  NPtcp -h remote_host [options]
+
+                       OR
+
+      local_host>  nplaunch NPtcp -h remote_host [options]
+
+   MPICH
+   -----
+
+      Install MPICH
+      Compile NetPIPE using 'make mpi'
+      use p4pg file or edit mpich/util/mach/mach.{ARCH} file
+          to specify the machines to run on
+      mpirun [-nolocal] -np 2 NPmpi [options]
+      'setenv P4_SOCKBUFSIZE 256000' can make a huge difference for
+           MPICH on Unix systems.
+
+   LAM/MPI    (comes on the RedHat Linux distributions now)
+   -------
+
+      Install LAM
+      Compile NetPIPE using 'make mpi'
+      put the machine names into a lamhosts file
+      'lamboot -v -b lamhosts' to start the lamd daemons
+      mpirun -np 2 [-O] NPmpi [options]
+      The -O parameter avoids data translation for homogeneous systems.
+
+   MPI/Pro     (commercial version)
+   -------
+
+      Install MPI/Pro
+      Compile NetPIPE using 'make mpi'
+      put the machine names into /etc/machines or a local machine file
+      mpirun -np 2 NPmpi [options]
+
+   MP_Lite      (A lightweight version of MPI)
+   -------
+
+      Install MP_Lite  (http://www.scl.ameslab.gov/Projects/MP_Lite/)
+      Compile NetPIPE using 'make MP_Lite'
+      mprun -np 2 -h {host1} {host2} NPmplite [options]
+
+   PVM
+   ---
+
+      Install PVM  (comes on the RedHat distributions now)
+      Set the PVM paths in the makefile if necessary.
+      Compile NetPIPE using 'make pvm'
+      use the 'pvm' utility to start the pvmd daemons
+        type 'pvm' to start it  (this will also start pvmd on the local_host)
+        pvm> help           --> lists all commands
+        pvm> add remote_host --> will start a pvmd on a machine called 'host2'
+        pvm> quit           --> when you have all the pvmd machines started
+      remote_host> NPpvm [options]
+      local_host>  NPpvm -h remote_host [options]
+                       OR
+      local_host>  nplaunch NPpvm -h remote_host [options]
+      Changing PVMDATA in netpipe.h and PvmRouteDirect in pvm.c can
+        effect the performance greatly.
+
+   TCGMSG      (unlikely anyone will try this that doesn't know TCGMSG well)
+   -------
+
+      Install TCGMSG package
+      Set the TCGMSG paths in the makefile.
+      Compile NetPIPE using 'make tcgmsg'
+      create a NPtcgmsg.p file with hosts and paths (see hosts/NPtcgmsg.p)
+      parallel NPtcgmsg
+          (no options can be passed into this version)
+
+   MPI-2
+   -----
+
+      Install the MPI package
+      Compile NetPIPE using 'make mpi2'
+      Follow the directions for running the MPI package from above
+      The MPI_Put() function will be tested with fence calls by default.
+      Use -g to test MPI_Get() instead, or -f to do MPI_Put() without
+        fence calls (will not work with LAM).
+
+   SHMEM
+   -----
+
+      Must be run on a Cray or SGI system that supports SHMEM calls.
+      Compile NetPIPE using 'make shmem'
+      (Xuehua, fill out the rest)
+
+   GPSHMEM  (a General Purpose SHMEM library) (gpshmem.c in development)
+   -------
+
+      Ask Ricky or Krzysztof for help :).
+
+   GM       (test the raw performance of GM on Myrinet cards)
+   --
+
+      Install the GM package and configure the Myrinet cards
+      Compile NetPIPE using 'make gm'
+
+      remote_host> NPgm [options]
+      local_host>  NPgm -h remote_host [options]
+
+                       OR
+
+      local_host>  nplaunch NPgm -h remote_host [options]
+
+   LAPI
+   ----
+
+      Log into IBM SP machine at NERSC
+      Compile NetPIPE using 'make lapi'
+
+      To run interactively at NERSC:
+
+      Set environment variable MP_MSG_API to lapi
+        e.g. 'setenv MP_MSG_API lapi', 'export MP_MSG_API=lapi'
+      Run NPlapi with '-procs 2' to tell the parallel environment you
+        want 2 nodes.  Use any other options that are applicable to
+        NetPIPE.
+
+      To submit a batch job at NERSC:
+
+      Copy the file batchLapi from the 'hosts' directory to the directory
+        containing NPlapi.
+      Edit the copy of batchLapi:
+                job_name: Identifying name of job, can be anything
+                output:   File to send stdout to
+                error:    File to send stderr to (most of NetPIPE's output
+                                will go here)
+                tasks_per_node: Number of tasks to be run on each node
+                node:           Number of nodes to run on
+                (Use a combination of the above two options to determine
+                 how NetPIPE runs.  Use 1 task per node and 2 nodes to run
+                 benchmark between nodes.  Use 2 tasks per node and 1 node
+                 to run benchmark on single node)
+
+                Use whatever command-line options are appropriate for NetPIPE
+
+      Submit the job with the command 'llsubmit batchLapi'
+      Check status of all your jobs with 'llqs -u <user>'
+      You should receive an email when the job finishes.  The resulting output
+        files will then be available.
+
+   ARMCI
+   -----   
+   
+      Install the ARMCI package
+      Compile NetPIPE using 'make armci'
+      Follow the directions for running the MPI package from above
+      If running on interfaces other than the default, create a file
+        called armci_hosts, containing two lines, one for each hostname,
+        then run package. 
+
+   Infiniband
+   ----------
+
+      This test will only work on machines connected via TCP/IP as well
+        as Infiniband.
+      Install Mellanox Infiniband adapters and software
+      Make sure the adapters are up and running (e.g. Check that the 
+        Mellanox-supplied bandwidth/latency program, perf_main, works, if 
+        you have it).
+      Compile NetPIPE using 'make ib' (The environment variable MTHOME needs
+        to be set to the directory containing the include and lib directories
+        for the Mellanox software).
+
+      remote_host> NPib [-options]
+      local_host>  NPib -h remote_host [-options]
+
+                       OR
+
+      local_host>  nplaunch NPib -h remote_host [options]
+
+      (remote_host should be the ip address or hostname of the other host)
+        
+      Other options:
+        Use -m to select mtu size for Infiniband adapter.
+          Valid values are 256, 512, 1024, 2048, 4096.  Default is 1024.
+        Use -t to select the communications type.
+          Possible values are 
+            send_recv: basic send and receive
+            send_recv_with_imm: send and receive with immediate data
+            rdma_write: one-sided remote dma write
+            rdma_write_with_imm: one-sided remote dma write with immediate data
+          Default is send_recv.
+        Use -c to select the message completion type.
+          Possible values are 
+            local_poll: poll on last byte of receive buffer
+            vapi_poll: use VAPI polling mechanism
+            event: use VAPI event completion mechanism
+          Default is local_poll.
+
+Interpreting the Results
+------------------------
+
+NetPIPE generates a np.out file by default, which can be renamed using the
+-o option.  This file contains 3 columns:  the number of bytes, the 
+throughput in Mbps, and the round trip time divided by two.
+The first 2 columns can therefore be used to produce a throughput vs
+message size graph.
+
+The screen output contains this same information, plus the test number
+and the number of ping-pong's involved in the test.
+
+>more np.out
+       1 0.136403   0.00005593
+       2 0.274586   0.00005557
+       3 0.402104   0.00005692
+       4 0.545668   0.00005593
+       6 0.805053   0.00005686
+       8 1.039586   0.00005871
+      12 1.598912   0.00005726
+      13 1.700719   0.00005832
+      16 2.098007   0.00005818
+      19 2.340364   0.00006194
+
+
+Invalidating Cache
+------------------
+
+The -I switch can be used to reduce the effects cache has on performance.  
+Without the switch, NetPIPE tests the performance of communicating 
+n-byte blocks by reading from an n-byte buffer on one node, sending data 
+over the communications link, and writing to an n-byte buffer on the other 
+node.  For each block size, this trial will be repeated x times, where x
+typically starts out very large for small block sizes, and decreases as the
+block size grows.  The same buffers on each node are used repeatedly, so
+after the first transfer the entire buffer will be in cache on each node,
+given that the block-size is less than the available cache.  Thus each transfer
+after the first will be read from cache on one end and written into cache on
+the other.  Depending on the cache architecture, a write to main memory may
+not occur on the receiving end during the transfer loop.
+
+While the performance measurements obtained from this method are certainly 
+useful, it is also interesting to use the -I switch to measure performance 
+when data is read from and written to main memory.  In order to facilitate 
+this, large pools of memory are allocated at startup, and each n-byte transfer 
+comes from a region of the pool not in cache.  Before each series of n-byte 
+transfers, every byte of a large dummy buffer is individually accessed in 
+order to flush the data for the transfer out of cache.  After this step, the 
+first n-byte transfer comes from the beginning of the large pool, the second 
+comes from n-bytes after the beginning of the pool, and so on (note that stride
+between n-byte transfers will depend on the buffer alignment setting).  In this
+way we make sure each read is coming from main memory.
+
+On the receiving end data is written into a large pool in the same fashion 
+that it was read on the transmitting end.  Data will first be written into 
+cache.  What happens next depends on the cache architecture, but one case is 
+that no transfer to main memory occurs, YET.  For moderately large block 
+sizes, however, a large number of transfer iterations will cause reuse of 
+cache memory.  As this occurs, data in the cache location to be replaced must 
+be written back to main memory, so we incur a performance penalty while we 
+wait for the write.
+
+In summary, using the -I switch gives worst-case performance (i.e. all data
+transfers involve reading from or writing to memory not in cache) and not
+using the switch gives best-case performance (i.e. all data transfers involve
+only reading from or writing to memory in cache).  Note that other combinations,
+such as reading from memory in cache and writing to memory not in cache, would
+give intermediary results.  We chose to implement the methods that will measure
+the two extremes.
+
+Changes needed
+--------------
+
+ - we need to replace the getrusage stuff from version 2.4 with a dummy
+   workload
+

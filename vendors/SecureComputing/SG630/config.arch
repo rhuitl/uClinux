@@ -1,0 +1,38 @@
+############################################################################
+#
+# Vendor specific settings
+#
+
+ifeq ($(ROOTDIR)/boot,$(wildcard $(ROOTDIR)/boot))
+VENDOR_TOPDIRS = boot
+endif
+
+#Get the version.
+include $(ROOTDIR)/vendors/$(CONFIG_VENDOR)/config.version
+
+# To override the vendor-global version do something like:
+# VERSIONPKG = 2.3.5u1
+
+HW_VENDOR	= SnapGear
+HW_PRODUCT	= SnapGearPCI630
+LINUXTARGET	= vmlinux
+
+############################################################################
+
+CPUFLAGS          = -m4 -ml
+VENDOR_CFLAGS     = -DCONFIG_SNAPGEAR
+GLIBC_TARGET_OPTS = --host=sh4-linux --enable-static-nss
+
+############################################################################
+
+include $(ROOTDIR)/vendors/config/sh/config.arch
+
+RELFILES += images/configs.tar.gz
+
+############################################################################
+
+ifdef UCLINUX_BUILD_BOOT
+	MISC  = -DCONFIG_CPU_SH4_7751R
+endif
+
+############################################################################

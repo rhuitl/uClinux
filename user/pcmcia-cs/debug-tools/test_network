@@ -1,0 +1,199 @@
+#!/usr/bin/perl
+
+$| = 1; # Don't buffer output
+
+sub indent
+{
+    my($str) = @_;
+    $str =~ s/\n(.)/\n  \1/g;
+    return "  $str";
+}
+
+sub irq_count
+{
+    my($irq) = @_;
+    my($s) = `grep " $irq:" /proc/interrupts`;
+    return $1 if ($s =~ /^ +\d+:\s+(\d+)/);
+}
+
+sub cvt_addr
+{
+    my($addr) = @_;
+    $addr =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/;
+    return ($1<<24)+($2<<16)+($3<<8)+$4;
+}
+
+sub checkout
+{
+    my($dev,$driver,$card) = @_;
+    
+    print "\nChecking network interface $dev ($driver driver):\n\n";
+    
+    $log = `dmesg | grep $dev | tail`;
+    if ($log) {
+	print "  Kernel messages for $dev:\n", indent($log), "\n";
+    }
+    
+    $conf = `/sbin/ifconfig $dev`;
+    $conf =~ s/\n$//;
+    print "  Current ifconfig settings:\n", indent($conf), "\n";
+
+    @line = split(/\n/, $conf);
+    ($x,$ipaddr,$bcast,$netmask) = split(/ [a-zA-Z ]+:/, $line[1]);
+    $ip = cvt_addr($ipaddr);
+    $bc = cvt_addr($bcast);
+    $nm = cvt_addr($netmask);
+    if ((($bc | $nm) != 0xffffffff) || (($ip & $nm) != ($bc & $nm))) {
+	print "  The broadcast address and netmask are inconsistent!\n";
+    }
+
+    if ($conf !~ /Mask/) {
+	print "  The interface is not configured!\n";
+    } elsif ($conf !~ /RUNNING/) {
+	print "  The interface is not running!\n";
+    } else {
+	print "  The interface is configured and running.\n";
+    }
+
+    $irq = $1 if ($conf =~ /Interrupt:(\d+)/);
+    @rx = split(/ [a-zA-Z ]+:/, $1) if ($conf =~ /RX(.*)\n/);
+    @tx = split(/ [a-zA-Z ]+:/, $1) if ($conf =~ /TX(.*)\n/);
+    shift(@rx); shift(@tx);
+    $rx_ok = ($rx[0] > 5*($rx[1]+$rx[2]+$rx[3]+$rx[4])+1);
+    $tx_ok = ($tx[0] > 5*($tx[1]+$tx[2]+$tx[3]+$tx[4])+1);
+    $rx_any = $rx[0]+$rx[1]+$rx[2]+$rx[3]+$rx[4];
+    $tx_any = $tx[0]+$rx[1]+$rx[2]+$rx[3]+$rx[4];
+
+    if ($conf =~ /RUNNING/) {
+	if ($rx_ok && $tx_ok) {
+	    print "  RX and TX traffic both look ok.\n";
+	} elsif ($rx_ok) {
+	    print "  RX looks ok, but there seems to be a TX problem.\n";
+	} elsif ($tx_ok) {
+	    print "  TX looks ok, but there seems to be an RX problem.\n";
+	} elsif ($rx_err+$tx_err > 1) {
+	    print "  RX and TX traffic both look bad.\n";
+	} else {
+	    print "  There hasn't been any traffic on this interface!\n";
+	}
+    }
+
+    $addr = ""; $dflt = "";
+    open(RT, "route -n |");
+    while (<RT>) {
+	chop; @s = split;
+	$dflt = $s[7] if ($s[0] eq "0.0.0.0");
+	next if (!/$dev/);
+	if ($s[1] ne "0.0.0.0") {
+	    print "\n  There is a route to a gateway at $s[1].\n";
+	    if ($s[1] eq $ipaddr) {
+		print "  Your gateway address is set to your IP address!\n";
+	    } else {
+		$addr = $s[1];
+	    }
+	    last;
+	}
+    }
+    close(RT);
+
+    if ($addr eq "") {
+	if ($dflt ne "") {
+	    print "\n  Your default route is pointed to interface $dflt.\n";
+	} else {
+	    print "\n  You have not configured a gateway or default route.\n";
+	}
+	while (1) {
+	    print "\n  Enter a numeric IP address to ping: ";
+	    $addr = <STDIN>; chop($addr);
+	    if ($addr !~ /^\d+\.\d+\.\d+\.\d+$/) {
+		print "  That is not a valid address!\n";
+	    } elsif ($addr eq $ipaddr) {
+		print "  Sorry, pinging yourself is not informative!\n";
+	    } elsif (system("/sbin/ifuser $dev $addr")) {
+		print "  There is no route to $addr through $dev!\n";
+	    } else {
+		last;
+	    }
+	}
+    }
+
+    print "\n  Pinging $addr ...";
+    $start = irq_count($irq);
+    open(PING, "ping -c 1 $addr|");
+    $rx = 0;
+    while (<PING>) {
+	if (/(\d) packets received/) {
+	    $rx = $1;
+	    last;
+	}
+    }
+    close(PING);
+    $stop = irq_count($irq);
+    print (($rx) ? " response received!\n" : " timed out!\n");
+    print "  The device interrupt ";
+    print (($stop - $start) ? "seems" : "does not seem");
+    print " to be incrementing normally.\n";
+}
+
+foreach $f ("/var/state/pcmcia/stab", "/var/lib/pcmcia/stab",
+	    "/var/run/stab") {
+    if (-f $f) {
+	$stab = $f; last;
+    }
+}
+if (!$stab) {
+    print "Socket status file (stab) not found!  Is PCMCIA running??\n";
+    exit 1;
+}
+
+$net = `cat /etc/pcmcia/network 2>/dev/null`;
+$opts = `cat /etc/pcmcia/network.opts`;
+$rh = "/etc/sysconfig/network-scripts/ifcfg-eth0";
+print "PCMCIA network settings are coming from ";
+if ($net =~ /ifup / || $opts =~ /ifup /) {
+    print "linuxconf.\n";
+    print "  $rh does not exist!\n" if (!-e $rh);
+} else {
+    print "/etc/pcmcia/network.opts.\n";
+    if (!$opts) {
+	print "    /etc/pcmcia/network.opts is empty??\n";
+    } elsif (($opts !~ /\w+=[^\n]*y/) && ($opts !~ /IPADDR[^\n]*\d/)) {
+	print "    /etc/pcmcia/network.opts is not configured??\n";
+    }
+    print "  $rh also exists??\n" if (-e $rh);
+}
+
+
+$ns = 0;
+open(IN, $stab);
+while ($_ = <IN>) {
+    chop;
+    if (/^Socket (\d+): (.*)/) {
+	($sock,$card) = ($1,$2);
+    } else {
+	@f = split;
+	next if ($f[1] ne "network");
+	$ns++;
+	checkout($f[4], $f[2], $card);
+    }
+}
+close(IN);
+
+exit 0 if ($ns);
+
+print "No PCMCIA network interfaces are configured.\n";
+
+$s = `cat $stab`;
+open(IN, "/sbin/cardctl ident |");
+while (<IN>) {
+    $sock = $1 if (/^Socket (\d+)/);
+    if (/function: 6/) {
+	print "\nThere is a network device in socket $sock:\n";
+	$tag = $1 if ($s =~ /Socket $sock: ([^\n]+)/);
+	print "  $tag\n";
+    }
+}
+close(IN);
+
+$log = `dmesg | grep '_c[bs]:' | tail`;
+print "\nKernel messages from client drivers:\n", indent($log) if ($log);

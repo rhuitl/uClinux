@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# chkconfig: 345 81 19
+# description: ulogd is the userspace logging daemon for netfilter/iptables
+#
+
+
+. /etc/rc.d/init.d/functions
+
+
+function start()
+{
+	printf "Starting %s: " "ulogd"
+	daemon /usr/sbin/ulogd -d
+	echo
+	touch /var/lock/subsys/ulogd
+}
+
+
+function stop()
+{
+	printf "Stopping %s: " "ulogd"
+	killproc ulogd
+	echo
+	rm -f /var/lock/subsys/ulogd
+}
+
+
+function reload()
+{
+	pid=`pidof ulogd`
+	if [ "x$pid" != "x" ]; then
+		kill -HUP $pid 2>/dev/null
+	fi
+	touch /var/lock/subsys/ulogd
+}
+
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+	stop
+	start
+	;;
+  reload)
+	reload
+	;;
+  status)
+	status ulogd
+	;;
+  *)
+	printf "Usage: %s {start|stop|status|restart|reload}\n" "ulogd"
+	exit 1
+esac
+
+exit 0

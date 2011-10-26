@@ -1,0 +1,152 @@
+Hi,
+
+This is a preliminary and not really well tested patch to make FAS 2.12.0
+support the BSD/SunOS/Linux ioctl()s for reading and setting the serial
+control and status lines. The ioclt()s in question are TIOCMSET, TIOCMGET, 
+TIOCMBIC, TIOCMBIS.
+
+Due to lack of O/S support, programs need to include <sys/fas.h> if they
+want to use these features, and will miserably fail if they try to access
+a non-FAS-controller serial port with them. (Exception: Digiboards, they
+have this stuff as well, in <sys/digi.h>, identical definitions).
+
+Patching is straightforward - install FAS as usual, make sure that it
+works, go to the FAS source directory, run this through "patch -p1",
+recompile with "make", "make install", and build a new kernel.
+
+gert
+------------------------------------------------------------------
+
+
+diff -u +recursive fas-2.12-original/fas.c fas-2.12.1G/fas.c
+--- fas-2.12-original/fas.c	Sat Oct  5 17:22:51 1996
++++ fas-2.12.1G/fas.c	Sat Oct 12 22:23:02 1996
+@@ -976,11 +976,11 @@
+ 	for (unit = 0; unit < fas_physical_units; ++unit)
+ 		(void) printcfg ("fas", fas_port [unit], 7,
+ 					fas_vec [unit], -1,
+-					"unit=%d type=%c release=2.12.0",
++					"unit=%d type=%c release=2.12.1G",
+ 					unit, port_stat [unit]);
+ #else
+ 	port_stat [unit] = '\0';
+-	(void) printf ("\nFAS 2.12.0 async driver: Unit 0-%d init state is [%s]\n\n",
++	(void) printf ("\nFAS 2.12.1G async driver: Unit 0-%d init state is [%s]\n\n",
+ 			unit - 1,
+ 			port_stat);
+ #endif
+@@ -1620,6 +1620,7 @@
+ 	unchar	cpbyte;
+ #endif
+ 	int	old_level;
++	uint	ipint, i_msr, i_mcr;
+ 
+ 	fip = fas_internals_ptr [GET_UNIT (dev)];
+ 	ttyp = fip->tty;
+@@ -1969,6 +1970,67 @@
+ 			}
+ 			break;
+ #endif
++		case TIOCMGET:			/* get RS232 lines */
++			old_level = SPLINT ();
++			i_msr = FAS_FIRST_INB (fip, MDM_STATUS_PORT);
++			i_mcr = FAS_FIRST_INB (fip, MDM_CTL_PORT);
++			(void) splx (old_level);
++
++			ipint = (( i_mcr & MC_SET_DTR ) ? TIOCM_DTR : 0) |
++				(( i_mcr & MC_SET_RTS ) ? TIOCM_RTS : 0) |
++				(( i_msr & MS_CTS_PRESENT ) ? TIOCM_CTS : 0) |
++				(( i_msr & MS_DSR_PRESENT ) ? TIOCM_DSR : 0) |
++				(( i_msr & MS_RING_PRESENT) ? TIOCM_RI  : 0) |
++				(( i_msr & MS_DCD_PRESENT ) ? TIOCM_CAR : 0);
++
++			printf( "\nFAS: TIOCMGET: i_mcr=%x, i_msr=%x, returning int %x\n", i_mcr, i_msr, ipint);
++			if (copyout (&ipint, arg.iparg, sizeof ipint)
++				== -1)
++			{
++			    u.u_error = EFAULT;
++			    break;
++			}
++			break;
++
++		case TIOCMSET:		/* set RS232 status lines (RTS,DTR) */
++		case TIOCMBIC:
++		case TIOCMBIS:
++			if (copyin (arg.iparg, &ipint, sizeof ipint)
++					== -1)
++			{
++				u.u_error = EFAULT;
++				break;
++			}
++			if ( ipint & ~(TIOCM_RTS|TIOCM_DTR) )
++			{
++				u.u_error = EINVAL;
++				break;
++			}
++
++			i_mcr = ((ipint & TIOCM_DTR) ? MC_SET_DTR : 0) |
++				((ipint & TIOCM_RTS) ? MC_SET_RTS : 0);
++
++			printf( "\nFAS: TIOCMSET/BIS/BIC: i_mcr=%x\n", i_mcr);
++
++			old_level = SPLINT ();
++			switch( cmd )
++			{
++			    case TIOCMSET:	/* set all lines */
++				MCR = (MCR & ~(MC_SET_DTR|MC_SET_RTS)) | i_mcr;
++				break;
++			    case TIOCMBIS:	/* set some lines to 1 */
++				MCR |= i_mcr;
++				break;
++			    case TIOCMBIC:	/* set some lines to 0 */
++				MCR &= ~i_mcr;
++				break;
++			}
++
++			FAS_FIRST_OUTB (fip, MDM_CTL_PORT, MCR);
++
++			(void) splx (old_level);
++			break;
++
+ 		default:	/* default ioctl processing */
+ 			/* If it is a TCSETA* command, call fas_param ().
+ 			   There is a bug in ttiocom with TCSELE. It
+diff -u +recursive fas-2.12-original/fas.h fas-2.12.1G/fas.h
+--- fas-2.12-original/fas.h	Sat Oct  5 17:22:51 1996
++++ fas-2.12.1G/fas.h	Sat Oct  5 17:42:54 1996
+@@ -608,6 +610,32 @@
+ #define VPC_SERIAL_INFO		AIOCINFO
+ #define VPC_SERIAL_OUT		AIOCSERIALOUT
+ #define VPC_SERIAL_IN		AIOCSERIALIN
++
++/* ioctl calls to set/read modem status/control lines */
++#ifndef TIOCMSET
++
++/* taken from OSR5 header files, thanks to Robert Lipe (robertl@arnet.com) */
++# define TIOCGSID        (TIOC|122)      /* get session id of tty */
++
++# define TIOCMSET        (tIOC|26)       /* set modem bits */
++# define TIOCMBIS        (tIOC|27)       /* set specified modem bits */
++# define TIOCMBIC        (tIOC|28)       /* clear specified modem bits */
++# define TIOCMGET        (tIOC|29)       /* get modem bits */
++
++/* from Linux header files */
++# define TIOCM_LE        0x001
++# define TIOCM_DTR       0x002
++# define TIOCM_RTS       0x004
++# define TIOCM_ST        0x008
++# define TIOCM_SR        0x010
++# define TIOCM_CTS       0x020
++# define TIOCM_CAR       0x040
++# define TIOCM_RNG       0x080
++# define TIOCM_DSR       0x100
++# define TIOCM_CD        TIOCM_CAR
++# define TIOCM_RI        TIOCM_RNG
++
++#endif
+ 
+ /* serial in/out requests */
+ 
+Only in fas-2.12.1G: fas.o
+Only in fas-2.12.1G: fas.s
+ 

@@ -1,0 +1,61 @@
+#!/bin/sh
+
+srcdir=$1
+OBJDIR=$2
+dirs=$3
+
+if [ "${OBJDIR}/Makefile" = "${srcdir}/Makefile" ]
+then
+	echo "failed. ${OBJDIR} == ${srcdir}"
+	exit 1
+fi
+
+mkdir -p ${OBJDIR}
+OBJDIRTOP=`(cd ${OBJDIR};pwd)`
+
+if [ -f "${OBJDIRTOP}/Makefile" ]
+then
+    : echo "Will not overwrite ${OBJDIRTOP}/Makefile"
+else
+	echo 'srcdir='${srcdir}/ 		 >${OBJDIRTOP}/Makefile
+	echo 'OBJDIR='${OBJDIR}                 >>${OBJDIRTOP}/Makefile
+	echo 'OBJDIRTOP='${OBJDIRTOP}           >>${OBJDIRTOP}/Makefile
+	echo 'VPATH+=${srcdir}' 		>>${OBJDIRTOP}/Makefile
+	echo 'OSDEP='${OSDEP}                   >>${OBJDIRTOP}/Makefile
+	echo 'BUILDENV='${BUILDENV}             >>${OBJDIRTOP}/Makefile
+	echo 'OPENSWANSRCDIR='${srcdir}         >>${OBJDIRTOP}/Makefile
+	echo 'include ${srcdir}Makefile.top'   >>${OBJDIRTOP}/Makefile
+
+	echo 'programs install clean checkprograms:: ' >>${OBJDIRTOP}/Makefile
+	echo '	@for d in $(SUBDIRS) ; \'                                >>${OBJDIRTOP}/Makefile
+	echo '	do \'                                                    >>${OBJDIRTOP}/Makefile
+	echo '		(cd $$d && $(MAKE) OPENSWANSRCDIR=${OPENSWANSRCDIR} $@ ) || exit 1; \'  >>${OBJDIRTOP}/Makefile
+	echo '	done; '                                                  >>${OBJDIRTOP}/Makefile
+fi
+
+
+find $dirs -name Makefile -print | (cd ${OBJDIR}; while read file
+do
+	dirname=`dirname $file`
+	dsrcdir=${srcdir}/${dirname}
+	mkdir -p $dirname
+
+	if [ -f ${dirname}/Makefile ]
+	then
+	    : echo "Will not overwrite ${dirname}/Makefile"
+	else
+		echo 'srcdir='${dsrcdir}/ 		 >${dirname}/Makefile
+		echo 'OBJDIR='${OBJDIR}                 >>${dirname}/Makefile
+		echo 'OBJDIRTOP='${OBJDIRTOP}           >>${dirname}/Makefile
+		echo 'OSDEP='${OSDEP}                   >>${dirname}/Makefile
+		echo 'BUILDENV='${BUILDENV}             >>${dirname}/Makefile
+		echo 'VPATH+=${srcdir}' 		>>${dirname}/Makefile
+		echo 'OPENSWANSRCDIR='${srcdir}         >>${dirname}/Makefile
+		echo 'include ${srcdir}Makefile'       >>${dirname}/Makefile
+	fi
+done
+)
+
+
+
+

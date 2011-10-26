@@ -1,0 +1,274 @@
+*
+* RCSID $Id: ji_setup.txt,v 1.6 1999/04/06 04:54:23 rgb Exp $
+*
+
+[Here is JI's setup.  This document is OBSOLETE (rgb, May 6, 1998) but is
+included for historical purposes and the concepts are still relevant
+although commands and syntax have changed significantly.
+
+Here is a simplified view of JI's testbed:
+
+
+    +-------+						    +-------+
+    |  elf  |						    |  del  |
+    +---*---+						    +---*---+
+   eth1 * 10.1.0.145      	        		    ef1 * 10.3.0.140
+	*							*
+    *************************               *************************
+			*			*
+                   eth1 * 10.1.0.143       eth2 * 10.3.0.139
+                    +---*---+	            +---*---+
+                    |  fir  |               |  ice  |
+                    +---*---+               +---*---+
+		   eth2 * 10.2.0.143       eth1 * 10.2.0.139
+			*			*	
+		    *********************************
+
+
+In case you are wondering, all machines are connected to the same
+"main" network with their eth0 interfaces, but this is irrelevant to
+the examples, and hence not shown in the diagram.
+
+Only fir and ice need to run IPSEC. 
+
+All netmasks are 255.255.0.0.
+
+Elf has a route to 10.3.xx.xx via fir, and del has a route to
+10.1.xx.xx via ice. 
+
+fir and ice know how to route only to their connected subnets; fir
+does not (yet) know how to get to 10.3.xx.xx, and ice does not know how to
+get to 10.1.xx.xx. 
+
+First, let us set up fir. 
+
+
+Now, ipsec0 needs to be associated with a real interface. In our case,
+we shall associate it with the interface on the 10.2.0.0 subnet, that
+is, eth2, because that's where IPSEC'ed traffic will flow. Then we
+need to configure the new pseudo interface. Because
+there is already a route to subnet 10.2.0.0 using eth2, we also need
+to remove than and let the ipsec0 interface handle it:
+
+	fir# tncfg attach ipsec0 eth2
+	fir# ifconfig ipsec0 10.2.0.143 netmask 255.255.0.0 
+	fir# route del 10.2.0.0
+	fir# route add -net 10.2.0.0 netmask 255.255.0.0 dev ipsec0
+
+On ice, just load the module.
+
+2.1. Transport Mode.
+
+Let us have fir and ice communicate securely, using the latest and
+greatest IPSEC transform: triple-DES with replay protection and
+96-bits of MD5 hash.
+
+Issue the following command, which tells fir to process packets
+originating with it and destined for ice by applying a transform
+defined by destination address 10.2.0.139 (ice) and SPI 125
+
+	fir# addrt 10.2.0.143 255.255.255.255 10.2.0.139 255.255.255.255 \
+ 		10.2.0.139 125
+
+To verify it has worked, type:
+
+	fir# cat /proc/net/ipsec-rt
+
+you should get:
+
+	(10.2.0.143/255.255.255.255 -> 10.2.0.139/255.255.255.255) =>
+		(10.2.0.139, 0x00000115)
+
+To set the actual Security Association, type:
+
+	fir# setsa 10.2.0.139 125 esp 3des-md5-96 i \
+		 1000000000000001 6630663066303132
+
+And type the same thing on ice, so it will know how to decrypt packets:
+
+	ice# setsa 10.2.0.139 125 esp 3des-md5-96 i \
+		 1000000000000001 6630663066303132
+
+If you ping ice from fir, and look at the traffic on the wire, you'll
+see that packets from fir to ice are encrypted (and authenticated),
+while packets from ice to fir are in the clear. Needless to say, you
+can set up a symmetric set of transforms on ice and fir,
+repspectively, so that the reverse traffic is also encrypted.
+
+2.2. Tunnel mode.
+
+Now, we want to set up fir so that packets from elf to del will be
+tunneled through the (fir->ice) tunnel. The first step is to set up a
+route to net 10.3.xx.xx through the ipsec0 interface:
+
+
+	fir# route add -net 10.3.0.0 netmask 255.255.0.0 dev ipsec0 gw
+10.2.0.139
+
+[ To understand what this does, remember that we "attached" eth2 to
+ipsec0; the route is set up so that packets will be routed through
+ice, but they will first pass through the ipsec0 interface; then, when
+they have been processed, they will be passed on to the attached
+interface and delivered to the next-hop specified in the gw parameter
+in the route command. ]
+
+Now, issue the following command:
+
+	fir# addrt 10.1.0.0 255.255.0.0 10.3.0.0 255.255.0.0 10.2.0.139 103
+
+To verify it has worked, type:
+
+	fir# cat /proc/net/ipsec-rt
+
+you should get:
+
+(10.1.0.0/255.255.0.0 -> 10.3.0.0/255.255.0.0) => (10.2.0.139, 0x00000103)
+
+
+This means that packets originating from net 10.1.xx.xx and destined
+for net 10.3.xx.xx should be IPSEC-processed, with a "Destination
+Address" of 10.2.0.139 and a "Security Parameters Index" of 103. The
+Destination Address indicates the other point of the tunnel, whether
+it is a real tunnel (as in this case), or simply the destination (in
+what we call "transport mode" which doesn't quite work yet). The
+Security Parameters Index, or SPI, is an opaque value that indicates,
+along with the DA, what processing these packets will receive at our
+end as well as the remote end. The pair (DA, SPI) is called a SAID
+(Security Association IDentifier) in this document.
+
+We now want to tell the IPSEC code what the processing for packets
+which have been selected to be processed with DA=10.2.0.139 and
+SPI=103. First, they will be encapsulated in simple IP-in-IP (proto 4)
+encapsulation, and to enable that we type:
+
+	fir# setsa 10.2.0.139 103 ip4 10.2.0.143 10.2.0.139
+
+This tells the IPSEC code that packets which have been selected to be
+processed with DA=10.2.0.139 and SPI=103 should be run through algorithm
+1 (IP-in-IP), with "outer" (encapsulating packet) source and
+destination addresses of 10.2.0.143 (fir) and 10.2.0.139 (ice)
+respectively. Type
+	
+	fir# cat /proc/net/ipsec-spi
+
+to verify that the SAID has been formed. You should get
+
+(10.2.0.139, 00000103, 1: [10.2.0.143 -> 10.2.0.139])
+
+So far so good, but we've simply reproduced already existing
+functionality. Now, let's add security. First, we'll tell the code to
+encrypt packets using the ESP-DES-CBC transform. We'll create another
+SAID, this time for algorithm 4 (ESP-DES-CBC).
+
+	fir# setsa 10.2.0.139 105 esp des-cbc 66306630 6630663066303132
+
+This tells the IPSEC layer that packets destined to be processed with
+DA=10.2.0.139, SPI=105, should be processed with algorithm #4
+(ESP-DES-CBC), use 0x66306630 as the DES-CBC Initialization Vector,
+and use 0x6630663066303132 as the DES key (the DES parity bits are
+ignored, so this yields the 56-bit DES key). 
+
+Finally, we also want to authenticate the resulting packet, so we
+create another SAID, this time for the AH-MD5 transform:
+
+	fir# setsa 10.2.0.139 106 ah md5 66306630663031326630663066303132
+
+Now comes the crucial step. What the original addrt command did was to
+establish that outgoing packets are to be processed with IP-in-IP
+encapsulatino first. Now, we need to "link" this transform (IPIP) to the ESP
+transform and then the AH. We do that with the spigrp ("group SPIs")command:
+
+	fir# spigrp 10.2.0.139 103 10.2.0.139 105 10.2.0.139 106
+
+Now, we also need to specify what will happen when we receive
+packets. IP-in-IP does not need any special handling. ESP and AH,
+however, need the SAIDs to be established. We use the same commands we
+used for the outgoing packets, but specifying ourselves as the
+destination (of course). 
+
+	fir# setsa 10.2.0.143 115 esp des-cbc 66306630 6630663066303132
+	fir# setsa 10.2.0.143 116 ah md5 66306630663031326630663066303132
+
+To see the whole picture, type:
+	fir# cat /proc/net/ipsec-spi
+	(10.2.0.143, 00000116, 2: klen = 16, alen = 16)
+	(10.2.0.143, 00000115, 4: ivlen = 4, iv = 66 30 66 30)
+	(10.2.0.139, 00000106, 2: klen = 16, alen = 16)
+	(10.2.0.139, 00000105, 4: ivlen = 4, iv = 66 30 66 30)
+	(10.2.0.139, 00000103, 1: [10.2.0.143 -> 10.2.0.139])
+
+On ice, now, we have to send things up the opposite way. Here are the
+commands to use:
+
+	ice# ifconfig ipsec0 10.2.0.139 netmask 255.255.0.0
+	ice# route add -net 10.1.0.0 netmask 255.255.0.0 dev ipsec0
+
+	ice# addrt 10.3.0.0 255.255.0.0 10.1.0.0 255.255.0.0 10.2.0.143 113
+	ice# setsa 10.2.0.143 113 ip4 10.2.0.139 10.2.0.143
+	ice# setsa 10.2.0.143 115 esp des-cbc 66306630 6630663066303132
+	ice# setsa 10.2.0.143 116 ah md5 66306630663031326630663066303132
+
+	ice# spigrp 10.2.0.143 113 10.2.0.143 115 10.2.0.143 116
+
+	ice# setsa 10.2.0.139 105 esp des-cbc 66306630 6630663066303132
+	ice# setsa 10.2.0.139 106 ah md5 66306630663031326630663066303132
+
+	ice# cat /proc/net/ipsec-rt 
+	(10.3.0.0/255.255.0.0 -> 10.1.0.0/255.255.0.0) => (10.2.0.143, 0x00000113)
+	ice# cat /proc/net/ipsec-spi 
+	(10.2.0.143, 00000116, 2: klen = 16, alen = 16)
+	(10.2.0.143, 00000115, 4: ivlen = 4, iv = 6f 30 66 30)
+	(10.2.0.143, 00000113, 1: [10.2.0.139 -> 10.2.0.143])
+	(10.2.0.139, 00000106, 2: klen = 16, alen = 16)
+	(10.2.0.139, 00000105, 4: ivlen = 4, iv = 66 30 66 30)
+
+If you ping del from elf, ICMP packets will leave elf, reach fir, get
+encapsulated in IPIP, encrypted with DES and authenticated with MD5,
+tunneled to ice, get decapsulated, and then sent to del; the return
+packets will follow the inverse path.
+
+For completeness, let us show part of the routing tables on all four machines:
+
+fir# netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+<my-home-net>   0.0.0.0         255.255.255.128 U     0      0       32 eth0
+10.1.0.0        0.0.0.0         255.255.0.0     U     0      0        2 eth1
+10.2.0.0        0.0.0.0         255.255.0.0     U     0      0        3 eth2
+10.3.0.0        0.0.0.0         255.255.0.0     U     0      0        2 ipsec0
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        4 lo
+
+ice# netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+<my-home-net>   0.0.0.0         255.255.255.128 U     0      0       10 eth0
+10.2.0.0        0.0.0.0         255.255.0.0     U     0      0        1 eth1
+10.3.0.0        0.0.0.0         255.255.0.0     U     0      0        2 eth2
+10.1.0.0        0.0.0.0         255.255.0.0     U     0      0        1 ipsec0
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        1 lo
+
+elf$ netstat -r -n
+Kernel routing table
+Destination     Gateway         Genmask         Flags Metric Ref Use    Iface
+<my-home-net>   0.0.0.0         255.255.255.128 U     0      0       11 eth0
+10.1.0.0        0.0.0.0         255.255.0.0     U     0      0        1 eth1
+10.3.0.0        10.1.0.143      255.255.0.0     UG    0      0        1 eth1
+127.0.0.0       0.0.0.0         255.0.0.0       U     0      0        1 lo
+
+del$ netstat -r -n
+<...>
+Destination      Gateway            Flags     Refs     Use  Interface
+10.1/16          10.3.0.139         UGS         0      613  ne1
+10.3/16          link#1             UC          0        0  ne1
+<...>
+
+(del is a BSD machine).
+
+
+*
+* $Log: ji_setup.txt,v $
+* Revision 1.6  1999/04/06 04:54:23  rgb
+* Fix/Add RCSID Id: and Log: bits to make PHMDs happy.  This includes
+* patch shell fixes.
+*
+*

@@ -1,0 +1,77 @@
+#!/usr/bin/perl -w
+
+# $Id: faxview.th,v 1.1 1998/08/31 20:25:37 gert Exp $
+# Program for handling gziped and tarred g3 files
+#
+# use together with "new_fax.th"
+#
+# Torsten Hilbrich <Torsten.Hilbrich@gmx.net>
+
+# The FAX viewer
+my $viewer="/opt/kde/bin/kfax";
+
+# First let's define a function that determines the filetype
+sub type($) 
+{
+  my $file = shift;
+
+  open TYPE, "file \"$file\"|"
+    or die "Could not exec file for $file";
+  my @ret = <TYPE>;
+  close TYPE;
+
+  return join "", @ret;
+}
+	
+# A temp directory 
+my $tmp = "/tmp/faxview-$$";
+mkdir $tmp, 0755
+  or die "Unable to create temp directory $tmp";
+
+# The array files contains all files to be viewed
+my @files;
+
+# Step through the command line argument
+my $file;
+foreach $file (@ARGV) {
+  # Ignore non existing and unreadable files
+  -f $file && -r $file or next;
+
+  my $steps = 0;
+  $steps++;
+  # Check for gzip compressed files
+  if(type($file) =~ /compressed/) {
+    my $newname = "$tmp/gzip-$steps";
+    system("gzip -dc \"$file\" > \"$newname\"") == 0
+      or die "Unable to unzip $file into $tmp";
+    $file = $newname;
+    redo;
+  }
+  if(type($file) =~ /tar/) {
+    my $tempdir = "$tmp/tar-$steps";
+    mkdir $tempdir, 0755
+      or die "Unable to create temp directory $tempdir";
+    chdir $tempdir;
+    # Extract the file right here
+    system("tar xf \"$file\"") == 0
+      or die "Problem while unpacking tar archive $file";
+    # Add these files to @files
+    open READ, "tar tf \"$file\"|"
+      or die "Unable to read tar archive $file";
+    while(<READ>) {
+      chop($_);
+      push @files, $_;
+    }
+    close READ;
+    next;
+  }
+  push @files, $file;
+}
+
+system($viewer, @files) == 0
+  or die "Problem while calling the fax viewer $viewer";
+
+END {
+  defined $tmp and
+    system("rm -fr \"$tmp\"");
+}

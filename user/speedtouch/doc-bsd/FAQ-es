@@ -1,0 +1,144 @@
+Francois Rogler, francois@rogler.org, 26/10/2001
+Last update : $Id: FAQ-es,v 1.1 2002/07/02 11:37:19 edgomez Exp $
+
+
+
+                         Manejador Speedtouch USB para *BSD
+                           Preguntas Hechas Frecuentemente
+
+--------------------------------------------------------------------------------
+
+el kernel no añade el modem
+modem_run o pppoa2 no encuentran el modem
+tazas por debajo de lo que deberian ser
+modem no se conecta en la primera conexión
+manejador no compila cuando escribo make
+
+--------------------------------------------------------------------------------
+
+Problema : modem no es encontrado por el kernel
+
+Solución : revise que la opción 'Assign IRQ to USB' esté activada en su bios
+           y que Not PnP OS esté seleccionado.
+
+--------------------------------------------------------------------------------
+
+Problema : modem_run o pppoa2 no logran encontrar el modem
+
+Solución : Este problema puede ser debido a varias causas.
+
+1. revise que su modem sea encontrado por su kernel.
+Deberia encontrarlo en su dmesg :
+            ugen0: ALCATEL Speed Touch USB , rev 1.10/0.00, addr 2
+tambien podria ser ugen1 o ugen2 o ... dependiendo del hardware usb conectado.
+
+2. revisa que todas las entradas se crearon en /dev :
+ a. Si tiene varias controladoras usb, podria necesitar crear entradas para usb1
+    (o usbX donde X es un número)
+    cd /dev && ./MAKEDEV usbX (donde X es el numero de la controladora)
+ b. Si tiene varios dispositivos usb conectados, podria necesitar crear entradas
+    para ugen1 (o ugenX donde X es un número).
+    cd /dev && ./MAKEDEV ugenX 
+    ugenX debe ser el mismo que tiene en su dmesg.
+
+3. Si modem_run todavia no logra ubicar el modem, entonces podria especificarlo
+   en la linea de comando con la opción : -d /dev/ugenX (ugenX sigue siendo 
+   el mismo que usted creó justo antes y tambien el mismo en el dmesg)
+
+   sugerencia : No olvide añadir '-d /dev/ugenX' en la linea pppoa2 en ppp.conf
+
+   ejemplo : # modem_run -v 1 -m -d /dev/ugen0 -f /usr/local/libdata/mgmt.o
+   y en ppp.conf : device !"pppoa2 -vpi 8 -vci 35 -d /dev/ugen0"
+
+--------------------------------------------------------------------------------
+
+Problema : tazas por debajo de lo que deberian ser.
+
+Solución : Puede incrementar el numero de mbufs compilando un nuevo kernel con
+           un valor aumentado de `maxusers' y/o NMBCLUSTERS.
+           Tambien podria cambiar NMBCLUSTERS con kern.ipc.nmbclusters.
+
+Explicación : El manejador usa demasiados mbufs, y a veces se queda sin mbufs.
+              Esto es un fallo del manejador y estamos tratando de corregirlo.
+
+Ejemplo :
+añada la linea siguiente en /boot/loader.conf :
+kern.ipc.nmbclusters="4096"
+
+o juegue con estos valores en su kernel :
+maxusers        32
+options         NMBCLUSTERS=4096
+
+--------------------------------------------------------------------------------
+
+Problema : modem no se conecta en la primera conexión.
+
+Solución : conectese una segunda vez.
+
+Explanation : Ese es otro fallo en el manejador, en algunos casos, pppoa2 no
+              se bifurca bien.
+
+--------------------------------------------------------------------------------
+
+Problema : la conexión está bien pero no puedo accesar ningun sitio.
+
+Solución : 2 posibles errores :
+Primero, una pequeña prueba para ver si la conexion esta bien. Intente hacer
+ping a el computador donde usted está conectado.
+ejemplo:
+`ifconfig tun0' muestra :
+tun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1500
+        inet6 fe80::2e0:18ff:fe90:9b25%tun0 prefixlen 64 scopeid 0x7 
+        inet 8.1.1.10 --> 8.1.1.1 netmask 0xffffff00 
+        Opened by PID 666
+Entonces intente : `ping 8.1.1.1'
+
+Si el ping funciona, entonces su conexión esta bien y solo tiene un pequeño
+problema de configuración con su red. De lo contrario, su conexión no funciona,
+revise sus bitácoras ppp y pppoax.
+
+* Revise su DNS en /etc/resolv.conf
+  deberia verse como : 
+nameserver xxx.xxx.xxx.xxx
+
+
+* Revise que su tabla de ruteo este bien : `netstat -rn'
+  Si su tabla de ruteo predeterminada no apunta hacia el computador donde se
+está conectando, puede especificar la ruta predeterminada manualmente con :
+`route add default' then the IP of the remote host
+ejemplo : `route add default 8.1.1.1'
+
+Tambien puede forzar ppp a cambiar la ruta predeterminada cambiando ppp.conf :
+`add default HISADDR' by `add! default HISADDR'
+
+--------------------------------------------------------------------------------
+
+Problema : Manejador no compila cuando escribo `make' y obtengo el siguiente
+           mensaje :
+   "Makefile", line 10: Could not find speedtouch.tmpl
+   make: fatal errors encountered -- cannot continue
+
+Solución : escriba primero : `./configure' luego `make'
+
+Explicación : No leyó cuidadosamente las notas de INSTALL
+
+--------------------------------------------------------------------------------
+
+Problema : No puedo encontrar las bitácoras de pppoa2 y de modem_run
+
+Solución : Necesita añadir alsunas lineas a /etc/syslog.conf o desactivar esta
+           functionalidad
+
+Para syslog.conf, puede añadir las lineas siguientes (FreeBSD) :
+!pppoa2
+*.*                                             /var/log/pppoa2.log
+!modem_run
+*.*                                             /var/log/modem_run.log
+
+Creo que es diferente para OpenBSD (y NetBSD) pues deberia encontrar la
+bitácora en /var/log/messages
+
+Para desactivar syslog con el manejador, necesita hacer :
+./configure --enable-syslog=no
+luego ``make'' y ``make install'' como de costumbre.
+

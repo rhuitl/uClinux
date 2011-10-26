@@ -1,0 +1,75 @@
+.TH g32pbm 1 "27 Oct 93" "greenie" "mgetty+sendfax manual"
+.IX g32pbm
+.SH NAME
+g32pbm \- convert a Group 3 fax file into a portable bitmap
+.SH SYNOPSIS
+.B g32pbm
+.RB [ -reversebits ]
+.RB [ -stretch ]
+.RI [ g3file ]
+.SH DESCRIPTION
+Reads a Group 3 fax file (raw or digifax) as input. If no filename is
+given, stdin is used.
+.IX "Group 3 fax"
+.IX fax
+Produces a portable bitmap as output.
+.SH OPTIONS
+.TP
+.B -r
+Tells
+.I g32pbm
+to interpret bits least-significant
+first, instead of the default most-significant first ("-reversebits").
+Some fax modems do it one way and others do it the other way. If you get
+a whole bunch of "invalid code" messages (nearly one per line), try using
+this flag.
+.TP
+.B -s
+Double each horizontal row of the fax file in the pbm file ("-stretch)".
+You can use this to adjust the aspect ratio of a "normal resolution" fax
+file to match that of a "fine resolution" fax file.  This might not seem
+like it belongs here, but it's 
+.I much
+faster than using pnmscale|pgmtopbm later.
+.B -s 
+is activated automatically if the file is specified on the command 
+line and its name starts with "fn..." (fax/normal).
+.TP
+.B -l(aserjet)
+Instead of a portable bitmap (PBM), output HP laserjet files, suitable for
+direct printing on a HP laserjet or desjket.
+.TP
+.B -d <dpi>
+Scale output to <dpi> dots per inch before printing. Normal FAX resolution
+is 204x196 dpi (fine mode), or 204x98 dpi (normal mode). In LaerJet mode,
+only the values 75, 150 and 300 are allowed for <dpi>.
+.TP
+.B -t
+turn image by 90 degrees clockwise. Multiple -t commands increase angle,
+that is, -t -t will turn it upside down, and so on.
+.TP
+.B -?
+Print a short command syntax.
+.SH REFERENCES
+The standard for Group 3 fax is defined in CCITT Recommendation T.4.
+.SH BUGS
+.I g32pbm
+could be smarter about the image width, at the moment, the maximum width
+is 1728 pixels, and the maximum height is 4300 lines. Everything bigger is
+just cut off.
+
+Only 'raw' pbm files are created.
+
+Scaling is too slow.
+
+Turning is too slow (and not yet fully implemented either).
+.SH "SEE ALSO"
+pbm2g3(1), pbm(5), g3cat(1), sendfax(8), mgetty(1)
+.SH AUTHOR
+.I g32pbm
+is Copyright (C) 1993 by Gert Doering, <gert@greenie.muc.de>. It is
+similar to the
+.I g3topbm
+program in Jef Poskanzers
+.I pbmplus
+package, but it's a complete re-write. No code is copied.

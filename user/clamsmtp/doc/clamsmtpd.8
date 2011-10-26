@@ -1,0 +1,213 @@
+.\" 
+.\" Copyright (c) 2004, Nate Nielsen
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without 
+.\" modification, are permitted provided that the following conditions 
+.\" are met:
+.\" 
+.\"     * Redistributions of source code must retain the above 
+.\"       copyright notice, this list of conditions and the 
+.\"       following disclaimer.
+.\"     * Redistributions in binary form must reproduce the 
+.\"       above copyright notice, this list of conditions and 
+.\"       the following disclaimer in the documentation and/or 
+.\"       other materials provided with the distribution.
+.\"     * The names of contributors to this software may not be 
+.\"       used to endorse or promote products derived from this 
+.\"       software without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+.\" "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
+.\" FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
+.\" COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
+.\" INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+.\" BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS 
+.\" OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
+.\" AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+.\" OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF 
+.\" THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH 
+.\" DAMAGE.
+.\" 
+.\"
+.\" CONTRIBUTORS
+.\"  Nate Nielsen <nielsen@memberwebs.com>
+.\"
+.Dd September, 2004
+.Dt clamsmtpd 8
+.Os clamsmtp 
+.Sh NAME
+.Nm clamsmtpd
+.Nd an SMTP server for scanning viruses via clamd
+.Sh SYNOPSIS
+.Nm
+.Op Fl d Ar level
+.Op Fl f Ar configfile
+.Op Fl p Ar pidfile
+.Nm 
+.Fl v
+.Sh DESCRIPTION
+.Nm
+is an SMTP filter that allows you to check for viruses using the ClamAV
+anti-virus software. It accepts SMTP connections and forwards the SMTP commands
+and responses to another SMTP server. 
+.Pp
+The DATA email body is intercepted and scanned before forwarding. By default email 
+with viruses are dropped silently and logged without any additional action taken.
+.Pp
+.Nm
+aims to be lightweight and simple rather than have a myriad of options. The options
+it does have are configured by editing the 
+.Xr clamsmtpd.conf 5
+file. See the man page for 
+.Xr clamsmtpd.conf 5
+for more info on the default location of the configuration file.
+.Sh OPTIONS
+Previous versions had more options. These still work for now but have equivalents in 
+.Xr clamsmtpd.conf 5 
+and are not documented here. The options are as follows. 
+.Bl -tag -width Fl
+.It Fl d 
+Don't detach from the console and run as a daemon. In addition the 
+.Ar level
+argument specifies what level of error messages to display. 0 being 
+the least, 4 the most.
+.It Fl f 
+.Ar configfile 
+specifies an alternate location for the 
+.Nm
+configuration file. See 
+.Xr clamsmtpd.conf 5
+for more details on where the configuration file is located by default.
+.It Fl p
+.Ar pidfile
+specifies a location for the a process id file to be written to. This file 
+contains the process id of 
+.Nm 
+and can be used to stop the daemon.
+.It Fl v
+Prints the clamsmtp version number and exits.
+.El
+.Sh LOGGING
+.Nm
+logs to 
+.Xr syslogd 
+by default under the 'mail' facility. You can also output logs to the console
+using the 
+.Fl d 
+option.
+.Sh LOOPBACK FEATURE
+In some cases it's advantageous to consolidate the virus scanning and filtering 
+for several mail servers on one machine. 
+.Nm
+allows this by providing a loopback feature to connect back to the IP that an 
+SMTP connection comes in from. 
+.Pp
+To use this feature specify only a port number (no IP address) for the 
+.Ar OutAddress
+setting in the configuration file. This will cause 
+.Nm
+to pass the email back to the said port on the incoming IP address.
+.Pp
+Make sure the 
+.Ar MaxConnections
+setting is set high enough to handle the mail from all the servers without refusing
+connections. 
+.Sh TRANSPARENT PROXY FEATURE
+A transparent proxy is a configuration on a gateway that routes certain types of 
+traffic through a proxy server without any changes on the client computers. 
+.Nm
+has support for transparent proxying of SMTP traffic by enabling the 
+.Ar TransparentProxy
+setting. This type of setup usually involves firewall rules which redirect traffic to 
+.Nm 
+and the setup varies from OS to OS. The SMTP traffic will be forwarded to it's 
+original destination after being scanned. 
+.Pp
+When doing transparent proxying for outgoing email it's probably a good idea to 
+turn on bounce notifications using the
+.Ar Bounce
+setting. Also note that some features (such as SSL/TLS) will not be available
+when going through the transparent proxy. 
+.Pp
+Make sure that the
+.Ar MaxConnections 
+setting is set high enough for your transparent proxying. Because 
+.Nm 
+is not being used as a filter inside a queue, which usually throttles the amount
+of email going through, this setting may need to be higher than usual. 
+.Sh VIRUS ACTIONS
+Using the 
+.Ar VirusAction
+option you can run a script or program whenever a virus is found. This may 
+be handy in certain circumstances but it has several drawbacks. For one, the 
+performance of the virus filtering will take a hit, perhaps DOS'ing your 
+machine under heavy load. Secondly as with running any program there are 
+security implications to be considered. 
+.Pp
+.Please consider the above carefully before implementing a virus action. 
+.Pp
+The script is run without its output being logged, or return value being 
+checked. Because of this you should test it thoroughly. Make sure it runs
+without problems under the user that 
+.Xr clamsmtpd 8
+is being run as. 
+.Pp
+Various environment variables will be present when your script is run. You 
+may need to escape them properly before use in your favorite scripting 
+language. Failure to do this could lead to a REMOTE COMPROMISE of your 
+machine.
+.Bl -tag -width Fl
+.It Ar CLIENT
+The network address of the SMTP client connected.
+.It Ar EMAIL
+When the
+.Ar Quarantine
+option is enabled, this specifies the file that the virus was saved to.
+.It Ar RECIPIENTS
+The email addresses of the email recipients. These are specified one per 
+line, in standard address format. 
+.It Ar SENDER
+The email address for the sender of the email. 
+.It Ar SERVER
+The network address of the SMTP server we're connected to.
+.It Ar TMPDIR
+The path to the temp directory in use. This is the same as the 
+.Ar TempDirectory
+option. 
+.It Ar VIRUS
+The name of the virus found.
+.El
+.Sh SECURITY
+There's no reason to run this daemon as root. It is meant as a filter and should
+listen on a high TCP port. It's probably a good idea to run it using the same 
+user as the 
+.Xr clamd 8
+daemon. This way the temporary files it writes are accessible to 
+.Xr clamd 8
+.Pp
+Care should be taken with the directory that 
+.Nm
+writes its temporary files to. In order to be secure, it should not be a world
+writeable location. Specify the directory using the 
+.Ar TempDirectory
+setting.
+.Pp
+When using the 
+.Ar VirusAction
+option make sure you understand the security issues involved. Unescaped 
+environment variables can lead to execution of arbitrary shell commands 
+on your machine.
+.Pp
+If running 
+.Nm
+on a publicly accessible IP address or without a firewall please be sure to 
+understand all the possible security issues. This is especially true if the 
+loopback feature is used (see above).
+.Sh SEE ALSO
+.Xr clamsmtpd.conf 5
+.Xr clamd 8 ,
+.Xr clamdscan 1 
+.Sh AUTHOR
+.An Nate Nielsen Aq nielsen@memberwebs.com

@@ -1,0 +1,128 @@
+#!/bin/sh
+# IPsec startup and shutdown script
+# Copyright (C) 1998, 1999, 2001  Henry Spencer.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: setup,v 1.110 2001/06/20 15:55:13 henry Exp $
+#
+# ipsec         init.d script for starting and stopping
+#               the IPsec security subsystem (KLIPS and Pluto).
+#
+# This script becomes /etc/rc.d/init.d/ipsec (or possibly /etc/init.d/ipsec)
+# and is also accessible as "ipsec setup" (the preferred route for human
+# invocation).
+#
+# The startup and shutdown times are a difficult compromise (in particular,
+# it is almost impossible to reconcile them with the insanely early/late
+# times of NFS filesystem startup/shutdown).  Startup is after startup of
+# syslog and pcmcia support; shutdown is just before shutdown of syslog.
+#
+# chkconfig: 2345 47 68
+# description: IPsec provides encrypted and authenticated communications; \
+# KLIPS is the kernel half of it, Pluto is the user-level management daemon.
+
+me='ipsec setup'		# for messages
+
+
+
+if test " $IPSEC_DIR" = " "	# if we were not called by the ipsec command
+then
+	# we must establish a suitable PATH ourselves
+	PATH=/usr/local/sbin:/sbin:/usr/sbin:/usr/local/bin:/bin:/usr/bin
+	export PATH
+fi
+
+# Check that the ipsec command is available.
+found=
+for dir in `echo $PATH | tr ':' ' '`
+do
+	if test -f $dir/ipsec -a -x $dir/ipsec
+	then
+		found=yes
+		break			# NOTE BREAK OUT
+	fi
+done
+if ! test "$found"
+then
+	echo "cannot find ipsec command -- \`$1' aborted" |
+		logger -s -p daemon.error -t ipsec_setup
+	exit 1
+fi
+
+# Pick up IPsec configuration (until we have done this, successfully, we
+# do not know where errors should go, hence the explicit "daemon.error"s.)
+# Note the "--export", which exports the variables created.
+eval `ipsec _confread --varprefix IPSEC --export --type config setup`
+if test " $IPSEC_confreadstatus" != " "
+then
+	echo "$IPSEC_confreadstatus -- \`$1' aborted" |
+		logger -s -p daemon.error -t ipsec_setup
+	exit 1
+fi
+IPSECsyslog=${IPSECsyslog-daemon.error}
+export IPSECsyslog
+
+# misc setup
+umask 022
+
+
+
+# do it
+case "$1" in
+  start|--start|stop|--stop|_autostop|_autostart)
+	if test " `id -u`" != " 0"
+	then
+		echo "permission denied (must be superuser)" |
+			logger -s -p $IPSECsyslog -t ipsec_setup 2>&1
+		exit 1
+	fi
+	tmp=/var/run/ipsec_setup.st
+	(
+		ipsec _realsetup $1
+		echo "$?" >$tmp
+	) 2>&1 | logger -s -p $IPSECsyslog -t ipsec_setup 2>&1
+	st=`cat $tmp`
+	rm -f $tmp
+	exit $st
+	;;
+
+  restart|--restart)
+	$0 stop
+	$0 start
+	;;
+
+  _autorestart)			# for internal use only
+	$0 _autostop
+	$0 _autostart
+	;;
+
+  status|--status)
+	ipsec _realsetup $1
+	exit
+	;;
+
+  --version)
+	echo "$me $IPSEC_VERSION"
+	exit 0
+	;;
+
+  --help)
+	echo "Usage: $me {--start|--stop|--restart|--status}"
+	exit 0
+	;;
+
+  *)
+	echo "Usage: $me {--start|--stop|--restart|--status}" >&2
+	exit 2
+esac
+
+exit 0

@@ -1,0 +1,191 @@
+begin
+	comment
+		the serpinski (sp?) curve. a simple demo...
+	;
+
+	integer n, h0;
+
+	n := 2;		comment  recursion deep ;
+	h0 := 32;	comment  'window' width / height (power of 2) ;
+
+	begin
+
+	integer i, h, x, y, x0, y0;
+	integer peny, penx;
+	Boolean array scr [0 : h0, 0 : h0];
+
+        procedure serp;
+	begin
+		i := 0;	 h := h0 / 4;
+		x0 := 2 * h;  y0 := 3 * h;
+		
+	doloop:
+		i  := i  + 1;
+		x0 := x0 - h;
+		h  := h  / 2;
+		y0 := y0 + h;
+		x  := x0;
+		y  := y0;
+		setpen;
+		A (i);  x := x + h;  y := y - h;  movepen;
+		B (i);  x := x - h;  y := y - h;  movepen;
+		C (i);  x := x - h;  y := y + h;  movepen;
+		D (i);  x := x + h;  y := y + h;  movepen;
+
+		if i < n then
+			goto doloop
+
+	end;
+
+	procedure A (i);
+	value i;
+	integer i;
+	begin
+		if i > 0 then begin
+			A (i-1);  x := x + h;  y := y - h;  movepen;
+			B (i-1);  x := x + 2 * h;  movepen;
+			D (i-1);  x := x + h;  y := y + h;  movepen;
+			A (i-1)
+		end
+	end;
+
+
+	procedure B (i);
+	value i;
+	integer i;
+	begin
+		if i > 0 then begin
+			B (i-1);  x := x - h;  y := y - h;  movepen;
+			C (i-1);  y := y - 2 * h;  movepen;
+			A (i-1);  x := x + h;  y := y - h;  movepen;
+			B (i-1)
+
+		end
+	end;
+
+	procedure C (i);
+	value i;
+	integer i;
+	begin
+		if i > 0 then begin
+			C (i-1);  x := x - h;  y := y + h;  movepen;
+			D (i-1);  x := x - 2 * h;  movepen;
+			B (i-1);  x := x - h;  y := y - h;  movepen;
+			C (i-1)
+
+		end
+	end;
+
+	procedure D (i);
+	value i;
+	integer i;
+	begin
+		if i > 0 then begin
+			D (i-1);  x := x + h;  y := y + h;  movepen;
+			A (i-1);  y := y + 2 * h;  movepen;
+			C (i-1);  x := x - h;  y := y + h;  movepen;
+			D (i-1)
+
+		end
+	end;
+	
+	procedure setpen;
+	begin
+		penx := x;
+		peny := y
+	end;
+
+
+	procedure xline (y, x, dx);
+	value y, x, dx; integer y, x, dx;
+	begin
+		integer i;
+
+		for i := 0 step 1 until dx do
+			scr [y, x + i] := true
+	end;
+
+	procedure yline (x, y, ny);
+	value x, y, ny; integer x, y, ny;
+	begin
+		integer j;
+		for j := 0 step 1 until ny do
+			scr [y + j, x] := true
+	end;
+
+	procedure drline (y1, x1, y2, x2);
+	value y1, x1, y2, x2; integer y1, x1, y2, x2;
+	begin
+		integer i, j, dx, dy;
+		real sy, sx, y, x;
+
+		dy := y2 - y1;  dx := x2 - x1;
+
+		if abs (dy) > abs (dx) then begin
+			sy := sign (dy);  
+			sx := sign (dx) * abs (dx / dy)
+		end
+		else begin
+			sy := sign (dy) * abs (dy / dx);
+			sx := sign (dx)
+		end;
+
+		y := y1;  x := x1;
+	doloop:
+		scr [y, x] := true;
+		y := y + sy;  x := x + sx;
+
+		if (y1 <= y2 and y <= y2)
+			or (y1 >= y2 and y >= y2)
+			or (x1 <= x2 and x <= x2)
+			or (x1 >= x2 and x >= x2) then goto doloop
+	end;
+
+	procedure movepen;
+	begin
+		integer procedure min (x, y);
+		value x, y; integer x, y;
+			if x < y then min := x
+			else min := y;
+
+		if penx = x then
+			yline (x, min (y, peny), abs (y - peny))
+		else if peny = y then
+			xline (y, min (x, penx), abs (x - penx))
+		else
+			drline (peny, penx, y, x);
+
+		penx := x;
+		peny := y
+	end;
+
+	comment
+		This is the main program:
+	;
+
+	begin
+		integer i, j;
+
+		comment  cleanup the screen ;
+	
+		for j := 0 step 1 until h0 do
+			for i := 0 step 1 until h0 do
+				scr [j, i] := false;
+
+		serp;
+
+		comment  print the screen ;
+
+		for j := 0 step 1 until h0 do begin
+			for i := 0 step 1 until h0 do
+				if scr [j, i] then
+					write ("##")
+				else
+					write ("  ");
+			outsymbol (1, "\n", 0)
+		end
+	end
+	end
+end
+
+

@@ -1,0 +1,55 @@
+#! /bin/sh
+# make symlinks to alternate names for manpages
+
+PATH=/bin:/usr/bin ; export PATH
+usage="$0 mandir manpage ..."
+
+if test ! -e $1
+then
+	echo "$0: directory \`$1' does not exist, aborting" >&2
+	exit 1
+fi
+cd $1 || {
+	echo "$0: cannot cd \`$1', aborting" >&2
+	exit 1
+}
+shift
+
+for m
+do
+	if test ! -f $m
+	then
+		echo "$0: cannot find \`$m'" >&2
+		exit 1
+	fi
+	suf=$(expr $m : '.*\([.][^.][^.]*\)$')
+
+	# a .\"+ line rules
+	them=$(awk '/^\.\\"\+[ 	]/ { for (i = 2; i <= NF; i++) print $i }' $m)
+
+	# otherwise, try to intuit the list of names from the NAME section
+	if test " $them" = " "
+	then
+		them=$(	awk '/^\.SH[ \t]+NAME/,/^\.SH[ \t]+[^N]/' $m |
+			egrep -v '^\.' | tr '	,' '  ' |
+			sed -n '/  *\\*-  *.*/s///p' | tr -s ' ' '\012' |
+			egrep -v '^ipsec$' )
+	fi
+
+	# do it
+	for f in $them
+	do
+		case $f in
+		ipsec*)	ff="$f"		;;	# ipsec.8, ipsec.conf.5, etc.
+		*)	ff="ipsec_$f"	;;
+		esac
+		case $ff in
+		*.[1-8])			;;
+		*)		ff="$ff$suf"	;;
+		esac
+		if test " $ff" != " $m"
+		then
+			ln -f -s $m $ff
+		fi
+	done
+done

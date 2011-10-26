@@ -1,0 +1,718 @@
+Major changes between version 0.15 and 0.16.
+--------------------------------------------
+* Minor fix for keepalive and outfill options, so diald will compile
+  on boxes without them.
+
+* Fixes to broken routing failues. The 0.15 fix for spurious routing
+  failures went a bit too far.
+
+* Minor fixes to dctrl layout for consistency.
+
+* Fixes to the -pppd-options option. This _should_ work now.
+
+Major changes between version 0.14 and 0.15.
+--------------------------------------------
+* Rolled in keepalive and outfill options for SLIP. Thanks to
+  Jonathan I. Kamens for these patches. See the diald manual page
+  for a bit more information.
+
+* Rolled in changes for ethernet device mode. Used by the isdn4linux
+  people. See the manual page under the "-m" option for further
+  information. Also look in contrib/isdn4linux.
+  I don't have the contrib stuff documented properly yet.
+  Someone from the isdn4linux camp want to give me a hand?
+
+* Changes to deal with conflicts between diald's timer_list structure
+  and a structure of the same name in the kernel sched.h include file.
+
+* Bug fix for spurious routing failure messages.
+  It was caused by multiple attempts to do rerouting. Rerouting
+  only happens once now. WARNING: This change may cause a small
+  window in which no route exists when using rerouting on
+  kernels that do not support metrics. (Pre-1.3.X, for some X.
+  I've forgotten which X this is.)
+
+* New "window" option for setting TCP routine window sizes.
+
+* Added new route-wait option. This option causes diald to wait for
+  a packet from the remote side to cross a newly established link 
+  before declaring it up. This is useful on systems that don't establish
+  a return route until a RIP packet gets sent across the link.
+  On such systems any packets sent before the routing packet is
+  sent from the remote side go into the black hole of packet routing.
+  [The annex at my old U of T site does this. If there is justice
+   in the world no other people well ever need this option.]
+
+* Changes to fix further CPU hogging problems when using the fifo option.
+
+* The ip-up and ip-down scripts are now run in the background.
+  Also added some commentary to the documentation and FAQ indicating that
+  the user must be sure that any add-route and del-route scripts return
+  as soon as possible, since they hold up diald while they run.
+
+* Fixed a bug that caused diald to issue the warning
+  "PPP network layer died, but link did not. Probable configuration error."
+  without cause.
+
+* Changes to the dctrl script, a man page describing dctrl.
+  No more need to configure dctrl by editing the script, it
+  takes command line options now. Neat features to embed a
+  mini status monitor into a FVWM Goodstuff toolbar, or a
+  a Bowman/Afterstep Wharf.
+
+* Changes to the monitor fifo command to allow monitoring of selected
+  messages. Backwards compatible, so older usage remains the same.
+  This is intended to be used by a future version of the dctrl
+  program to selectivly choose to monitor only parts of the state.
+  This needs to be documented. It is not used by any programs at this
+  time.
+
+* Run time configuration of almost everything that used to be configured
+  at compile time in config.h. The only exception is the location of
+  the main configuration files /etc/diald.conf and
+  /usr/lib/diald/diald.defs.
+
+* Don't close a monitor output fifo on a write error, just start
+  loosing the data instead. This is the correct thing to do because
+  a monitoring process that is too slow will cause the pipe buffers
+  to overflow, and thus lead to write errors. We don't want this to
+  result in killing the monitoring connection.
+
+* Make metrics on routing a bit more realistic. We now use 0 for
+  the real link and 1 for the proxy link. This is enough for the
+  proxy link to take precedence.
+
+Major changes between version 0.13 and 0.14.
+--------------------------------------------
+* Added code to use the new kernel interface for packet forwarding
+  in kernels after 1.3.75. If you are using a version of diald compiled
+  with kernel includes from an earlier kernel, you will have to recompile
+  diald to activate this code. Sorry, the kernel interface has changed
+  and I need the more recent include files from the kernel to get
+  things right for the current 1.3.X kernels. This means I can't
+  avoid the need to recompile diald unless I decide to put one of the
+  include files from 1.3.X into the diald distribution.
+  [Versions of diald compiled under kernels > 1.3.75 seem to work
+   fine on 1.2.13 kernels (for those people who run both bleeding
+   edge and stable kernels on their systems.)]
+
+* Added in code to deal with the possibility of pppd shutting down
+  the network layer without shutting down the link. This should
+  not happen normally. In fact if it is happening, then it probably
+  indicates a problem with pppd, or your service providers ppp
+  implementation. This is just in case code. If the link layer
+  dies diald will notice, issue an error message, and wait for
+  it come back up. If it does not come back after 60 seconds it will
+  kill pppd.
+
+* Added in support for multiple simultaneous monitor outputs.
+
+* Minor changes so that diald doesn't become a CPU hog on linux-1.3.81
+  and later kernels. The problem was a change in the sematics of
+  select() on named pipes.
+
+* Fixed a bug that caused diald to go into an infinite loop if
+  there were no free devices available.
+
+* Added in code to attempt automatic MTU adjustments when PPP
+  negotiates an MTU that does not match the request. This issues
+  a warning message in the system logs since it is not really
+  supported by the kernel. The main reason for this code is to
+  make it clear to the user that the MTU needs to be changed
+  by issuing a really noisy error message.
+
+Major changes between version 0.12 and 0.13.
+--------------------------------------------
+
+* The directory structure of the distribution has changed a little.
+  There are now several subdirectories:
+
+  bin		- distributed scripts.
+  contrib	- contributed utilities.
+  config	- distributed configuration files.
+  doc		- documentation for diald.
+  patches	- patches for other software that may be needed
+		  be diald is being used.
+
+* Removed the direct use of <asm/byteorder.h> so that diald can 
+  be compiled on older systems (e.g. linux-1.59) that don't define this.
+
+* Magic to get rid of the need to define PPP_VERSION_2_2_0 (or not).
+  Diald no longer needs to know which version is compiled into
+  the kernel.
+
+* Fixed a bug in the implementation of the "reroute" option.
+
+* Added an option to implement logarithmic backoff on the
+  timeout for redialing attempts. See "redial-backoff-start"
+  and "redial-backoff-limit" in the manual page.
+
+* Added an option to limit the number of consecutive failed
+  attempts to make a connection that diald will allow. When
+  the limit is exceeded diald will block further connections
+  until an "unblock" command is issued on the command FIFO.
+  This is intended to prevent diald from going nuts at an
+  unattended site and ringing up a giant phone bill
+  when the maching on the other end of the modem is just
+  answering and doing nothing.
+
+* Fixed a minor problem on the manual page where it said that proxyarp
+  could not be done directly by diald. It can now.
+
+* Fixed a bug where proxyarp.c would not compile with pppd-2.1.2d on
+  the system.
+
+* Fixed it so that the ip-down script only gets run if the interface
+  was actually up. It used to get run if diald attemped to dial out and
+  failed.
+
+* Fixed spurious error messages about various commands failing.
+  This was due to a bad interaction between diald's signal handling
+  and the libc implementation of system(). Diald no longer uses
+  the libc system() call.
+
+* Added metrics to the routes generated by diald. This won't
+  cause any changes on machines running 1.2.x kernels, but
+  it fixes a problem on 1.3.x kernels that can cause TCP
+  connections to get killed if a packet retransmit happens
+  to occur between the time a link gets trashed and diald manages
+  to put the route to the proxy link back into place.
+  Note that this means there is now an extra parameter passed
+  to the "addroute" and "delroute" commands. See the manual
+  page for information on correctly using this information.
+
+* Added output for load information to the monitor information.
+  Changed dctrl to use this information.
+
+* Added a "dynamic" command to the FIFO commands. This command
+  takes two parameters, giving a local and a remote ip address.
+  It is intended for use with connect scripts that do some extra
+  work to figure out the dynamic ip addresses, so they can
+  pass that information back to diald. This will be most
+  useful to you if you must parse out the IP addresses and
+  then still issue a further command as part of your login sequence.
+  (Cases like this cannot be handled by the "dslip-mode" option).
+
+* Added a "message" command to the FIFO commands. This
+  just passes its input on as the output to the monitor
+  "messages" segment. It is intended to let connect scripts
+  send messages to the monitoring process for diald.
+  This allows connect scripts that inform the user of
+  progress and error conditions as part of the monitoring information.
+
+* Added output for "messages" to the monitor information.
+  See above for the "messages" FIFO command.
+
+* Added in a give-way option and better support
+  for the "two-way" operation mode. Diald will now always
+  allow an incoming connection, provided its outgoing link is
+  down, or it is in the process of closing its outgoing link.
+  If the "give-way" option is set, diald will allow an incoming
+  connection to be attempted, unless the link is currently up.
+  If diald is in the middle of a connection when the incoming 
+  request occurs, and "give-way" is set, it will abandon the
+  outgoing connection in favour of the incoming one.
+  Thanks to Oliver Jowett <oliver@sa-search.massey.ac.nz> for
+  providing the patches that implement these features.
+
+* Fixed the parsing of configuration files to deal with
+  quoted characters the same way that pppd does.
+  Also, added in quotes delimited by ' rather than ".
+
+* Lots of updates to the documentation.
+
+Major changes between version 0.11 and 0.12.
+--------------------------------------------
+
+* Completely rewrote the dctrl tool. This is the tk equivalent
+  of Gavin Hurlbut's <gjhurlbu@beirdo.uplink.on.ca> diald-top
+  package (an excelent tool that I recomend to you all).
+  Anyway, dctrl now has a cool graphical indicator to show the
+  state of your link in its icon. You can also issue any
+  of the FIFO commands directly to diald using dctrl, and
+  you can watch the state of your connection queue in a nice
+  scrollable graphic window.
+  Sorry, there's no manual page. Just run it It should
+  be obvious how to use it.
+  NOTE: You may want to edit the configurable parameters
+  at the start of the script that give the locations
+  for the diald control fifo and the diald monitor output fifo.
+
+* Finally got around to documenting the output of the monitor command.
+
+* Added in a "device <devname>" option as an alternative to 
+  specifying the device(s) for diald to use at the beginning
+  of the command line.
+  Diald will still work with the old syntax, but if you want
+  to put your device specifications into /etc/diald.conf
+  along with everything else, now you can run diald without
+  any command line arguments.
+  [Note: if you need to pass extra arguments on to pppd
+   (e.g. "-- 111.111.111.111:111.111.111.112"), you can
+   put these options into your /etc/ppp/options file to
+   avoid putting them on the diald command line. This
+   means diald can now always be run without any arguments
+   that might show someone running ps parts of your system configuration.]
+  [Thanks to "Robert Schouwenburg" <Rodos@RodosWorld.hacom.nl>
+   for the suggestion.]
+
+* Added in a new timeout "nodev-retry-timeout".
+  If diald fails to find a free device, it will wait a short
+  period before trying again. This used to be the same as
+  the "redial-timeout" parameter. Now you can control
+  them independently.
+
+* Added a "reset" command to the list of fifo commands.
+  This will cause diald reset its configuration options to the default
+  values and then reread its configuration files as well as reprocess
+  any command line arguments it might have been given.
+  WARNING: if your new configuration has errors the reset command
+  may cause diald to terminate with an error condition.
+  Ideally this should revert to the previous configuration if there
+  is an error in the new one, but that would require a much better
+  encapsulation of the configuration information that is currently
+  provided by the structure of diald's code.
+
+  NOTE: This hasn't had much testing. I'll be interested to hear how it works.
+
+* Intelegent connect/disconnect scripts that need to know what device they are
+  attempting to dial out on can now look at the environment variable
+  MODEM, which will contain the name of the device the connect/disconnect
+  script is attached to. Those of you who have different types of devices
+  that you want to be able to use with the same diald (say an ISDN modem 
+  with a propietary command set and a hayes compatiable modem as backup)
+  can now do so.
+
+* Added a new rules to the distributed diald.conf file
+  that try to deal with the possibility that an attempt to start
+  a TCP connection may be fail due to the target site being unreachable.
+  The idea is to keep the timeout for the connection from getting
+  too long if there is nothing on the other end to respond.
+  Look for the rule reading
+
+  accept tcp 15 tcp.syn
+
+  Even if you don't use the distributed diald.conf files I'd be
+  interested in hearing if this is a generally useful rule, and
+  if the timeout of 15 seconds I choose is perhaps too small for
+  general use.
+
+  Thanks to "Bryan A. Pendleton" <bp@bpdomain.access.one.net>
+  for asking the questions that lead me to think of this.
+
+* Added a few error messages in to describe what is happening when
+  various scripts fail. Hopefully this will help people with initial
+  configuration at least a little bit.
+
+* Fixed some bugs that caused diald to die if a monitoring program died
+  without shutting down the monitoring feature.
+  Part of this seems to be a bug deep down in the stdio functions.
+  I haven't tracked it down. I just stopped using stdio and the bug went away.
+  The other part was noticing that the other end of the pipe was gone
+  (SIGPIPE received) and closing down monitoring output.
+
+* Changed diald to take advantage of bind() calls for SOCK_PACKET
+  sockets in newer kernels. This means on recent 1.3.X kernels
+  diald won't see every packet that passes through your IP layer.
+  If you have a local ethernet then this will substantially reduce
+  the load that diald puts on your system.
+  If you are using an older kernel, then you won't see any change...
+
+* Complete rewrite of the internal handling of the tcp.live rules.
+  This was inspired by a bug fix from Wolfram Grolger.
+  After looking at his bug fix for a while I realized that the way
+  I was going about handling things just wouldn't stand up to a variety
+  of nasty conditions that could happen when packets were being lost
+  or TCP stacks on one end or the other of a connection where down.
+  Internally diald now watches for FIN packets AND for the
+  corresponding ACK packets going in both directions
+  before declaring a connection "dead". It is still possible
+  that diald can become confused if a link goes down and then
+  up again half way through a TCP connection shuting down, but the worst 
+  thing that can happen is that the connection is live a bit longer
+  than it might otherwise be. In any case, the circumstances
+  that could cause this should be extremly rare. Also, the only
+  possible fix requires potentially unbounded memory usage by diald.
+  I believe the new system is the best possible trade off, and I'll
+  continue to believe that until I think of a better one.
+
+* The bug with diald's interaction with kerneld seems to have
+  magically gone away. I assume due to changes in the latest versions
+  of kerneld. If you are having problems with the interaction between
+  kerneld and diald, please update your copy of kerneld.
+
+* Changed UNSAFE_ROUTING so that it can be controlled at run time,
+  rather than at compile time. See the new options "reroute" and
+  "-reroute" in the manual page. Note that the default setting
+  is still controlled from config.h at compile time. It can just
+  be adjusted at run time now.
+
+* Made sure that all failed attempts to execute an external program
+  are logged by diald. This might ease configuration problems for
+  new users.
+
+* Added a proxyarp routing option, mostly taken from pppd. I can't
+  test this, so both positive and negative reports about its status
+  are welcome.
+
+* Fixed the ip-up and ip-down options so that the scripts get
+  the arguments that the manual page says that they do.
+
+* Fixes to the diald-login script in the doc subdirectory.
+  Thanks to  Bruce Toback <btoback@netcom.com> for the fixes.
+
+Major changes between version 0.10 and 0.11.
+--------------------------------------------
+
+* Changed the way filter rules work to deal better with TCP
+  connection shutdowns. There are two main changes.
+
+  First before generating the connection ID diald will swap
+  the source and dest addresses if the source is numerically
+  larger than the dest. This has the effect of reducing all
+  connections to a cannonical ID, regardless of the direction
+  the data is really flowing.
+
+  Second, each TCP connection watches for RST and FIN packets
+  directly and keeps a variable tcp.live which is 0 only if
+  both ends of the connection have been shut down.
+  This seems to get around problems where one end shuts down
+  before the other, and then has to send some data after
+  the FIN packet because some packets got lost.
+
+  If you've been writing your own filter rules, you might
+  want to reread the relevant sections of the manual page
+  to see how the rules have changed.
+
+* Attemped to fix post connection fowarding to avoid
+  seeing ``old'' packets again on the packet filter.
+  Of course if replies come back right away, then
+  we just see the replies right away, but this
+  change just feels "right" to me.
+
+* Added "two-way" option for people who are using diald on
+  both ends of a demand dialed link. See the manual page for
+  more information.
+
+* Changed diald so that if a script or pppd goes zombie for some
+  reason it won't cause diald to die when it fails to reap the child.
+
+* Fixed a bug that caused diald to drop the connection after an
+  "up" rule expired, even if the connection was live.
+
+* Added a timeout for the code that waits for information on
+  dynamic slip connections.
+
+Major changes between version 0.9 and 0.10.
+-------------------------------------------
+
+* Fixed a bug in the buffering code that would cause diald
+  to seg fault and disappear in the middle of the night.
+
+* Fixed a bug that allowed diald to get confused about weather
+  or not pppd was still running.
+
+* Fixed a bug in the restrict statement interpretation that
+  caused diald to parse times with "00" in them as being
+  much later than intended.
+
+* Fixed a bug in the restrict timeout code that caused links to
+  come up as requested, but never go down.
+
+* Fixed a bug that caused diald to think "chat" failed when it didn't.
+
+* Added fifo options "forced/unforced". Issuing a "force" command
+  will bring the link up until an "unforced" command is issued.
+  After the unforced command the state of the link will float
+  up or down by the normal rules.
+
+* Added a primitive Tk graphical tool for monitoring diald.
+  See the file dctrl. You must have tcl/tk installed for to use this.
+
+* Some changes to allow diald to compile with libc-5.x.
+
+Major changes between version 0.8 and 0.9.
+------------------------------------------
+
+* Fixed bugs that prevented the FIFO options from working properly.
+
+* Fixed a bug in non-dynamic SLIP mode that made diald attempt to
+  get the dynamic address, even though it was not needed.
+
+* Added ip-up and ip-down script options. These serve the same
+  purpose as the ip-up and ip-down scritps in pppd, but work
+  for both slip and ppp mode. Also, unlike for pppd, these
+  scripts are not given hard-coded path names, you specify
+  the script name so different copies of diald can run different
+  scripts.
+
+* Fixed bug that caused diald to leave a litter of old point to
+  point routes around when running in dynamic mode, also fixed
+  a bug that causes diald to fail when used in dynamic mode
+  with UNSAFE_ROUTING turned off.
+
+* Fixed several bugs in the new zero overhead slip code that
+  caused it to fail if UNSAFE_ROUTING was turned off or if
+  any compress was used on the link.
+
+* Made a partial fix to failure to count transmitted bytes when
+  UNSAFE_ROUTING option is in use. There is no complete fix for both
+  SLIP and PPP without changes in the kernel. I could use the pppstats
+  structure to fix this for PPP. I have not done so yet.
+  In any case, the counts will be correct unless you are forwarding
+  packets from another machine across the demand dialed link.
+
+* Added the "rotate-devices" option, originally requested by
+  Chuck Mattern <cmattern@mindspring.com>. This causes diald
+  to rotate the list of possible devices by one each time it
+  attempts a call, thus preventing diald from getting stuck
+  if the first device in the list is damaged.
+
+* Added in BOOTP support for dynamic slip mode. See the man page
+  under dslip-mode and the config.h file setting for PATH_BOOTPC.
+
+Major changes between version 0.7 and 0.8.
+------------------------------------------
+
+* Changed the SLIP code to get rid of the major overhead of moving
+  packets from kernel space to user space and back to kernel space.
+  The overhead is now the same as for PPP (i.e. only on outgoing packets).
+  Also of note, in kernels after 1.3.13, it should be completely
+  safe to use the UNSAFE_ROUTING option. With this option
+  set there should be no overhead to using diald! (Thanks to Alan Cox
+  for getting this change into the kernel!)
+
+* Adding compile time options to make diald work with the PPP 2.2 beta
+  releases. Sorry, I can't see a way to make a compiled copy of diald
+  work with both ppp-2.1.2 and ppp-2.2, they've gone and changed the
+  kernel interface. I'll talk to Al Longyear about it, but I don't
+  really expect any miracles.
+
+* Added an "impulse" option to control link up time in larger time
+  units than a second. See the manual page.
+
+* Added a way to issue control commands to a running diald via a FIFO.
+  I've been meaning to do this for a while, but when 
+  Mike Jagdis <jaggy@purplet.demon.co.uk> sent me a patch that was a good
+  start on what I wanted. I plugged in bits of his patch and then ran with it.
+  See the "fifo" option on the man page for complete details.
+  The major bonus here is a way to get a running diald to attach
+  to a device that was opened by another program, for example by getty
+  in response to an incoming call. You can also block and unblock
+  diald's activity and issue all of the commands that can be issued
+  to diald with signals. As time goes on I'll probably add more commands
+  to this interaction channel.
+
+* Changed the syntax for the "restrict" command.
+  The command syntax is now
+  restrict <start-time> <end-time> <weekday> <day> <month>
+  the <weekday>, <day> and <month> parameters are still in the
+  crontab style format, but the <start-time> and <end-time>
+  are given in HH:MM:SS format. I think this allows better
+  specification of time ranges than the crontab format.
+  As a shortcut you can use "*" for either start or end time,
+  in which case they default to 00:00:00 and 23:59:59 respectively.
+
+* Changed the semantics of "accept" filters with timeout 0.
+  Timeout 0 used to mean that the accept rule behaved exactly
+  like and ignore rule. Timeout 0 now means to kill the matched
+  connection immediately.
+  ******* WARNING ********
+  This is an incompatible change! You must change all rules in your
+  /etc/diald.conf that have timeout 0 to ignore rule! For example,
+  the rule "accept tcp 0 tcp.fin" should become "ignore tcp tcp.fin".
+
+* Changed the timer code so that it should be immue to changes
+  in the wall clock. This should allow diald to be run along with
+  xntpd or other time adjusting protocols.
+
+* Added the BUFFER_PACKETS configuration option. If you define
+  this option diald will store packets that get sent when the link
+  is down and forward them once it manages to establish the link.
+  This should fix the response delay people see on the first
+  attempt at a telnet or rlogin when the link is down.
+  Note that if your connect takes a long time to start up you
+  might still want to muck with the kernel setting of TCP_SYN_RETRIES.
+
+* Added in pidfile option. Made diald write out it's pid to /var/run/diald.pid
+  by default. Be careful to use the pidfile option if you want
+  to run multiple copies of diald, or they will all write to /var/run/daild.pid.
+
+* Made diald re-open the modem line just before running the disconnect
+  script. This means those users who want to can use the disconnect
+  script to query the modem for state flags, e.g. to determine why
+  the connection was terminated.
+
+Major changes between version 0.6 and 0.7.
+------------------------------------------
+
+* Fixed routing so that when the connection goes down the
+  point to point route to the proxy device is restored.
+
+* Fixed minor bug in code to read dynamic IP address off the
+  banner send by dynamic SLIP. If the buffer has a non IP
+  address number in it, it used to be interpreted as an IP number.
+  Now it just gets skipped over.
+
+* Configuration parsing imposed an artificial limit on the size
+  of timeouts. The restriction has been removed. If you want
+  a 2^31-1 second timeout, now you can have it.
+
+* Added in UNSAFE_ROUTING configuration option. Using this
+  option eliminates the overhead of reading packets off the
+  proxy and forwarding them to the physical link by changing
+  all routes to point to the physical link while it is up.
+  Note without this option diald does not introduce an overhead on
+  incoming packets, only on going packets.
+
+  Be warned that I am not at all sure this option works safely.
+  I'd be interested to hear how it works for people, but don't
+  use it unless you are willing to chance TCP lockups.
+
+* Added time restrictions to filter rules. See the "restrict"
+  option in the man page.
+
+* Added four new classes of filter rules, and got rid of reject rules.
+  Accept rules are the same as before. I've added in "bringup",
+  "keepup" and "ignore" rules. I have also added the rules "up" and "down",
+  which force the link up or down during the currently applicable time
+  restriction. See the manual page for more information.
+
+* I have exchanged the meaning of SIGTERM and SIGINT as signals to diald.
+  SIGTERM now terminates diald and SIGINT now shuts down the link if
+  it is up. This is so diald will terminate cleanly on shutdown.
+
+* Changed accounting log code to open the file before each update,
+  and then close it again after the update. This allows atomic
+  rotation of the accounting logs without shutting down diald.
+  Look in the contrib directory for some interesting scripts that
+  process the accouting logs.
+
+Major changes between version 0.5 and 0.6.
+------------------------------------------
+
+* None
+
+Major changes between version 0.4 and 0.5.
+------------------------------------------
+
+* Fixed bugs in the options file parser that caused core dumps
+  when compiled as a QMAGIC executable.
+
+* Fixed various bugs in the timer code that caused early timeouts.
+
+* Fixed bugs in the filter code that caused IP packets to get ignored
+  when determining the idle timeout.
+
+Major changes between version 0.3 and 0.4.
+------------------------------------------
+
+* ANSIized the code. This caught a bunch of coding inconsistencies,
+  but did not result in any major changes. Things compile clean
+  with -Wall now.
+
+* Added in addroute and delroute script options to allow users to do local
+  routing work when diald starts and ends.
+
+* Added in primitive ability to use more than one device. diald searches
+  for an unlocked device on a list and uses that one. Note that it
+  will try to run the same connect script regardless of the device
+  it gets. This isn't really ideal. Eventually I'll have to rewrite
+  the option syntax to accommodate a proper modem server format.
+
+* Fixed modem locking bugs. You can all stop sending me messages
+  about this now.
+
+* Added in an option to allow diald to work with dynamic slip and ppp
+  addresses.
+
+* Added in an accounting log file. This is intended to record information
+  salient to getting charges reimbursed by an accounting department.
+  Check out the option "-accounting-log" in the man page.
+
+* Added a "netmask" option to diald, acts like "netmask" in pppd.
+
+* Changed name of "default" option to "defaultroute" to match pppd.
+
+* Fixed some more problems with the modem hanging for 30 seconds when
+  dialing went wrong, or some other process mucked up the modem device.
+
+* Rewrote the packet filtering code. The goal of the rewrite was a redesign
+  to accommodate a possible future move of the packet filtering code into
+  the kernel. This would allow diald to act as a firewall as well as a
+  dialer daemon. There are some minor user visible differences as a result.
+  The most notable is that the "filter" command has been replaced
+  with the commands "accept" and "reject". Note that the "reject" command
+  does not actually do anything yet, for now it is equivalent to an
+  accept command with timeout 0.  The other visible change is the
+  ability to define variable names and protocol rule names in the
+  configuration files. Note that diald does NOT yet actually act as 
+  a firewall, and will never do so without kernel modifications.
+
+* Added options to allow run time definition of variable names for
+  filter rules, as well as named protocol rules. As a result I have
+  moved the default definitions out of the code and into the file
+  /etc/diald.defs. This file is the first file read when diald starts.
+
+Major changes between version 0.2 and 0.3.
+------------------------------------------
+This is a bug fix release.
+
+* I think I finally tracked down the cause of those intermittent
+  modem "hangs" were the OS waited 30 seconds for some buffers to drain
+  before finishing a close. This problem should be gone.
+
+* Spelling fixes thanks to Hugues Lafarge <hugues@afp.com>.
+
+* Stupid bug that causes SLIP mode to hang up immediately fixed.
+  SLIP mode should actually work now.
+
+* Diald wasn't seeing SIGHUP's in SLIP mode. I forgot to set the
+  session group and controlling tty. Fixing this caused, pppd SIGHUP's
+  to break. The solution is to give pppd the controlling tty in fork
+  just before exec.
+
+* Added a "disconnect" script ala pppd. I don't need this myself,
+  but maybe someone out there will.
+
+Major changes between version 0.1 and 0.2.
+------------------------------------------
+diald has been almost completely rewritten (twice!) since the
+first release. There are many changes. Here are the high points:
+
+* The ppp-on script is no longer used. Diald will run a connect
+  script (chat works nicely) by itself, and then run pppd if needed.
+  This is so diald can know the pid of the pppd process, which allows
+  diald to know what ppp interface (ppp0, ppp1, etc.) the pppd is
+  running on, and allows diald to know what process to kill to take
+  down the link. The old diald just issued a killall -INT pppd,
+  which prohibited more than one diald running, or a diald controlled
+  pppd running together with a non-diald controlled pppd.
+
+* There are LOTS of configurable options now. Look at the usage
+  line (just run diald without any options) or read the man page.
+  The man page still needs some work, but I hope it will be enough
+  to get experienced users up and running. (Hey, this is still ALPHA
+  software, I only have so much spare time).
+
+* The entire mechanism for controlling the state of the link has been
+  replaced by a formal state machine. I think this machine guarantees
+  that no more than one child process can be active at a time, and
+  will even kill off child processes that are taking to long to do
+  their tasks. Let me know if you have problems with this. The old diald
+  could be forced to spawn hundreds of chat scripts or pppd daemons.
+
+* Diald no longer uses slattach to set up the slip link. It just does it
+  by itself. This allows it to know which slip device it is using,
+  which should allow multiple diald's to run at the same time.
+
+* The policy for bringing up and shutting down the link is now very
+  configurable, down to the level of choosing what packets
+  should bring the link up and keep it alive, together with
+  multiple timeouts on connections over the link.
+  Look at the manual page and the sample diald.conf files in the
+  doc subdirectory. Ask me if you are having problems configuring
+  diald to do something you want. It will help me to write a better
+  manual page, and will point deficiencies in the current design.
+
+* UUCP style locks are now placed on the call-out device.

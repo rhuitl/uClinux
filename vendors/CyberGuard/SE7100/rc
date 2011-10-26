@@ -1,0 +1,45 @@
+echo "/etc/rc processing ..."
+hostname NetGate7100 
+echo "Making Filesystems ..."
+#
+# /dev/ram0 is the root filesystem for recovery images
+# so skip it :-)
+#
+/bin/expand /etc/ramfs.img /dev/ram1
+echo "Mounting Filesystems ..."
+mount -t proc proc /proc
+mount -t devpts devpts /dev/pts
+mount -t tmpfs -o size=256k tmpfs /var
+
+#mount -t ext2 /dev/ram1 /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/mnt
+mkdir /var/lock
+mkdir /var/empty
+echo "Processing Config Filesystem ..."
+if ! mount -t ext3 /dev/flash/config /etc/config
+then
+	mke2fs -j /dev/flash/config
+	if ! mount -t ext3 /dev/flash/config /etc/config
+	then
+		/bin/expand /etc/ramfs.img /dev/ram2
+		mount -t ext2 /dev/ram2 /etc/config
+	fi
+fi
+/bin/flatfsd -r
+cp /etc/config/resolv.user /etc/config/resolv.conf
+echo "Loading crypto drivers."
+insmod safenet
+insmod safenet_sg
+
+echo "Setting system clock ..."
+hwclock --hctosys --utc
+
+#
+# need to wait for the cardmgr to find/configure eth2
+#
+cardmgr &
+sleep 3
+echo "/etc/rc complete."

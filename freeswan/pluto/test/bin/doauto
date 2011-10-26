@@ -1,0 +1,59 @@
+#!/bin/sh
+# start of an automatic testing script
+
+DOPLUTO=dopluto
+DOWHACK=dowhack
+
+DFAIL=""
+XFAIL=""
+SFAIL=""
+CFAIL=""
+
+case "$#" in
+0)	set - 	isakmp-psk isakmp-rsa \
+		ipsec-psk ipsec-rsa ipsec-rsa-c \
+		ipsec-psk-rw ipsec-rsa-rw ipsec-oppo
+	;;
+esac
+
+for t
+do
+    echo $t:
+    case "$t" in
+    shutdown)
+    	$DOWHACK shutdown
+	;;
+    *)
+	LD=log/$t
+	[ -d "$LD" ] || mkdir -p "$LD"
+
+	# start Initiator pluto (daemon forks to return control)
+	$DOPLUTO west >$LD/pi-log 2>&1
+
+	# start Responder pluto (daemon forks to return control)
+	$DOPLUTO east >$LD/pr-log 2>&1
+
+	(
+
+	    $DOWHACK d$t || DFAIL="$DFAIL $t $?"
+
+	    case "$t" in
+	    *-rsa*) $DOWHACK kall ;;
+	    esac
+
+	    $DOWHACK listen
+
+	    $DOWHACK x$t || XFAIL="$XFAIL $t $?"
+
+	    $DOWHACK shutdown || SFAIL="$SFAIL $t $?"
+	) >$LD/wi-log
+
+	[ -f log.ref/$t/wi-log ] && cmp log.ref/$t/wi-log $LD/wi-log || CFAIL="$CFAIL $t $?"
+	;;
+    esac
+done
+
+[ -z "$DFAIL" ] || echo "definition failures:$DFAIL" >&2
+[ -z "$XFAIL" ] || echo "execution failures:$XFAIL" >&2
+[ -z "$SFAIL" ] || echo "shutdown failures:$SFAIL" >&2
+[ -z "$CFAIL" ] || echo "cmp failures:$CFAIL" >&2

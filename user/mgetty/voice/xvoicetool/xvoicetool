@@ -1,0 +1,152 @@
+#!/usr/bin/wish -f
+
+# Set the following to your voice-Spooldirectory:
+set voicedir /tmp/voice
+set icondir /home/marc/vgetty/voice/xvoicetool
+
+# Set the following to the preferred playback-method (via Double-Click on
+# an entry in the scrolledlist.
+# Possible values:
+# play_audio = play via /dev/audio
+# play_modem = play via modem-speaker
+set defplay  play_audio
+
+# This is the command, executed when playing via /dev/audio
+set audio "rmdtopvf %s | pvftovoc | vplay"
+
+# This is the command, executed when playing via modem
+set vm "vm play -s %s"
+
+#################### END OF CONFIGURABLE SECTION ##########################
+
+wm title . "VoiceTool"
+
+proc play_audio {} {
+global fnlist audio
+
+  foreach i [.f.list curselection] {
+    exec cat [lindex $fnlist $i] | rmdtopvf | pvftovoc | vplay 2>/dev/null
+    set t [.f.list get $i]
+    set l [string length $t]
+    if {$l>19} {
+      set t [string range $t 0 18]
+      .f.list delete $i
+      .f.list insert $i $t
+    }
+  }
+}
+
+proc play_modem {} {
+global fnlist vm
+
+  foreach i [.f.list curselection] {
+    exec vm play -s [lindex $fnlist $i]
+    set t [.f.list get $i]
+    set l [string length $t]
+    if {$l>19} {
+      set t [string range $t 0 18]
+      .f.list delete $i
+      .f.list insert $i $t
+    }
+  }
+}
+
+proc delete_it {} {
+global fnlist
+  foreach i [lsort -integer -decreasing [.f.list curselection]] {
+    exec rm -f [lindex $fnlist $i]
+    set fnlist [lreplace $fnlist $i $i]
+    .f.list delete $i
+  }
+}
+
+proc get_files {} {
+global voicedir fnlist
+  
+  set fnlist {}
+  if {[file exists $voicedir/.timestamp]} {
+    set lastplay [file mtime $voicedir/.timestamp]
+  } else {
+    set lastplay -1
+  }
+  foreach n [glob -nocomplain $voicedir/incoming/*.rmd] {
+    set t [exec ls -l --full-time $n | cut -c11-12,42-61]
+    lappend fnlist $n
+    if {$lastplay>0} {
+      if {[file mtime $n]>$lastplay} {set t "$t\N"}
+    }
+    .f.list insert end $t
+  }
+}
+
+proc timestamp {} {
+global voicedir
+
+  set do_stamp 1
+  for {set i 0} {$i<[.f.list size]} {incr i} {
+    if {[string length [.f.list get $i]]>19} {set do_stamp 0}
+  }
+  if {$do_stamp} {
+    exec touch $voicedir/incoming/.timestamp
+    exec rm -f $voicedir/incoming/.flag
+  }
+}
+
+proc set_key_ok {} {
+global voicedir
+  
+  set f [open $voicedir/.code w]
+  puts $f [.sk.e get]
+  close $f
+  destroy .sk
+}
+
+proc set_key_abort {} {
+  destroy .sk
+}
+
+proc set_key {} {
+global voicedir
+
+ toplevel .sk
+ wm transient .sk .
+ wm title .sk "Key"
+ entry .sk.e -width 10 -relief sunken
+ button .sk.ok -text Ok -command set_key_ok
+ button .sk.abo -text Abort -command set_key_abort
+ pack .sk.e -padx 3 -pady 3
+ pack .sk.ok -side right -expand 1
+ pack .sk.abo -side right -expand 1
+ set f [open $voicedir/.code r]
+ gets $f key
+ close $f
+ .sk.e insert 0 $key
+ bind .sk.e <Return> set_key_ok
+ tkwait window .sk
+}
+
+frame .f
+# listbox .f.list -geometry 20x10 -relief sunken
+listbox .f.list -relief sunken
+scrollbar .f.scroll
+button .quit  -bitmap @$icondir/exit -anchor se -command "timestamp; destroy ."
+button .playa -bitmap @$icondir/spkr -anchor se -command play_audio
+button .playm -bitmap @$icondir/modem -anchor se -command play_modem
+button .key   -bitmap @$icondir/key -anchor se -command set_key
+button .del   -bitmap @$icondir/mag -anchor se -command delete_it
+
+pack .f -padx 3 -pady 3
+pack .f.list -side left
+pack .f.scroll -side left -fill y -expand 1
+pack .quit  -side right -expand 1 -fill x -padx 3 -pady 3
+pack .playa -side right -expand 1 -fill x -padx 3 -pady 3
+pack .playm -side right -expand 1 -fill x -padx 3 -pady 3
+pack .key   -side right -expand 1 -fill x -padx 3 -pady 3
+pack .del   -side right -expand 1 -fill x -padx 3 -pady 3
+get_files
+
+bind .f.list <Double-Button-1> $defplay
+wm protocol . WM_DELETE_WINDOW "timestamp; destroy ."
+wm iconbitmap . @$icondir/icon
+
+tkwait window .

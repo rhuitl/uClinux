@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if tar -c -f - -C /var/etc . | gzip -c | truncate 16384 \
+   >/var/config.tar.gz; then
+	flash_eraseall /dev/mtd3
+	cat /var/config.tar.gz >/dev/mtd3
+	echo Configuration has been saved.
+fi
+
+rm -f /var/config.tar.gz

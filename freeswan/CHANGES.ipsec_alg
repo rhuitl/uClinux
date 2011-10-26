@@ -1,0 +1,266 @@
+CHANGES.ipsec_alg,v 1.1.2.13 2002/05/30 03:12:03 jjo Exp
+
+v0.8.0: Phase1 cipher algorithms support, plus MODP2048
+ 	 - rc1:   no user visible changes (polishing)
+ 	 - pre14: force initialization of new vars in whack.c
+ 	 - pre13: fixed make *go, different CFLAGS in libcrypto for pluto
+ 	          and KLIPS
+ * PLUTO: 
+   -    NEW: added Phase1 (IKE) algorithms:
+    	   AES, twofish, serpent, blowfish; SHA2_256, SHA2_512
+   -    NEW: IKE algorithm selection 
+        	ike="aes128-sha,aes128-md5"
+   - 	NEW: IKE DH group selection (if not selected will default
+        to current 1536,1024) eg:
+		ike="aes128-sha-modp2048"
+	as current stock, PFS group will be same as P1's DH.
+   -	NEW: support for OAKLEY_MODP2048 (only by explicit selection),
+   	with _warnings_ if it takes "too" long to compute_dh_shared.
+
+   - 	keylen handling fixes for ESP proposals
+   -	show algos for newest connection state (IKE and ESP)
+   		+ ipsec auto --status | grep algo.*newe
+   -    added patches from Mathieu Lafon - Arkoon Network Security,
+        for ESP proposals:
+        . (optional, me) strict response with esp= only algos by
+	  adding '!' to esp string, eg:   esp=aes128-sha1,aes128-md5!
+        . NULL esp= string handling: propose everything.
+   -    massive cipher code reorganization, new ./libcrypto/lib<algo>
+   	hierachy, almost no code changes.
+
+   -	[OT] contributed SHA2 patch to KAME project (typo error
+   	in sha2 array setup)
+ * KLIPS
+   - 	**possibly esp= string incompatible change**
+        bumped AES,Serpent,twofish to 128-256 keys, so now you
+   	*MUST* specify keylength in alg string (defaults to max algo keylen)
+		esp=aes-md5       (OLD)
+	should be 
+		esp=aes128-md5    (explicit keylen)
+
+v0.7.3: KLIPS ext->alg rename, manual conn support
+
+ The most user visible change is just 1 AES option, no more CAST and manual
+ connection support (tested Ok with cloned scripts from ./testing/ ).
+
+ Changes from previous release:
+ * KLIPS: the big rename
+   - 	renamed *ipsec_ext* to *ipsec_alg*, *IPSEC_EXT* to *IPSEC_ALG*, 
+	everywhere: in filenames, interface and Config*.in => you must
+	re-select kernel build configuration for IPSEC_ALG_* 
+	(former IPSEC_EXT_*)
+   -	implemented 2linked list ipsec_alg registration instead
+	of fixed arrays => some space savings and better scalability
+	(debugged from previous available beta ).
+   -	more documentation in ipsec_alg.[ch]
+   - 	CAST discontinued, AES: only 1 impl (mailing list discussion)
+	
+ * KLIPS UTILS: manual connection support
+   -	manual conn support (klips/utils/spi.c)
+	. same pluto parser for esp strings
+	. debug flag support
+	. Makefile trickery to allow compilation "from" some pluto sources
+	  (constants.c, kernel_alg.c, alg_info.c)
+
+ * PLUTO: stricter runtime kernel algo checking
+   - 	stricter runtime algo checking in spdb.c, makes proposal
+	selection as responder more robust by avoiding *falsely* accepting
+	proposals for stock algos (3DES, MD5, SHA1) if not present.
+
+v0.7.2b:
+ Changes from v0.7.2a
+ 	* PLUTO
+	- make pluto patch for x509 patched freeswan.
+	- fixed pluto crash for RW cases (alg_info ref_cnt).
+
+v0.7.2a: "spawn of the missing link"
+ Changes from v0.6.3: 
+ 	* User visible:
+	- ipsec auto --status gives verbose info about discovered algos:
+	  Eg:
+	  + ipsec auto --status | egrep ESP
+	  000   algorithm ESP encrypt: id=3, name=ESP_3DES
+	  000   algorithm ESP encrypt: id=12, name=ESP_AES
+	  000   algorithm ESP auth attr: id=1, name=AUTH_ALGORITHM_HMAC_MD5
+	  000   algorithm ESP auth attr: id=2, name=AUTH_ALGORITHM_HMAC_SHA1
+	  000   algorithm ESP auth attr: id=5, name=AUTH_ALGORITHM_HMAC_SHA2_256
+	  000   algorithm ESP auth attr: id=7, name=AUTH_ALGORITHM_HMAC_SHA2_512
+	  000 "quark-nkosa":   ESP algorithms wanted: 12/000-2/000,    \
+	       253/000-2/000, 252/000-2/000, 7/000-2/000, 6/000-2/000, \
+	       11/000-2/000, 3/000-2/000,
+	  000 "quark-nkosa":   ESP algorithms loaded: 12/128-2/160, 3/168-2/160,
+
+	- ESP auth modules: 
+	     . SHA2 (256, 512)
+	     . SHA1, MD5, RIPEMD (all with opt. x86 asm); 
+	     . experimental XCBC_MAC_AES
+
+	- tested over linux-2.2.x
+
+	- working STATIC compilation for all modules (with core ipsec.o
+	  static or modular)
+	  
+	- tested interop with SSH Sentinel for all common modules: 
+	  aes(rinjdael), twofish, blowfish, cast, 3des (module)
+	  
+	- ext modules (loaded or static) will prevail stock implementation:
+	  you can compile with all stock algos and insert modules (for 
+	  same algos: 3DES, SHA1, MD5) to test/benchmark them.
+
+ 	* KLIPS
+	- *NEW* ESP auth hooks (!)
+	- STATIC COMPILATION of any module (with static or modular ipsec.o)
+	  pretty bloody work... to cope with ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+	- Makefile changes (eg: make -C ext clean ... works recursely)
+	- changed hooking code and logic: 
+	  a loaded MODULE will hook BEFORE stock algo (3des, md5, sha1)
+	  ie. you can test the new modules by just loading them and
+	  doing down/up.
+	  This allows, eg. compiling ipsec.o WITHOUT any algo (and load
+	  them afterwards)
+	- ipsec_sa->ipsec_ext link:  ip_sa->ips_ext_{enc,auth}
+	  . no more lookups with enc_alg for each packet processing (obvious)
+	  . no more micro-locking: just count ipsec_sa' pointer for ref count
+	  . direct usage of ipsec_ext data from other places, eg:
+	    ipsec_tunnel.c:    ip_s->ipsec_ext_enc->blocksize
+	- new struct ipsec_ext_enc, ipsec_ext_auth "derived" from 
+	  struct ipsec_ext (thanks cpp :)
+	- BIG cleanup: about 20% less lines of code in ipsec_ext.c (450 lin)
+	- IV,esp_head functions eliminated, direct IV handling
+	  using ixt->blocksize
+	- tiny exported interface (ipsec_ext.h)
+	- INC/DEC MODULE usage count (you'll actually _see_ your algo module
+	  working :)
+	- namespace (structs, fields) re-arranged
+	- prefix all ipsec_ext fields with "ixt_", "ixt_e_" and "ixt_a_"
+	- NOT-YET: sadb 256 array alternative: linked list, etc
+
+      * PLUTO
+	- ipsec auto --status will show very useful info about algos loaded
+        - SADB_AALG_MAX=15, debug ESP auth registration 
+	- better diagnostics for absent kernel algos for esp selection
+	- changed logic in spdb.c to allow replacing any ESP proposal =>
+	  added "policy" parameter, used in kernel_alg_db_prop_new()
+	  (v0.7.2a)
+	
+  ************************************************************************
+  *   recall that from v0.6 pluto MUST have the esp= connection parameter 
+  *   in the dotconf connection section
+  *   eg.
+  *           esp=aes,3des  
+  *   to propose/use AES transform (_and_ 3DES).
+  *
+  *   Pluto WILL ONLY offer esp= list, checking 1-by-1 if
+  *   if kernel cipher support IS LOADED and skipping that one if not.
+  *   
+  *   So, if you want previous behaviour (offer-all-loaded-ciphers) just add:
+  *
+  *      conn %default
+  *           esp=aes,twofish,serpent,cast,blowfish,3des
+  *   
+  *   Some valid transform strings:
+  *          "aes"                    equiv. to   "aes128-md5,aes128-sha1"
+  *          "aes-sha1"               equiv. to   "aes128-sha1"
+  *          "aes128-sha1, 3des-sha1"
+  *          "aes128,blowfish96,3des"
+  *          "aes-sha2_256,aes-sha2_512"
+  *          
+  ***********************************************************************
+
+v0.6.3:
+ Changes from v0.6.3:
+	* KLIPS
+	- ext_aes: 
+		libaes pentium asm implementation: 2x speed !
+ 		(from loopAES-v1.5)
+	- ext_aes-opt:
+		alternative (also 2x) impl. upgraded to libaes-0.03
+		(from Nigel at libaes.sourceforge.net)
+	- some minor tweaks to minimize ipsec_ext_aes.c ipsec_ext_aes-opt.c diff
+v0.6.2:
+ Changes from v0.6.1:
+ 	* KLIPS
+	- added ipsec_aes-opt: AES optimized impl. from Nigel 
+	  (libaes.sourceforge.net)
+	* PLUTO
+	- enhanced and cleaned up esp= dotconf parsing code 
+
+v0.6.1:
+ Changes from v0.6.2:
+	* KLIPS:
+	- renamed blowfish: "bf" -> "blowfish" (ie: modprobe ipsec_blowfish)
+
+v0.6: "esp= support"
+ Changes from v0.5:
+	* KLIPS: _no_changes_
+	* PLUTO: esp= configurabilty
+	- added enum_search() to constants.c: returns value if strcmp()==0
+	  Used by parsing logic tricks to allow searching in enum_names
+	  arrays (thus avoiding yetanother duplication), eg:         
+	  	"3des"  -> "ESP_3DES"
+		"md5"   -> "AUTH_ALGORITHM_HMAC_MD5"
+	- added "esp" parsing to utils/auto, default=3des
+        - added msg.esp (string 7) to whack->pluto protocol 
+	- new file alg_info.c for esp algo parsing logic
+	  . build proposals with esp= ordered list only _ANDed_
+	    with registered (runtime kernel) ESP algos
+	  Eg: (assuming all these algos are loaded) in ipsec.conf
+	    connection section:
+	     <none> or esp=	# default: 3DES+{MD5,SHA1}
+	     esp=3des-sha1	# only this: 3DES+SHA1
+	     esp=aes,cast	# AES+{MD5,SHA1}, CAST+{MD5,SHA1}
+	- alg_info_test: test utility for esp algo parsing, eg:
+	      $ cd pluto
+	      $ make alg_info_test    
+	      $ ./alg_info_test  aes,cast,3des-sha1
+		(12 = "ESP_AES", 1 = "AUTH_ALGORITHM_HMAC_MD5")
+		(12 = "ESP_AES", 2 = "AUTH_ALGORITHM_HMAC_SHA1")
+		(6 = "ESP_CAST", 1 = "AUTH_ALGORITHM_HMAC_MD5")
+		(6 = "ESP_CAST", 2 = "AUTH_ALGORITHM_HMAC_SHA1")
+		(3 = "ESP_3DES", 2 = "AUTH_ALGORITHM_HMAC_SHA1")
+
+v0.5: "kidnapped CPU hero"
+ Changes from v0.4:
+  NOTE: you must _really_ clean the build area (*.o ) because some _MAX
+        values have changed.
+
+	* KLIPS
+	- Changed SADB_EALG_MAX from 12 to 256 (to accomodate ESP enc ids
+	  like ESP_SERPENT=252, ESP_TWOFISH=253)
+	- Added timing measurement tests (cipher "bandwidth"), eg:
+	   # modprobe ipsec_twofish test=1
+	   # dmesg | tail -9
+	   ipsec_twofish_init(enc_alg=253 name=twofish): ret=0
+	   klips_debug:ipsec_ext_test: enc_alg=253 blocksize=16 \
+	   		key_e_size=8892 keysize=16
+	   klips_debug:ipsec_ext_test: cbc_encrypt=1 ret=1024
+	   klips_debug:ipsec_ext_test: memcmp(enc, tmp) ret=1: OK.
+	   klips_debug:ipsec_ext_test: cbc_encrypt=0 ret=1024
+	   klips_debug:ipsec_ext_test: memcmp(dec,tmp) ret=0: OK.
+	   klips_debug:ipsec_ext_test: decrypt speed=25200 KB/s
+	   klips_debug:ipsec_ext_test: encrypt speed=28600 KB/s
+	   ipsec_twofish_init(enc_alg=253): test_ret=0
+
+	- Changed BLOWFISH to use asm versions if possible
+	- Added SERPENT, TWOFISH from
+		Dr Brian Gladman http://fp.gladman.plus.com/index.html
+		(nicely hacked to un-global-ize sources)
+	- Added CAST from 
+		OpenBSD sources ("public domain")
+		*tested Ok against OpenBSD 3.0*
+	- Added NULL from
+		me :)
+
+	* PLUTO
+	- (also touched by SADB_EALG_MAX changes) please _really_ clean
+	  lib/*.o pluto/*.o before recompiling
+	- esp_transform_name bumped to 256 entries (from about 12)
+	- first attr.key_len processing (be careful, may break)
+	  no negotiation, just use peers attr.key_len  if it's lower
+	  than maxkeybits
+	- patch from Nigel Metheringham to allow RH62/2.2.20 compilation
+
+v0.4: 
+	First release (should fill-in here :)
+ 
+

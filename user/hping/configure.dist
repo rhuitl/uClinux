@@ -1,0 +1,54 @@
+#!/bin/sh
+
+show_help()
+{
+	echo configure help:
+	echo "--help               show this help"
+	echo "--no-tcl             disable TCL scripting support"
+	echo "                     even if uid != euid"
+}
+
+if [ "$1" = "--help" ]; then
+	show_help
+	exit 0
+fi
+
+CC=${CC:=cc}
+
+echo create byteorder.h...
+cat > byteorder.h <<EOF
+#ifndef __BYTEORDER_H
+#define __BYTEORDER_H
+#include <endian.h>
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define __LITTLE_ENDIAN_BITFIELD
+#define BYTE_ORDER_LITTLE_ENDIAN
+#else
+#define __BIG_ENDIAN_BITFIELD
+#define BYTE_ORDER_BIG_ENDIAN
+#endif
+#endif /* __BYTEORDER_H */
+EOF
+
+echo creating Makefile...
+sed	-e "s^@PCAP@^PCAP=-lpcap^g" \
+	-e "s^@MANPATH@^^g" \
+	-e "s^@SOLARISLIB@^^g" \
+	-e "s^@TCL_LIB@^-ltcl -ldl^g" \
+	<Makefile.in > Makefile
+
+cat > systype.h <<EOF
+#ifndef __SYSTYPE_H
+#define __SYSTYPE_H
+
+EOF
+echo \#define OSTYPE_LINUX >> systype.h
+cat >> systype.h <<EOF
+
+#endif /* SYSTYPE_H */
+EOF
+
+echo creating dependences...
+$CC -MM *.c > .depend
+
+echo now you can try \`make\'

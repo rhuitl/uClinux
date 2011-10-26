@@ -1,0 +1,258 @@
+From owner-mgetty Tue Jun 20 05:43:54 1995
+Return-Path: <owner-mgetty>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0sNuED-0002ELC@greenie.muc.de>; Tue, 20 Jun 95 05:43 MEST
+Return-Path: <l-mgetty-owner@muc.de>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0sNuE9-00007wC@greenie.muc.de>; Tue, 20 Jun 95 05:43 MEST
+Received: from greenie.muc.de ([193.174.4.62]) by colin.muc.de with SMTP id <25579-2>; Tue, 20 Jun 1995 05:43:41 +0200
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0sNu4e-0002ELC@greenie.muc.de>; Tue, 20 Jun 95 05:34 MEST
+Received: from GATEWAY by greenie.muc.de with netnews
+	for mgetty@muc.de (mgetty@muc.de)
+To: mgetty@muc.de
+Date: Fri, 16 Jun 1995 07:24:39 +0200
+From: mam@werries.de (Michael A Meiszl)
+Message-ID: <3rr4in$b9q@mamunx.werries.de>
+Organization: Meiszl Consulting Hamm
+References: <3rpugn$hjc@adson.sub.de>
+Subject: Re: Mgetty als Fax-Server fuer ein WfW-Netzwerk
+Status: RO
+
+Meine Trivialloesung funktioniert bislang ohne groessere Probleme und is
+auch Dummloosern (wie meinem Weibe :-) ) nahezubringen.
+
+Man nehme:
+	1 WinDoof Rechner mit Postscript Druckertreiber (Laserwriter NTX II
+	ist schoen simpel)
+
+	In die zu druckende Datei schreibe man irgendwo (am besten am Ende)
+	eine Zeile <Faxnummer:000...> rein (bei Excel kann es irgendein
+	Feld sein)
+
+	Damit der Looser auch merkt, was passiert, lasse man den Message
+	Empfang laufen (WinPopup oder automatisch bei NT)
+
+
+	1 Tunix/Flinux/irgendwat Kiste mit Samba und Ghostscript. Den Samba
+	Druckbefehl konfiguriert man:
+
+	[FAX]
+		path=/usr/spool/samba
+		read only=true
+		printable=true
+		public=true
+		comment=CCT Fax Postscript
+		print command=/usr/local/samba/bin/do_fax %s %U %m
+
+
+	Das "do_fax" Skript sieht so aus:
+-----------------------------------------------------------------------------
+
+#!/bin/sh
+PATH=/bin:/usr/bin:/usr/local/bin:/usr/local/samba/bin
+
+TELEFONANLAGE=JA	# braucht Amtsholung
+
+TMP=/tmp/fax.$$.ps
+DEBUG=
+
+NUMMER=`faxfilter $1 $TMP`
+USER=$2
+RECHNER=$3
+FAXERRORS=/tmp/faxerrors.$$
+FAXADMIN=faxadmin@werries.de	# User fuer Mail
+
+export NUMMER TMP USER RECHNER FAXERRORS DEBUG TELEFONANLAGE
+if [ "$DEBUG" = "" ]
+then
+	rm -f $1
+else
+	cp $1 /tmp/fax.input
+	rm -f $1
+fi
+if [ "$NUMMER" = "" ]
+then
+	if [ -s $1 ]
+	then
+		(
+		echo Das war wohl nichts $USER
+		echo
+		echo Um einen Fax zu versenden, muss im Dokument eine Zeile
+		echo "                <Faxnummer:0...>"
+		echo "auftauchen. Denk auch an die Amtsholung (0,...) mit Pause!"
+		echo
+		echo "Aendere den Text und drucke nochmal."
+		) | smbclient -M $RECHNER -U FAXMANAGER 2>&1 >/dev/null
+	fi
+	rm -f $TMP
+	exit 0
+fi
+LEN=`expr length $NUMMER`
+
+
+#
+# Wenn die Nummer laenger ist, als 3 Zeichen und der Dummlooser die Amts-
+# holung vergessen hat, basteln wir noch ein 0, davor
+#
+
+
+if [ "$TELEFONANLAGE" = "JA" -a $LEN -gt 3 ]
+then
+	X=`expr substr $NUMMER 1 2`
+	if [ ! "$X" = "0," ]
+	then
+		NUMMER=0,$NUMMER
+	fi
+fi
+
+faxspool -q -f $FAXADMIN $NUMMER $TMP >$FAXERRORS 2>&1
+
+if [ -s $FAXERRORS ]
+then
+	(
+	echo Fehler beim Versenden des Faxes:
+	cat $FAXERRORS
+	) | smbclient -M $RECHNER -U FAXMANAGER 2>&1 >/dev/null
+else
+	(
+	echo "Hai $USER!"
+	echo "Dein Fax an $NUMMER wurde erfolgreich angenommen."
+	echo "Der Versand erfolgt spaeter (keine Panik, ich mach das schon...)"
+	) | smbclient -M $RECHNER -U FAXMANAGER 2>$1 >/dev/null
+fi
+if [ "$DEBUG" = "" ]
+then
+	rm -f $TMP $FAXERRORS
+else
+	(
+	date
+	set
+	echo "---------------------"
+	echo $*
+	echo "---------------------"
+	) >/tmp/smbfax.debug
+fi
+	
+exit 0
+-----------------------------------------------------------------------------
+Da das Skript noch ein kleines Programm faxfilter braucht, hier noch
+Faxfilter.c:
+-----------------------------------------------------------------------------
+
+/*
+ * Simples Programm, dass aus einer Postscriptdatei den Text
+	<faxnummer:xxx-xxxx>
+ * raussucht und loescht
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <malloc.h>
+
+#define SUCHTEXT "(<faxnummer:"
+
+char FaxNummer[80];
+
+char *getline(FILE *F)
+{
+	static char l[255];
+	int len=0;
+	char c;
+	char *s=l;
+
+	*s='\0';
+	while (!feof(F))
+		{
+		c=fgetc(F);
+		if (feof(F)) return l;
+
+		if (c==4 || c==13) continue;
+		if (c==10) {
+			*s++=10;
+			*s=0;
+			return l;
+			}
+		*s++=c;
+		*s=0;
+		len+=1;
+		if (len>253) {
+			return l;
+			}
+		}
+	return l;
+}
+
+void findnummer(char *s)
+{
+	char *x=FaxNummer;
+
+	s+=strlen(SUCHTEXT);
+	*x=0;
+	while (strchr("0123456789,- \t",*s))
+		{
+		if (*s==' ' || *s=='\t') { s++; continue; }
+		if (*s=='-') { s++; continue; }
+		*x++=*s++;
+		*x=0;
+		}
+	return;
+}
+
+int match(char *s)
+{
+	char *q;
+	char *x=NULL;
+
+	if (q=malloc(strlen(s)+1)) {
+		strcpy(q,s);
+		for (x=q;*x;x++) *x=tolower(*x);
+		x=strstr(q,SUCHTEXT);
+		if (x) findnummer(x);
+		free(q);
+		}
+	return (x!=NULL);
+}	
+main(int argc, char *argv[])
+{
+	FILE *F,*G;
+	char *s;
+
+	F=stdin;
+	G=stdout;
+
+	if (argc>1) {
+		F=fopen(argv[1],"r");
+		if (!F) {
+			perror("cannot open inputfile");
+			exit(1);
+			}
+		}	
+	if (argc>2) {
+		G=fopen(argv[2],"w");
+		if (!G) {
+			perror("cannot create outputfile");
+			exit(1);
+			}
+		}
+
+	while (!feof(F)) {
+		s=getline(F);
+		if (!match(s)) fputs(s,G);
+		else if(G!=stdout) printf("%s\n",FaxNummer);
+		}
+	fclose(F);
+	fclose(G);
+	exit(0);
+}
+----------------------------------------------------------------------------
+Wenn jetzt noch sendfax funktioniert (bei mir leider nich so 100% :-( ),
+steht dem WinDoof Fax nix mehr im Wege...
+
+
+	MAM
+-- 
++-------------------------+---------------+--------------+-------------------+
+| /\/\ichael A. /\/\eiszl | Tomsonstr. 25 | D-59071 Hamm | Tel +49 2381 9880 |
++-------------------------+---------------+--------------+-------------------+
+

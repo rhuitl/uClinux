@@ -1,0 +1,145 @@
+RRDGRAPH_EXAMPLES(1)         rrdtool         RRDGRAPH_EXAMPLES(1)
+
+
+
+NNAAMMEE
+       rrdgraph_examples - Examples for rrdtool graph
+
+SSYYNNOOPPSSIISS
+       rrrrddttooooll ggrraapphh //hhoommee//hhttttppdd//hhttmmll//tteesstt..ppnngg ----iimmgg--ffoorrmmaatt PPNNGG \\
+
+       followed by any of the examples below
+
+DDEESSCCRRIIPPTTIIOONN
+       For your convenience some of the commands are explained
+       here by using detailed examples. They are not always cut-
+       and-paste ready because comments are intermixed with the
+       examples.
+
+EEXXAAMMPPLLEESS
+       DDaattaa wwiitthh mmuullttiippllee rreessoolluuttiioonnss
+
+           --end now --start end-120000s --width 400
+           DEF:ds0a=/home/rrdtool/data/router1.rrd:ds0:AVERAGE
+           DEF:ds0b=/home/rrdtool/data/router1.rrd:ds0:AVERAGE:step=1800
+           DEF:ds0c=/home/rrdtool/data/router1.rrd:ds0:AVERAGE:step=7200
+           LINE1:ds0a#0000FF:"default resolution\n"
+           LINE1:ds0b#00CCFF:"resolution 1800 seconds per interval\n"
+           LINE1:ds0c#FF00FF:"resolution 7200 seconds per interval\n"
+
+       NNiicceellyy ffoorrmmaatttteedd lleeggeenndd sseeccttiioonn
+
+           DEF:ds0=/home/rrdtool/data/router1.rrd:ds0:AVERAGE
+           DEF:ds1=/home/rrdtool/data/router1.rrd:ds1:AVERAGE
+           VDEF:ds0max=ds0,MAXIMUM,8,*
+           VDEF:ds0avg=ds0,AVERAGE,8,*
+           VDEF:ds0min=ds0,MINIMUM,8,*
+           VDEF:ds0pct=95,ds0,PERCENTILE,8,*
+           VDEF:ds1max=ds1,MAXIMUM,8,*
+           VDEF:ds1avg=ds1,AVERAGE,8,*
+           VDEF:ds1min=ds1,MINIMUM,8,*
+           VDEF:ds1pct=95,ds1,PERCENTILE,8,*
+
+       Note: consolidation occurs here.
+
+           CDEF:ds0bits=ds0,8,*
+           CDEF:ds1bits=ds1,8,*
+
+       Note: 10 spaces to move text to the right
+
+           COMMENT:"          "
+
+       Note: the column titles have to be as wide as the columns
+
+           COMMENT:"Maximum    "
+           COMMENT:"Average    "
+           COMMENT:"Minimum    "
+
+       Note: some lines contains the new-line character "\n"
+
+
+
+
+
+
+
+
+           COMMENT:"95th percentile\n"
+           AREA:ds0bits#00C000:"Inbound "
+           GPRINT:ds0max:"%6.2lf %Sbps"
+           GPRINT:ds0avg:"%6.2lf %Sbps"
+           GPRINT:ds0min:"%6.2lf %Sbps"
+           GPRINT:ds0pct:"%6.2lf %Sbps\n"
+           LINE1:ds1bits#0000FF:"Outbound"
+           GPRINT:ds1max:"%6.2lf %Sbps"
+           GPRINT:ds1avg:"%6.2lf %Sbps"
+           GPRINT:ds1min:"%6.2lf %Sbps"
+           GPRINT:ds1pct:"%6.2lf %Sbps\n"
+
+       OOffffsseettttiinngg aa lliinnee oonn tthhee yy--aaxxiiss
+
+       Depending on your needs you can do this in two ways:
+
+       +o   Offset the data, then graph this
+
+               DEF:mydata=my.rrd:ds:AVERAGE
+
+           Note: this will also influence any other command that
+           uses "data"
+
+               CDEF:data=mydata,100,+
+               LINE1:data#FF0000:"Data with offset"
+
+       +o   Graph the original data, with an offset
+
+               DEF:mydata=my.rrd:ds:AVERAGE
+
+           Note: no color in the first line so it is not visible
+
+               LINE1:100
+
+           Note: the second line gets stacked on top of the first
+           one
+
+               LINE1:data#FF0000:"Data with offset":STACK
+
+       TTiimmee rraannggeess
+
+           Last four weeks: --start end-4w --end 00:00
+           January 2001:    --start 200101010000 --end start+31d
+           January 2001:    --start 200101010000 --end 200102010000
+           Last hour:       --start end-1h
+           Last 24 hours:   <nothing at all>
+           Yesterday:       --end 00:00
+
+       VViieewwiinngg tthhee ccuurrrreenntt aanndd pprreevviioouuss wweeeekk ttooggeetthheerr
+
+           --end now --start end-1w
+           DEF:thisweek=router.rrd:ds0:AVERAGE
+           DEF:lastweek=router.rrd:ds0:AVERAGE:end=now-1w:start=end-1w
+
+       Shift the data forward by one week (604800 seconds)
+
+           SHIFT:lastweek:604800
+           [ more of the usual VDEF and CDEF stuff if you like ]
+           AREA:lastweek#0000FF:Last\ week
+           LINE1:thisweek#FF0000:This\ week
+
+SSEEEE AALLSSOO
+       rrdgraph gives an overview of how rrrrddttooooll ggrraapphh works.
+       rrdgraph_data describes DDEEFF,CCDDEEFF and VVDDEEFF in detail.  rrd-
+       graph_rpn describes the RRPPNN language used in the ??DDEEFF
+       statements.  rrdgraph_graph page describes all the graph
+       and print functions.
+
+       Make sure to read rrdgraph_examples for tips&tricks.
+
+AAUUTTHHOORR
+       Program by Tobias Oetiker <oetiker@ee.ethz.ch>
+
+       This manual page by Alex van den Bogaerdt
+       <alex@ergens.op.het.net>
+
+
+
+1.2.10                      2005-06-17       RRDGRAPH_EXAMPLES(1)

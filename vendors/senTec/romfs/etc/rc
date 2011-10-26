@@ -1,0 +1,21 @@
+hostname cobra1
+/bin/expand /etc/ramfs.img /dev/ram0
+mount -t proc proc /proc
+mount -t ext2 /dev/ram0 /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 netmask 255.255.255.0 lo
+# set up the ip address of the target:
+ifconfig eth0 192.168.100.2 broadcast 192.168.100.255 netmask 255.255.255.0 up
+# add a route via eth0:
+route add -net 192.168.100.0 netmask 255.255.255.0 eth0
+# start the portmapper (needed for nfs):
+portmap &
+# the following line is an example, how to mount nfs directories:
+#mount -t nfs -o rsize=4096,wsize=4096 192.168.100.1:/home/uClinux /usr
+cat /etc/motd
+

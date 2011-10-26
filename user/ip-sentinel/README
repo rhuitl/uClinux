@@ -1,0 +1,227 @@
+Release notes for IP Sentinel, version 0.11
+===========================================
+
+In a perfect environment there are managed switches with one host per
+port. Unfortunately, in the reality there are often unmanaged switches,
+there are more than one host on a port, it takes too much effort to
+update the MAC-port table of the switches and so on. When having a
+small or middle-sized company without a seperate network department,
+people will take free IPs without asking the responsible part-time
+admin. It can be imagined easily, that this will cause problems when
+the device/host will not be used for a certain time, another host takes
+its IP and the original device will be turned on again.
+
+DHCP seems to remove the reasons for static IPs. But because there
+are some cases which require fixed IPs (e.g. IP-tied licences,
+elder applications which do not understand DNS), you will see
+people choosing arbitrary IPs when the part-time admin is not
+available for a short time (e.g. lunch break).
+
+Another example might be an ethernet subnet where people have to pay
+for the usage but can plugin their machines without problems (e.g. when
+there is a connnection port in each room). Although external usage can
+be prevented by packetfilters, internal and bandwidth robbing traffic
+(e.g. Doom deathmatches, CDROM transfer) is still possible.
+
+
+"IP Sentinel" tries to prevent such an unauthorized usage by giving a
+faked answer to ARP requests. After receiving such a faked reply, the
+requesting party stores the MAC in their ARP table and will send
+future packets to this invalid MAC which renders the IP unreachable.
+
+
+Beside this, "IP Sentinel" has to follwing features:
+- freely customizable IPs and netmasks
+- usual security attributes like non-root and chroot execution
+- protection against basic DOS attacks
+- small memory footprint when built with dietlibc
+
+
+
+OPERATION DETAILS
+-----------------
+The following example demonstrates the process when an unauthorized
+host 'M' tries to enter a subnet:
+
+1. Host 'M' takes reserved IP 192.168.0.1
+2. Host 'A' (IP 192.168.0.2) wants to communicate with 'M' (it resolved
+   M's IP e.g. through NetBIOS).
+3. Host sends ARP-request "who-has 192.168.0.1"
+4. M sends "M is-at ..."
+5. "IP Sentinel" sees the request from 3. and sends a random reply "M
+   is-at de:ad:be:ef:0:4". This step will be repeated a few times.
+6. 'A' receives both replies and will store the latter one
+7. 'A' sends packages for 'M' to the 'de:ad:be:ef:0:4' MAC
+
+Because "IP Sentinel" is probably slower than 'M' (there are search-
+and general administration cost), it can not be guaranteed that
+packages from 'A' do arrive 'M'. But because of the repeating of
+step 5, the faked MAC will be make known to 'A' after some time and
+a communication is impossible.
+
+Some machines check before step 1 whether an IP is already in use by
+sending an "who-has <IP>" (arping). Because "IP Sentinel" answers on
+this query, it is highly probable that 'M' will refuse to bring-up its
+network.
+
+
+Beside this operation-mode, ip-sentinel can answer arp-requests
+originated by an intruder also.
+
+
+
+INSTALLATION
+------------
+After unpacking, "IP Sentinel" can be installed with the usual './configure
+&& make all install' steps. There are some ./configure-flags which might be
+interesting:
+
+* --disable-dietlibc: Because "IP Sentinel" uses low-level interfaces
+  which are not standardized by SUSv3, there may occure problems with
+  dietlibc<0.21. Usage of a detected dietlibc can be explicitely
+  turned off with this flag.
+
+* --with-username=USER: "IP Sentinel" drops its privileges by going
+  into a chroot()-directory and setuid()/setgid()'ing to another
+  user. The passwd-entries (homedirectory, gid) of this user are used
+  to determine the needed arguments of these operations.
+
+  The default-name of this user can be set with this option but IP
+  Sentinel allows to specify these parameters on the commandline
+  also. By default, 'nobody' will be assumed and you *SHOULD* use
+  this option to set a more proper name.
+
+* --with-configfile=FILE: "IP Sentinel" reads its configuration from
+  this file which must be located inside the chroot-environment
+  mentioned above.
+
+* --enable-release turns on various optimizations and should be used
+  when running "IP Sentinel". Because these optimizations are making
+  the developing impossible (e.g. no stackframe-pointers) they are
+  disabled by default.
+
+* --enable-developing turns on extra checks and should not be used
+  unless you want to develop "IP Sentinel".
+
+After installation, the executables 'ip-sentinel' resides in <PREFIX>/sbin
+(or whatever you specified with '--sbindir'). On startup it will lookup
+the passwd-entries of the specified user, chdir() & chroot() into its
+homedirectory and call setuid()/gid() there.
+
+Under certain circumstances like a dietlibc-compiled 'ip-sentinel' and
+remote NIS, such passwd-lookups are failing. Then the needed parameters
+(uid, gid, rootdirectory) MUST be given on the commandline. Please see
+ip-sentinel(8) for details.
+
+The contrib/-directory in the source-tarball contains an initscript
+suitable for Red Hat Linux and support for 'minit'.
+
+
+To test some aspects of the software, it is shipped with an extensive
+test-suite whose tests will be executed with 'make check'.  The
+'src/simulate' program which is generated in this step might be useful
+to test real-world situations since it prints the generated
+ethernet/arp headers in a human-readable format.  This tool is called
+with the same arguments like the final 'ip-sentinel' and fed on its
+stdin with 'A-ip A-mac B-ip B-mac' tuples:
+
+| $ echo '192.168.0.1  11:11:11:11:11:11  192.168.0.10 22:22:22:22:22:22' | \
+|    src/simulate -i src/testsuite/data/simulate.cfg eth0 10>&1
+
+
+
+CONFIGURATION
+-------------
+After successful installation, the reserved IPs can be told in the
+configfile (default: <chrootdir>/ips.cfg) by the following two ways:
+
+- single IPs (e.g. 192.168.0.1)
+- netmasks (e.g. 192.168.0.1/255.255.255.1 or 10.0.0.0/8)
+- ranges (e.g. 192.168.0.{1-5})
+
+When adding an exclamation mark ('!') in front of an IP or network
+specification, this IP/net will be removed from a less-specified
+reservation list.  Analogously, IPs or networks can be added if they
+are more-specified than fitting negation-lists
+
+"Less-specified" means that the corresponding netmask has not so
+many set bits like the other mask; IPs have a mask of 32 and are
+most-specified. E.g. the net 192.168.0.0/16 is less-specified than
+192.168.0.0/24 or the IP 192.168.0.1.
+
+When there are overlapping and conflicting statements which are
+specified in a similar manner, the behavior is undefined.
+
+
+A MAC can be assigned to single IPs or entiry networks. When not
+giving such a MAC, a random one will be choosen in a switch-friendly
+way. "Switch-friendly" means that only a small amount (32) of random
+MACs will be used in a certain period, so that the MAC-buffer of the
+switch will not overflow.
+
+Specifying a MAC will probably not work in a switched environment
+because the switch will see an IP at different ports and will be
+confused therefore.
+
+
+Because of the common format of the random MACs, the corresponding
+'arpwatch' messages can be filtered out easily by putting
+
+| * ^    ethernet address: de:ad:be:ef:0:
+| * ^old ethernet address: de:ad:be:ef:0:
+| /dev/null
+
+into .procmailrc.
+
+
+
+EXAMPLES
+--------
+
+1. ./ipsentinel -u 42 -g 42 -r /var/lib/ip-sentinel -i x.dat eth0
+
+   Runs with an uid and gid of 42, uses /var/lib/ip-sentinel as its
+   chroot-environment, reads 'x.dat' there and gives answers on
+   ARP-requests on interface eth0.
+
+2. A sample 'x.dat' might be:
+
+   0.0.0.0/0      		## block anything by default
+   !192.168.0.0/24		## allow IPs from 192.168.0.*
+   192.168.0.23			## but reserve 192.168.0.23
+   192.168.{20-30}.0/24		## and all /24 subnets between 192.168.20.0
+                                ## and 192.168.30.0
+   192.168.0.42  a:b:c:d:e:f	## and 192.168.0.42 and use a specific
+				## MAC there
+   10.0.0.1@a:a:a:a:a:a		## two tagged src-ip addresses
+   10.0.0.2@!1:1:1:1:1:1
+   *@1:1:1:2:2:2                ## host with a certain MAC on every IP
+
+   When "IP Sentinel" receives a request for 169.254.1.2 or 192.168.0.23,
+   a reply like '... is-at de:ad:be:ef:0:29' will be created. IPs like
+   192.168.0.1 will not be handled.
+
+   When an intruder is at "10.0.0.1" and uses the mac "a:a:a:a:a:a:",
+   a faked reply will be generated. Users at the same ip but another
+   mac will be ignored.
+
+   In opposite, users with ip "10.0.0.2" and mac "1:1:1:1:1:1" will
+   be ignored but intruders with other macs (e.g. "2:2:2:2:2:2") are
+   getting faked replies.  When --poision is used, ip-sentinel will
+   generate a "10.0.0.2 is at 1:1:1:1:1:1" arp-reply to a broad
+   address.
+
+   The host with the MAC 1:1:1:2:2:2 will be blocked everytime; which
+   might be wanted because it spreads viruses e.g.
+
+   'src/testsuite/data' contains other sample configfiles and expected
+   result.
+
+
+
+TODO
+----
+- validate the test-results
+- check if it is cheaper to have the 70 bytes of data or a pointer to
+  this data in the scheduler-heap; pointers have hidden costs for
+  memory-management and destroy L1/L2 caching

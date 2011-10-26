@@ -1,0 +1,150 @@
+# Microsoft C makefile for mawk,
+# an implementation of The AWK Programming Language, 1988.
+# 
+# Tested with Microsoft C vers 6 and 7, using the following make utils:
+#   dmake-3.8, GNUish make, Kneller's Ndmake, and Microsoft's nmake
+
+#========================== Configuration ===============================
+# Compiler flags:
+#  -AL large model
+#  -Gs remove stack probes, -G2 requires 286-or-better
+#  -O,-Ot optimize for time, -Os optimize for size
+# MSDOS and _MSC_VER are predefined.
+
+CC = cl -nologo
+CFLAGS = -AL -O $(DEFS)
+
+MSCLIB=llibce
+
+# Link and bind for DOS-only programs
+STACK=0x4000
+LF2=$(MSCLIB)
+
+# Link and bind for bound OS/2 and DOS programs
+STACK=0x4800
+LF2=$(MSCLIB)p,mawk.def
+BIND=bind $@
+DEFS=-DOS2
+
+#========================================================================
+
+
+.c.obj:
+	$(CC) $(CFLAGS) -c $<
+
+OBJ1 = parse.obj array.obj bi_funct.obj bi_vars.obj cast.obj code.obj \
+	da.obj error.obj execute.obj fcall.obj 
+
+OBJ2 =  field.obj files.obj fin.obj hash.obj jmp.obj init.obj \
+	kw.obj main.obj matherr.obj
+
+OBJ3 = memory.obj print.obj re_cmpl.obj scan.obj scancode.obj split.obj \
+	zmalloc.obj version.obj dosexec.obj
+
+OBJ = $(OBJ1) $(OBJ2) $(OBJ3)
+
+REXP_OBJ = rexp.obj rexp0.obj rexp1.obj rexp2.obj rexp3.obj rexpdb.obj
+
+RSP = mawk.lnk
+
+mawk.exe : $(OBJ) $(REXP_OBJ) $(RSP)
+	link @$(RSP) setargv.obj/NOE,$@,,/NOD:llibce $(LF2)/STACK:$(STACK);
+	$(BIND)
+
+$(RSP) : $(OBJ) $(REXP_OBJ)
+	echo $(OBJ1)+ > $@
+	echo $(OBJ2)+ >> $@
+	echo $(OBJ3)+ >> $@
+	echo $(REXP_OBJ)+ >> $@
+
+RFLAGS=-I. -Irexp -DMAWK
+
+rexp.obj  :  rexp/rexp.c  rexp/rexp.h
+	$(CC) $(CFLAGS) $(RFLAGS) -c rexp/rexp.c
+
+rexp0.obj  :  rexp/rexp0.c  rexp/rexp.h
+	$(CC) $(CFLAGS) $(RFLAGS) -c rexp/rexp0.c
+
+rexp1.obj  :  rexp/rexp1.c  rexp/rexp.h
+	$(CC) $(CFLAGS) $(RFLAGS) -c rexp/rexp1.c
+
+rexp2.obj  :  rexp/rexp2.c  rexp/rexp.h
+	$(CC) $(CFLAGS) $(RFLAGS) -c rexp/rexp2.c
+
+rexp3.obj  :  rexp/rexp3.c  rexp/rexp.h
+	$(CC) $(CFLAGS) $(RFLAGS) -c rexp/rexp3.c
+
+rexpdb.obj  :  rexp/rexpdb.c  rexp/rexp.h
+	$(CC) $(CFLAGS) $(RFLAGS) -c rexp/rexpdb.c
+
+config.h : msdos/msc.h
+	copy msdos\msc.h  config.h
+	copy msdos\mawk.def .
+
+dosexec.c : msdos/dosexec.c
+	copy msdos\dosexec.c dosexec.c
+
+test : mawk.exe  # test that we have a sane mawk
+	@echo you may have to run the test manually
+	cd test && mawktest.bat
+
+fpe_test :  mawk.exe # test FPEs are handled OK
+	@echo testing floating point exception handling
+	@echo you may have to run the test manually
+	cd test && fpe_test.bat
+
+###################################################
+# parse.c is provided 
+# so you don't need to make it.
+#
+# But if you do:  here's how:
+# To make it with bison under msdos
+# YACC=bison -y
+# parse.c : parse.y 
+#	$(YACC) -d parse.y
+#	rename y_tab.h parse.h
+#	rename y_tab.c parse.c
+########################################
+
+#scancode.c :  makescan.c  scan.h
+#	$(CC) -o makescan.exe  makescan.c
+#	makescan.exe > scancode.c
+#	del makescan.exe
+
+clean :
+	del *.obj
+
+distclean :
+	del *.obj
+	del config.h dosexec.c
+	del mawk.exe
+
+
+#  dependencies of .objs on .h
+array.obj : config.h field.h bi_vars.h mawk.h symtype.h nstd.h memory.h zmalloc.h types.h sizes.h
+bi_funct.obj : config.h field.h bi_vars.h mawk.h init.h regexp.h symtype.h nstd.h repl.h memory.h bi_funct.h files.h zmalloc.h fin.h types.h sizes.h
+bi_vars.obj : config.h field.h bi_vars.h mawk.h init.h symtype.h nstd.h memory.h zmalloc.h types.h sizes.h
+cast.obj : config.h field.h mawk.h parse.h symtype.h nstd.h memory.h repl.h scan.h zmalloc.h types.h sizes.h
+code.obj : config.h field.h code.h mawk.h init.h symtype.h nstd.h memory.h jmp.h zmalloc.h types.h sizes.h
+da.obj : config.h field.h code.h mawk.h symtype.h nstd.h memory.h repl.h bi_funct.h zmalloc.h types.h sizes.h
+error.obj : config.h bi_vars.h mawk.h parse.h vargs.h symtype.h nstd.h scan.h types.h sizes.h
+execute.obj : config.h field.h bi_vars.h code.h mawk.h regexp.h symtype.h nstd.h memory.h repl.h bi_funct.h zmalloc.h types.h fin.h sizes.h
+fcall.obj : config.h code.h mawk.h symtype.h nstd.h memory.h zmalloc.h types.h sizes.h
+field.obj : config.h field.h bi_vars.h mawk.h init.h parse.h regexp.h symtype.h nstd.h memory.h repl.h scan.h zmalloc.h types.h sizes.h
+files.obj : config.h mawk.h nstd.h memory.h files.h zmalloc.h types.h fin.h sizes.h
+fin.obj : config.h field.h bi_vars.h mawk.h parse.h symtype.h nstd.h memory.h scan.h zmalloc.h types.h fin.h sizes.h
+hash.obj : config.h mawk.h symtype.h nstd.h memory.h zmalloc.h types.h sizes.h
+init.obj : config.h field.h bi_vars.h code.h mawk.h init.h symtype.h nstd.h memory.h zmalloc.h types.h sizes.h
+jmp.obj : config.h code.h mawk.h init.h symtype.h nstd.h memory.h jmp.h zmalloc.h types.h sizes.h
+kw.obj : config.h mawk.h init.h parse.h symtype.h nstd.h types.h sizes.h
+main.obj : config.h field.h bi_vars.h code.h mawk.h init.h symtype.h nstd.h memory.h files.h zmalloc.h types.h fin.h sizes.h
+makescan.obj : parse.h symtype.h scan.h
+matherr.obj : config.h mawk.h nstd.h types.h sizes.h
+memory.obj : config.h mawk.h nstd.h memory.h zmalloc.h types.h sizes.h
+parse.obj : config.h field.h bi_vars.h code.h mawk.h symtype.h nstd.h memory.h bi_funct.h files.h zmalloc.h jmp.h types.h sizes.h
+print.obj : config.h field.h bi_vars.h mawk.h parse.h symtype.h nstd.h memory.h scan.h bi_funct.h files.h zmalloc.h types.h sizes.h
+re_cmpl.obj : config.h mawk.h parse.h regexp.h symtype.h nstd.h memory.h repl.h scan.h zmalloc.h types.h sizes.h
+scan.obj : config.h field.h code.h mawk.h init.h parse.h symtype.h nstd.h memory.h repl.h scan.h files.h zmalloc.h types.h fin.h sizes.h
+split.obj : config.h field.h bi_vars.h mawk.h parse.h regexp.h symtype.h nstd.h memory.h scan.h bi_funct.h zmalloc.h types.h sizes.h
+version.obj : config.h mawk.h patchlev.h nstd.h types.h sizes.h
+zmalloc.obj : config.h mawk.h nstd.h zmalloc.h types.h sizes.h

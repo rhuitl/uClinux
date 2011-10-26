@@ -1,0 +1,119 @@
+#!/bin/sh
+# Copyright (c) 1996, Eric Schenk.
+#
+# This script is intended to give an example of a connection script that
+# uses the "message" facility of diald to communicate progress through
+# the dialing process to a diald monitoring program such as dctrl or diald-top.
+# It also reports progress to the system logs. This can be useful if you
+# are seeing failed attempts to connect and you want to know when and why
+# they are failing.
+#
+# This script requires the use of chat-1.9 or greater for full
+# functionality. It should work with older versions of chat,
+# but it will not be able to report the reason for a connection failure.
+
+# Configuration parameters
+
+# The initialization string for your modem
+
+MODEM_INIT="ATZ&C1&D2%C0"
+
+# The phone number to dial
+PHONE_NUMBER="5551212"
+
+# The chat sequence to recognize that the remote system
+# is asking for your user name.
+USER_CHAT_SEQ="name:--name:--name:--name:--name:--name:--name:"
+
+# The string to send in response to the request for your user name.
+USER_NAME="USER"
+
+# The chat sequence to recongnize that the remote system
+# is asking for your password.
+PASSWD_CHAT_SEQ="word:"
+
+# The string to send in response to the request for your password.
+PASSWORD="PASSWORD"
+
+# The prompt the remote system will give once you are logged in
+# If you do not define this then the script will assume that
+# there is no command to be issued to start up the remote protocol.
+PROMPT="annex:"
+# The command to issue to start up the remote protocol
+PROTOCOL_START="ppp"
+
+# The string to wait for to see that the protocol on the remote
+# end started OK. If this is empty then no check will be performed.
+START_ACK="Switching to PPP."
+
+# Pass a message on to diald and the system logs.
+function message () {
+[ $FIFO ] && echo "message $*" >$FIFO
+logger -p local2.info -t connect "$*"
+}
+
+# Initialize the modem. Usually this just resets it.
+message "Initializing Modem"
+chat TIMEOUT 5 "" $MODEM_INIT TIMEOUT 45 OK ""
+if [ $? != 0 ]; then
+    message "Failed to initialize modem"
+    exit 1
+fi
+
+# Dial the remote system.
+
+message "Dialing system"
+chat \
+	TIMEOUT 45 \
+	ABORT "NO CARRIER" \
+	ABORT BUSY \
+	ABORT "NO DIALTONE" \
+	ABORT ERROR \
+	"" ATDT$PHONE_NUMBER \
+	CONNECT ""
+case $? in
+   0) message Connected;;
+   1) message "Chat Error"; exit 1;;
+   2) message "Chat Script Error"; exit 1;;
+   3) message "Chat Timeout"; exit 1;;
+   4) message "No Carrier"; exit 1;;
+   5) message "Busy"; exit 1;;
+   6) message "No DialTone"; exit 1;;
+   7) message "Modem Error"; exit 1;;
+   *)
+esac
+
+# We're connected try to log in.
+message "Loggin in"
+chat \
+	TIMEOUT 5 \
+	$USER_CHAT_SEQ \\q$USER_NAME \
+	TIMEOUT 45 \
+	$PASSWD_CHAT_SEQ $PASSWORD
+if [ $? != 0 ]; then
+    message "Failed to log in"
+    exit 1
+fi
+
+# We logged in, try to start up the protocol (provided that the
+# user has specified how to do this)
+
+if [ $PROMPT ]; then
+    message "Starting Comm Protocol"
+    chat TIMEOUT 15 $PROMPT $PROTOCOL_START
+    if [ $? != 0 ]; then
+        message "Prompt not received"
+        exit 1
+    fi
+fi
+
+if [ $START_ACK ]; then
+    chat TIMEOUT 15 $START_ACK ""
+    if [ $? != 0 ]; then
+	message "Failed to start Protocol"
+	exit 1
+    fi
+fi
+
+# Success!
+message "Protocol started"

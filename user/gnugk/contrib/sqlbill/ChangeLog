@@ -1,0 +1,141 @@
+13 Jun 2006 -- zvision
+  * postgresql.conf typo fixed
+
+21 Sep 2005 -- zvision
+  * dumpdata.sh/restoredata.sh scripts fixed
+
+19 Sep 2005 -- zvision
+  * new voipuser.nasaddress field to restrict user's access to the given NAS only
+  * firstname, surname voipuser fields removed. They should be rather a part
+    of bussiness logic, not the billing engine core.
+  * extended to support MERA and Cisco devices
+  * version number changed to 1.0.6
+
+17 Sep 2005 -- zvision
+  * constraint check added to voiptariff to ensure initialincrement
+    and regularincrement are not 0
+
+11 Sep 2005 -- zvision
+  * fixed bug, when a default tariff took priority over account specific tariffs
+
+14 Apr 2005 -- zvision
+  * unneccessary voipcall_h323id_idx index removed
+
+07 Mar 2005 -- zvision
+  * fixed syntax error in f_voiptariff.sql script
+
+25 Jan 2005 -- zvision
+  * fixed a syntax error inside match_tariff
+
+13 Dec 2004 -- zvision
+  * allow an empty value for Calling-Station-Id
+  * bugs fixed in report queries, ASR calculation more accurate,
+    redundant code removed
+
+07 Dec 2004 -- zvision
+  * simple report query examples to get ASR, ACD and other statistics
+    added to the 'examples' directory
+
+03 Nov 2004 -- zvision
+  * check RRQ aliases against voipuser h323id and allowedaliases fields
+  * updated postgresql.conf authorize_check and authorize_reply queries
+    to allow validation of endpoint aliases sent in h323-ivr-out=terminal-alias
+	attribute
+
+29 Oct 2004 -- zvision
+  * don't trim usernames during checks to avoid problems with the billing
+  * adjust voiptariffdst indexes to not include WHERE active condition
+
+25 Oct 2004 -- zvision
+  * tariff matching extended to support more precise group tariff matching,
+    ability to specify per group special destinations
+  * tariff matching now processes active flag correctly for tariffs/tariff
+    destinations
+
+13 Oct 2004 -- zvision
+  * new 'prefix' column in the voipcall table to store a prefix
+    that the Called-Station-Id has matched
+
+5 Oct 2004 -- zvision
+  * fix to allow negative prices to be specified for callback tariffs
+
+1 Oct 2004 -- zvision
+  * fill voipcalltermtariff.tariffdesc field with correct tariff description
+
+26 Sep 2004 -- zvision
+  * associate names with table constraints to allow further easy modifications
+  * changed voiptariff multikey to contain the terminating column too
+  * fix an error in the c_all_tables.sql script that prevented from creation 
+    of voipcalltermtariff table
+  * fix an error in the d_all_tables.sql script that prevented from deleting
+    all tables in the database
+  
+21 Sep 2004 -- zvision
+  * added support for termination accounts and tariffs
+
+15 Sep 2004 -- zvision
+  * added database versioning and upgrade scripts
+  * new 'exactmatch' column in voiptariffdst to allow both prefix like matching
+    and exact H.323 ID like matching
+  * fixed missing graceperiod handling in tariff table import from an OpenOffice
+    Calc file
+
+26 Aug 2004 -- zvision
+  * scripts to dump/restore data added
+  * fixed bug that prevented IP only authorization using IP address range
+  * fixed bug (syntax error) with tariff matching when tariff groups are used
+  
+15 Aug 2004 -- zvision
+  * a new column 'active' in the voiptariff table to allow per user
+    blocking of destinations
+
+12 Aug 2004 -- zvision
+  * added a new 'graceperiod' column to voiptariff and voipcall
+
+6 Aug 2004 -- zvision
+  * support for tariff table import from an OpenOffice.org Calc spreadsheet 
+  - new tariffs.sxc, f_pricing.sql and f_merged.sql files
+
+5 Aug 2004 -- zvision
+  * cost for calls longer than the initialincrement was incorrectly calculated
+  * allow arbitraty prefix length
+
+4 Aug 2004 -- zvision
+  * allow voipcall rows with NULL tariffdesc to be inserted - this happens
+    when users dial numbers not found in the tariff table
+
+9 Jul 2004 -- zvision
+  * added GnuGk config examples how to use the billing systems with SQLAcct,
+    SQLPasswordAuth and SQLAuth modules instead of Radius. It does not provide
+    full functionality, like with Radius, but may be enough for some people
+
+22 Jun 2004 -- zvision
+  * reject gracefully Access-Requests without Framed-IP-Address attribute
+  * better handling of IP only authorization - changed user account binding 
+    order - IP only users are searched first, then search by h323id is performed
+
+17 Jun 2004 -- zvision
+  * BUGFIX: accounting_update_query changed to not check h323id in order
+    to allow IP only authorization
+  * BUGFIX: accounting_stop_query changed to not check h323id in order
+    to allow IP only authorization
+
+16 Jun 2004 -- zvision
+  * added ability to authenticate users only by their IP (ignoring User-Name)
+
+15 Jun 2004 -- zvision
+  * BUGFIX: active flag for old voiptariff aparently did not work - all tariffs
+    were counted as active
+  * Billing unit configurable (previously it was fixed to 60 seconds). Now it is
+    possible to even to create tariffs for one-time event billing (initialincrement
+    set to 60 and regular increment set 0)
+  * Tariff engine redesigned - now a single tariff consists of three 
+    components: destination info (prefix), the actual tariff (pricing)
+	and an optional tariff group. Now is possible to set different pricing
+	to each account for the same destination
+  * voipuser.password column name changed to voipuser.chappassword to describe 
+    the purpose of this field better
+  * Currency precision increased from 2 to 4 decimal places
+  
+18 Feb 2004 -- zvision
+  * Initial release

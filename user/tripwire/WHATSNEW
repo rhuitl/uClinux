@@ -1,0 +1,376 @@
+## $Id: WHATSNEW,v 1.19 1994/08/30 06:09:50 gkim Exp $
+##
+## WHATSNEW for Tripwire v1.2, v1.1.1, and v1.1
+##
+## Gene Kim & Gene Spafford
+## The COAST Project
+## Department of Computer Sciences
+## Purdue University
+##
+
+##
+## Version 1.2 -- July 15, 1994
+##
+
+    Version 1.2 adds several new features, as well as fixing reported
+bugs.  Among the changes are:
+
+	- Signature checking for symbolic link contents has been added.
+	- Tripwire now correctly runs on Alpha AXPs, and other machines
+		with "long" types that are not 32 bits wide.
+	- The Haval digital hash routine has been added as the eighth
+		signature routine (faster than MD5, and purportedly 
+		more secure).
+	- The SHA signature routine has been changed to conform to the
+		recent fix introducted in its FIPS definition by NIST/NSA
+		to correct an unspecified weakness.
+	- The database format changes slightly to correct a boundary
+		condition error.  Because database entry numbers change,
+		because the SHA signatures change, and because of Haval,
+		old Tripwire databases must be reinitialized.
+	- Handling specified configuration and database files (and file 
+		descriptors) has been fixed to better accomodate pipes.
+	- Full support for flex added.
+	- Signature checking is now considerably faster through the use
+		of the stdio library for file I/O.
+	- A Perl script has been added to update Tripwire databases where
+		all inode numbers were changed by "fsirand" (NFS sites only); 
+		See FAQ.
+	- Another fix to make database updates more predictable.
+	- All reported bugs have been fixed in this revision.
+	- A new README section describes some documented attacks on 
+		systems running Tripwire.
+	- Many small changes have been made to the documentation to correct
+		and update information.
+
+    NOTE:  The script `twdb_check.pl' (written in Perl) has been added
+to the distribution. It checks database consistency after updates of
+the tw.config file.  This functionality will be put into the Tripwire
+program in the next release.  Run this script after Tripwire database updates
+to ensure that database entry numbers are consistent with the tw.config
+file.  See the README file for details (section 3.5.2).
+
+    Numerous other people played a crucial role in shaping this release:
+
+    Paul Szabo is responsible for a number of fixes and cleaning up
+the way filenames are handled internally, leading to a much simpler
+treatment to filenames with escaped characters in Tripwire.
+
+    Paul Hilchey is responsible for rewriting the list routines,
+fixing a number of bugs and replacing a hideous implementation with
+one that is elegant and succinct.
+
+    Asokan is responsible for going through all the Tripwire code to
+remove assumptions about the size of certain types (e.g., "long" is
+not 32 bits on the Alpha).
+
+    Casper H.S. Dik pointed out how some signature routines used very
+small reads, leading to suboptimal performance.  He offered a simple
+fix through the use of the stdio library for file I/O.
+
+    Cal Page modified the lex and yacc files to accomodate newer 
+versions of GNU flex and bison, which continue to diverge from the 
+traditional tools.
+
+    Tom Orban spent many an afternoon on the phone with me, guiding me
+step-by-step to find elusive database update bugs.  Among other
+things, Tom Orban and Terry Kennedy helped track down the problems
+that led to the addition of the twdb_check.pl script.
+
+    Keith Rickert and Eugene Zaustinsky painstakingly pointed out
+distribution errors.  Keith Rickert and Greg Black helped us with
+the last batch of fixes that shortly preceded this release.  We
+appreciate their help.
+
+    Thanks go to those people who helped test Tripwire:
+
+	Eric Berg, Eric M. Boehm, Lothar Butsch, John Crosswhite,
+	Jason Downs, Peter Evans, Jon Freivald, Kevin Johnson,
+	Lothar Kaul, Terry Kennedy, Chris Kern, Paul Madden, Fred
+	Marchand, Mitchell Marks, Jim Moreno, Tom Orban, Lorraine
+	Padour, Calvin Page, Tom Painter, Roger Peyton, Peter
+	Phillips, Keith W. Rickert, Jim Roche, D Seddon, Paul
+	Szabo, Gene C Van Nostern, John Wiegley, Robert Wilhite,
+	Alain Williams, Eugene Zaustinsky.
+
+
+Gene & Gene
+Kim  & Spafford
+
+##
+## Version 1.1 -- December 15, 1994
+##
+
+Introduction:
+=============
+
+    Version 1.1 considerably upgrades the functionality of Tripwire.
+All known bugs have been fixed, and many selected features have been
+added at the request of Tripwire users.
+
+    Among the major changes are:
+
+	- rewrite of the "-update" command.  
+	- addition of an "-interactive" command that prompts the user
+		whether a changed file's database entry should be 
+		updated.
+	- addition of a "-loosedir" command for quieter Tripwire runs.
+	- support for monotonically growing files in tw.config.
+	- addition of comprehensive test suite to test Tripwire
+		functionalities.
+	- hooks for external services (i.e., compression, encryption, 
+		networking) through "-cfd" and "-dfd" options.
+	- addition of the new NIST SHA/SHS signature algorithm.
+	- corrections and changes in the MD2, MD4, MD5, CRC32, 
+		and Snefru signature routines.
+	- addition of a more rigorous signature test suite.
+	- more error checking in tw.config @@directives.
+	- siggen replaces sigfetch.
+	- addition of a tw.config file for Solaris v2.2 (SVR4).
+	- change of base-64 alphabet to conform to standards.
+	- preprocessor macro fixes.
+
+
+New Tripwire database format:
+=============================
+
+    The Tripwire database format has changed since v1.0, using a
+different base-64 alphabet and encoding scheme.  Use the twconvert
+program to convert v1.0 databases to v1.1 databases (located in the
+./src directory).
+
+    If you have been using an older version of Tripwire, you will
+need to use twconvert convert your databases to the new format.
+
+
+Updating the Tripwire database:
+===============================
+
+    There has been a major rewrite/rethink of the "tripwire -update"
+command, as well as the addition of a "tripwire -interactive" command
+which allows the user to interactively select which database entries
+should be updated.  No vestiges of the "-add" or "-delete" command
+remain, since the "-update" command now automatically deletes and adds
+files.
+
+    However, the preferred way of keeping Tripwire databases in sync
+with the filesystems is using the "-interactive" command.  A Tripwire
+session using Interactive mode might look like:
+
+    6:25am (flounder) tw/src 1006 %% tripwire -interactive
+    ### Phase 1:   Reading configuration file
+    ### Phase 2:   Generating file list
+    ### Phase 3:   Creating file information database
+    ### Phase 4:   Searching for inconsistencies
+    ###
+    ###                     Total files scanned:            49
+    ###                           Files added:              0
+    ###                           Files deleted:            0
+    ###                           Files changed:            49
+    ###
+    ###                     After applying rules:
+    ###                           Changes discarded:        47
+    ###                           Changes remaining:        2
+    ###
+    changed: drwx------ genek        1024 May  3 06:25:37 1993 /homes/genek/research/tw/src
+    changed: -rw------- genek        7978 May  3 06:24:19 1993 /homes/genek/research/tw/src/databases/tw.db_flounder.Eng.Sun.COM.old
+    ### Phase 5:   Generating observed/expected pairs for changed files
+    ###
+    ### Attr        Observed (what it is)         Expected (what it should be)
+    ### =========== ============================= =============================
+    /homes/genek/research/tw/src
+          st_mtime: Mon May  3 06:25:37 1993      Mon May  3 06:11:39 1993      
+          st_ctime: Mon May  3 06:25:37 1993      Mon May  3 06:11:39 1993      
+    ---> File: '/homes/genek/research/tw/src'
+    ---> Update entry?  [YN(y)nh?] y
+    
+    ### Updating database...
+    ###
+    ### Phase 1:   Reading configuration file
+    ### Phase 2:   Generating file list
+    ### Phase 3:   Updating file information database
+    ###
+    ### Warning:   Old database file will be moved to `tw.db_flounder.Eng.Sun.COM.old'
+    ###            in ./databases.
+    ###
+    6:25am (flounder) tw/src 1007 %% 
+
+    Tripwire prompts the user whether the database entry of the
+current file should be updated to match the current file information.
+Pressing either 'y' or 'n' either updates the current file or skips to
+the next file.  Pressing 'Y' or 'N' applies your answer to the entire
+entry.  (I.e., if /etc is changed, typing 'Y' will not only update /etc,
+but it will also files update all the files in /etc.)
+
+
+Tripwire exit codes:
+====================
+
+    Tripwire exit status can be interpreted by the following mask:
+
+	1:	run-time error.  aborted.
+	2:	files added
+	4:	files deleted
+	8:	files changed
+
+    For example, if Tripwire exits with status code 10, then files
+were found added and changed.  (i.e., 8 + 2 = 10.)
+
+
+Tripwire quiet option:
+======================
+
+    When run with -q option, Tripwire really is quiet, printing only
+one-line reports for each added, deleted, or changed file.  The output
+is more suitable for parsing with awk or perl.
+
+
+Monotonically growing files:
+============================
+
+    The ">" template is now supported in the tw.config files.  This
+template allows files to grow without being reported.  However, if the
+file is deleted or is smaller than the size recorded in the database,
+it is reported as changed.
+
+
+
+Loose directory checking:
+=========================
+
+    This option was prompted by complaints that Tripwire in Integrity
+Checking and Interactive mode unnecessarily complains about
+directories whose nlink, ctime, mtime, or size have changed.  When
+Tripwire is run with the "-loosedir" option, directories automatically
+have these attributes included in their ignore-mask, thus quieting
+these complaints.
+
+    Note that this is option is not enabled by default, making normal
+Tripwire behavior no different than previous releases.  However,
+running with this option enabled considerably decreases "noise" in
+Tripwire reports.  
+
+    (Ideally, this "loose directory checking" should be offered on
+a per-file basis in the tw.config file.  However, adding another field
+to the tw.config file was too extensive a change to be considered for
+this release.  A later release of Tripwire may rectify this.)
+
+
+Hooks for external services:
+============================
+
+    Tripwire now supports the "-cfd" and "-dfd" option that allows the
+user to specify an open file descriptor for reading the configuration
+file and database file, respectively.  Using these options, an
+external program can feed Tripwire both input files through open file
+descriptors.  This external program could supply services not provided
+though Tripwire, such as encryption, data compression, or a
+centralized network server.
+
+    This program might do the following:  Open the database and
+configuration files, process or decode (i.e., uncompress the file),
+and then write out the reguarly formatted file to a temporary file.
+Open file descriptors to these files are then passed to Tripwire by
+command-line arguments though execl().
+
+    An example of using a shell script to compress and encrypt your
+files is given in ./contrib/zcatcrypt.  It is a four line Bourne shell
+script that encrypts and compresses the database and configuration
+files.
+
+
+SHA/SHS signature routines:
+===========================
+
+    Tripwire now includes SHA/SHS, the proposed NIST Digital Signature
+Standard.  See the README file for details on this algorithm.
+
+    Please note that the SHA code in ./sigs/sha seems to be poorly
+handled by many optimizing C compilers.  For example, the stock C
+compiler included with SunOS 4.x takes almost two minutes to compile
+this file with the -O option on a Sparcstation10.
+
+    Other compilers (such as GCC) do not have this problem.
+
+
+Change in tw.config preprocessor:
+=================================
+
+    The tw.config preprocessor has been changed to allow the proper
+expansion of @@variables in filenames.  The following use of @@define
+now works as expected:
+
+	@@define DOMAIN_NAME    my_main_nis_domain
+	/var/yp/@@DOMAIN_NAME   L
+	@@DOMAIN_NAME/FOO	L
+
+    (This is the third attempt at getting this working correctly.  We
+finally fixed this by moving the macro expansion routines into the
+lexical analyzer.)
+
+
+Expanded test suite:
+====================
+
+    The Tripwire test suite now includes runs a more standard
+signature test suite.  This was prompted by discovery of several
+implementation errors in the MD2, MD4, and MD5 signature routines that
+was introduced right before the official release of Tripwire.  (Thanks
+Eugene Zaustinsky.)
+
+    Two more test suites have been added.  One iterates through all
+the Tripwire reporting functionalities, and exercises all the database
+update cases.  The other test suite checks for proper Tripwire
+preprocessor macro expansions.
+
+CRC32 changes:
+==============
+
+    Furthermore, the CRC32 signature routine is now POSIX 1003.2 
+compliant.  (Thanks Dan Bernstein.)
+
+
+"siggen" replaces "sigfetch":
+=============================
+
+    As a tester noted, "sigfetch" was a misnomer since nothing was
+actually being fetched.  Consequently, it was easy to (incorrectly)
+conclude that "sigfetch" retrieved signatures from the database.
+
+    The "siggen" command is the current incarnation of "sigfetch".
+The manual pages reflect this change.
+
+
+Source code cleanup:
+====================
+
+    The authors went through the sources, doing generic cleanups aid
+in code comprehension.
+
+
+Bug fixes:
+==========
+
+    This release fixes all known bugs.  The TODO list, however, gives a
+wishlist of features that may be included in future releases.
+
+
+List of thanks:
+===============
+
+    Special thanks go to the testers of disappearing v1.0.3.  Reports
+of critical bug fixes go to (in no special order):  E. Clinton
+Arbaugh, Pat Macdonald, Eric Demerling, John Rouillard, Bob
+Cunningham, and Neil Todd.
+
+    Sam Gassel, Edward DeHart, Drew Gonczi, Rik Farrow, Jim Napier,
+Drew Jolliffe, John Rouillard, Alain Brossard, Eric Bergren, Patrick
+Sullivan, Nora Hermida, Juergen Schmidt, Debbie Pomerance, Michael
+Hines, Tim Ramsey, Georges Tomazi, Mitchell Marks, Philip Cox, Kevin
+Dupre', Chris Kern, and Eugene Zaustinsky helped in getting the
+Tripwire v1.1 release in shape for our December 1993 release.
+
+Gene & Gene
+Kim  & Spafford
+
+

@@ -1,0 +1,159 @@
+# -*- mode: Makefile -*-
+# Copyright (C) 2002 by its various Authors, see CVS-log
+#
+# PURPOSE OF THIS FILE: Make file for OpenH323 Gatekeeper
+#
+# - Automatic Version Information via RCS:
+#   $Id: Makefile.in,v 1.24 2006/07/06 18:25:19 willamowius Exp $
+#   $Source: /cvsroot/openh323gk/openh323gk/Makefile.in,v $
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+#
+
+PROG	 = gnugk
+SOURCES	 = main.cxx singleton.cxx job.cxx yasocket.cxx h323util.cxx \
+           Toolkit.cxx SoftPBX.cxx GkStatus.cxx RasTbl.cxx Routing.cxx \
+           Neighbor.cxx GkClient.cxx gkauth.cxx RasSrv.cxx ProxyChannel.cxx \
+           gk.cxx version.cxx gkacct.cxx gktimer.cxx gkconfig.cxx \
+           sigmsg.cxx clirw.cxx cisco.cxx ipauth.cxx statusacct.cxx \
+           syslogacct.cxx capctrl.cxx @SOURCES@
+
+HEADERS  = GkClient.h GkStatus.h Neighbor.h ProxyChannel.h RasPDU.h \
+           RasSrv.h RasTbl.h Routing.h SoftPBX.h Toolkit.h factory.h \
+           gk.h gk_const.h gkacct.h gkauth.h job.h name.h rasinfo.h rwlock.h \
+           singleton.h slist.h stl_supp.h version.h yasocket.h gktimer.h \
+           gkconfig.h configure Makefile sigmsg.h clirw.h cisco.h ipauth.h \
+           statusacct.h syslogacct.h capctrl.h @HEADERS@
+
+# add cleanup files for non-default targets
+CLEAN_FILES += $(OBJDIR)/addpasswd $(OBJDIR)/addpasswd.o docs/manual/*.html
+# add cleanup files for autoconf
+#CLEAN_FILES += Makefile config.*
+
+# colon, the empty variable and a single space are special characters to
+# MAKE and may cause trouble. Let's 'quote' the little bastards by
+# assigning it to a variable
+colon:=:
+comma:=,
+empty:=
+space:=$(empty) $(empty)
+
+# remove half updated or corrupt files
+.DELETE_ON_ERROR:
+
+# setup various important paths
+PWLIBDIR=@PWLIBDIR@
+OPENH323DIR=@OPENH323DIR@
+OPENH323MAKEDIR=@OPENH323MAKEDIR@
+
+ifndef TMP
+  TMP=/tmp
+endif
+
+ifeq (@NEEDOPENH323PREFIX@,1)
+ifndef PREFIX
+PREFIX=@OPENH323INSTALLPREFIX@
+endif
+endif
+
+CWD:=$(shell pwd)
+
+
+# having an own idea about default targets. This leads to nicly
+# maintainable binaries with proper library dependence, libraries may be
+# replaced on the fly.
+.PHONY: bothdepend bothshared gkdefault
+.DEFAULT: gkdefault
+gkdefault: bothdepend bothshared
+
+# LD_RUN_LIST is the list form of the LD_RUN_PATH
+LD_RUN_LIST := $(subst $(colon),$(space),$(LD_RUN_PATH))
+LD_RUN_LIST += $(PWLIBDIR)/lib $(OPENH323DIR)/lib
+
+# compiler/linker flags set by configure script
+STDCCFLAGS += @STDCCFLAGS@
+LDFLAGS    += @LDFLAGS@
+ENDLDLIBS  += @ENDLDLIBS@
+ENDLDFLAGS += @ENDLDFLAGS@
+
+STDCCFLAGS += -D'MANUFACTURER=@MANUFACTURER@'
+STDCCFLAGS += -D'PROGRAMMNAME=@PROGRAMNAME@'
+
+# automatically include debugging code or not
+ifdef PASN_NOPRINT
+  STDCCFLAGS += -DPASN_NOPRINT
+else
+  STDCCFLAGS += -DPTRACING
+endif
+
+###
+### Including the general make rules of OpenH323
+###
+
+include $(OPENH323MAKEDIR)/openh323u.mak
+
+### Remove -fdata-sections gcc option that cause problems during link step
+temp_STDCCFLAGS := $(subst -fdata-sections,,$(STDCCFLAGS))
+STDCCFLAGS = $(temp_STDCCFLAGS)
+
+# GK version infomation
+STDCCFLAGS	+= -DMAJOR_VERSION=@GNUGK_MAJOR_VERSION@ -DMINOR_VERSION=@GNUGK_MINOR_VERSION@ -DBUILD_NUMBER=@GNUGK_BUILD_NUMBER@
+
+OPTCCFLAGS	= -O2
+
+# special dependency to ensure version.cxx is rebuilt each time gnugk is recompiled
+# so the proper build timestamp is included
+versionts.h: $(subst version.cxx,,$(SOURCES)) $(HEADERS) $(OH323_LIBDIR)/$(OH323_FILE) $(PW_LIBDIR)/$(PTLIB_FILE)
+	@touch $@
+
+# extra targets
+addpasswd: $(OBJDIR)/addpasswd.o
+	$(CXX) -o $(OBJDIR)/addpasswd $(CFLAGS) $(OBJDIR)/addpasswd.o $(LDFLAGS) -l$(PTLIB_BASE)$(LIB_TYPE) $(ENDLDLIBS) $(ENDLDFLAGS)
+
+doc:
+	$(MAKE) -C docs/manual html
+
+install: install-addpasswd
+
+install-addpasswd: addpasswd
+	$(INSTALL) $(OBJDIR)/addpasswd $(INSTALLBIN_DIR)
+
+#
+# By this command the build number may be incremented
+#
+.PHONY: increment
+
+# Use this to increment the build number
+increment:
+	-@BN=@GNUGK_BUILD_NUMBER@; \
+        BNN=`expr "$$BN" + 1`; \
+        echo "Upgrading from build $$BN to $$BNN"; \
+        cp version.h $(TMP)/version.h; \
+        sed -e 's/BUILD_NUMBER.*'"$$BN"'/BUILD_NUMBER '"$$BNN/" \
+                $(TMP)/version.h > version.h; \
+        rm -f $(TMP)/version.h; \
+		echo "Rerunning configure utility"; \
+		./configure
+
+# special configure dependencies
+configure: configure.in
+	autoconf
+
+Makefile: Makefile.in config.status
+	./config.status
+
+config.status: configure
+	./config.status --recheck
+

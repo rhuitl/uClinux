@@ -1,0 +1,206 @@
+# $Id: Makefile.xenix,v 1.2 1993/08/19 05:26:47 genek Exp $
+#
+# 	Tripwire build
+#
+# Gene Kim
+# Purdue University
+#
+
+# XENIX Makefile
+
+# support for parallel compiles (ala Dynix)
+# comment the following line out if your Make doesn't support this syntax.
+#P      = &
+
+# you can use ANSI C if you like, but K&R is equally fine.
+CC     = cc
+CFLAGS = -O
+
+#CC     = gcc
+#CFLAGS = -O -ansi
+
+# make sure libraries are not linked dynamically (as a security measure)
+#LDFLAGS= -Bstatic
+LDFLAGS= -s -lx
+
+# NOTICE/TNL   -lx required for dir type functions in LDFLAGS
+
+# If you don't have the install command, you need to replace
+# the use of it later in the makefile with a cp and chmod
+INSTALL= /etc/install
+
+# where you want to install the Tripwire binary
+TARGET = /usr/tmp/ch.Z.1123
+# NOTICE/TNL   above is a sneaky dir stored UNDER mounted /usr/tmp filesystem
+# to be exposed only during tripwire runs. A daemon (that does other things)
+# has a chdir("/usr/tmp");  that keeps the filesystem busy to confuse bad guys.
+# tripwire will kill -17 $TRIPWIREPID   to tell the daemon to chdir away
+# from /usr/tmp so root can umount it for the tripwire run. Then another
+# SIGUSR2 to tell daemon to reoccupy /usr/tmp after the run.
+
+# how you get hostname information (BSD vs. SYSV style)
+HOSTNAME	= uname -n
+#HOSTNAME	= hostname
+
+OFILES = 	config.parse.o main.o list.o ignorevec.o databs.build.o \
+		utils.o preen.o diff.sorted.o diff.parse.o preen.interp.o \
+		preen.report.o nullsig.o \
+		$(SIG1) $(SIG2)
+
+SIG1DIR   = ./md5
+SIG2DIR   = ./snefru
+
+SIG1	  = $(SIG1DIR)/md5wrapper.o $(SIG1DIR)/md5.o
+SIG2	  = $(SIG2DIR)/snefru.o
+
+# for generating shar distribution package
+
+DIST	= tripwire-0.9
+DISTPKG = Makefile README README.FIRST README.coast TODO Announce \
+	  tripwire.config *.[ch] tripwire.8 tripwire.design.ms Changelog
+
+###
+
+all:	tripwire 
+
+tripwire:	$(P) $(OFILES)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OFILES)
+
+$(SIG1):
+	(cd $(SIG1DIR); make CC="$(CC)" CFLAGS="$(CFLAGS)")
+$(SIG2):
+	(cd $(SIG2DIR); make CC="$(CC)" CFLAGS="$(CFLAGS)")
+
+.c.o:
+	$(CC) $(CFLAGS) -c $<
+
+install:	tripwire
+	$(INSTALL) tripwire $(TARGET)
+
+test:	tripwire
+	@HOST=`$(HOSTNAME)`; \
+	CURRPATH=`pwd`;	\
+	sed s,/tmp/genek/tripwire-0.9,$$CURRPATH, \
+			< ./Tests/tripwire.database_TEST \
+			> ./Databases/tripwire.database_$$HOST; \
+	cp tripwire.config tripwire.config.orig; \
+	sed s,/tmp/genek/tripwire-0.9,$$CURRPATH, \
+			< ./tripwire.config.orig \
+			> ./tripwire.config; 
+	@echo ======= test begin ======= ;
+	./tripwire; 
+	@echo ======= test end ======= ;
+	@echo ''; 
+	mv tripwire.config.orig tripwire.config; 
+	@CURRPATH=`pwd`; \
+	echo ''; \
+	echo Tripwire should have only reported: ; \
+	echo "    added:   $$CURRPATH/tripwire.config.orig" ; \
+	echo "             $$CURRPATH/Databases/... " ; \
+	echo "    changed: $$CURRPATH (your current directory) " ; \
+	echo "             ...and any other files you may have changed!"
+
+#
+# only for building distribution
+#
+maketest:
+	HOST=`$(HOSTNAME)`; \
+	CURRPATH=`pwd`;	\
+	./tripwire -initialize; \
+	cp ./Databases/tripwire.database_$$HOST ./Tests/tripwire.database_TEST;\
+	cp ./Tests/tripwire.database_TEST /tmp/genek/tripwire-0.9/Tests
+
+
+tags:	force
+	ctags *.[ch]
+
+shar:
+	-mkdir $(DIST)
+	-mkdir $(DIST)/Databases
+	-cp $(DISTPKG) $(DIST)
+	-cp -r $(SIG1DIR) $(SIG2DIR) ./$(DIST)
+	-cp -r configs Tests $(DIST)
+	-rm -fr ./$(DIST)/$(SIG1DIR)/RCS
+	-rm -fr ./$(DIST)/$(SIG1DIR)/CVS.adm
+	-rm -fr ./$(DIST)/$(SIG2DIR)/RCS
+	-rm -fr ./$(DIST)/$(SIG2DIR)/CVS.adm
+	-rm -fr ./$(DIST)/Tests/CVS.adm
+	-rm -fr $(DIST)/./configs/CVS.adm
+	-rm -f ./$(DIST)/$(SIG1DIR)/*.o
+	-rm -f ./$(DIST)/$(SIG2DIR)/*.o
+	shar -a $(DIST) > Tripwire.Dist.shar
+	-rm -rf ./$(DIST)
+
+tar:
+	-mkdir $(DIST)
+	-mkdir $(DIST)/Databases
+	-cp $(DISTPKG) $(DIST)
+	-cp -r $(SIG1DIR) $(SIG2DIR) ./$(DIST)
+	-cp -r configs Tests $(DIST)
+	-rm -fr ./$(DIST)/$(SIG1DIR)/RCS
+	-rm -fr ./$(DIST)/$(SIG1DIR)/CVS.adm
+	-rm -fr ./$(DIST)/$(SIG2DIR)/RCS
+	-rm -fr ./$(DIST)/$(SIG2DIR)/CVS.adm
+	-rm -fr $(DIST)/./Tests/CVS.adm
+	-rm -fr $(DIST)/./configs/CVS.adm
+	-rm -f ./$(DIST)/$(SIG1DIR)/*.o
+	-rm -f ./$(DIST)/$(SIG2DIR)/*.o
+	tar cf Tripwire.Dist.tar $(DIST)
+	-rm -rf ./$(DIST)
+
+depend:	force
+	makedep
+	mv Makefile Makefile.old
+	mv Makefile.new Makefile
+
+proto:	force
+	makeproto tripwire.h *.c
+
+clean:
+	rm -f $(OFILES)
+
+clobber:	clean
+
+force:
+
+# include dependencies
+
+#### Do not remove this line.  Makedep depends on it! ####
+config.parse.o: ./config.h
+config.parse.o: ./list.h
+config.parse.o: ./tripwire.h
+databs.build.o: ./config.h
+databs.build.o: ./list.h
+databs.build.o: ./tripwire.h
+diff.parse.o: ./config.h
+diff.parse.o: ./list.h
+diff.parse.o: ./tripwire.h
+diff.sorted.o: ./config.h
+diff.sorted.o: ./list.h
+diff.sorted.o: ./tripwire.h
+diff.sorted.o: ./utils.c
+ignorevec.o: ./config.h
+ignorevec.o: ./list.h
+ignorevec.o: ./tripwire.h
+list.o: ./config.h
+list.o: ./list.h
+main.o: ./config.h
+main.o: ./list.h
+main.o: ./tripwire.h
+main.o: ./snefru/snefru.h
+main.o: ./md5/md5.h
+main.o: ./nullsig.h
+nullsig.o: ./config.h
+preen.o: ./config.h
+preen.o: ./list.h
+preen.o: ./tripwire.h
+preen.interp.o: ./config.h
+preen.interp.o: ./list.h
+preen.interp.o: ./utils.h
+preen.interp.o: ./tripwire.h
+preen.report.o: ./config.h
+preen.report.o: ./list.h
+preen.report.o: ./tripwire.h
+utils.o: ./config.h
+utils.o: ./list.h
+utils.o: ./tripwire.h

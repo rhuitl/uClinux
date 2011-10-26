@@ -1,0 +1,129 @@
+.TH pppoa3 "8" "May 2004" "SpeedTouch USB driver"
+.SH NAME
+pppoa3 \- ppp(d) PPP over ATM interface for SpeedTouch USB and SpeedTouch 330 modem
+.SH SYNOPSIS
+.B pppoa3
+[\fIOPTION\fR]... -vpi value1 -vci value2
+.SH DESCRIPTION
+.PP
+\fBpppoa3\fR allows ppp(d) to communicate with the SpeedTouch USB modem through a PTY interface. It manages PPP encapsulation into ATM cells, which are then send as aal5 packets to the modem through the USB bus. Unlike \fBpppoa2\fR, \fBpppoa3\fR uses threads to do its job (for more details read the pppoax-doc-[en,fr].txt document shipped with the driver)
+.PP
+You have to carefully set your \fBvpi\fR and \fBvci\fR values according to your country settings.
+.PP
+Here are some values :
+
+vpi.vci = 8.48 for Netherlands
+          8.35 for France
+          8.67 for France (bis)
+          8.35 for Belgium
+          8.35 for Italy
+          0.38 for UK
+.SH MANDATORY
+.TP
+\fB\-vpi\fR vpi_value
+Defines vpi value
+
+.TP
+\fB\-vci\fR vci_value
+Defines vci value
+
+.SH OPTIONS
+.TP
+\fB\-\-async, \-a\fR
+Force Async mode for ppp communication.
+
+.TP
+\fB\-\-bridging, \-b
+Bridging 1483 mode (PPPoE support).
+
+.TP
+\fB\-\-clean, \-c\fR
+Clean previous instance of pppoa3 according to modem ID
+
+.TP
+\fB\-\-device, \-d\fR device_filename
+Defines which USB device should be used as the SpeedTouch USB modem. On Linux, this is something like /proc/bus/usb/003/006. Usefull when using more than one modem on the same machine.
+
+.TP
+\fB\-\-alt-ep, \-e\fR alternate_number
+Use an alternate endpoint interface. The value 1 is used if nothing is specified as it works with all modem revision. If you specify -1, no alternate endpoint interface will be selected, using the one selected by the system.
+
+.TP
+\fB\-\-filename, \-f\fR log_filename (syslogd unavailable)
+Defines the log filename to use (Default /var/log/pppoa3-ModemID.log)\n
+
+.TP
+\fB\-\-modem, \-m\fR ModemID
+Defines a modem ID so you can use more than one modem
+on the same machine running differents \fBpppoa3\fR with
+different modem IDs (Default 1)
+
+.TP
+\fB\-\-pipe, \-p\fR
+Enables named pipe control thread
+(See the \fB\-ph\fR option for more details)
+
+.TP
+\fB\-\-schedule, \-s\fR policy
+Defines the schedule policy used for the io threads
+    0 \- SCHED_OTHER (Non realtime / default)
+    1 \- SCHED_RR    (Realtime round-robin)
+    2 \- SCHED_FIFO  (Realtime fifo)
+
+.TP
+\fB\-\-verbose\fR level, \fB\-v\fR level
+Verbosity level
+    \- 0 Main messages + Error messages
+    \- 1 level 0 + State/Warnings messages
+    \- 2 level 1 + More debug info
+    \- 3 level 2 + USB packet dumping (can cause driver crash)
+
+.TP
+\fB\-\-pipehelp, \-ph\fR
+Prints an helpfull control pipe command list (See next section)
+
+.TP
+\fB\-\-help, \-h\fR
+Prints a help message
+
+.SH PIPE COMMANDS
+.PP
+\fBpppoa3\fR can start a control pipe thread when \fB\-p\fR option is set or when \fBpppoa3\fR receives a SIGUSR2 signal. This pipe allows you to send simple commands to \fBpppoa3\fR in order to modify its behaviour without restarting it.
+.PP
+To execute a command, you just have to type :
+.PP
+    # echo command > /var/run/pppoa3-modemID.pipe
+.PP
+\fBCommand List\fR
+
+.TP
+\fBverbose\fR=level
+Defines the verbosity level (See previous section for \'level\' meaning)
+
+.TP
+\fBiopolicy\fR=policy
+Defines the schedule policy of the 2 IO threads (See previous section for \'policy\' meaning)
+
+.TP
+\fBkill\fR=entity
+\'entity\' is one of those strings
+     pipe  -> this turn off the pipe option
+     pppoa -> this simulates a modem hangup event
+
+.PP
+\fBExamples\fR
+
+.TP
+# echo "verbose=2" > /var/run/pppoa3-modem1.pipe"
+
+.TP
+# echo "kill=pppoa" > /var/run/pppoa3-modem1.pipe"
+
+.SH RETURN VALUES
+.TP
+0 on success, any other value on failure
+.SH SEE ALSO
+.TP
+\fBmodem_run(8)\fR, \fBpppoa2(8)\fR
+.SH AUTHOR
+SpeedTouch USB driver development team.

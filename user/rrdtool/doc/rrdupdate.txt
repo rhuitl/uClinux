@@ -1,0 +1,107 @@
+RRDUPDATE(1)                 rrdtool                 RRDUPDATE(1)
+
+
+
+NNAAMMEE
+       rrdupdate - Store a new set of values into the RRD
+
+SSYYNNOOPPSSIISS
+       rrrrddttooooll {uuppddaattee | uuppddaatteevv} _f_i_l_e_n_a_m_e [----tteemmppllaattee|--tt _d_s_-
+       _n_a_m_e[::_d_s_-_n_a_m_e]...]  NN|_t_i_m_e_s_t_a_m_p::_v_a_l_u_e[::_v_a_l_u_e...]  _a_t_-
+       _t_i_m_e_s_t_a_m_p@@_v_a_l_u_e[::_v_a_l_u_e...]  [_t_i_m_e_s_-
+       _t_a_m_p::_v_a_l_u_e[::_v_a_l_u_e...] ...]
+
+DDEESSCCRRIIPPTTIIOONN
+       The uuppddaattee function feeds new data values into an RRRRDD. The
+       data is time aligned (interpolated) according to the prop-
+       erties of the RRRRDD to which the data is written.
+
+       uuppddaatteevv This alternate version of uuppddaattee takes the same
+               arguments and performs the same function. The _v
+               stands for _v_e_r_b_o_s_e, which describes the output
+               returned. uuppddaatteevv returns a list of any and all
+               consolidated data points (CDPs) written to disk as
+               a result of the invocation of update. The values
+               are indexed by timestamp (time_t), RRA (consolida-
+               tion function and PDPs per CDP), and data source
+               (name).  Note that depending on the arguments of
+               the current and previous call to update, the list
+               may have no entries or a large number of entries.
+
+       _f_i_l_e_n_a_m_e
+               The name of the RRRRDD you want to update.
+
+       ----tteemmppllaattee|--tt _d_s_-_n_a_m_e[::_d_s_-_n_a_m_e]...
+               By default, the uuppddaattee function expects its data
+               input in the order the data sources are defined in
+               the RRD, excluding any COMPUTE data sources (i.e.
+               if the third data source DDSSTT is COMPUTE, the third
+               input value will be mapped to the fourth data
+               source in the RRRRDD and so on). This is not very
+               error resistant, as you might be sending the wrong
+               data into an RRD.
+
+               The template switch allows you to specify which
+               data sources you are going to update and in which
+               order. If the data sources specified in the tem-
+               plate are not available in the RRD file, the
+               update process will abort with an error message.
+
+               While it appears possible with the template switch
+               to update data sources asynchronously, RRRRDDttooooll
+               implicitly assigns non-COMPUTE data sources miss-
+               ing from the template the _*_U_N_K_N_O_W_N_* value.
+
+               Do not specify a value for a COMPUTE DDSSTT in the
+               uuppddaattee function. If this is done accidentally (and
+               this can only be done using the template switch),
+               RRRRDDttooooll will ignore the value specified for the
+               COMPUTE DDSSTT.
+
+       NN|_t_i_m_e_s_t_a_m_p::_v_a_l_u_e[::_v_a_l_u_e...]
+               The data used for updating the RRD was acquired at
+               a certain time. This time can either be defined in
+               seconds since 1970-01-01 or by using the letter
+               'N', in which case the update time is set to be
+               the current time. Negative time values are
+               subtracted from the current time. An AT_STYLE TIME
+               SPECIFICATION (see the _r_r_d_f_e_t_c_h documentation) may
+               also be used by delimiting the end of the time
+               specification with the '@' character instead of a
+               ':'. Getting the timing right to the second is
+               especially important when you are working with
+               data-sources of type CCOOUUNNTTEERR, DDEERRIIVVEE or AABBSSOOLLUUTTEE.
+
+               The remaining elements of the argument are DS
+               updates. The order of this list is the same as the
+               order the data sources were defined in the RRA. If
+               there is no data for a certain data-source, the
+               letter UU (e.g., N:0.1:U:1) can be specified.
+
+               The format of the value acquired from the data
+               source is dependent on the data source type cho-
+               sen. Normally it will be numeric, but the data
+               acquisition modules may impose their very own
+               parsing of this parameter as long as the colon (::)
+               remains the data source value separator.
+
+EEXXAAMMPPLLEE
+       "rrdtool update demo1.rrd N:3.44:3.15:U:23"
+
+       Update the database file demo1.rrd with 3 known and one
+       _*_U_N_K_N_O_W_N_* value. Use the current time as the update time.
+
+       "rrdtool update demo2.rrd 887457267:U 887457521:22
+       887457903:2.7"
+
+       Update the database file demo2.rrd which expects data from
+       a single data-source, three times. First with an _*_U_N_K_N_O_W_N_*
+       value then with two regular readings. The update interval
+       seems to be around 300 seconds.
+
+AAUUTTHHOORR
+       Tobias Oetiker <oetiker@ee.ethz.ch>
+
+
+
+1.2.10                      2005-06-17               RRDUPDATE(1)

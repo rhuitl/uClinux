@@ -1,0 +1,162 @@
+############################################################################
+#
+# Vendor specific settings
+#
+
+CONSOLE_BAUD_RATE = 9600
+LINUXTARGET = zImage
+
+############################################################################
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all build
+#
+
+# ARCH = kernel,  TARGET_ARCH = uClibc
+
+MACHINE       = nios2
+ARCH          = nios2nommu
+CROSS_COMPILE = nios2-linux-uclibc-
+CROSS         = $(CROSS_COMPILE)
+
+CONFIG_UCLINUX=y
+
+CC        = $(CROSS_COMPILE)gcc
+AS        = $(CROSS_COMPILE)as
+CXX       = $(CROSS_COMPILE)g++
+AR        = $(CROSS_COMPILE)ar
+LD        = $(CROSS_COMPILE)ld
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+ELF2FLT   = $(CROSS_COMPILE)elf2flt
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+UCLINUX_BUILD_SET = 0					# have we set a special config below
+
+# These can be used by configure.
+# Either configure $(CONFIGURE_OPTS)
+# or     configure --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+#
+TARGETARCH    := nios2-linux-uclibc
+HOSTARCH      := $(shell sh $(ROOTDIR)/tools/config.guess)
+CONFIGURE_OPTS := --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+
+############################################################################
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  :=  -O1 -g
+  else
+	CFLAGS  :=  -O2 -g
+  endif
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -DEMBED
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS = $(CFLAGS)
+	CFLAGS  += -I$(ROOTDIR)
+	CFLAGS  += -Dlinux -D__linux__ -D__uClinux__ -Dunix
+
+	LDFLAGS  = $(CFLAGS) -Wl,-d -Wl,-elf2flt
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+	GCC_DIR = $(shell $(CC) -v 2>&1 | grep specs | sed -e 's/.* \(.*\)specs/\1\./')
+	GCC_LIB = ~/buildroot/build_nios2/staging_dir/lib
+
+	SLIBC        = -lc
+	SLIBM        = -lm
+	SLIBNET      = -lnet
+	SLIBDES      = -ldes
+	SLIBAES      = -laes
+	SLIBPCAP     = -lpcap
+	SLIBSSL      = -lssl
+	SLIBCRYPTO   = -lcrypto
+
+	LIBC        = $(SLIBC)
+	LIBM        = $(SLIBM)
+	LIBNET      = $(SLIBNET)
+	LIBDES      = $(SLIBDES)
+	LIBAES      = $(SLIBAES)
+	LIBPCAP     = $(SLIBPCAP)
+	LIBSSL      = $(SLIBSSL)
+	LIBCRYPTO   = $(SLIBCRYPTO)
+	LIBCRYPT    = -lcrypt
+	LIBGCC      = -lgcc
+	LIBIBERTY   = -liberty
+	LIBIO       = -lio
+	LIBIOSTREAM = -liostream
+	LIBSTDCPP   = -lstdc++
+
+	LDPATH = \
+		-L$(ROOTDIR)/lib \
+		-L$(ROOTDIR)/lib/libnet \
+		-L$(ROOTDIR)/lib/libdes \
+		-L$(ROOTDIR)/lib/libaes \
+		-L$(ROOTDIR)/lib/libpcap \
+		-L$(ROOTDIR)/lib/libssl
+
+	INCLIBC = 
+	INCLIBM = 
+	INCNET  = -I$(ROOTDIR)/lib/libnet
+	INCDES  = -I$(ROOTDIR)/freeswan/libdes
+	INCAES  = -I$(ROOTDIR)/freeswan/libcrypto/libaes
+	INCGMP  = -I$(ROOTDIR)/lib/libgmp
+	INCPCAP = -I$(ROOTDIR)/lib/libpcap
+	INCSSL  = -I$(ROOTDIR)/lib/libssl/include
+	INCVEND = -I$(ROOTDIR)/vendors/include
+
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  :=  -O1 -g
+  else
+	CFLAGS  :=  -O2 -g
+  endif
+	CFLAGS  += $(VENDOR_CFLAGS)
+	CFLAGS  += -Dlinux -D__linux__ -Dunix -D__uClinux__ -DEMBED
+	CFLAGS  += $(INCLIBC) $(INCLIBM)
+	CFLAGS  += -I$(ROOTDIR)
+	CFLAGS  += -I$(ROOTDIR)/include
+	CFLAGS  += -fno-builtin
+	CFLAGS  += -Dfork=vfork -D__adjtimex=adjtimex
+
+	CXXFLAGS = $(CFLAGS) $(INCCXX) -fname-mangling-version-0
+
+	LDFLAGS  = $(CFLAGS) -Wl,-d -Wl,-elf2flt
+	LDLIBS   = $(LDPATH) -lcrypt -lutil $(LIBC)
+	CXXLIBS  = $(LDPATH) $(LIBSTDCPP) $(LIBIOSTREAM) $(LIBIO) $(LIBIBERTY) \
+			$(LIBC) $(LIBGCC)
+	
+	FLTFLAGS := -z
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+endif
+
+############################################################################

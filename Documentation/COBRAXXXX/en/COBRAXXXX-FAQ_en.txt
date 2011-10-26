@@ -1,0 +1,132 @@
+File:       COBRAXXXX-FAQ_en.txt
+Location:   uClinux-dist/Documentation/COBRAXXXX/en/
+            and COBRAXXXX-CD/documentation/boards/
+Author:     Heiko Degenhardt (linux@sentec-elektronik.de)
+Contents:   Frequently asked questions about the board.
+Version:    v01.00
+Date:       Wed Mar 24 17:59:40 CET 2004
+License:    This document is under the GNU GPL
+            (see uClinux-dist/COPYING)
+______________________________________________________________________
+
+CHANGES
+
+040324  v01.00 Creation
+        (new file, because it is for both boards now)
+        (hede)
+______________________________________________________________________
+
+GENERAL
+
+Q: What does "COBRA5272" or "COBRA5282" mean?
+A: COBRA stands for "COldfire Board for Rapid Applications". The 5272
+   shows that the board is based on Motorola's ColdFire 5272. The
+   COBRA5282 is based on the MCF5282.
+
+Q: Where can I order the boards? Is there a web site?
+A: You can order the boards via the German distributor ELEKTRONIKLADEN.
+   Their web sites for the boards are
+   http://www.elektronikladen.de/cobra5272.html and
+   http://www.elektronikladen.de/cobra5282.html.
+   The home page of the boards is at
+   http://www.sentec-elektronik.de/cobra/.
+
+Q: Ok, now I have the board. What are the first steps I should do
+   to get a running image?
+A: Now that you have downloaded the uClinux-dist sources please read 
+   ./Documentation/COBRAXXXX/en/COBRAXXXX-Getting-started_en.txt
+   to get started. If you obtained the COBRAXXXX-CD, you will find 
+   all related pdf files in /documentation/boards/.
+
+COMMUNICATION
+
+Q: What cable have I to use for communicating via the serial port?
+A: You can use a "normal" serial cable, not a so called "null modem
+   cable".
+
+Q: What are the standard values for the communication parameters?
+A: Serial Port: 19200 Baud, 8n1
+   Server IP:   192.168.100.1
+   Client IP:   192.168.100.2
+   Netmask:     255.255.255.0
+   Gateway IP:  0.0.0.0
+   Ethernet:    00:00:00:00:00:01 
+(The default MAC address for the COBRA5282 is 00:CF:52:82:CF:01).
+
+Q: How can I configure the parameters for the commands that are
+   executed on kernel start up?
+A: At start-up of the uClinux kernel the commands of the file
+   uClinux-dist/vendors/senTec/romfs/etc/rc get executed.
+   Here you can configure for instance the IP address, the netmask,
+   if you want to mount a directory via NFS, and if so, which
+   directory gets mounted and so on.
+   (HINT: To get a detailed description you should look into the
+   manual pages of the commands, eg. "man ifconfig").
+
+ERRORS/PROBLEMS
+
+Q: The board always does a reset. What can I do?
+A: Here are some things to check:
+   a) Increase the value of the current clamp:
+   The power supply should give around 500mA at 6V (if you have a
+   starter kit with a linear voltage regulator you can try to
+   increase the voltage to around 7.5V).
+
+   b) Measure the voltage:
+   On the starterkit board you find opposite to the bdm connector
+   a row of LED's (D3..D10). On the left site of it there is a
+   edge connector. There you have plus on the one site, and ground
+   on the other. The voltage there should be >3.15V.
+   On the COBRA5282 board, near the breadbord area, you find
+   2 rows with 4 pins each. They are labeled "GND" and "+3.3V".
+   Between 2 of their pins you should measure a voltage >3.15V.
+
+Q: "make" gives an error about a missing reference to
+   "del_mtd_partitions"?
+A: You must set CONFIG_MTD_PARTITIONS in the kernel config!
+
+Q: I don't have a BDM-Adaptper. Where can I get one?
+A: You can look for it for instance at http://www.pemicro.com or
+   http://www.cybertec.com.au. Make sure to use a
+   "Shielded ColdFire BDM Adapter, 3.3V".
+
+Q: After "make dep" or "make" there are many messages scrolling out
+   of the terminal window. How is it possible to read them?
+A: You can for instance "pipe" them into the program "tee" that
+   writes them into a file, eg. "errs". To do that, just type:
+   "make 2>&1 | tee errs".
+
+Q: The tftp download from dBUG doesn't work, gives errors or
+   simply stops, but my cabling is correct. What can I do?
+A: There seem to be errors in the dBUG source code that make
+   it less tolerant against errors concerning problems with
+   the network interfaces. As far as we can tell the download
+   works more stable if you give the file name on the command
+   line, e.g. "dn image.bin".
+   You should set the network speed to 10MBit on the COBRA5272
+   and to 100MBit half duplex on the COBRA5282. To do that
+   you can for instance use mii-tool on a Linux host.
+   There seem to be no problems if you use a switch or hub
+   to connect the board with your PC.
+
+Only for COBRA5272:
+Q: I want to use the external bus for my own periphals. With the
+   oscilloscope I can see, that the external chipselects are
+   "floating", and so my periphals cannot work. What can I do?
+A: The buffers IC 0201 - IC 0209 (see Schematic p. 3) are selected
+   with the same chipselects. When the buffers are disabled, the 
+   level of all external signal (includig the chipselects) are
+   falling to Ground. To avoid this, the used chipselects can
+   be pulled up (eg. with 4,7k) to 3,3V.
+
+
+FEEDBACK
+
+If you find errors, or have some tips or questions concerning this
+FAQ, please send an email to linux@sentec-elektronik.de. You'll
+easily find out that I'm not a native English speaker, so feedback
+is really welcome!
+
+______________________________________________________________________
+(c) 2004, senTec Elektronik Gmbh, Heiko Degenhardt
+

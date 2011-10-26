@@ -1,0 +1,74 @@
+Here's a modification of rexec source that I call klaxon. It is
+extremely useful for detecting portscanner attacks like those perpetrated
+by ISS and SATAN, among others. It also has optional IDENT (RFC931)
+support for finding out the remote user (where applicable).
+
+Ident is a protocol sometimes also called TAP which is based on RFC931.
+If the machine that the scan attempt supports this protocol (usually out
+of inet) you will get a username as well as the hostname of the attacking
+machine. NOTE: This information should be taken with a grain of salt as
+ident can be very easy to spoof. However, it can also be useful, so I have
+left it as an option in the source. The current timeout for determining
+if the remote machine supports ident is 3 seconds. You can adjust this
+in the Makefile.
+ Both ident-full and ident-free version of the executable are built from
+one Makefile. Currently, it compiles out of the box on Solaris2.X, 
+SunOS4.1.X, Digital Unix 3.2*, Linux, HPUX, and probably others.
+
+Copy the version of the source (with or without ident) and rename it
+to klaxon. Put it in a directory where you put the rest of your custom
+non-OS executables. It's best to have it local to the machine rather than
+on an NFS mounted partition, since it is a daemon run out of inetd.
+
+For each service that you want to place a trap, you stick klaxon in
+place of the normal executable. Here are some examples: 
+(stick in /etc/inetd.conf)
+
+#
+# Local testing counterintelligence
+#
+rexec   stream  tcp     nowait  root    /etc/local/klaxon klaxon rexec
+link    stream  tcp     nowait  root    /etc/local/klaxon klaxon link
+supdup  stream  tcp     nowait  root    /etc/local/klaxon klaxon supdup
+tcpmux  stream  tcp     nowait  root    /etc/local/klaxon klaxon tcpmux
+rje     stream  tcp     nowait  root    /etc/local/klaxon klaxon rje
+tftp    dgram   udp     wait    root    /etc/local/klaxon klaxon tftp
+
+
+Now, you need to restart inetd. Do this by sending it a HUP signal.
+ps -ax (SunOS4.X) or ps -ef (Solaris2.X) will tell you the process id
+of inetd.  kill -HUP <process_id> to restart inetd.
+
+(replace "/etc/local" with the location where you put klaxon)
+
+
+NOTES: 
+	This works in place of any tcp or udp service, but it does NOT work
+	in place of RPC based services.
+
+	You can also build a static version by compiling with the appropriate
+	static flag (-Bstatic or -static depending on compiler) by linking
+	in mine.o (gcc -c mine.c, and then add it to the linking phase in
+	the Makefile)
+
+
+BUILDING: 
+	$(OS) = 4x or 5x on Sun machines.
+	Known to build correctly with gcc and Sun SparcWorks compilers
+
+	1) Type make
+	2)  a) Copy klaxon.$(OS).ident to klaxon if you want ident support
+ 	    b) Copy klaxon.$(OS) to klaxon if you do not care about ident support
+	3) edit your inetd.conf as described above
+	4) test it out by telneting to your machine on the tcpmux port.
+	   (e.g. telnet localhost 1)
+
+ACKNOWLEDGEMENTS:
+	Wietse Venema - from whom I borrowed and modified the rfc931 support
+	NetBSD - from whom I borrowed the original rexec code.
+
+
+PROBLEMS:
+	email Doug.Hughes@eng.auburn.edu
+
+	LINUX users: line 104 must be changed to argv[0] instead of argv[1].

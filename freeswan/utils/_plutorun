@@ -1,0 +1,197 @@
+#!/bin/sh
+# Pluto control daemon
+# Copyright (C) 1998, 1999, 2001  Henry Spencer.
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: _plutorun,v 1.8.10.3 2002/04/12 16:06:47 mcr Exp $
+
+me='ipsec _plutorun'		# for messages
+
+wherelog=daemon.error
+pidfile=/var/run/pluto.pid
+verb="Starting"
+for dummy
+do
+	case "$1" in
+	--re)	verb="Restarting"	;;
+	--debug)	plutodebug="$2" ; shift	;;
+	--uniqueids)	uniqueids="$2" ; shift	;;
+	--nat_traversal)    nat_traversal="$2" ; shift  ;;
+	--keep_alive)   keep_alive="$2" ; shift ;;
+	--force_keepalive)   force_keepalive="$2" ; shift ;;
+	--disable_port_floating)    disable_port_floating="$2" ; shift  ;;
+	--virtual_private)  virtual_private="$2" ; shift ;;
+	--nocrsend)	nocrsend="$2" ; shift	;;
+	--dump)	dumpdir="$2" ; shift	;;
+	--load)	plutoload="$2" ; shift	;;
+	--start)	plutostart="$2" ; shift	;;
+	--wait)	plutowait="$2" ; shift	;;
+	--pre)	prepluto="$2" ; shift	;;
+	--post)	postpluto="$2" ; shift	;;
+	--log)	wherelog="$2" ; shift	;;
+	--pid)	pidfile="$2" ; shift	;;
+	--)	shift ; break	;;
+	-*)	echo "$me: unknown option \`$1'" >&2 ; exit 2	;;
+	*)	break	;;
+	esac
+	shift
+done
+
+# initially we are in the foreground, with parent looking after logging
+
+# precautions
+if test -f $pidfile
+then
+	echo "pluto appears to be running already (\`$pidfile' exists), will not start another"
+	exit 1
+fi
+if test ! -e /dev/urandom
+then
+	echo "cannot start Pluto, system lacks \`/dev/urandom'!?!"
+	exit 1
+fi
+
+# sort out options
+popts=
+for d in $plutodebug
+do
+	popts="$popts --debug-$d"
+done
+case "$uniqueids" in
+yes)	popts="$popts --uniqueids"	;;
+no|'')				;;
+*)	echo "unknown uniqueids value (not yes/no) \`$IPSECuniqueids'"	;;
+esac
+case "$nocrsend" in
+yes)	popts="$popts --nocrsend"	;;
+no|'')				;;
+*)	echo "unknown nocrsend value (not yes/no) \`$IPSECnocrsend'"	;;
+esac
+case "$nat_traversal" in
+yes)  popts="$popts --nat_traversal"  ;;
+no|'')                ;;
+*)    echo "unknown nat_traversal value (not yes/no) \`$IPSECnat_traversal'" ;;
+esac
+[ -n "$keep_alive" ] && popts="$popts --keep_alive $keep_alive"
+case "$force_keepalive" in
+yes)  popts="$popts --force_keepalive"  ;;
+no|'')                ;;
+*)    echo "unknown force_keepalive value (not yes/no) \`$IPSECforce_keepalive'" ;;
+esac
+case "$disable_port_floating" in
+yes)  popts="$popts --disable_port_floating"  ;;
+no|'')                ;;
+*)    echo "unknown disable_port_floating (not yes/no) \`$disable_port_floating'" ;;
+esac
+[ -n "$virtual_private" ] && popts="$popts --virtual_private $virtual_private"
+# set up dump directory
+if test " $dumpdir" = " "
+then
+	ulimit -c 0			# preclude core dumps
+elif test ! -d "$dumpdir"
+then
+	echo "dumpdir \`$dumpdir' does not exist, ignored"
+	ulimit -c 0			# preclude core dumps
+elif cd $dumpdir			# put them where desired
+then
+	ulimit -c unlimited		# permit them
+else
+	echo "cannot cd to dumpdir \`$dumpdir', ignored"
+	ulimit -c 0			# preclude them
+fi
+
+# execute any preliminaries
+if test " $prepluto" != " "
+then
+	$prepluto
+	st=$?
+	if test " $st" -ne 0
+	then
+		echo "...prepluto command exited with status $st"
+	fi
+fi
+
+IPSEC_SECRETS=${IPSEC_CONFS}/ipsec.secrets
+if test ! -f "${IPSEC_SECRETS}"
+then
+    ( logger -p authpriv.info -t ipsec__plutorun No file ${IPSEC_SECRETS}, generating key.
+      ipsec newhostkey --quiet 
+      
+      # tell pluto to go re-read the file
+      ipsec auto --rereadsecrets
+      # XXX publish the key somehow?
+    ) &
+fi
+
+# 
+# make sure that the isakmp port is open!
+#
+if test -f /etc/sysconfig/ipchains
+then
+    if egrep -q 500:500 /etc/sysconfig/ipchains
+    then
+	:
+    else
+	ipchains -I input 1 -p udp -s 0.0.0.0/0.0.0.0 -d 0.0.0.0/0.0.0.0 500:500 -j ACCEPT
+	# XXX not for now
+	#sh /etc/rc.d/init.d/ipchains save
+    fi
+fi
+
+# spin off into the background, with our own logging
+echo "$verb Pluto subsystem..." | logger -p authpriv.error -t ipsec__plutorun
+dir=${IPSEC_DIR-/usr/local/lib/ipsec}
+until (
+	$dir/pluto --nofork $popts 2>&1
+	status=$?
+	echo "exit"
+	echo $status
+	) 2>/dev/null | $dir/_plutoload --load "$plutoload" \
+		--start "$plutostart" \
+		--wait "$plutowait" --post "$postpluto"
+do
+	status=$?
+	case "$status" in
+	13)	echo "internal failure in pluto scripts, impossible to carry on"
+		exit 1
+		;;
+	10)	echo "pluto apparently already running (?!?), giving up"
+		exit 1
+		;;
+	137)	echo "pluto killed by SIGKILL, terminating without restart or unlock"
+		exit 0
+		;;
+	143)	echo "pluto killed by SIGTERM, terminating without restart"
+		# pluto now does its own unlock for this
+		exit 0
+		;;
+	*)	st=$status
+		if test $st -gt 128
+		then
+			st="$st (signal `expr $st - 128`)"
+		fi
+		echo "!pluto failure!:  exited with error status $st"
+		echo "restarting IPsec after pause..."
+		(
+			sleep 10
+			ipsec setup _autorestart
+		) </dev/null >/dev/null 2>&1 &
+		exit 1
+		###sleep 10
+		###rm -rf $pidfile
+		#### and go around the loop again
+		;;
+	esac
+done </dev/null 2>&1 |
+	logger -p $wherelog -t ipsec__plutorun >/dev/null 2>/dev/null &
+
+exit 0

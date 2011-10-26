@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# lirc:        This is an init script for RedHat distribution.
+#
+# Author:      Denis V. Dmitrienko <denis@null.net>
+#
+# chkconfig: 345 95 10
+# description: lirc is a Linux Infrared Remote Control system.
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+[ -f /usr/local/sbin/lircd ] || exit 0
+[ -f /usr/local/sbin/lircmd ] || exit 0
+
+PATH=/usr/local/sbin:/usr/local/bin:$PATH
+
+# See how we were called.
+case "$1" in
+  start)
+	echo -n "Starting Infrared Remote Control: "
+	daemon lircd
+	daemon lircmd
+	echo
+	touch /var/lock/subsys/lirc
+	;;
+  stop)
+	echo -n "Shutting down Infrared Remote Control: "
+	killproc lircmd
+	killproc lircd
+	echo
+	rm -f /var/lock/subsys/lirc
+	;;
+  status)
+	status lircd
+	status lircmd
+	;;
+  restart)
+	$0 stop
+	$0 start
+	;;
+  *)
+	echo "Usage: lirc {start|stop|status|restart}"
+	exit 1
+esac
+
+exit 0
+

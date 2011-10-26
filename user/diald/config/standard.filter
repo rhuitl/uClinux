@@ -1,0 +1,65 @@
+#------------------------------------------------------------------------------
+# Rules for TCP packets.
+
+# Keep named xfers from holding the link up
+ignore tcp tcp.dest=tcp.53
+ignore tcp tcp.source=tcp.53
+
+# (Ack! SCO telnet starts by sending empty SYNs and only opens the
+# connection if it gets a response. Sheesh..)
+accept tcp 5 ip.tot_len=40,tcp.syn
+
+# keep empty packets from holding the link up (other than empty SYN packets)
+ignore tcp ip.tot_len=40,tcp.live
+
+# make sure http transfers hold the link for 2 minutes, even after they end.
+accept tcp 120 tcp.dest=tcp.80
+accept tcp 120 tcp.source=tcp.80
+
+# Once the link is no longer live, we try to shut down the connection
+# quickly. Note that if the link is already down, a state change
+# will not bring it back up.
+keepup tcp 5 !tcp.live
+ignore tcp !tcp.live
+
+# an ftp-data or ftp connection can be expected to show reasonably frequent
+# traffic.
+accept tcp 120 tcp.dest=tcp.21
+accept tcp 120 tcp.source=tcp.21
+
+# If we don't catch it above, give the link 10 minutes up time.
+accept tcp 600 any
+
+#------------------------------------------------------------------------------
+# Rules for UDP packets
+#
+
+# Don't bring the link up for rwho.
+ignore udp udp.dest=udp.513
+ignore udp udp.source=udp.513
+# Don't bring the link up for RIP.
+ignore udp udp.dest=udp.520
+ignore udp udp.source=udp.520
+# Don't bring the link up for NTP or timed.
+ignore udp udp.dest=udp.123
+ignore udp udp.source=udp.123
+ignore udp udp.dest=udp.525
+ignore udp udp.source=udp.525
+# Don't bring up on domain name requests between two running nameds.
+ignore udp udp.dest=udp.53,udp.source=udp.53
+# Bring up the network whenever we make a domain request from someplace
+# other than named.
+accept udp 30 udp.dest=udp.53
+accept udp 30 udp.source=udp.53
+# Do the same for netbios-ns broadcasts
+ignore udp udp.source=udp.137,udp.dest=udp.137
+accept udp 30 udp.dest=udp.137
+accept udp 30 udp.source=udp.137
+# keep routed and gated transfers from holding the link up
+ignore udp tcp.dest=udp.520
+ignore udp tcp.source=udp.520
+# Anything else gest 2 minutes.
+accept udp 120 any
+
+# Catch all, 30 seconds timeout.
+accept any 30 any

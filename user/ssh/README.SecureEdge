@@ -1,0 +1,57 @@
+This file contains instructions for getting ssh to run
+on the SecureEdge.
+
+SSHD - the server
+=================
+
+Sshd runs out of inetd.  All the necessary configuration for this is
+performed automatically by the build environment.
+
+The sshd_config file is installed into the unit.  This should be examine
+and possibly edited so it corresponds to what is desired.
+
+Also note that it uses /etc/config/passwd, and /etc/config/group so you
+might want to get this stuff going appropriate using tinylogin. I haven't
+got the server configured to use shadow groups simply because uClinux
+does not support shadow passwords. Also for the SecureEdge, anybody that
+logs on has to be root.  In this case creating shadow passwords is a bit
+of a waste of time.  The romfs build procedure includes both of these
+files with a single "root" entry defined.
+
+The ssh_host_dsa_key and ssh_host_key files must have modes of 400 or 600.
+If the ssh-keygen program is installed, these keys will be created at
+boot time.  This does take a little time, especially for the DSA key.
+The other key is generated first to allow earlier (and probably less
+safe) connections.  If the key generation program is not enabled,
+these key files will have to be manually inserted into the unit.
+Of course, key generation can be enabled, the unit booted, the flash
+file system saved (sync or sync -f) and the key generation disabled
+(edit /etc/config/start).  This will produce random key files for the
+unit that persist between reboots.  Alternatively, keys can be generated
+on the host system if the necessary software is installed.
+
+
+Bugs:
+
+The server takes a long time to respond to connection requests.  This is
+because a new encryption key has to be generated and doing so involves
+working with some very large numbers in fairly complex ways.  Reducing the
+length of the session encryption keys will help reduce this wait but it
+will also decrease the effectiveness of the package significantly.
+
+A final invalid packet is sent (or maybe only received by the client)
+when ssh
+v2 is disconnected.
+
+SSH - The client
+================
+Simply copy it into the box.  Make sure that any user that you want
+to have using the client is defined in /etc/config/passwd.  Once again
+tinylogin allows you to play with login names etc.
+
+I copied in the ssh_config file to get it working, although I don't
+think that this is actually required.  This copying is done during the
+rom file system build process.
+
+Any comments, etc send them to matthewn@lineo.com.
+

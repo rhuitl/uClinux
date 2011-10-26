@@ -1,0 +1,16 @@
+#!/bin/sh
+# Make tinylogin links list file.
+
+CONFIG_H=${1:-Config.h}
+APPLETS_H=${2:-applets.h}
+gcc -E -DMAKE_LINKS -include $CONFIG_H $APPLETS_H |
+  awk '/^[ \t]*LINK/{
+	match($2,"_TLG_DIR[A-Z_]*")
+	dir=substr($2,RSTART+8,RLENGTH-8)
+	gsub("_","/",dir)
+	if(dir=="/ROOT") dir=""
+	file=$3
+	gsub("\"","",file)
+	if (file=="tinylogin") next
+	print tolower(dir) "/" file
+  }'

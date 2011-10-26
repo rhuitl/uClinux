@@ -1,0 +1,25 @@
+echo "/etc/rc processing ..."
+echo "Starting watchdog ..."
+watchdog /dev/watchdog
+hostname SG635
+echo "Mounting Filesystems ..."
+mount -t proc proc /proc
+mount -t devpts devpts /dev/pts
+mount -t tmpfs -o size=33m tmpfs /var
+mount -t tmpfs -o size=2m tmpfs /etc/config
+mkdir -m 1777 /var/tmp
+mkdir -m 755 /var/log
+mkdir -m 755 /var/run
+mkdir -m 1777 /var/lock
+mkdir -m 755 /var/empty
+mkdir -m 755 /var/mnt
+echo "Processing Config Filesystem ..."
+flatfsd -r -n
+echo "Setting system clock ..."
+hwclock --hctosys --utc
+logd boot
+echo 1 >/proc/sys/net/ipv4/conf/all/promote_secondaries
+insmod authd
+initconf -v
+ifconfig lo 127.0.0.1
+echo "/etc/rc complete."

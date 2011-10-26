@@ -1,0 +1,140 @@
+#!/bin/sh
+#
+# firewall		This script sets up firewall rules.
+#
+# chkconfig: 2345 09 91
+# description: Sets up or removes firewall rules.
+#
+# Firewall rules for a firewall between a private internal network and the
+# Internet.
+#
+# Copyright (C) 2000 Roaring Penguin Software Inc.  This software may
+# be distributed under the terms of the GNU General Public License, version
+# 2 or any later version.
+
+# Interface to Internet
+EXTIF=ppp+
+
+# Internal network address.  For stand-alone machines, delete this and
+# all the "forward" rules.
+INTERNAL=192.168.2.0/24
+
+# Wildcard address
+ANY=0.0.0.0/0
+
+# Source function library.  THIS WORKS ONLY ON RED HAT-LIKE SYSTEMS.
+
+. /etc/rc.d/init.d/functions
+
+### For details, see the man page ipchains(1) and
+### /usr/doc/HOWTO/IPCHAINS-HOWTO -- David.
+
+case "$1" in
+    start)
+	echo -n "Setting up firewall rules"
+
+	# Turn on forwarding to silence warnings...
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+
+	# Set default policies; clear all rules
+	ipchains -P input ACCEPT
+	ipchains -P output ACCEPT
+	ipchains -P forward DENY
+
+	ipchains -F forward
+	ipchains -F input
+	ipchains -F output
+
+	### Spoof protection: Drop obviously suspect packets ###
+
+	# Drop packets claiming to be from unroutable addresses
+	ipchains -A input -l -s 10.0.0.0/8     -i $EXTIF -j DENY
+	ipchains -A input -l -s 172.16.0.0/12  -i $EXTIF -j DENY
+	ipchains -A input -l -s 192.168.0.0/16 -i $EXTIF -j DENY
+
+	# Drop packets wanting to go to unroutable addresses
+	ipchains -A input -l -d 10.0.0.0/8     -i $EXTIF -j DENY
+	ipchains -A input -l -d 172.16.0.0/12  -i $EXTIF -j DENY
+	ipchains -A input -l -d 192.168.0.0/16 -i $EXTIF -j DENY
+
+	### External access to services on this machine ###
+
+	# Reject identd packets without logging
+	ipchains -A input -i $EXTIF -p tcp -d $ANY 113 -j REJECT
+
+	# Allow access to sendmail -- log connection attempts
+	#ipchains -A input -l -i $EXTIF -p tcp -d $ANY 25 -y -j ACCEPT
+	#ipchains -A input  -i $EXTIF -p tcp -d $ANY 25 -j ACCEPT
+
+	# Allow access to ssh -- we run ssh on port 23 because of
+	# a stupid client firewall at one place we work.
+	#ipchains -A input -l -i $EXTIF -p tcp -d $ANY 23 -y -j ACCEPT
+	#ipchains -A input -i $EXTIF -p tcp -d $ANY 23 -j ACCEPT
+
+	# Deny all other TCP connection attempts on the external interface
+	ipchains -A input -l -i $EXTIF -p tcp -y -j DENY
+
+	# Deny TCP and UDP packets to privileged ports
+	ipchains -A input -l -i $EXTIF -d $ANY 0:1023 -p udp -j DENY
+	ipchains -A input -l -i $EXTIF -d $ANY 0:1023 -p tcp -j DENY
+
+	### FORWARD rules only apply if you have an internal LAN gatewaying
+	### through this computer.
+	# Allow DNS queries
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 53 -p udp -j MASQ
+
+	# Allow internal users to browse web (http and https)
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 80  -p tcp -b -j MASQ
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 443  -p tcp -b -j MASQ
+
+	# Allow internal users to read news
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 119  -p tcp -b -j MASQ
+
+	# Allow internal users to access POP and IMAP services on mail server
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 25 -p tcp -b -j MASQ
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 110 -p tcp -b -j MASQ
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 143 -p tcp -b -j MASQ
+
+	# Allow internal users to access external FTP servers
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 21  -p tcp -b -j MASQ
+
+	# Allow internal users to access external Telnet and SSH servers
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 22  -p tcp -b -j MASQ
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 23  -p tcp -b -j MASQ
+
+	# Allow unprivileged ports --> unprivileged ports for passive FTP
+	ipchains -A forward -s $INTERNAL 1024: -d $ANY 1024: -p tcp -b -j MASQ
+
+	# A catch-all rule for logging purposes
+	ipchains -A forward -s $ANY            -d $ANY -l            -j DENY
+
+	# Turn on forwarding
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+
+	echo_success
+	echo ""
+	;;
+
+    stop)
+	echo -n "Shutting down firewall rules"
+	# Turn off forwarding
+	echo 0 > /proc/sys/net/ipv4/ip_forward
+
+	# Set default policies; clear all rules
+	ipchains -P input ACCEPT
+	ipchains -P output ACCEPT
+	ipchains -P forward DENY
+
+	ipchains -F forward
+	ipchains -F input
+	ipchains -F output
+	echo_success
+	echo ""
+        ;;
+
+    *)
+	echo "Usage: firewall {start|stop}"
+	exit 1
+esac
+
+exit 0

@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# $Id$
+#
+# sample command file which can be invoked from dhcpcd
+# This script derived from "rc.inet2"
+#
+# Author: Yoichi Hariguchi <yoichi@fore.com>
+#
+
+NET=/usr/sbin
+IN_SERV="xntpd"
+
+# make configuration files for DNS and NTP
+for serv in resolv ntp ; do
+  if [ -f /etc/dhcpc/${serv}.conf ]; then
+    if [ -L /etc/${serv}.conf ]; then
+      rm -f /etc/${serv}.conf
+    elif [ -f /etc/${serv}.conf ]; then
+      mv /etc/${serv}.conf /etc/${serv}.conf.ORG
+    fi
+    ln -s /etc/dhcpc/${serv}.conf /etc
+  fi
+done
+
+# Start the INET SuperServer
+if [ -f ${NET}/inetd ]; then
+  ${NET}/inetd
+else
+  exec false
+  #exit 1
+fi
+
+# # Start the NAMED/BIND name server.
+# if [ -f ${NET}/named ]; then
+#   ${NET}/named
+# fi
+
+# Start the ROUTEd server.
+if [ -f ${NET}/routed ]; then
+   ${NET}/routed -q
+fi
+
+# Start the various INET servers.
+for server in ${IN_SERV} ; do
+  if [ -f ${NET}/${server} ]; then
+    ${NET}/${server}
+  fi
+done
+
+# Start the various SUN RPC servers.
+
+if [ -f ${NET}/rpc.portmap ]; then
+  ${NET}/rpc.portmap
+
+  # Start the NFS server daemons.
+  if [ -f ${NET}/rpc.mountd ]; then
+    ${NET}/rpc.mountd
+  fi
+#  if [ -f ${NET}/rpc.nfsd ]; then
+#    echo -n " nfsd"
+#    ${NET}/rpc.nfsd
+#  fi
+#  # Fire up the PC-NFS daemon(s).
+#  if [ -f ${NET}/rpc.pcnfsd ]; then
+#    echo -n " pcnfsd"
+#    ${NET}/rpc.pcnfsd ${LPSPOOL}
+#  fi
+#  if [ -f ${NET}/rpc.bwnfsd ]; then
+#    echo -n " bwnfsd"
+#    ${NET}/rpc.bwnfsd ${LPSPOOL}
+#  fi
+fi # Done starting various SUN RPC servers.
+
+
+# # Setting up NIS:
+# # (NOTE: For detailed information about setting up NIS, see the
+# #  documentation in /usr/doc/yp-clients* and /usr/doc/ypserv*.)
+# #
+# if [ -z "$NISDOMAINNAME" ] ; then
+#   domainname-yp `cat /etc/nisdomainname`
+# fi
+# # Then, we start up ypbind.  It will use broadcast to find a server.
+# if [ -d /var/yp ] ; then
+#   /usr/sbin/ypbind 
+# fi
+
+# if you just 'exit' and do not issue 'exec trure', this process does not
+# finish (I do not know why :p)
+exec true
+# Done!

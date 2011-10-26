@@ -1,0 +1,114 @@
+# Openswan master makefile
+# Copyright (C) 1998-2002  Henry Spencer.
+# Copyright (C) 2003-2004  Xelerance Corporation
+# 
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# for more details.
+#
+# RCSID $Id: Makefile.top,v 1.4 2005/07/18 03:46:13 mcr Exp $
+
+
+PATCHES=linux
+# where KLIPS goes in the kernel
+# note, some of the patches know the last part of this path
+KERNELKLIPS=$(KERNELSRC)/net/ipsec
+KERNELCRYPTODES=$(KERNELSRC)/crypto/ciphers/des
+KERNELLIBFREESWAN=$(KERNELSRC)/lib/libfreeswan
+KERNELLIBZLIB=$(KERNELSRC)/lib/zlib
+KERNELINCLUDE=$(KERNELSRC)/include
+
+MAKEUTILS=packaging/utils
+ERRCHECK=${MAKEUTILS}/errcheck
+KVUTIL=${MAKEUTILS}/kernelversion
+KVSHORTUTIL=${MAKEUTILS}/kernelversion-short
+
+SUBDIRS?=lib programs testing
+
+clean::
+	-(cd ${OPENSWANSRCDIR} && $(MAKE) modclean && $(MAKE) mod26clean)
+
+distclean:	clean
+	rm -f out.kpatch 
+	if [ -f umlsetup.sh ]; then source umlsetup.sh; if [ -d "$$POOLSPACE" ]; then rm -rf $$POOLSPACE; fi; fi
+
+install_file_list:
+	@for d in $(SUBDIRS) ; \
+	do \
+		(cd $$d && $(MAKE) --no-print-directory srcdir=${OPENSWANSRCDIR}/$$d/ OPENSWANSRCDIR=${OPENSWANSRCDIR} install_file_list ) || exit 1; \
+	done; 
+
+# uninstall, as much as possible
+uninstall:
+	$(MAKE) --no-print-directory install_file_list | egrep -v '(/ipsec.conf$$|/ipsec.d/)' | xargs rm -f
+
+taroldinstall:
+	tar --ignore-failed-read -c -z -f oldFreeSWAN.tar.gz `$(MAKE) --no-print-directory install_file_list`
+
+TAGSFILES=$(wildcard include/*.h lib/lib*/*.c programs/*/*.c linux/include/*.h linux/include/openswan/*.h linux/net/ipsec/*.[ch])
+
+tags:	$(TAGSFILES)
+	@LC_ALL=C ctags $(CTAGSFLAGS) ${TAGSFILES}
+
+cscope:
+	@ls ${TAGSFILES} > cscope.files
+	@cscope -b
+
+TAGS:	$(TAGSFILES)
+	@LC_ALL=C etags $(ETAGSFLAGS) ${TAGSFILES}
+
+.PHONY: dummy
+dummy:
+
+uml:	checkprograms
+	-chmod +x packaging/utils/*.sh 
+	-chmod +x testing/utils/make-uml.sh testing/utils/verify-uml.sh
+	./testing/utils/verify-uml.sh
+	./testing/utils/make-uml.sh `pwd`
+
+umluserland:
+	(touch ${OPENSWANSRCDIR}/Makefile.inc && source ${OPENSWANSRCDIR}/umlsetup.sh && cd $$POOLSPACE && $(MAKE) $$OPENSWANHOSTS $$REGULARHOSTS ) 
+
+
+# DESTDIR is normally set in Makefile.inc
+# These recipes explicitly pass it to the second-level makes so that
+# DESTDIR can be adjusted for building for UML without changing Makefile.inc
+# See	testing/utils/functions.sh
+#	testing/utils/make-uml.sh
+#	testing/utils/uml-functions.sh
+check:	uml Makefile.ver
+ifneq ($(strip(${REGRESSRESULTS})),)
+	mkdir -p ${REGRESSRESULTS}
+endif
+	@for d in $(SUBDIRS); do (cd $$d && $(MAKE) DESTDIR=${DESTDIR} checkprograms || exit 1); done
+	@for d in $(SUBDIRS); \
+	do \
+		echo ===================================; \
+		echo Now making check in $$d; \
+		echo ===================================; \
+		${MAKE} -C $$d DESTDIR=${DESTDIR} check ;\
+	done
+ifneq ($(strip(${REGRESSRESULTS})),)
+	-perl testing/utils/regress-summarize-results.pl ${REGRESSRESULTS}
+endif
+	@echo "======== End of make check target. ========"
+
+# USE_ variables determine if features are compiled into Openswan.
+# export them so that "make env" can get at them
+export USE_LWRES USE_IPROUTE2 USE_IPSECPOLICY USE_IKEPING
+export USE_KEYRR USE_KLIPS USE_NETKEY USE_VENDORID
+export USE_AGGRESSIVE USE_XAUTH USE_XAUTHPAM
+export USE_NAT_TRAVERSAL USE_NAT_TRAVERSAL_TRANSPORT_MODE USE_LDAP
+export USE_LIBCURL
+export USE_WEAKSTUFF USE_NOCRYPTO USE_EXTRACRYPTO
+export USE_TAPROOM USE_OBJDIR
+export HAVE_STATSD USE_DYNAMICDNS
+export USE_IPSEC_CONNECTION_LIMIT IPSEC_CONNECTION_LIMIT
+export USE_LIBNSS USE_FIPSCHECK USE_MODP_RFC5114 USE_NM
+export USE_MAST USE_SAREF_KERNEL

@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# printfax - print G3-FAX pages
+#
+# printfax [-h|-l] <page1.g3> [page.g3 ...]
+#
+# This script prints G3 FAX pages that you add on the command line.
+# You can specify whether the pages have high resolution (204x196)
+# with the option "-h" or low resolution (204x98) with the option "-l".
+# If you don't specify the resolution, printfax will try to find out
+# it by checking the filename. "fn*" is a low resolution fax, while
+# "ff*" stands for high resolution. If printfax still can't find out
+# the resolution, it will fall back to high resolution.
+#
+# $Id: printfax.ps,v 1.1 1998/06/12 17:20:09 gert Exp $
+#
+# (c) 1997 Roland Rosenfeld <roland@spinnaker.rhein.de>
+#
+
+# Configure for you special needs:
+
+DPI=600			# printer resolution
+PRINTCMD="lpr -Ploki"	# print command
+
+# End of configuration section.
+
+if [ $# -eq 0 ]
+then
+    echo "Usage: $0 [-h|-l] faxfile [faxfile...]"
+    exit 1
+fi
+
+case $1
+in
+    -h)
+        res=""; shift;;
+    -l|-n)
+        res="-s"; shift;;
+esac
+
+for file 
+do
+    case `basename $file`
+    in
+        fn*-*.[0-9][0-9])
+            res="-s";;
+        ff*-*.[0-9][0-9])
+            res="";;
+    esac
+
+    # convert G3 to PBM, scale page to Din A4 and print it:
+    cat $file \
+    | g32pbm $res \
+    | pnmtops -noturn -dpi $DPI -width 8.268 -height 11.693 \
+    | $PRINTCMD
+	
+done
+
+exit 0

@@ -1,0 +1,155 @@
+
+uClinux/distribution
+====================
+
+Contents
+--------
+
+0) Introduction
+1) Instructions for compiling
+2) Changing the applications/kernel-options/libraries
+3) Documentation
+
+
+0) Introduction
+---------------
+
+The uClinux-dist source package is an "all-in-one" build framework for
+generating a complete system. It has been developed with embedded devices
+in mind, but it can just as equally be used for normal computing devices
+(like a PC for example). It is ideal for building small, light weigth
+systems.
+
+The uClinux-dist was originally targeted specifically at non-MMU
+microprocessors. But for many years now it has supported full VM processors.
+It supports a wide varity of hardware, many CPUs and  a large number of
+target boards.
+
+
+1) Instructions for Compiling
+-----------------------------
+
+  1. You will need a cross-compiler package for your target. Many binary
+     tool packages exists specifically for compiling uClinux. Install
+     that in the standard way first. For example, if you are targeting m68k
+     or ColdFire systems then you can use the m68k-uclinux-tools binary
+     packages of www.uclinux.org.
+ 
+  2. If you have not un-archived the source package then do that now.
+     It is a gziped tar image, so do:
+ 
+       tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+ 
+     This will dump the source into a "uClinux-dist" directory.
+     You can do this into any directory, typically use your own user
+     login. (I don't recommend devloping as root, it is a bad pactice,
+     and it will bite you one day!)
+ 
+  3. Cd into the source tree:
+ 
+          cd uClinux-dist
+ 
+  4. Configure the build target:
+ 
+          make xconfig
+ 
+     You can also use "make config" or "make menuconfig" if you prefer.
+ 
+     The top level selection is straight forward if you know the vendor of
+     the board you want to compile for. You can choose also to modify the
+     underlying default kernel and application configuration if you want.
+ 
+     At first it is suggested that you use the default configuration for
+     your target board. It will almost certainly work "as is".
+
+     You can also select between different kernel versions and libraries,
+     at this top level. Not all kernel versions support all boards, as a
+     general rule choose 2.6.x. uClibc is the perferred library choice on
+     all targets (both MMU-less and VM processors). If you choose a
+     combination that doesn't have a default configuration file then the
+     config step will issue a message letting you know.
+ 
+     Based on what platform you choose in this step the build will generate
+     an appropriate default application set.
+
+     Sometimes a number of questions will appear after you 'Save and Exit'.
+     Do not be concerned, it just means that some new config options have
+     been added to the source tree that do not have defaults for the
+     configuration you have chosen.  If this happens the safest option is
+     to answer 'N' to each question as they appear.
+
+  5. Build the dependencies (if required):
+ 
+          make dep
+ 
+     If you selected the 2.6.x kernel then you do not need to do this step.
+     If you choose the 2.4.x or 2.0.x kernels you must run the make dep.
+
+  6. Build the image:
+ 
+          make
+ 
+ 
+  Thats it!
+ 
+  The make will generate appropriate binary images for the target hardware
+  specified. All generated files will be placed under the "images" directory.
+  The exact files vary from target to target, typically you end up with
+  something like an "image.bin" file.
+
+  How to load and run the generated image will depend on your target system
+  hardware. There are a number of HOWTO documents under the Documentation
+  directy that describe how to load and run the image on specific boards.
+  Look for a file named after your target board.
+
+
+2) Changing the Applications/Kernel/Libraries
+---------------------------------------------
+
+  You can modify the kernel configuration and application set generated for
+  your target using the config system. You can configure by running one of
+  the following three commands:
+
+        make xconfig       - graphical X11 based config
+        make menuconfig    - text menu based config
+        make config        - plain text shell script based config
+
+  Menuconfig and xconfig are the simplest, I would recommend using one of
+  them.
+
+  The key options under the "Target Platform Selection" menu are the
+  following:
+
+        Customize Kernel Settings
+            Selecting this option run the standard Linux kernel config.
+
+        Customize Vendor/User Settings
+            Selecting this option will run a configure process allowing
+            you to enable or disable individual applications and libraries.
+
+   Use the online "Help" if unsure of what a configuration option means.
+
+   When you 'Save and Exit' the build system will run you through the
+   configs you have selected to customise.
+
+
+3) Documention
+--------------
+
+  There is an assortment of documentaion files under the Documentaion
+  directory. The more interresting ones are:
+
+       SOURCE  -- file at the top level gives a brief run down of the
+                  structure of this source distribution package.
+
+       Documentation/Adding-User-Apps-HOWTO
+               -- description of how to add a new application into the
+                  config and build setup of the distribution.
+
+       Documentation/Adding-Platforms-HOWTO
+               -- description of how to add a new vendor board config to
+                  the distribution.
+
+       Documentation/<BOARD>-HOWTO
+               -- describes building and loading for a particular board.
+

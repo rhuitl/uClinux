@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# First stage boot record first
+dd if=/dev/zero bs=1 count=6 2> /dev/null | cat > boot.b
+echo -n "LILO" >> boot.b
+echo -n -e "\001\000" >> boot.b
+echo -n -e "\026\001" >> boot.b
+dd if=/dev/zero bs=1 count=498 2> /dev/null | cat >> boot.b
+
+# Second stage boot record
+dd if=/dev/zero bs=1 count=6 2> /dev/null | cat >> boot.b
+echo -n "LILO" >> boot.b
+echo -n -e "\002\001" >> boot.b
+echo -n -e "\026\001" >> boot.b
+dd if=/dev/zero bs=1 count=498 2> /dev/null | cat >> boot.b
+
+exit 0

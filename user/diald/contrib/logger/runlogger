@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#Ok, here's the simplest script.  I run this one daily from cron at
+#midnight, and all it does is run logreporter over the accounting log
+#from the last 24 hours, then append the data to the weekly logfile and
+#truncate the accounting logfile.  Make sure that cron is mailing its
+#output to you, and you'll get the daily summary in your mailbox.
+
+LOGDIR=/var/adm
+LOG=diald.log
+LOGREPORTER=/usr/local/bin/logreporter
+TEMPLATE=diald.template
+
+cd $LOGDIR
+$LOGREPORTER $TEMPLATE $LOG
+cat $LOG >> $LOG.0
+cp /dev/null $LOG
+
+# EOF

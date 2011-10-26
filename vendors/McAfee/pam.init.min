@@ -1,0 +1,22 @@
+verbose "Updating PAM cache size requirements"
+
+foreach i [metaconfig fields pam] {
+	if {[regexp {^(.*)\.cache_size$} "$i" dummy name] == 0} {
+		continue
+	}
+
+	# we special case some values, anything that isn't special we set to 10
+
+	if {$name == "sg_proxy"} {
+		config set pam "$i" 100
+	} elseif {$name == "sg_pptp"} {
+		config set pam "$i" 30
+	} elseif {$name == "sg_l2tp"} {
+		config set pam "$i" 30
+	} elseif {$name == "sg_sshd"} {
+		config set pam "$i" 20
+	} else {
+		config set pam "$i" 10
+	}
+}
+

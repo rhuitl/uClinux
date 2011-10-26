@@ -1,0 +1,150 @@
+#!/bin/sh
+#
+# etc/install-etc 1.17 2001/03/16 14:10:24 (David Hinds)
+#
+# This handles updating the PCMCIA startup and device configuration
+# scripts.  I used to do this in the Makefile, but it is really much
+# more of a shell scripty thing.
+
+# Get configuration settings
+. ../config.out
+
+if [ $1 ] ; then PREFIX=$1 ; fi
+PROBE=../cardmgr/probe
+ETC=$PREFIX/etc/pcmcia
+
+install_clients ()
+{
+    echo "-> Updating client scripts in $ETC"
+    mkdir -p $ETC
+    CONF=`echo *.conf`
+    if [ "$CONF" != "*.conf" ] ; then
+	cp *.conf $ETC
+    fi
+    for f in *.opts ; do
+	[ -r $ETC/$f ] || cp $f $ETC/$f
+	b=`basename $f .opts`
+	cmp -s $b $ETC/$b && continue
+	[ -r $ETC/$b ] && mv $ETC/$b $ETC/$b.O
+	cp $b $ETC/$b
+    done
+    for f in shared ; do
+	cmp -s $f $ETC/$f && continue
+	[ -r $ETC/$f ] && mv $ETC/$f $ETC/$f.O
+	cp $f $ETC/$f
+    done
+    # Tweak network.opts for Red Hat
+    if [ -f /etc/redhat-release ] && \
+	cmp -s network.opts $ETC/network.opts ; then
+	echo "->   Configuring /etc/pcmcia/network.opts for Red Hat"
+	cat network.rh >> $ETC/network.opts
+    fi
+    # Tweak network.opts for Debian
+    if [ -f /etc/debian_version ] && \
+	cmp -s network.opts $ETC/network.opts ; then
+	echo "->   Configuring /etc/pcmcia/network.opts for Debian"
+	cat network.deb >> $ETC/network.opts
+    fi
+}
+
+install_sysv ()
+{
+    SYSV=$PREFIX$RC_DIR/init.d/pcmcia
+
+     if [ -d /etc/sysconfig ] ; then
+	mkdir -p $PREFIX/etc/sysconfig
+	CFG=$PREFIX/etc/sysconfig/pcmcia
+	if [ -f $CFG ] ; then . $CFG ; fi
+	if [ "$PCMCIA" != "yes" ] ; then
+	    echo "-> Creating PCMCIA options file $CFG"
+	    echo PCMCIA=yes > $CFG
+	    PCIC=i82365
+	    if [ -x $PROBE ] ; then PCIC=`$PROBE -m` ; fi
+	    echo "PCIC=$PCIC" >> $CFG
+	    echo "PCIC_OPTS=" >> $CFG
+	    echo "CORE_OPTS=" >> $CFG
+	    echo "CARDMGR_OPTS=" >> $CFG
+	fi
+    fi
+
+    cmp -s rc.pcmcia $SYSV
+    if [ $? -ne 0 ] ; then
+	# Just clobber old startup script on RedHat-ish systems
+	if [ $RC_DIR = "/etc/rc.d" ] ; then
+	    rm -f $SYSV.N
+	elif [ -e $SYSV ] ; then
+	    SYSV=$SYSV.N
+	fi
+	echo "-> Installing PCMCIA startup script as $SYSV"
+	mkdir -p $PREFIX$RC_DIR/init.d
+	cp rc.pcmcia $SYSV
+	chmod +x $SYSV
+    fi
+
+    if [ $RC_DIR = "/sbin/init.d" ] ; then
+	START=03 ; STOP=42 # SuSE init sequence
+    else
+	START=45 ; STOP=96 # Red Hat, etc
+    fi
+    # Set up PCMCIA links to mirror network init/shutdown
+    for RUN in 0 1 2 3 4 5 6 ; do
+	RC=$PREFIX$RC_DIR/rc$RUN.d
+	mkdir -p $RC
+	if [ -r $RC/S*pcmcia -o -r $RC/K*pcmcia ] ; then continue ; fi
+	if [ -r $RC_DIR/rc$RUN.d/S*network ] ; then
+	    ln -vsf ../init.d/pcmcia $RC/S${START}pcmcia
+	fi
+	if [ -r $RC_DIR/rc$RUN.d/K*network ] ; then
+	    ln -vsf ../init.d/pcmcia $RC/K${STOP}pcmcia
+	fi
+    done
+}
+
+install_bsd ()
+{
+    BSD=$PREFIX/etc/rc.d/rc.pcmcia
+    if [ -e $BSD ] ; then BSD=$BSD.N ; fi
+
+    echo "-> Installing PCMCIA startup script as $BSD"
+    mkdir -p $PREFIX/etc/rc.d
+#    if [ -x $PROBE ] ; then
+#	PCIC=`$PROBE -m`
+#	sed -e "s/=i82365/=$PCIC/" rc.pcmcia > $BSD
+#    else
+	cp rc.pcmcia $BSD
+#    fi
+    chmod +x $BSD
+}
+
+install_depmod ()
+{
+    CONF=$PREFIX/etc/modules.conf
+    if [ ! -r $CONF -a -r $PREFIX/etc/conf.modules ] ; then
+	CONF=$PREFIX/etc/conf.modules
+    fi
+    /sbin/modprobe -c | grep -q 'path\[pcmcia\]'
+    if [ $? -ne 0 ] ; then
+	echo "-> Updating $CONF"
+	grep -qs ^path $CONF || grep -qs ^keep $CONF ||
+	    echo keep >> $CONF
+	/sbin/modprobe -c | sed -ne '/path[net]/s/\bnet\b/pcmcia/gp' >> $CONF
+    fi
+    if [ -x /sbin/depmod -a "$PREFIX" = "" -a "$CONF_SRC" != 2 ] ; then
+	echo "-> Running depmod..."
+	/sbin/depmod -a
+    else
+	echo "-> *NOT* running depmod.  Run depmod by hand if necessary."
+    fi
+}
+
+if [ "$SYSV_INIT" = "y" ] ; then
+    install_sysv
+else
+    install_bsd
+fi
+
+install_clients
+install_depmod
+
+# Directory to receive cardmgr's 'stab' socket status file
+mkdir -p $PREFIX/var/lib/pcmcia

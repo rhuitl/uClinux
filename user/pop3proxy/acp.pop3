@@ -1,0 +1,45 @@
+#!/bin/akanga -p
+#
+# Sample access control program for pop3.proxy
+#
+
+#
+# Simply allow connections from outside.
+#
+if (~ $PROXY_INTERFACE 140.77.194.1)
+	exit 0
+
+#
+# Important users have the IP numbers 192.168.1.10,11,45, allow them.
+#
+if (~ $PROXY_CLIENT *.10 *.11 *.45)
+	exit 0
+
+#
+# Get the current hour.
+#
+now = `{ date +'%H' }
+
+if (~ $PROXY_SERVER *.yahoo.com *.hotmail.*) {
+	#
+	# Private usage, restriced to lunch breaks from 12:00 to 13:00.
+	#
+	if (! ~ $now 12) {
+		echo -ERR try later again
+		echo private usage: $PROXY_SERVER >[1=2]
+		exit 1
+		}
+	}
+
+#
+# For some reason the outgoing POP3 proxy is only available during working
+# hours.
+#
+if (! ~ $now 08 09 10 11 12 13 14 15 16 17 18) {
+	echo -ERR server not available
+	echo out of time window >[1=2]
+	exit 1
+	}
+
+exit 0
+

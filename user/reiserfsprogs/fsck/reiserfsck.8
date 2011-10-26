@@ -1,0 +1,91 @@
+.\" -*- nroff -*-
+.\" Copyright 1996-2001 Hans Reiser.
+.\" 
+.TH REISERFSCK 8 "March 2001" "Reiserfsprogs-3.x.0j"
+.SH NAME
+reiserfsck \- check a Linux Reiserfs file system
+.SH SYNOPSIS
+.B reiserfsck 
+[
+.B -arvixoV
+] [
+.B -l logfilename
+] [
+.B --rebuild-tree
+] [
+.B --check
+] [
+.B --rebuild-sb
+] [
+.B --interactive
+] [
+\fB --logfile \fI logfilename
+] [
+.B --fix-fixable
+]
+.I device
+.SH DESCRIPTION
+It looks for reiserfs filesystem on a device, replays transactions
+which are to be replayed and either check or repair the filesystem
+.TP
+.I device
+is the special file corresponding to the device (e.g /dev/hdXX for
+IDE disk partition or /dev/sdXX for SCSI disk partition).
+.SH OPTIONS
+.TP
+.B --check
+This checks filesystem consistency. This is a default action. It may
+be used on a filesystem mounted read-only
+.TP
+.B --rebuild-tree
+This rebuilds filesystem tree using leaf nodes found on the
+device. Normally, you do not need this, but if you have to rebuild
+tree - please backup whole partition first or at least the most
+important data if you can mount the partition.
+.TP
+.B --rebuild-sb
+.TP
+.B --interactive, -i
+This makes \fBreiserfsck\fR to stop after each pass completed.
+.TP
+.B --quiet, -q
+have \fBreiserfsck\fR to not reflect its progress
+.TP
+.B --nolog, -n
+have \fBreiserfsck\fR to not log anything
+.TP
+\fB--logfile \fIfilename\fR, \fB-l \fI filename
+have \fBreiserfsck\fR to put info about found corruptions in logfile
+rather than on stderr
+.TP
+.B --fix-fixable, -x
+have \fBreiserfsck\fR to recover corruptions which can be fixed w/o
+--rebuild-tree when it is runnig in check mode. Corruptions which can
+be fixed so far: bad pointers to data blocks, wrong directory's
+st_size and st_blocks, directories entries pointing to nowhere can be
+deleted
+.TP
+.B --fix-non-critical, -o
+have \fBreiserfsck\fR to fix: file sizes when they are bigger than
+real file size, set file mode to regular file when mode looks wrong
+and to try to recover "objectid sharing" problem
+.TP
+.B -a
+When it is set - \fBreiserfsck\fR assumes that it is called by fsck -A
+and just returns even if filesystem seems not umounted cleanly
+.TP
+.B -r
+ignored
+.TP
+.B -V
+Prints version and exits
+.SH AUTHOR
+This version of \fBreiserfsck\fR has been written by Hans Reiser
+<reiser@idiom.com>.
+.SH BUGS
+There are probably few of them. Please, report bugs to Hans Reiser <reiser@idiom.com>.
+.SH TODO
+Faster recovering, signal handling, i/o error handling, etc.
+.SH SEE ALSO
+.BR mkreiserfs (8),
+.BR debugreiserfs (8)

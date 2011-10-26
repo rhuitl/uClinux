@@ -1,0 +1,286 @@
+############################################################################
+#
+#  A Generic Microblaze config.arch that can be included by other platforms
+#  to reduce the number of places that need to be edited when something
+#  common changes.  If you include this file you may provide:
+#
+#  CPUFLAGS            - cpu specific flags to pass to the compiler
+#  VENDOR_CFLAGS       - vendor specific flags to pass to the compiler
+#  DISABLE_XIP         - set this to 1 to disable XIP code
+#  DISABLE_SHARED_LIBS - set this to 1 to disable shared libraries
+#  DISABLE_MOVE_RODATA - set this to 1 to disable moving rodata to text
+#  LOPT                - library optimisation flags
+#  UOPT                - user optimisation flags
+#
+#  Note:  Many of these are still unsupported on Microblaze!
+#
+#  John Williams    <jwilliams@itee.uq.edu.au>
+#  	based upon m68k version by 
+#  David McCullough <davidm@snapgear.com>
+#
+############################################################################
+#
+# Generic settings
+#
+
+ifndef CONSOLE_BAUD_RATE
+CONSOLE_BAUD_RATE = 9600
+endif
+
+ifndef EXTRA_MODULE_DIRS
+ifeq ($(ROOTDIR)/modules,$(wildcard $(ROOTDIR)/modules))
+ifneq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules/
+else
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules
+endif
+endif
+endif
+
+ifndef VERSIONPKG
+#define VERSIONPKG 1.0.0
+endif
+
+ifndef VERSIONSTR
+VERSIONSTR = $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+endif
+
+############################################################################
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all builds
+#
+
+# ARCH = kernel,  TARGET_ARCH = uClibc
+
+ENDIAN        = big
+MACHINE       = microblaze
+ARCH          = microblaze
+CROSS_COMPILE = mb-
+CROSS         = $(CROSS_COMPILE)
+CONFIGURE_HOST = mb
+
+CONFIG_UCLINUX=y
+
+CC        = ucfront-gcc $(CROSS_COMPILE)gcc $(CPUFLAGS)
+AS        = $(CROSS_COMPILE)as $(CPUFLAGS)
+CXX       = ucfront-g++ $(CROSS_COMPILE)g++ $(CPUFLAGS)
+AR        = $(CROSS_COMPILE)ar
+LD        = ucfront-ld $(CROSS_COMPILE)ld
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+ELF2FLT   = $(CROSS_COMPILE)elf2flt
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+UCLINUX_BUILD_SET = 0					# have we set a special config below
+
+ifndef DISABLE_SHARED_LIBS
+  ifeq ($(CONFIG_BINFMT_SHARED_FLAT),y)
+	BUILD_SHARED = 1
+  endif
+endif
+
+# Use the various processor config options to determine special
+# compiler flags
+# this is common to both apps and libs
+
+# find where $(CROSS)gcc is living
+GCC_DIR = $(shell $(CC) -v 2>&1|grep specs|sed -e 's/.* \(.*\)specs/\1\./')
+
+# work out which gcc version we are using
+GCC_VER = $(shell $(CC) -v 2>&1|grep version|cut -d " " -f 3)
+
+# split into major and minor numbers
+GCC_MAJOR = $(shell echo $(GCC_VER) | cut -d '.' -f 1)
+GCC_MINOR = $(shell echo $(GCC_VER) | cut -d '.' -f 2)
+
+# Clear the XILINX_EDK variable - it confuses mb-gcc.. ugh
+XILINX_EDK=
+
+# old style CONFIG defines...
+ifdef CONFIG_MICROBLAZE_HARD_MULT
+	HAS_HARD_MULT := y
+endif
+
+ifdef CONFIG_MICROBLAZE_HARD_DIV
+	HAS_HARD_DIV := y
+endif
+
+ifdef CONFIG_MICROBLAZE_HARD_BARREL
+	HAS_HARD_BARREL := y
+endif
+
+# and the new style
+# Is the HW multiply instruction available?
+# check if C_FAMILY contains spartan3, virtex2 or virtex4
+ifneq (,$(findstring virtex2,$(CONFIG_XILINX_MICROBLAZE0_FAMILY)))
+	HAS_HARD_MULT := y
+endif
+ifneq (,$(findstring virtex4,$(CONFIG_XILINX_MICROBLAZE0_FAMILY)))
+	HAS_HARD_MULT := y
+endif
+ifneq (,$(findstring spartan3,$(CONFIG_XILINX_MICROBLAZE0_FAMILY)))
+	HAS_HARD_MULT := y
+endif
+
+ifeq ($(CONFIG_XILINX_MICROBLAZE0_USE_BARREL),1)
+	HAS_HARD_BARREL := y
+endif
+
+ifeq ($(CONFIG_XILINX_MICROBLAZE0_USE_DIV),1)
+	HAS_HARD_DIV := y
+endif
+
+ifeq ($(CONFIG_XILINX_MICROBLAZE0_USE_FPU),1)
+	HAS_FPU := y
+endif
+
+ifeq ($(CONFIG_XILINX_MICROBLAZE0_USE_PCMP_INSTR),1)
+	HAS_PCMP_INSTR := y
+endif
+
+# Take the HAS_HARD_{BARREL|MUL|DIV} vars and convert into CFLAGS etc
+ARCH_CPUFLAGS :=
+
+# Hardware floating point support
+ifeq ($(HAS_FPU),y)
+	ARCH_CPUFLAGS += -mhard-float
+else
+	ARCH_CPUFLAGS += -msoft-float
+endif
+
+# Hardware comparison support
+ifeq ($(HAS_PCMP_INSTR),y)
+	ARCH_CPUFLAGS += -mxl-pattern-compare
+endif
+
+# Hardware multiplier
+ifeq ($(HAS_HARD_MULT),y)
+	ARCH_CPUFLAGS += -mno-xl-soft-mul
+	LIBC_SUFFIX := _hard
+else
+	ARCH_CPUFLAGS += -mxl-soft-mul
+	LIBC_SUFFIX := _soft
+endif
+
+# Hardware barrel shifter
+ifeq ($(HAS_HARD_BARREL),y)
+	ARCH_CPUFLAGS += -mxl-barrel-shift
+	LIBC_SUFFIX := $(LIBC_SUFFIX)_shift
+endif
+
+# Hardware integer divide unit
+ifeq ($(HAS_HARD_DIV),y)
+	ARCH_CPUFLAGS += -mno-xl-soft-div
+else
+	ARCH_CPUFLAGS += -mxl-soft-div
+endif
+
+GCC_LIB = $(GCC_DIR)/libgcc.a $(GCC_DIR)/../../../../microblaze/lib/libc$(LIBC_SUFFIX).a 
+
+# Set the UCFRONT_LINK_SUFFIX variable to have this tacked onto the 
+# end of the ucfront command line.  This is such a hack.
+ifeq ($(GCC_MAJOR),2)
+	UCFRONT_LINK_SUFFIX = -lc $(GCC_LIB) -lc
+endif
+
+############################################################################
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O2) -g -fomit-frame-pointer
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += $(ARCH_CPUFLAGS) $(VENDOR_CFLAGS) -DEMBED
+
+  ifdef BUILD_SHARED
+	CFLAGS  += -mid-shared-library
+  else
+	ifndef DISABLE_XIP
+	  CFLAGS  += -msep-data
+	endif
+  endif
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CPUFLAGS) $(CFLAGS)
+
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+	CFLAGS  += -D__uClinux__
+	LDFLAGS += -Wl,-elf2flt
+
+  ifndef DISABLE_MOVE_RODATA
+  	LDFLAGS += -Wl,-move-rodata
+  endif
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+  ifdef BUILD_SHARED
+	LIBC          = -Wl,-R,$(ROOTDIR)/lib/libc.gdb $(SLIBC)
+  endif
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-Os) -g -fomit-frame-pointer
+  endif
+
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += $(ARCH_CPUFLAGS) $(VENDOR_CFLAGS) -DEMBED
+
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CFLAGS)
+
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+	CFLAGS  += -D__uClinux__
+
+	CXXFLAGS = $(CFLAGS) -nostdinc++ -fno-exceptions
+	CXXSUP :=
+
+#	LDFLAGS += -nostartfiles $(ROOTDIR)/$(LIBCDIR)/lib/crt0.o
+	LDFLAGS += -Wl,-elf2flt
+
+  ifndef FLTFLAGS
+	FLTFLAGS :=
+  endif
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+	EXTRA_CFLAGS := $(CPUFLAGS)
+
+	CXXLIBS =
+
+	LDLIBS = $(LIBBIND)
+endif
+
+############################################################################

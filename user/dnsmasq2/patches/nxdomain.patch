@@ -1,0 +1,146 @@
+#14312
+
+When we receive a NXDOMAIN response from an upstream server, immediately
+retry the query with all servers.  If any of the other servers respond
+with a good response, "stick" to that server and keep querying only it
+(until the next NXDOMAIN comes through).
+
+Index: dnsmasq2/src/forward.c
+===================================================================
+--- dnsmasq2.orig/src/forward.c	2009-03-24 13:41:05.000000000 +1000
++++ dnsmasq2/src/forward.c	2009-03-24 13:49:51.000000000 +1000
+@@ -298,7 +298,7 @@ static int resend_query(time_t now, stru
+   unsigned short gotname;
+   struct server *start;
+ 
+-  if (!header)
++  if (!header || forward->reply)
+     return 0;
+ 
+   /* retry on existing query, send to all available servers  */
+@@ -387,6 +387,7 @@ static int forward_query(int udpfd, unio
+ 	    }
+ 
+ 	  /* Store the header so that we can resend/reply for failures/timeouts */
++	  forward->reply = 0;
+ 	  forward->header = whine_malloc(plen);
+ 	  if (!forward->header)
+ 	    {
+@@ -504,6 +505,38 @@ static size_t process_reply(HEADER *head
+   return resize_packet(header, n, pheader, plen);
+ }
+ 
++static void store_reply(HEADER *header, size_t nn, struct frec *forward)
++{
++  if (forward->reply)
++    return;
++
++  if (forward->header)
++    free(forward->header);
++  forward->header = whine_malloc(nn);
++  if (forward->header)
++    {
++      forward->reply = 1;
++      memcpy(forward->header, header, nn);
++      forward->plen = nn;
++    }
++}
++
++static void forward_reply(HEADER *header, size_t n, time_t now,
++			  struct frec *forward, struct server *server)
++{
++  size_t nn;
++
++  if ((nn = process_reply(header, now, server, n)))
++    {
++      /*my_syslog(LOG_WARNING, _("process_reply: %d"), nn);*/
++      header->id = htons(forward->orig_id);
++      header->ra = 1; /* recursion if available */
++      send_from(forward->fd, daemon->options & OPT_NOWILD, (char *)header, nn,
++		&forward->source, &forward->dest, forward->iface);
++    }
++  free_frec(forward); /* cancel */
++}
++
+ /* sets new last_server */
+ void reply_query(int fd, int family, time_t now)
+ {
+@@ -514,7 +547,6 @@ void reply_query(int fd, int family, tim
+   struct frec *forward;
+   socklen_t addrlen = sizeof(serveraddr);
+   ssize_t n = recvfrom(fd, daemon->packet, daemon->edns_pktsz, 0, &serveraddr.sa, &addrlen);
+-  size_t nn;
+   struct server *server;
+   
+   /* packet buffer overwritten */
+@@ -542,6 +574,25 @@ void reply_query(int fd, int family, tim
+    
+   server = forward->sentto;
+   
++  if ((header->rcode == NXDOMAIN) && !(daemon->options & OPT_ORDER))
++    {
++      if (forward->forwardall == 0)
++	{
++	  /* resend to all servers to handle private domains */
++	  if (resend_query(now, forward))
++	    store_reply(header, n, forward);
++	  return;
++	}
++      else if (forward->forwardall > 2)
++	{
++	  /* if there are still other servers to wait for,
++	     then save the reply in case they fail/timeout */
++	  --forward->forwardall;
++	  store_reply(header, n, forward);
++	  return;
++	}
++    }
++
+   if ((header->rcode == SERVFAIL || header->rcode == REFUSED) &&
+       !(daemon->options & OPT_ORDER) &&
+       forward->forwardall == 0)
+@@ -579,14 +630,7 @@ void reply_query(int fd, int family, tim
+   if (forward->forwardall == 0 || --forward->forwardall == 1 || 
+       (header->rcode != REFUSED && header->rcode != SERVFAIL))
+     {
+-      if ((nn = process_reply(header, now, server, (size_t)n)))
+-	{
+-	  header->id = htons(forward->orig_id);
+-	  header->ra = 1; /* recursion if available */
+-	  send_from(forward->fd, daemon->options & OPT_NOWILD, daemon->packet, nn, 
+-		    &forward->source, &forward->dest, forward->iface);
+-	}
+-      free_frec(forward); /* cancel */
++      forward_reply(header, n, now, forward, server);
+     }
+ }
+ 
+@@ -1075,6 +1119,16 @@ struct frec *get_new_frec(time_t now, in
+ 	    else if (!timeout || timeout > f->time + TIMEOUT_FAST)
+ 	      timeout = f->time + TIMEOUT_FAST;
+ 	  }
++	else if (f->reply)
++	  {
++	    if (now >= f->time + TIMEOUT_FAST)
++	      {
++		forward_reply(f->header, f->plen, now, f, NULL);
++		target = f;
++	      }
++	    else if (!timeout || timeout > f->time + TIMEOUT_FAST)
++	      timeout = f->time + TIMEOUT_FAST;
++	  }
+ 	else if (difftime(now, f->time) >= 4*TIMEOUT)
+ 	  {
+ 	    free_frec(f);
+Index: dnsmasq2/src/dnsmasq.h
+===================================================================
+--- dnsmasq2.orig/src/dnsmasq.h	2009-03-24 13:41:05.000000000 +1000
++++ dnsmasq2/src/dnsmasq.h	2009-03-24 13:47:26.000000000 +1000
+@@ -401,6 +401,7 @@ struct frec {
+   unsigned short orig_id, new_id;
+   int fd, forwardall;
+   unsigned int crc;
++  int reply;
+   HEADER *header;
+   size_t plen;
+   time_t time;

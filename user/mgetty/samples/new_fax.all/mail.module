@@ -1,0 +1,61 @@
+# MODULE mail
+# A function to mail a fax to a user
+# The files are attached as MIME-encoded GIF-pictures
+#
+# Written 1996 by Darko Krizic
+#
+mail()
+{
+	mailer="/usr/sbin/sendmail -t"
+	log "mail to $data"
+
+	(
+	# some settings
+	tmp=/tmp/`basename $0`.$$
+	bound=Newfax_-${$}${$}
+
+	# optionally use the name	
+	if [ -z "$name" ]
+	then	
+		name=$id
+	fi
+
+	# write the mail
+	echo "\
+Subject: Fax from $name ($pages pages)
+From: faxadmin@xplor.ipf.de (Fax Subsystem)
+To: $data
+MIME-Version: 1.0
+Content-type: multipart/mixed; boundary=\"$bound\"
+
+--$bound
+Content-Type: text/plain; 
+
+A new fax has arrived
+
+Sender ID:        $id
+Name:             $name
+Pages:            $pages
+"
+	for file in $*
+	do
+		echo $file
+	done
+
+	for file in $*
+	do
+		echo "--$bound"
+		page=`echo $file | /usr/bin/awk -F\. '{ printf "%d", $NF }' -`
+		echo "Content-Type: application/octet-stream; name=\"page${page}.gif\";"
+		echo "Content-transfer-encoding: x-uuencode"
+		echo
+		g32pbm $file 2>>$log \
+		| pnmscale 0.5 2>>$log \
+		| ppmtogif 2>>$log \
+		| uuencode 2>>$log "page${page}.gif"
+		echo
+	done
+	echo "--$bound--"
+	) | tee /var/log/faxmail | $mailer
+}
+

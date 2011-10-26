@@ -1,0 +1,300 @@
+#!/bin/bash
+#
+# This code is free software covered by GNU GPL license version 2 or above.
+# Please refer to http://www.gnu.org/ for the full license text.
+#
+# Some code lifted from Konstantin Riabitsev's diskonkey (GPL)
+#
+# INSTALL
+# -------
+# Put this in /etc/hotplug/usb/usb-storage
+# Be sure that in /etc/hotplug/usb.distmap are the usb-storage entries
+# Create file etc/hotplug/usb-storage.map with this sintax:
+#      mount  
+#   or 
+#      symbolic 
+#
+# For a device with no partitions (the filesystem is in /dev/sd?), 
+# use partition number 0
+# 
+# For Example:
+#   05dc:0080 0 0 mount    /mnt/disco_usb defaults,user,umask=0002,rw
+#   05dc:0081 0 0 mount    /mnt/otro_disco_usb defaults,user,umask=0002,rw
+#   0424:223a 0 1 symbolic /dev/usbcard0
+#   0424:223a 1 1 symbolic /dev/usbcard1
+#   0424:223a 2 1 symbolic /dev/usbcard2_1
+#   0424:223a 2 2 symbolic /dev/usbcard2_2
+#
+# TODO
+# ----
+# Refactorize this script in perl :)
+#
+# AUTHOR and SUPPORT
+# ------------------
+# Hector Rivas Gandara (keymon), keymon(aT)wanadoo.es .
+#
+DEFAULT_MOUNT_POINT=/home/dades/usb
+DEFAULT_MOUNT_OPTIONS=defaults,user,umask=0002,rw
+CONFIG_FILE=/home/conf/usb-storage.map
+
+# Get's the usb device serial number for a given usb device. 
+# Return the 20 first digits
+function getUsbDeviceSerialNumber {
+    lsusb -v -D $1 | grep -m 1 iSerial | sed 's/  */ /g' | cut -f 4 -d " " | sed 's/\(.\{20\}\).*/\1/g'
+}
+
+# Get's the usb device vendor:product for a given usb device. 
+function getUsbDeviceVendorProduct {
+    local vendor=`lsusb -v -D $1 | grep -m 1 idVendor | sed 's/  */ /g;s/^ //' | cut -f 2 -d " " | sed 's/0x\(.*\)/\1/' `
+    local product=`lsusb -v -D $1 | grep -m 1 idProduct | sed 's/  */ /g;s/^ //' | cut -f 2 -d " " | sed 's/0x\(.*\)/\1/'`
+    echo $vendor:$product
+}
+
+# Get's the scsi host number associated to a usb-storage device 
+# with the given serial number
+function getScsiDeviceFromSerialNumber {
+    for i in /proc/scsi/usb-storage/*; do 
+        if grep -q $1 $i ; then
+            local scsiDev=`echo $i | cut -f 5 -d /`;
+        fi
+    done
+    echo $scsiDev
+}
+
+
+# Gets device name for the given scsi address
+function getScsiDeviceNameFromAddress {
+    local scsiAddress=$1
+    # get the device minor number and calculate the leter
+    local minor=`cat "/sys/class/scsi_device/${scsiAddress}/device/block/"dev | cut -f 2 -d :`
+    local letter=`expr substr abcdefghijkmnopqrs \( $minor / 16 + 1 \) 1`
+    echo /dev/sd$letter
+}
+
+# Gets partition devices in the given scsi address
+function getScsiDevicePartitions {
+    local scsiAddress=$1
+    local devs=""
+    for i in "/sys/class/scsi_device/${scsiAddress}/device/block/"sd*; do
+        dev=/dev/`echo $tmp | cut -f 8 -d /`
+        devs="$devs $dev"
+    done
+    echo devs 
+}
+
+# checks for a valid scsi address
+function isValidScsiAddress {
+    local scsiAddress=$1
+    test -e /sys/class/scsi_device/${scsiAddress}
+    return $?
+}
+
+# check if a device is mountable
+# FIXME: I don't like too much this way. Have anybody a better idea???
+function isMountable {
+    local device=$1;
+    local tmpMountPoint=/tmp/.usb-storage.$$
+    mkdir -p $tmpMountPoint
+    if mount -t auto $device $tmpMountPoint &> /dev/null; then 
+        umount $tmpMountPoint
+        rmdir $tmpMountPoint
+        return 0     
+    else
+        rmdir $tmpMountPoint
+        return 1
+    fi
+}
+
+# Adds a umount line in the remove script. creates the remove script
+# if necesary
+# Param: mount point of mounted device
+# Param: removeMountPoint = 1 if have to remove or 0 if not
+function addMountPointForRemover {
+    local mountPoint=$1
+    local removeMountPoint=$2
+
+    # create file if necesary
+    if [ ! -e $REMOVER ]; then
+        echo "#!/bin/sh"> $REMOVER
+        chmod +x $REMOVER
+    fi 
+
+    # lazy umount    
+    echo "umount -l \"$mountPoint\"" >> $REMOVER
+
+    if [ "$removeMountPoint" = "1" ]; then 
+        echo "rmdir \"$mountPoint\"" >> $REMOVER
+    fi
+        
+}
+
+# Mounts a device in the given point, with the given options
+# If mount point is already mounted, create other with a suffix
+# Returns the effective mount point
+function mountDevice {
+    local device=$1; 
+    local mountPoint=$2; 
+    local mountOptions=$3;
+    local removeMountPoint=0;
+
+    # check that mount point is not busy
+    local -i counter=2;
+    local realMountPoint=$mountPoint;
+    while mount | grep -q $realMountPoint; do
+        # check that the device is not mounted already in the same mountpoint
+        if mount | grep $realMountPoint | grep -q $device; then 
+            return
+        fi
+        realMountPoint=$mountPoint$counter
+        counter=counter+1
+    done
+    
+    # Supermount mount 
+    # Create dir if necesary
+    if [ ! -e $realMountPoint ]; then
+        mkdir -p $realMountPoint
+        removeMountPoint=1
+    fi
+
+    mount -t supermount none $realMountPoint -o dev=$device,fs=auto,--,$mountOptions
+    
+    # Add it to remove script
+    addMountPointForRemover $realMountPoint $removeMountPoint
+    
+}
+
+
+# Reads the configuration file, striping comments and removing blanks
+function getConfiguration {
+    cat $CONFIG_FILE | sed 's/\(.*\)#.*/\1/;s/  */ /g;s/^ //'
+}
+
+# Process the action for a concrete device and partition
+# params: 
+#    <"mount">  
+# or
+#    <"symbolic"> 
+function processPartition {
+    local device=$1;
+    local action=$2;
+
+    if [ "$action" = "mount" ]; then 
+        local mountPoint=$3;
+        local mountOptions=$4;
+    else 
+        local symbolicDevice=$3;
+    fi 
+    
+    if [ "$action" = "mount" ]; then
+        # Mount it to the mount point
+        mountDevice $device $mountPoint $mountOptions
+    else 
+        # Set symbolic device
+        ln -sf $device $symbolicDevice
+    fi
+    
+}
+
+# Process a device. This function gets the configuration for the defined
+# device and calls processScsiLunPartition for each partition
+# param: usbVendorProduct String with the key "idProduct:idVendor"
+# param: usbHostNumber asigned host number
+# param: lun Scsi lun number
+function processScsiLun {
+
+    local usbVendorProduct=$1
+    local usbHostNumber=$2
+    local lun=$3
+
+
+    local confType;
+    local mountPoint;
+    local mountOptions;
+    local symbolicDevice;
+    local partition;
+    local configurationLine;
+    local partitionDevice;
+    
+    # Get the base  device name (/dev/sd?)
+    local deviceBase=$(getScsiDeviceNameFromAddress $scsiHostNumber:0:0:$scsiLun)
+
+    # get all partitions defined in configuration file for this product and lun
+    local configuredPartitions=`getConfiguration | grep "$usbVendorProduct $lun" | cut -f 3 -d " "`
+
+    # if there is configuration, process each partition
+    if [ ! "$configuredPartitions" == "" ]; then
+        for partition in $configuredPartitions; do
+            configurationLine=`getConfiguration | grep -m 1 "$usbVendorProduct $lun $partition"`
+
+            # If there is a configuration line, use it. It should be there :)
+            if [ ! "$configurationLine" == "" ]; then
+                # check for special partition number 0
+                if [ "$partition" = "0" ]; then
+                    partitionDevice=${deviceBase}
+                else 
+                    partitionDevice=${deviceBase}${partition}
+                fi
+                confType=`echo $configurationLine | cut -d " " -f 4`
+                if [ "$confType" = "mount" ]; then
+                    mountPoint=`echo $configurationLine | cut -d " " -f 5`
+                    mountOptions=`echo $configurationLine | cut -d " " -f 6`
+                    processPartition $partitionDevice $confType $mountPoint $mountOptions
+                else 
+                    symbolicDevice=`echo $configurationLine | cut -d " " -f 5`
+                    processPartition $partitionDevice $confType $symbolicDevice
+                fi
+            fi
+        done            
+    # if there is no configuration, search for filesystem in sd? or sd?1
+    else 
+        # check if there is a filesystem in sd?1, using fdisk (is faster)
+        if fdisk -l ${deviceBase} | grep -q ${deviceBase}1; then 
+            processPartition ${deviceBase}1 mount $DEFAULT_MOUNT_POINT $DEFAULT_MOUNT_OPTIONS
+        else 
+            # check if there is a filesystem in sd?1
+            if isMountable ${deviceBase}; then 
+                processPartition ${deviceBase} mount $DEFAULT_MOUNT_POINT $DEFAULT_MOUNT_OPTIONS
+            fi
+        fi
+    fi
+
+}
+
+if [ "${ACTION}" = "add" ]; then
+
+    #####
+    # Set the remover to this script
+    # ln -s $0 $REMOVER
+
+    #####
+    # Wait a little, for the device to be created
+    sleep 1
+
+
+    #####
+    # Get device info 
+    usbSerial=$(getUsbDeviceSerialNumber $DEVICE);
+    usbVendorProduct=$(getUsbDeviceVendorProduct $DEVICE)
+
+    # Get the scsi host
+    scsiHostNumber=$(getScsiDeviceFromSerialNumber $usbSerial);
+
+    ####    
+    # Search for all luns
+    declare -i scsiLun=0
+    while isValidScsiAddress $scsiHostNumber:0:0:$scsiLun; do
+        processScsiLun $usbVendorProduct $scsiHostNumber $scsiLun
+        scsiLun=$scsiLun+1
+    done
+    
+fi
+
+if [ "${ACTION}" = "remove" ]; then
+    true
+fi
+
+exit;
+
+
+Imprimir
+

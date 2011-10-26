@@ -1,0 +1,101 @@
+# Lance Bailey <lrb@ctrg.rri.uwo.ca>
+#
+
+TRIPWIRE
+--------
+
+TRIPWIRE is a script designed to make easier the running of tripwire on 
+multiple machines, but with only one floppy drive available.
+
+
+A safe, and recommended by gene, manner of running tripwire is to keep
+the databases and the config files on a read only floppy. A safer still 
+approach is to also store the binaries on the floppy.  Unfortunately, if
+you only have one floppy, you can run out of space while trying to support
+a number of machines/platforms on one floppy. The obvious solution is 
+compression of some sort.
+
+
+TRIPWIRE is designed to take compressed binaries and databases, decompress
+them into a clean working area and run the [newly uncompressed] binary 
+according to the appropriate config file.
+
+
+To use TRIPWIRE, 
+
+1) 
+set up your config.h as follows (*before* compiling :)
+
+#define CONFIG_PATH	"/usr/local/adm/tcheck/tripwire.configs"
+#define DATABASE_PATH	"./Databases"
+
+#define CONFIG_FILE 	"tripwire.config_@"
+#define DATABASE_FILE	"tripwire.database_@"
+
+
+
+2) set up a floppy as follows 
+
+/floppy/Databases
+		     -- directory, contains compressed Databases of the
+			form:  tripwire.database_XXX.sub.do.main
+			tripwire.database_YYY.sub.do.main
+
+			where XXX.sub.do.main and YYY.sub.do.main are
+			hostnames (as returned by the hostname(1) command)
+			of machines you are monitoring.
+
+			There will be a unique database for each machine.
+
+
+/floppy/tripwire.configs
+		     -- directory containing compressed binaries for each of
+			your systems.  These are named for the hostname of
+			the system.  Continuing the above example, we would
+			have
+
+			/floppy/tripwire.configs/XXX.sub.do.main
+			/floppy/tripwire.configs/YYY.sub.do.main
+
+			if XXX and YYY were the same platform, then a single
+			file with two links to the inode could be used.
+
+
+
+/floppy/tripwire.configs
+
+		     -- directory containing the *uncompressed*
+			configuration files each of your systems.  These are
+			named tripwire.config_XXX.sub.dom.ain and
+			tripwire.config_YYY.sub.dom.ain
+
+			It is expected that each host will have a unique
+			config file, although it is possible that disk-sparse
+			clients might share configs. In this case, use multiple
+			links to the same config file.
+
+
+3) for each needed platform:
+   -build the binary
+   -run the binary tripwire to create the database
+   -compress the binary and the database and store them onto the floppy
+
+
+4) Mark the floppy readonly, re-mount and export to needed machines. NFS-mount 
+   the floppy as /usr/local/adm/tcheck (or edit the TRIPWIRE script to reflect
+   your preference).  Use a symlink on the floppy's local host to point 
+   /usr/local/adm/tcheck to the floppy if you can't control a floppy's
+   mount point (stupid NeXT).
+
+5) TRIPWIRE operates as follows:
+
+	cd the the /tmp area
+	forcably remove any hierarchy called tcheck.run
+	create the directory tcheck.run, move to it and create a Databases
+	    directory
+	uncompress the needed binary and database and store them in .  and
+	    Databases
+	run tripwire, mailing the output to root
+	move back to the /tmp area and remove the tcheck.run hierarchy
+
+

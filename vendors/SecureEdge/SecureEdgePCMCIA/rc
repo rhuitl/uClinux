@@ -1,0 +1,26 @@
+hostname SecureEdgePCMCIA
+date `cat /etc/build-date`
+mount -t proc proc /proc
+if mount 2>&1 | grep romfs > /dev/null; then
+	echo "Recovery image detected ..."
+	mount -t tmpfs tmpfs /etc/config
+	mount -t tmpfs tmpfs /var
+	mkdir /var/tmp
+	mkdir /var/log
+	mkdir /var/run
+	mkdir /var/mnt
+	mkdir /var/lock
+	mkdir /var/empty
+else
+	echo "Full image detected ..."
+	mount -n -o remount,rw /
+	rm -rf /tmp/*
+	rm -rf /var/tmp/*
+	rm -f /var/run/*
+	rm -f /var/log/*.pid
+	rm -f /var/lock/*
+	rm -f /var/empty/*
+fi
+/bin/flatfsd -r
+mount -a
+echo "/etc/rc complete."

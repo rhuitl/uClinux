@@ -1,0 +1,74 @@
+#!/usr/bin/perl
+
+######################################################################
+# GSM data extractor for US Robotics Sportster Vi modems.
+#
+# Extracts the GSM data from a raw modem data file, possibly for
+# conversion to other formats.
+#
+# - Scott Hutton <shutton@pobox.com>
+######################################################################
+
+######################################################################
+# Usage: extract_gsm < inputfile > outputfile
+######################################################################
+
+use strict;
+
+my %compr_desc = ( 1 => 'GSM',
+             2 => 'ADPCM_2',
+             3 => 'ADPCM_3',
+             4 => 'ADPCM_4',
+              );
+
+my $buf;
+my $in_header = 1;
+my $header = '';
+
+my $END_FRAME           = 0xa5;
+my $BEGIN_FRAME_NORMAL  = 0xfe;
+my $BEGIN_FRAME_SILENCE = 0xb6;
+
+my $npackets_written = 0;
+while (read(STDIN, $buf, 2)) {
+  my ($msb, $lsb) = unpack('C2', $buf);
+  if ($msb == $lsb && 
+      ($msb == $BEGIN_FRAME_NORMAL ||
+       $msb == $BEGIN_FRAME_SILENCE)) {
+    if ($in_header) {
+      $in_header = 0;
+      check_header();    # Verify file info before writing any output
+    }
+    # Read remainder of packet
+    my $end_frame;
+    read(STDIN, $buf, 34);
+    read(STDIN, $end_frame, 2);
+    my ($msb, $lsb) = unpack('C2', $end_frame);
+    if ($msb != $lsb || $msb != $END_FRAME) {
+      die "Missing or corrupt end frame word.  Probably bad file.\n";
+    }
+    print substr($buf, 0, 33);     # Last octet is unused
+    $npackets_written++;
+  } else {
+    $header .= $buf;
+  }
+}
+die "No packets written.  Header didn't terminate or no data found.\n"
+  unless $npackets_written;
+
+sub check_header {
+  my ($magic, $voice_modem_type, $compid, @reserved) =
+    unpack('A4 A16 s C10', $header);
+  $compid >>= 8;
+  my $compr_desc = $compr_desc{$compid} || 'unknown';
+
+  if (length($header) != 32) {
+    die "Header wrong size", length($header);
+  }
+
+  die "Not a raw modem data file.\n" unless $magic eq 'RMD1';
+  die "Not data from a US Robotics modem.\n"
+    unless $voice_modem_type eq 'US Robotics';
+  die "Not GSM data: found compression type $compr_desc (type $compid).\n"
+    unless $compr_desc eq 'GSM';
+}

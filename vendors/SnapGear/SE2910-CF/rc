@@ -1,0 +1,18 @@
+hostname SE2910-CF
+/bin/expand /etc/ramfs.img /dev/ram1
+date `cat /etc/build-date`
+mount -t proc proc /proc
+mount -n -o remount,rw /
+mount -t ext2 /dev/ram1 /etc/config
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+rm -f /var/run/*
+rm -f /var/log/*.pid
+rm -f /var/lock/*
+rm -f /var/empty/*
+/bin/flatfsd -r
+cp /etc/config/resolv.user /etc/config/resolv.conf
+insmod usbcore
+insmod usb-ohci
+/bin/sh /etc/config/start
+echo "/etc/rc complete."

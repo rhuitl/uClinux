@@ -1,0 +1,156 @@
+#! /bin/sh
+#
+# network 1.32 1997/05/13 02:16:47 (David Hinds)
+#
+# Initialize or shutdown a PCMCIA ethernet adapter
+#
+# This script should be invoked with two arguments.  The first is the
+# action to be taken, either "start", "stop", or "restart".  The
+# second is the network interface name.
+#
+# The script passes an extended device address to 'network.opts' in
+# the ADDRESS variable, to retrieve device-specific configuration
+# options.  The address format is "scheme,socket,instance,hwaddr"
+# where "scheme" is the current PCMCIA device configuration scheme,
+# "socket" is the socket number, "instance" is used to number multiple
+# interfaces in a single socket, and "hwaddr" is the card's hardware
+# ethernet address.
+#
+# added DHCP option 06/21/97 (Yoichi Hariguchi)
+#
+
+. ./shared
+
+# Get device attributes
+get_info $DEVICE
+HWADDR=`/sbin/ifconfig $DEVICE | sed -n -e 's/.*addr \(.*\)/\1/p'`
+
+# Load site-specific settings
+ADDRESS="$SCHEME,$SOCKET,$INSTANCE,$HWADDR"
+. $0.opts
+
+case "$ACTION" in
+
+'start')
+
+    test "$IF_PORT" && /sbin/ifport $DEVICE $IF_PORT
+
+    if [ "$DHCP" = "y" -o "$DHCP" = "Y" ] ; then
+        if [ "$DHCPSTF" ] ; then
+            /usr/sbin/dhcpcd -c $DHCPSTF ${device}
+        else
+            /usr/sbin/dhcpcd ${device}
+        fi
+    elif is_true $BOOTP ; then
+        /sbin/ifconfig $DEVICE up
+        /sbin/route add default dev $DEVICE
+        eval `/sbin/bootpc --bootfile '' --dev $DEVICE`
+        /sbin/route del default
+        if [ "$GATEWAYS" ] ; then
+            set - $GATEWAYS ; GATEWAY=$1
+        fi
+    fi
+
+    if [ "$IPADDR" != "" ] ; then
+
+        # Basic network setup
+        /sbin/ifconfig $DEVICE up $IPADDR netmask $NETMASK \
+        ${BROADCAST:+broadcast $BROADCAST}
+
+        if [ "$NETWORK" != "" ] ; then
+            /sbin/route add -net $NETWORK netmask $NETMASK dev $DEVICE
+        elif [ "$GATEWAY" != "" ] ; then
+            /sbin/route add $GATEWAY $DEVICE
+        fi
+
+        test "$GATEWAY" && /sbin/route add default gw $GATEWAY metric 1
+
+        # Update DNS stuff
+        cp /etc/resolv.conf /etc/resolv.new
+        echo "# $DEVICE begin" >> /etc/resolv.new
+        test "$DOMAIN" && echo "domain $DOMAIN" >> /etc/resolv.new
+        if [ "$DNSSRVS $DNS_1 $DNS_2 $DNS_3" != "   " ] ; then
+            for DNS in $DNSSRVS $DNS_1 $DNS_2 $DNS_3 ; do
+                echo "nameserver $DNS" >> /etc/resolv.new
+            done
+        fi
+        echo "# $DEVICE end" >> /etc/resolv.new
+        mv /etc/resolv.new /etc/resolv.conf
+
+        # Handle NFS mounts
+        if [ "$MOUNTS" != "" ] ; then
+            for MT in $MOUNTS ; do mount -v $MT ; done
+        fi
+    fi
+
+    if [ "$IPX_NETNUM" != "" ] ; then
+        ipx_interface add $DEVICE $IPX_FRAME $IPX_NETNUM
+    fi
+
+    is_func start_fn && start_fn $DEVICE
+    ;;
+
+'stop')
+
+    is_func stop_fn && stop_fn $DEVICE
+    
+    if [ "$DHCP" = "y" -o "$DHCP" = "Y" ] ; then
+        `mount | awk '/type nfs/ { print "umount " $3 }'`
+         /usr/sbin/dhcpcd -k
+#        if ! /usr/sbin/dhcpcd -k >/dev/null 2>&1 ; then
+#            /sbin/ifconfig $device down
+#        fi
+    elif is_true $BOOTP || [ "$IPADDR" != "" ] ; then
+
+        # Shut down NFS mounts
+        if [ "$MOUNTS" != "" ] ; then
+            for MT in $MOUNTS ; do
+                if mount | fgrep " on $MT type" ; then
+                    fuser -s -k -m $MT
+                   umount -v $MT
+                fi
+            done
+        fi
+
+        test "$IPX_NETNUM" && ipx_interface del $DEVICE $IPX_FRAME
+
+        # Remove nameservers
+        sed -e "/# $DEVICE begin/,/# $DEVICE end/d"	\
+            < /etc/resolv.conf > /etc/resolv.new &&	\
+        mv /etc/resolv.new /etc/resolv.conf
+
+    fi
+    /sbin/ifconfig $DEVICE down
+    ;;
+
+'check')
+    if [ "$MOUNTS" != "" ] ; then
+	for MT in $MOUNTS ; do
+	    if mount | fgrep " on $MT type" ; then
+		fuser -s -m $MT && exit 1
+	    fi
+	done
+    fi
+    # This is crude -- it checks for any external network activity
+    netstat -ntuw | tail +3 | awk '{ print $5, $6 }' | \
+	egrep -v '127.0.0.1|FIN_WAIT|TIME_WAIT|CLOSE' > /dev/null && exit 1
+    ;;
+
+'cksum')
+    chk_simple "$3,$SOCKET,$INSTANCE,$HWADDR" || exit 1
+    ;;
+
+'restart')
+    test "$IPADDR" && /sbin/ifconfig $DEVICE down up
+    ;;
+
+'suspend'|'resume')
+    ;;
+
+*)
+    usage
+    ;;
+
+esac
+
+exit 0

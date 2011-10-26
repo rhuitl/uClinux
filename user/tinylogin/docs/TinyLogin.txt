@@ -1,0 +1,224 @@
+NAME
+    tinylogin - a multi-call binary for login and user account
+    administration
+
+SYNOPSIS
+      tinylogin <function> [arguments...]   # or
+
+      <function> [arguments...]             # if symlinked
+
+DESCRIPTION
+    TinyLogin is a suite of tiny Unix utilities for handling logging
+    into, being authenticated by, changing one's password for, and
+    otherwise maintaining users and groups on an embedded system. It
+    also provides shadow password support to enhance system
+    security. TinyLogin is, as the name implies, very small, and
+    makes an excellent complement to BusyBox on an embedded System.
+    It can be used without BusyBox, of course, but I envision them
+    being used together most of the time.
+
+    Why is something like TinyLogin useful?
+
+        [andersen@slag]$ du -ch `which addgroup adduser delgroup deluser getty login passwd su sulogin`
+        0   /usr/sbin/addgroup
+        24k /usr/sbin/adduser
+        16k /sbin/getty
+        36k /bin/login
+        28k /usr/bin/passwd
+        24k /bin/su
+        12k /sbin/sulogin
+        140k        total
+
+        [andersen@slag]$ ls -sh ./tinylogin
+        40k ./tinylogin*
+
+    `nuff said.
+
+    TinyLogin is a curious blend of code from a whole bunch of
+    folks. It was originally cobbled together by Sean Bastille
+    <hightide@ginch.org> based in part on the May of 1998 version of
+    the shadow utilities, which can be downloaded from:
+    ftp://ftp.ists.pwr.wroc.pl/pub/linux/shadow/ The build system,
+    and the way in which TinyLogin invokes its component
+    applications has been totally rewritten, based on the build
+    system used for BusyBox. The code has also been majorly reworked
+    to make it more internally consistent, to make it use fewer
+    global variables, etc, by Erik Andersen.
+
+    TinyLogin may be used and distributed under the terms of GNU
+    General Public License, with the addition of the special terms
+    enumerated below by the shadow utilities license (a BSD style
+    license which allows me to make future releases under the GPL).
+
+  HACKING
+
+    TinyLogin, like BusyBox, is now modularized to easily allow you
+    to build only the components you need, thereby reducing binary
+    size. To turn off unwanted TinyLogin components, simply edit the
+    file tinylogin.def.h and comment out the parts you do not want
+    using C++ style (//) comments.
+
+    After the build is complete a tinylogin.links file is generated
+    which is then used by 'make install' to create symlinks to the
+    tinylogin binary for all compiled in functions. By default,
+    'make install' will place a symlink forest into `pwd`/_install
+    unless you have defined the PREFIX environment variable.
+
+MAKING IT WORK
+    I often get email from people wondering why tinylogin doesn't
+    work. It is almost always the case that they compiled with
+    "USE_SYSTEM_PWD_GRP = true" in the Makefile, and they are using
+    GNU Libc, and have either failed to install /etc/nsswitch.conf,
+    have badly configured their /etc/nsswitch.conf file, or have a
+    properly configured /etc/nsswitch.conf file but have not
+    installed the libraries the GNU Libc is looking for (which is
+    determined based on the contents of the /etc/nsswitch.conf
+    file). To avoid these problems, I recommend that unless you have
+    a very good reason, you should always leave the Makefile's
+    "USE_SYSTEM_PWD_GRP = false" setting in place. This will cause
+    tinylogin to directly use the system's password and group files.
+    This way, you do not need to worry about GNU Libc's NSS at all
+    (thereby making your embedded system even smaller). If you
+    absolutely must use GNU libc NSS for authentication you must
+    include something such as the following in your embedded
+    systems' /etc/nsswitch.conf file:
+
+      # /etc/nsswitch.conf
+      # Note that if you are doing networking, 
+      # other entries will also be needed.
+      passwd:         compat
+      group:          compat
+      shadow:         compat
+
+    Furthermore, you will also need to include the library
+    /lib/libnss_compat so that GNU Libc can find it when it is
+    needed (it is dynamicaly loaded, so 'ldd' won't tell you that
+    you need it -- which is why I've devoted this entire section of
+    the manual to tell you you need it). If you want to do something
+    more complicated, such as authenticating vs a remote LDAP
+    database, well tinylogin can work just fine with that type of
+    setup using GNU libc NSS, but setting it up is your problem, not
+    mine.
+
+COMMANDS
+    Currently defined functions include:
+
+    adduser, addgroup, deluser, delgroup, login, su, sulogin,
+    passwd, getty
+
+    * adduser
+        Add a user to the system
+
+        Usage: adduser [OPTIONS]... <USER>
+
+        Options:
+
+          -h <directory>    specify home directory
+          -s <shell>        specify shell
+          -g <gecos>        specify GECOS string
+
+        Default values are as follows:
+
+          HOME=/home/$USER
+          SHELL=/bin/sh
+          GECOS="Embedix,,,"
+
+        Description:
+
+        This utility adds a user to /etc/passwd and /etc/group. If
+        shadow is enabled /etc/shadow and /etc/gshadow are also
+        updated w/ appropriate information. The group name is set to
+        the same value as the user name. To set the initial
+        password, adduser executes passwd which presents an
+        interactive prompt. This makes adduser inappropriate for
+        batch account creation.
+
+        Normally, something like adduser is implemented in a
+        scripting language, but this one was implemented in C. The
+        rationale for this was that in a small system, one might not
+        have space for certain Unix shell utilities that are
+        normally taken for granted or that one might not have space
+        for even a minimal perl installation. Such limitations could
+        make making a robust adduser implementation difficult, so
+        the only viable option left was to do it in C.
+
+        When implementing adduser, the semantics of Debian's adduser
+        perl script were used as a reference, so those of you
+        familiar with that should notice similarities.
+
+    * addgroup
+        Add a group to the system
+
+        Usage: addgroup [OPTIONS]... <GROUP>
+
+        Options:
+
+          -g <number>       specify gid
+
+        Description:
+
+        This utility adds a group to /etc/group and if necessary,
+        /etc/gshadow as well. If the GID is not specified, addgroup
+        will try to find the next available gid within the range of
+        [100..64000].
+
+    * deluser
+        Delete a user from the system
+
+        Usage: deluser <USER>
+
+        Description:
+
+        This utility only takes one parameter which is the user
+        name. It will search /etc/passwd and delete the user's
+        account if it exists.
+
+        NOTE: Although adduser adds both users and groups, deluser
+        only deletes users.
+
+    * delgroup
+        Delete a group from the system
+
+        Usage: delgroup <USER>
+
+        Description:
+
+        This utility only takes one parameter which is the group
+        name. It will search /etc/passwd and delete the group if it
+        exists.
+
+        NOTE: Although adduser adds both users and groups, delgroup
+        only deletes groups.
+
+    * login
+        Begin session on the system
+
+        Usage: login
+
+    * su
+        Change uid or become root
+
+        Note that for su to work, the tinylogin binary must be
+        setuid root.
+
+    * sulogin
+        Single-user login
+
+    * passwd
+        Change user password
+
+    * getty
+        Opens a tty and invokes /bin/login
+
+SEE ALSO
+    busybox(1), pam(8)
+
+AUTHORS
+    Erik Andersen <erik@lineo.com>
+
+    Sean Bastille <hightide@ginch.org>
+
+    John Beppu <beppu@lineo.com>
+
+    Julianne Frances Haugh <unknown@unknown>
+

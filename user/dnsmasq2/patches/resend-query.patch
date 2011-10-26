@@ -1,0 +1,106 @@
+#14312
+
+Move the code to resend a query into a separate function.
+Code cleanup only; no change to operation.
+
+Index: dnsmasq2/src/forward.c
+===================================================================
+--- dnsmasq2.orig/src/forward.c	2009-03-23 11:58:12.000000000 +1000
++++ dnsmasq2/src/forward.c	2009-03-23 13:18:59.000000000 +1000
+@@ -289,9 +289,38 @@ static int send_query(HEADER *header, si
+   return 0;
+ }
+ 
++static int resend_query(HEADER *header, size_t plen, time_t now, struct frec *forward)
++{
++  char *domain;
++  int type;
++  unsigned short gotname = extract_request(header, plen, daemon->namebuff, NULL);
++  struct server *start;
++
++  /* retry on existing query, send to all available servers  */
++  domain = forward->sentto->domain;
++  forward->sentto->failed_queries++;
++  if (!(daemon->options & OPT_ORDER))
++    {
++      forward->forwardall = 1;
++      daemon->last_server = NULL;
++    }
++  type = forward->sentto->flags & SERV_TYPE;
++  if (!(start = forward->sentto->next))
++    start = daemon->servers; /* at end of list, recycle */
++  header->id = htons(forward->new_id);
++
++  if (send_query(header, plen, forward, start, type, domain, gotname))
++    return 1;
++  
++  /* could not send on, prepare to return */ 
++  header->id = htons(forward->orig_id);
++  free_frec(forward); /* cancel */
++  return 0;
++}
++
+ static int forward_query(int udpfd, union mysockaddr *udpaddr,
+ 			 struct all_addr *dst_addr, unsigned int dst_iface,
+-			 HEADER *header, size_t plen, time_t now, struct frec *forward)
++			 HEADER *header, size_t plen, time_t now)
+ {
+   char *domain = NULL;
+   int type = 0;
+@@ -300,24 +329,16 @@ static int forward_query(int udpfd, unio
+   unsigned short flags = 0;
+   unsigned short gotname = extract_request(header, plen, daemon->namebuff, NULL);
+   struct server *start = NULL;
++  struct frec *forward;
+     
+   /* may be no servers available. */
+   if (!daemon->servers)
+     forward = NULL;
+-  else if (forward || (forward = lookup_frec_by_sender(ntohs(header->id), udpaddr, crc)))
++  else if ((forward = lookup_frec_by_sender(ntohs(header->id), udpaddr, crc)))
+     {
+-      /* retry on existing query, send to all available servers  */
+-      domain = forward->sentto->domain;
+-      forward->sentto->failed_queries++;
+-      if (!(daemon->options & OPT_ORDER))
+-	{
+-	  forward->forwardall = 1;
+-	  daemon->last_server = NULL;
+-	}
+-      type = forward->sentto->flags & SERV_TYPE;
+-      if (!(start = forward->sentto->next))
+-	start = daemon->servers; /* at end of list, recycle */
+-      header->id = htons(forward->new_id);
++      if (resend_query(header, plen, now, forward))
++	return 1;
++      forward = NULL;
+     }
+   else 
+     {
+@@ -518,7 +539,7 @@ void reply_query(int fd, int family, tim
+ 	    {
+ 	      header->qr = 0;
+ 	      header->tc = 0;
+-	      forward_query(-1, NULL, NULL, 0, header, nn, now, forward);
++	      resend_query(header, nn, now, forward);
+ 	      return;
+ 	    }
+ 	}
+@@ -742,7 +763,7 @@ void receive_query(struct listener *list
+   if (type == T_A && source_addr.in.sin_addr.s_addr == htonl(0x7f000001) && source_addr.in.sin_port == preload_lookup_sin_port)
+     {
+     	forward_query(listen->fd, &source_addr, &dst_addr, if_index,
+-		      header, (size_t)n, now, NULL);
++		      header, (size_t)n, now);
+ 	return;
+     }
+ #endif
+@@ -760,7 +781,7 @@ void receive_query(struct listener *list
+       daemon->local_answer++;
+     }
+   else if (forward_query(listen->fd, &source_addr, &dst_addr, if_index,
+-			 header, (size_t)n, now, NULL))
++			 header, (size_t)n, now))
+     daemon->queries_forwarded++;
+   else
+     daemon->local_answer++;

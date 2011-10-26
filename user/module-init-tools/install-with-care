@@ -1,0 +1,21 @@
+#! /bin/sh
+
+echo install-with-care "$@"
+
+# Final arg is dest.
+eval DEST=\$$#
+
+case `echo $DEST | tr -s / /` in
+    /sbin/insmod.static) ;;# This didn't exist before, OK.
+    /sbin/insmod|/sbin/lsmod|/sbin/modprobe|/sbin/rmmod|/sbin/depmod)
+	if [ -f $DEST ] && [ ! -f $DEST.old ]; then
+	    echo Refusing to install $DEST, move old utils first. >&2
+	    exit 1
+	fi
+	;;
+    /bin/lsmod) # If we're installing into /bin, make /sbin/lsmod link.
+	ln -sf ../bin/lsmod /sbin/lsmod
+	;;
+esac
+
+exec install "$@"

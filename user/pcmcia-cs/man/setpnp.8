@@ -1,0 +1,64 @@
+.\" Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
+.\" setpnp.8 1.3 2000/06/12 21:24:49
+.\"
+.TH SETPNP 8 "2000/06/12 21:24:49" "pcmcia-cs"
+.SH NAME
+setpnp \- modify Plug and Play BIOS device resources
+.SH SYNOPSIS
+.B setpnp
+.RB [ -b ]
+.I device resource...
+.br
+.B setpnp
+.RB [ -b ]
+.I device {on|off}
+.SH DESCRIPTION
+This utility updates the system resource information for Plug and Play
+BIOS device nodes.  A device is specified by its two-digit hex node
+number.  In its first form, a list of resources are given on the
+command line.  Alternatively, a device can either be simply switched
+``on'' (reset to its boot configuration) or ``off'' (all resources
+disabled).
+.PP
+There are four types of resources: ``io'', ``mem'', ``irq'', and
+``dma''.  A resource list consists of one or more space-separated
+pairs of a resource type with one or more values.  Multiple values for
+one resource type can be separated by commas.  Values can also either
+be unitary or dash-separated ranges.  For example:
+.sp
+.RS
+.nf
+setpnp 0d io 0x2f8-0x2ff irq 3
+setpnp 12 io 0x350-0x35f,0x2f8-0x2ff irq 3 irq 10
+.RE
+.fi
+.sp
+The order of items of different types is not important, but if more
+than one item of the same type is present, their relative order is
+significant.  The Plug and Play BIOS will reject invalid configuration
+attempts; however,
+.B setpnp
+will not attempt to determine why a configuration was rejected.
+.PP
+By default, current (dynamic) device configuration information is
+modified.  With the
+.B -b
+option, a device's boot (static) configuration can be updated.  Some
+devices may only be reconfigured for the following boot.  Be especially
+careful when modifying your system's boot configuration.  Improper use
+of this command may disable vital system devices and render your
+system unbootable. 
+.SH OPTIONS
+.TP
+.B \-b
+Boot mode: update the device resource information that will be used at
+next boot (as opposed to current resource info).
+.TP
+.SH FILES
+.TP \w'/proc/bus/pnp/...\ \ \ \ |\|'u
+/proc/bus/pnp/...
+The kernel interface for Plug and Play BIOS device services.
+.SH AUTHORS
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+lspnp(8)

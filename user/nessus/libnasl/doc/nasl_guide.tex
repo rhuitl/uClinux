@@ -1,0 +1,1799 @@
+%
+%
+%                      THE NASL REFERENCE GUIDE
+%
+%
+% This document has been written in LaTeX. To compile it,
+% type 'latex nasl_guide.tex', and you will get a .dvi
+% file.
+%
+%
+% Written by Renaud Deraison <deraison@cvs.nessus.org>
+% $Id: nasl_guide.tex,v 1.19 2003/01/07 01:39:22 renaud Exp $
+
+
+\documentclass{article}
+
+% Do I need this ?
+
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[LE,RO]{NASL Reference Guide}
+\fancyfoot[LE,RO]{}
+
+\title{The Nessus Attack Scripting Language Reference Guide}
+\author{Renaud Deraison $<$deraison@nessus.org$>$}
+\date{Version 1.4.0}
+
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+\section{Introduction}
+
+\subsection{What is NASL ?}
+
+NASL is a scripting language designed for the Nessus security scanner. Its aim 
+is to allow anyone to write a test for a given security hole in a few minutes,
+to allow people to share their tests without having to worry about their 
+operating system, and to garantee everyone that a NASL script can not do
+anything nasty except performing a given security test against a given
+target.\\
+Thus, NASL allows you to easily forge IP packets, or to send regular packets.
+It provides you some convenient functions that will make the test of web and
+ftp server easier to write. NASL garantees you that a NASL script :
+\begin{itemize}
+\item will not send any packet to a host other than the target host
+\item will not execute any commands on your local system
+\end{itemize}
+
+
+
+\subsection{What NASL is not ?}
+
+NASL is not a powerful scripting language. Its purpose is to make scripts that 
+are security tests. So, do not expect to write a third generation web server
+in this language, nor a file conversion utility. 
+Use perl, python or whatever scripting language to do this  - they are 100 times faster\\
+
+NASL was designed rather quickly, so you may spot some inconstencies in its
+syntax.
+Please, let me know if you find some.
+
+
+
+\subsection{Why not using Perl/Python/tcl/\textit{whatever you like} for Nessus ?}
+
+
+I know that there is a lot of very good scripting languages around
+here, and that NASL is really weak compared to them. But none of
+these languages is secure, in the sense that you can easily write
+a test that will be a trojan and will indeed open a connection to
+a third party host - letting it know that you are a Nessus user, 
+and even eventually send the name of your targets to this evil
+third party host. Or worse, it could send your passwd file, or
+whatever.\\
+
+Another problem with many of these scripting language : a lot of
+them are memory hungry. It can also be an headache if you want to
+configure them for Nessus. Just think about Perl. Perl is good.
+Perl is beautiful (according to some). But how much time will you
+have to spend to install all the modules that may be necessary for
+writing efficient Nessus tests ? \verb+Net::RawIP+ is only one of them.\\
+
+NASL, on the other hand, does not take a huge amount of memory. This
+way, you can launch 20 threads of nessusd at the same time, without
+the need of having 256Mb of RAM. NASL is also self-sufficient. That
+is, you will not have to install a dozen of packages for each new
+security test. 
+
+\subsection{Why should you write your tests in NASL ?}
+
+You may already wonder whether it is worth or not to learn yet 
+another scripting language to write your tests, rather than
+coding them in C or Perl, or whatever. What you must know
+is that :
+\begin{itemize}
+\item NASL is optimized for Nessus. Writing a Nessus test in this
+language is fast
+\item NASL has a lot of things in common with C, so you should not
+be afraid of it
+\item NASL produces secure and easily sharable security tests
+\item NASL produces portable and easily modifiable security tests. When
+the Windows NT version of Nessus is released, you will use the same
+functions to do the same things (such as sending raw IP packets)
+\end{itemize}
+
+
+
+\subsection{What this guide will teach you}
+
+This guide teaches you how to write your own Nessus tests in NASL.
+This is my first attempt to write a comprehensive document, so
+I may have written complicated things. 
+
+\subsection{NASL limitations : what to not expect}
+
+As I stated before, NASL is not a powerful language. The biggest limitations as
+of now are :
+\begin{itemize}
+
+\item \textit{Structures}. Structures are not supported. They may be in a
+not-so-far-away future, but today they are not
+
+\item \textit{A correct debugger}. NASL has no correct debugger. However, there is a standalone interpretor 'nasl'
+
+
+\end{itemize}
+
+
+
+\subsection{History of the NASL interpretor}
+
+The first NASL interpretor was a modification of a personal
+project called \verb+pkt_forge+, written by Renaud Deraison in 1998, which
+was an interactive shell to manipulate packets. The parser was written
+quickly and it was ugly, memory management was awful, and the execution
+of the scripts was slow.\\
+In 2002, Michel Arboi re-wrote most of the NASL engine, and the project
+was dubbed 'NASL2'. Michel used bison to handle most of the grammar, and
+the new version is way faster, while leaving room for even more improvement
+in the future.
+
+\subsection{Thanks}
+
+I would like to thank the following persons for their advices regarding the design
+of NASL.
+Without them, NASL would be more akward than it is already :
+\begin{itemize}
+\item Denis \textsc{Ducamp} (denis@hsc.fr)
+\item \textsc{Fyodor} (fyodor@dhp.com)
+\item Noam \textsc{Rathaus} (noamr@securiteam.com)
+\item Michel \textsc{Arboi} (arboi@noos.fr)
+\end{itemize}
+
+I always appreciate suggestions and complaints about the language. Do not
+hesitate to share your opinion (be it good or bad) with me.
+
+\newpage
+\section{The basics : NASL syntax}
+
+
+NASL syntax is very similar to C, except that a lot of boring stuff has
+been removed. You do not have to care about the type of your objects,
+nor do you have to allow memory for them or free it. You do not need to
+declare your variables before you use them. You just have to focus on
+the security test you want to perform.\\
+
+If you do not know C, then you will have a hard time reading this manual
+has it is currently intended for C programmers. Just complain and this guide
+will be made more readable in the future.
+
+
+\subsection{Comments}
+
+  The comment char is '\verb+#+'. It only comments out the current line.\\
+
+\noindent Examples : 
+ 
+Valid comments are :
+\begin{verbatim}    
+    
+ 	a = 1;  # let a = 1 
+	
+	# Set b to 2 :
+	b = 2;
+\end{verbatim}	
+	
+	
+Invalid comments would be :
+\begin{verbatim}   
+   	#
+	  Set a to 1 :
+	  		#
+			
+	 a = 1;
+	
+	 a = # set a to 1 # 1;
+	 
+	  		
+\end{verbatim}
+
+\subsection{Variables, variables types, memory allocation, includes}
+
+  You do not need to declare variables before you use them, but you
+  may want to explicitely mark them as 'local' in a function, to avoid
+  modifying extern variables (see the relevant section about that).
+ 
+ 
+You do not have to care about the variable types. The
+NASL interpretor will yell at you if you try to do bogus
+things, such as adding an IP packet to a number.
+And you do not have to care about memory allocation nor
+do you have to care about the includes. There is no
+include. Memory is allocated when needed.
+
+\subsection{Numbers and strings}
+
+Numbers can be entered in three bases : decimal, hexadecimal, or binary.
+
+All these lines are correct :
+\begin{verbatim}
+
+ a = 1204;
+ b = 0x0A;
+ c = 0b001010110110;
+ d = 123 + 0xFF;
+ 
+\end{verbatim}
+
+The strings must be quoted. Note that, unlike C, the characters are not interpolated
+unless you explicitly ask to interpolate them using the \verb+string()+ function.
+
+\begin{verbatim}
+
+ a = "Hello\nI'm Renaud";           # a equals to "Hello\nI'm Renaud"
+ b =  string("Hello\nI'm Renaud");  # b equals to "Hello
+                                    #              I'm renaud"  	
+
+ c = string(a);                     # c equals to b
+
+\end{verbatim}
+
+The \verb+string()+ function will be dealt with in the ``String Manipulation'' section.
+
+\subsection{Anonymous / Non Anonymous arguments}
+
+
+\subsubsection{Non Anonymous functions}
+
+One thing which is different with C is the way NASL handles the 
+arguments of a function. In C, you must know by heart which argument
+must be at which place. And this quickly becomes an headache 
+when a function you call has more than 10 arguments.
+For instance, imagine a C function which will forge an IP packet for
+you. This function requires a dozen of arguments. If you want to use
+it, then you will have to remember their exact order or read the
+the documentation of this function. This is a waste of time, and
+this is what NASL attempts to avoid.\\
+
+So, when the order of the arguments of a function is important,
+and when the different arguments of the function have different
+types, then the function is a non anonymous function. That is,
+you have to give the name of the elements. If you forget
+some elements, then you will be prompted for them at 
+runtime.
+
+\begin{itemize}
+
+
+\item Example :
+
+The function \verb+forge_ip_packet()+ has a lot of elements. These
+two calls are valid and perform the exact same thing :
+\begin{verbatim}
+	forge_ip_packet(ip_hl : 5, ip_v : 4, 
+			ip_p : IPPROTO_TCP);
+			
+	forge_ip_packet(ip_p : IPPROTO_TCP,
+			ip_v : 4, ip_hl : 5);
+\end{verbatim}
+			
+The user will be prompted at runtime for the missing
+arguments (\verb+ip_len+, and so on...). Of course, a 
+security test must not directly interact with the user, but
+this is handy for debugging and quick coding.
+\end{itemize}
+
+\subsubsection{Anonymous functions}
+
+ The anonymous functions are functions that take only one argument,
+or arguments of the same type.
+
+Examples :
+\begin{verbatim}
+	send_packet(my_packet);
+	send_packet(packet1, packet2, packet3);
+\end{verbatim}	
+These functions may have options. For instance, the \verb+send_packet()+
+function waits for an answer. If you feel there is no need to
+read the host's answer, then you can deactivate the pcap, and
+speed up the test :
+\begin{verbatim}
+	send_packet(packet, use_pcap:FALSE);
+\end{verbatim}	
+	
+
+
+\subsection{For and while}
+	
+The for and while work like in C :
+
+
+For :
+\begin{verbatim}
+	for(instruction_start;condition;end_loop_instruction)
+	{
+	 #
+	 # Some instructions here 
+	 #
+	}
+\end{verbatim}	
+or 
+\begin{verbatim}
+	for(instruction_start;condition;end_loop_instruction)function();
+\end{verbatim}	
+	
+
+While :
+\begin{verbatim}
+	while(condition)
+	{
+	 #
+	 # Some instructions here
+	 #	
+	}
+\end{verbatim}	
+or
+\begin{verbatim}	
+	while(condition)function();
+\end{verbatim}	
+	
+\noindent Examples :
+
+\begin{verbatim}
+	# Count from 1 to 10
+	for(i=1;i<=10;i=i+1)display("i : ", i, "\n");
+	
+
+	# Count from 1 to 9, and say the type
+	# of each number (even or odd)
+	for(j=1;j<10;j=j+1){
+		if(j & 1)display(j, " is odd\n");
+		else display(j, " is even\n");		
+		}
+
+
+	# Do something completely useless :
+	
+	i = 0;
+	while(i < 10)
+	{
+	 i = i+1;
+	}
+
+\end{verbatim}
+
+
+\subsection{User-defined functions}
+
+NASL now supports user-defined functions. A user-defined function is defined
+like this :
+
+\begin{verbatim}
+
+function my_function(argument1, argument2, ....)
+{
+ #
+ # Body of the function
+ #
+ return(some_value); # this is optional
+}
+
+\end{verbatim}
+
+User-defined functions \textbf{must} use non-anonymous arguments. Recursion is handled.
+
+
+Example :
+\begin{verbatim}
+function fact(n)
+{
+  if((n == 0)||(n == 1))
+    return(n);
+  else
+    return(n*fact(n:n-1));
+}
+
+display("5! is ", fact(n:5), "\n");
+
+\end{verbatim}
+
+
+User-defined function may \textbf{not} contain other user-defined functions (actually, they can but the NASL interpretor will yell at you if you call the function that defines its subfunction more than once)
+
+  Note that if you want your function to return a value (that's the purpose of a function after all), then you have to use the function \verb+return()+. Since \verb+return()+ is a function, you \textbf{must} use parenthesis, that is, the following is incorrect :
+  \begin{verbatim}
+
+function func()
+{
+   return 1; # parenthesis are missing here !
+}
+  
+\end{verbatim}
+      
+
+\subsection{Operators}
+
+The standard C operators work in NASL. That is, \verb;+;,\verb+-+,
+\verb+*+, \verb+/+ and \verb+%+ work. At this time, the operators priority
+is not taken in account, but this will change. In addition to this
+operators, the binary operators \verb+|+ and \verb+&+ are implemented.
+
+In addition to this, there are two operators that do not exist in C :
+
+\subsubsection{The 'x' operator}
+	
+for and while are great and handy. But because the condition
+has to be evaluated at each iteration, then there is a loss
+of performance, which can be of some trouble if you want
+to send a SYN storm or whatever. The '\verb+x+' operator
+will repeat the same function N times, and will go
+really fast (at native C speed actually).
+
+\noindent Example :
+\begin{verbatim}
+	send_packet(udp) x 10;
+\end{verbatim}	
+
+Will send the same udp packet ten times.	 
+
+
+\subsubsection{The '$><$' operator}
+
+The \verb+><+ operator is a boolean operator which returns
+true if a string of chars A is contained in a string B.
+
+\noindent Example :
+
+\begin{verbatim}
+
+	a = "Nessus";
+	b = "I use Nessus";
+	
+	if(a >< b){
+		# This will be executed since
+		# a is in B
+		display(a, " is contained in ", b, "\n");
+		}
+\end{verbatim}
+	
+\newpage
+\section{The NASL Network related functions}
+
+
+NASL will not let you open a socket to another host
+than the host than nessusd wants to test. 
+
+\subsection{Sockets manipulation}
+
+A socket is a way to communicate with another host using TCP or
+UDP. It is like a pipe, designed to send data on a given port
+of a given protocol.
+
+\subsubsection{How to open a socket}
+The functions \verb+open_sock_tcp()+ and \verb+open_sock_udp()+ will
+open a TCP or UDP socket. These two functions are using anonymous
+arguments. You can currently open a socket on only one port at once,
+but this will eventually change in the future.\\
+\noindent Example :
+\begin{verbatim}
+# Open a socket on TCP port 80 :
+soc1 = open_sock_tcp(80);
+# Open a socket on UDP port 123 :
+soc2 = open_sock_udp(123);
+\end{verbatim}
+
+The \verb+open_sock+ functions will return 0 if the connection could not
+be established on the remote host. Usually, \verb+open_sock_udp()+ will
+never fail, since there is no way to determine whether the remote
+UDP port is open or not, whereas the \verb+open_sock_tcp()+ function
+will return 0 if the remote port is closed.\\
+A trivial TCP port scanner would be like this :
+\begin{verbatim}
+start = prompt("First port to scan ? ");
+end  = prompt("Last port to scan ? ");
+
+for(i=start;i<end;i=i+1)
+{
+ soc = open_sock_tcp(i);
+ if(soc) {
+  display("Port ", i, " is open\n");
+  close(soc);
+ }
+}
+\end{verbatim}
+
+You may want your socket to be bound to a special port or to come from
+a priviledged port (in the case you want your script to connect to
+a r-service for instance). The functions \verb+open_priv_sock_tcp()+ and
+\verb+open_priv_sock_udp()+ are here to do that.
+Their syntax is :
+\begin{verbatim}
+ soc = open_priv_sock_tcp(sport:<sport>, dport:<dport>);
+ soc = open_priv_sock_udp(sport:<sport>, dport:<dport>);
+\end{verbatim}
+
+\verb+sport+ is the source port, and \verb+dport+ is the destination
+port of the socket. If \verb+sport+ is not specified, then a socket
+with a source port < 1024 will be opened.
+
+
+
+\subsubsection{Closing a socket}
+
+The function \verb+close()+ is used to close a socket. It will internally
+perform a \verb+shutdown()+ before actually closing the socket.
+
+
+\subsubsection{Writing to a socket, and reading from it}
+
+Reading and writing to a socket is done using one of these functions :
+\begin{itemize}
+\item \begin{verbatim}recv(socket:<socketname>, 
+length:<length> 
+[,timeout : <timeout>)\end{verbatim} 
+Reads  \verb+<length>+ bytes from the socket \verb+<socketname>+. 
+This function can be used for TCP and UDP. The \verb+timeout+ option is in
+seconds.
+ 
+\item \begin{verbatim}recv_line(socket:<socketname>, 
+length:<length> 
+[, timeout: <timeout>])\end{verbatim}
+This function
+works the same way as \verb+recv()+, except that it will stop reading data
+as soon as the \verb+\n+ character is read. This function only works
+with TCP sockets.
+
+
+\item \verb+send(socket:<socket>, data:<data> [, length:<length>])+ : 
+send the data \verb+<data>+ on the socket \verb+<socket>+. The optional
+argument \verb+length+ tells the function to only send \verb+<length>+
+bytes on the socket. If it is not set, then the data will be sent until
+a NULL character is met.
+
+
+\end{itemize}
+
+The functions that are used to read data from a socket have an internal
+timeout value of five seconds. If the timeout is reached, then they will
+return~FALSE.\\
+\noindent Example :
+\begin{verbatim}
+
+# This Example displays the FTP banner of the remote host :
+
+soc = open_sock_tcp(21);
+if(soc)
+{
+ data = recv_line(socket:soc, length:1024);
+ if(data)
+ {
+  display("The remote FTP banner is : \n", data, "\n");
+ }
+ else
+ {
+  display("The remote FTP server seems to be tcp-wrapped\n");
+ }
+ close(soc);
+}
+
+\end{verbatim}
+
+\subsubsection{Higher level operations}
+
+NASL has a set of high level functions, regarding FTP and WWW.
+
+\begin{itemize}
+\item \verb+ftp_log_in(socket:<soc>, user:<login>, pass:<pass>)+ will
+attempt to log into the FTP server connected to the freshly open socket
+\verb+<soc>+. This function returns \verb+TRUE+ if it was possible to
+log in as \verb+<login>+ with password \verb+<pass>+. It returns FALSE
+if an error occured.
+
+\item \verb+ftp_get_pasv_port(socket:<soc>)+ issues a \verb+PASV+
+command on the FTP server, and returns the port to open a connection
+onto. This allows NASL scripts to retrieve data via FTP.
+This function returns \verb+FALSE+ if an error occurred.
+
+\item \verb+is_cgi_installed(<name>)+ returns a non-zero value if the
+cgi \verb+<name>+ is installed on the remote web server. This
+function performs a \verb+GET+ request on the remote web server.
+If \verb+<name>+ does not start by a slash (\verb+/+), then
+\verb+/cgi-bin/+ is appended in the front of it. This function
+can also be used to determine the existence of a given file.\\
+The value returned is the port number of the web server that
+runs the given CGI.
+
+\item \verb+http_get()+, \verb+http_head()+ and \verb+http_post()+ generate
+an HTTP/1.0 or HTTP/1.1 compliant request string. They all share the
+same prototype :\\
+\indent\verb+http_<operation>(item:<item>, port:<port>)+
+where :
+\begin{itemize}
+\item \verb+item+ is the name of the page to get (ie: "/cgi-bin/mycgi")
+\item \verb+port+ is the port of the web server to whom a request will be
+made. This is necessary, so that NASL can forge a HTTP/1.0 or HTTP/1.1
+request depending on what the remote server is speaking.
+\end{itemize}
+Exemple :
+\begin{verbatim}
+	port = get_kb_item("Services/www");
+	soc = open_sock_tcp(port);
+	req = http_get(item:"/", port:port);
+	send(socket:soc, data:req);
+
+	r = recv(socket:soc, length:8192); # <r> now contains the index.html
+					   # file, plus the web server headers
+\end{verbatim}
+
+\item \verb+cgibin()+ returns one of the paths entered by the user to use
+instead of cgi-bin. This function duplicates the run of the script, 
+which means that if the user set the CGI path to be '/cgi-bin:/my-cgis'
+then the script will be executed twice when cgibin() is called - the first
+time, it will return '/cgi-bin', the second time it will return
+'/my-cgis'.
+\end{itemize}
+
+\noindent Examples :
+\begin{verbatim}
+
+#
+# WWW
+#
+ if(is_cgi_installed("/robots.txt")){
+ 	display("The file /robots.txt is present\n");
+	}
+ if(is_cgi_installed("php.cgi")){
+ 	display("The CGI php.cgi is installed in /cgi-bin\n");
+	}
+ if(!is_cgi_installed("/php.cgi")){
+ 	display("There is no 'php.cgi' in the remote web root\n");
+	}
+
+#
+# FTP
+#
+  # open a connection to the remote host
+ soc = open_sock_tcp(21);
+ 
+ # Log in as the anonymous user
+ if(ftp_log_in(socket:soc, user:"ftp", pass:"joe@"))
+ {
+  # Get a passive port
+  port = ftp_get_pasv_port(socket:soc);
+  if(port)
+  {
+   soc2 = open_sock_tcp(port);
+   data = string("RETR /etc/passwd\r\n");
+   send(socket:soc, data:data);
+   password_file = recv(socket:soc2, length:10000);
+   display(password_file);
+   close(soc2);
+  }
+  close(soc);
+ }
+
+\end{verbatim}   
+
+\subsection{Raw packets manipulation}
+
+NASL allows you to forge your own IP packets, and will attempt
+to behave in an intelligent way with the packet forged. For instance,
+if you change a parameter in a TCP packet, then the TCP checksum will
+be recomputed silently. If you append a layer to an IP packet, then
+the \verb+ip_len+ element of the IP packet will be updated - unless
+you deliberately say to not do it.
+
+All the raw packets functions use non-anonymous arguments. Their
+names comes straight from the BSD include files. So, the 'length'
+element of an ip packet is called \verb+ip_len+ and not
+'\verb+length+'.
+
+
+\subsubsection{Forging an IP packet}
+The function \verb+forge_ip_packet()+ will forge a new IP packet. The function 
+\verb+get_ip_element()+ will return an element of a packet, whereas the
+function \verb+set_ip_elements()+ will change the elements of an existing IP
+packet.
+
+\begin{verbatim}
+ <return_value> = forge_ip_packet(
+		ip_hl    : <ip_hl>,
+		ip_v     : <ip_v>,
+		ip_tos   : <ip_tos>,
+		ip_len   : <ip_len>,
+		ip_id    : <ip_id>,
+		ip_off   : <ip_off>,
+		ip_ttl   : <ip_ttl>,
+		ip_p     : <ip_p>,
+		ip_src   : <ip_src>,
+		ip_dst   : <ip_dst>,
+		[ip_sum  : <ip_sum>] );
+	      
+\end{verbatim}
+
+The \verb+ip_sum+ argument of this function is optional. If it is not set, it
+will be automatically computed. The field \verb+ip_p+ may be a numeric value, or
+one of the constants \verb+IPPROTO_TCP+, \verb+IPPROTO_UDP+,
+\verb+IPPROTO_ICMP+, \verb+IPPROTO_IGMP+ or \verb+IPPROTO_IP+.
+
+
+\begin{verbatim}
+  <element> = get_ip_element(
+ 		ip      : <ip_variable>,
+ 		element : "ip_hl"|"ip_v"|"ip_tos"|"ip_len"|
+ 		          "ip_id"|"ip_off"|"ip_ttl"|"ip_p"|
+ 		          "ip_sum"|"ip_src"|"ip_dst");
+\end{verbatim}
+
+The function \verb+get_ip_element()+ will return one element 
+of a packet. The element must be one of \verb+"ip_hl"+, \verb+"ip_v"+,
+ \verb+"ip_tos"+, \verb+"ip_len"+,
+ \verb+"ip_id"+, \verb+"ip_off"+, \verb+"ip_ttl"+, \verb+"ip_p"+,  \verb+"ip_sum"+,
+  \verb+"ip_src"+ or \verb+"ip_dst"+. Note that the quotes have their importance.
+
+\begin{verbatim}
+  set_ip_elements( ip	: <ip_variable>,
+		  [ip_hl    : <ip_hl>, ]
+		  [ip_v     : <ip_v>,  ]
+		  [ip_tos   : <ip_tos>,]
+		  [ip_len   : <ip_len>,]
+		  [ip_id    : <ip_id>, ]
+		  [ip_off   : <ip_off>,]
+		  [ip_ttl   : <ip_ttl>,]
+		  [ip_p     : <ip_p>,  ]
+		  [ip_src   : <ip_src>,]
+		  [ip_dst   : <ip_dst>,]
+		  [ip_sum  : <ip_sum>  ] 
+		);
+		
+\end{verbatim}
+
+The function \verb+set_ip_elements()+ change the value of the IP packet
+\verb+<ip_variable>+ and recomputes the checksum if the element
+\verb+ip_sum+ is not altered.
+Since this function will not create a new packet in memory, you
+should prefer it to \verb+forge_ip_packet()+ when you have to send
+multiple, nearly similar, IP packets.
+
+
+Last but not least, there is a function \verb+dump_ip_packet(<packet>)+ which
+will print the IP packet in human readable form on screen. You should only
+use this for debugging purpose.
+
+
+\subsubsection{Forging a TCP packet}
+
+The function \verb+forge_tcp_packet()+ is used to forge a TCP packet.
+Its syntax is :
+\begin{verbatim}
+ tcppacket = forge_tcp_packet(ip : <ip_packet>,
+                              th_sport : <source_port>,
+			      th_dport : <destination_port>,
+			      th_flags : <tcp_flags>,
+			      th_seq   : <sequence_number>,
+			      th_ack   : <acknowledgement_number>,
+			      [th_x2   : <unused>],
+			      th_off   : <offset>,
+			      th_win   : <window>,
+			      th_urp   : <urgent_pointer>,
+			      [th_sum  : <checkum>],
+			      [data    : <data>]);
+			      
+\end{verbatim}
+
+The option \verb+th_flags+ must be one of \verb+TH_SYN+, \verb+TH_ACK+,
+\verb+TH_FIN+, \verb+TH_PUSH+ or \verb+TH_RST+. Flags can be
+combined using the \verb+|+ operator. \verb+th_flags+ may also
+be a numeric value. \verb+ip_packet+ must have been generated with
+\verb+forge_ip_packet()+ or must have be a packet read using
+\verb+send_packet()+ or \verb+pcap_next()+.
+
+The function used to change TCP elements is \verb+set_tcp_elements()+.
+It's syntax is similar to \verb+forge_tcp_packet()+ :
+
+\begin{verbatim}
+  set_tcp_elements(tcp : <tcp_packet>,
+                              [th_sport : <source_port>,]
+			      [th_dport : <destination_port>,]
+			      [th_flags : <tcp_flags>,]
+			      [th_seq   : <sequence_number>,]
+			      [th_ack   : <acknowledgement_number>,]
+			      [th_x2    : <unused>,]
+			      [th_off   : <offset>,]
+			      [th_win   : <window>,]
+			      [th_urp   : <urgent_pointer>,]
+			      [th_sum   : <checkum>],
+			      [data     : <data>] );
+			      
+\end{verbatim}
+    
+This function will automatically recompute the checksum of the packet, unless
+you explicitly set the \verb+th_sum+ element.
+
+The function used to get one element of a TCP packet is
+\verb+get_tcp_element()+. Its syntax is :
+\begin{verbatim}
+element = get_tcp_elements(tcp: <tcp_packet>,
+                  element: <element_name>);
+\end{verbatim}
+
+\verb+element_name+ must be one of \verb+"tcp_sport"+, "\verb+"th_dport"+,
+\verb+"th_flags"+, \verb+"th_seq"+, \verb+"th_ack"+, \verb+"th_x2"+,
+\verb+"th_off"+, \verb+"th_win"+, \verb+"th_urp"+, \verb+"th_sum"+. Note the
+quotes !
+
+\subsubsection{Forging a UDP packet}
+
+The UDP functions are nearly the same as for TCP functions :
+\begin{verbatim}
+ udp = forge_udp_packet(ip:<ip_packet>,
+                        uh_sport : <source_port>,
+			uh_dport : <destination_port>,
+			uh_ulen  : <length>,
+			[uh_sum  : <checksum>],
+			[data    : <data>]);
+\end{verbatim}
+
+The functions \verb+set_udp_elements()+ and \verb+get_udp_elements()+ work
+the same way as for the TCP functions.
+
+\subsubsection{Forging an ICMP packet}
+NASL is quite limited when it comes to forging an ICMP packet. Basically,
+the function accepts the following arguments :
+\begin{verbatim}
+ icmp = forge_icmp_packet(	ip:<ip_packet>,
+				icmp_code:<icmp_code>,
+				icmp_type:<icmp_type>,
+				icmp_seq:<icmp_seq>,
+				icmp_id:<icmp_id>,
+				[data:<data>]
+			);
+\end{verbatim}
+
+The functions \verb+get_icmp_element()+ and \verb+set_icmp_elements()+ work the same way as they does for TCP and ICMP, but can only change these fields.
+
+It should be possible to forge more complicated ICMP paquets by continuing
+the header in the \verb+data+ parameter, although this has never been tested.
+
+\subsubsection{Forging an IGMP packet}
+As for ICMP, forging an IGMP packet could be implemented in a better way in NASL. The function \verb+forge_igmp_packet()+ accepts the following arguments :
+\begin{verbatim}
+ igmp = forge_igmp_packet(	ip:<ip_packet>,
+				code:<igmp_code>,
+				type:<igmp_type>,
+				group:<igmp_group>,
+				[data:<data>]
+			);
+\end{verbatim}
+ 
+\subsubsection{Sending a raw packet}
+
+Once you have set up a packet using \verb+forge_*_packet()+, you
+can send it using the \verb+send_packet()+ function.
+
+This function syntax is :
+\begin{verbatim}
+ reply = send_packet(packet1, packet2, ...., packetN,
+                     pcap_active: <TRUE|FALSE>,
+                     pcap_filter: <pcap_filter>);
+\end{verbatim}
+
+If the argument \verb+pcap_active+ is set to \verb+TRUE+ (the default),
+then this function will wait for a reply from the host the packet was
+sent to. You can set up the argument \verb+pcap_filter+ to define
+what kind of packet you want. See the pcap (or tcpdump) manual to learn more from
+pcap filters.		  
+
+\subsubsection{Reading raw packets}
+
+You can read a packet using the \verb+pcap_next()+ function, the syntax
+of which is :
+\begin{verbatim}
+ reply = pcap_next();
+\end{verbatim}
+
+This function will read a packet from the last interface you used, with
+the last pcap filter you used on this interface, or your default networking interface if you did not send any packet before. \\
+This function has optional arguments. Its complete declaration is :
+\begin{verbatim}
+ reply = pcap_next([pcap_filter: <filter>,]
+	 	   [interface: <iface>,]
+	 	   [timeout: <timeout>]);
+\end{verbatim}
+
+\begin{itemize}
+\item \verb+pcap_filter+ is a standard pcap filter (man pcap or man tcpdump for details)
+\item \verb+interface+ is the networking interface you want to use
+\item \verb+timeout+ is the number of seconds you want to wait for a packet. Set this to zero if you do not want any timeout
+\end{itemize}
+
+\subsection{Utilities}
+
+NASL provides several handy functions that usually makes your coding easier.
+\begin{itemize}
+\item The function \verb+this_host()+ takes no argument an returns the IP address
+of the host the script is running on.
+
+\item The function \verb+get_host_name()+ takes no argument and returns the
+name of the currently tested host.
+
+\item The function \verb+get_host_ip()+ takes no argument and returns the
+IP adress of the currently tested host.
+
+\item The function \verb+get_host_open_port()+ takes no argument and returns the
+number of the first open TCP port of the remote host. This is useful for some
+scripts such as land or a TCP sequence analyzing program which need to work
+against an open port.
+
+
+\item The function \verb+get_port_state(<portnum>)+ returns \verb+TRUE+ if the TCP port
+\verb+<portnum>+ is open, or if its state is unknown (for instance, if it was not scanned,
+or if it is outside the scanned range).
+
+
+\item The function \verb+telnet_init(<soc>)+ initialize a telnet session
+on the freshly opened socket \verb+<soc>+ and returns the first line of telnet
+data. 
+
+Example :
+
+\begin{verbatim}
+	soc = open_sock_tcp(23);
+	buffer = telnet_init(soc);
+	display("The remote telnet banner is : ", buffer, "\n");
+\end{verbatim}
+
+\item The function \verb+tcp_ping()+ takes no argument and returns
+\verb+TRUE+ if the remote host answered to a TCP ping request (send a TCP packet
+with the ACK flag set).
+
+
+\item The function \verb+getrpcport()+ is the same as the standard function of
+the same name. Its syntax is :
+\begin{verbatim}
+ result = getrpcport(program : <program_number>,
+                     protocol: IPPROTO_TCP|IPPROTO_UDP,
+                     [version: <version>]);
+\end{verbatim}
+
+This function returns 0 if an error occured (if the program \verb+<program_number>+ is not
+registered in the remote rpc portmapper for instance).
+
+\end{itemize}		    
+	
+		
+
+	
+
+
+\newpage
+\section{String manipulation functions}
+
+NASL handles strings as numbers. So, you can play with the \verb+==+,
+\verb+<+, and \verb+>+ operators safely.
+
+Example :
+\begin{verbatim}
+ a = "version 1.2.3";
+ b = "version 1.4.1";
+ 
+ if(a < b){
+ 	#
+	# Will be executed, since version 1.2.3 is lower
+	# than version 1.4.1
+       }
+       
+ c = "version 1.2.3";
+ 
+ if(a==c) {
+       # Will also be evaluated
+       }
+\end{verbatim}
+
+It is also possible to get the n-th character of a string, the same way as 
+in C~:
+\begin{verbatim}
+ a = "test";
+ b = a[1];  # b equals to "e"
+\end{verbatim}
+
+You can also add and substract strings :
+\begin{verbatim}
+ a = "version 1.2.3";
+ b = a - "version ";   # b equals "1.2.3"
+ 
+ a = "this is a test";
+ b = " is a ";
+ c = a - b;            # c equals to "this test"
+ 
+ a = "test";
+ a = a+a;              # a equals to "testtest"
+\end{verbatim}
+In addition to this and to the \verb+><+ operator defined above, NASL has a set of
+functions dedicated to forge or modify strings :
+
+\subsection{The ereg() function for regular expressions}
+
+Pattern-matching operations are done through the \verb+ereg()+ function. Its
+syntax is :
+\begin{verbatim}
+	result = ereg(pattern:<pattern>, string:<string>)
+\end{verbatim}
+
+The \verb+pattern+ syntax is egrep-style. Please refer to man 1 egrep
+for more details about it.
+
+Example :
+\begin{verbatim}
+	if(ereg(pattern:".*", string:"test"))
+	{
+	  display("Always executed\n");
+	}
+	
+	mystring = recv(socket:soc, length:1024);
+	if(ereg(pattern: "SSH-.*-1\..*", 
+		string : mystring
+		))
+	{
+	 display("SSH 1.x is running on this host");
+	}
+	
+	
+\end{verbatim}
+
+\subsection{ereg\_replace()}
+
+The function \verb+ereg_replace()+ gives you the power to change a string
+in a very flexible way, thanks to the regular expressions. It works
+the same way as many other regexps tools, so the description will
+be short.
+
+Its syntax is :
+\begin{verbatim}
+ newstr = ereg_replace(pattern:<pattern>, 
+                       replace:<replace>,
+                       string:<string>);
+ \end{verbatim}
+
+ Here are some examples :
+
+\begin{verbatim}
+
+# extract the server type from the following string : 
+str = "Server : Apache 1.3.2";
+server_type = ereg_replace(pattern:"^Server : (.*)$", replace:"\1", string:str);
+
+
+# Another example
+str = "life is great";
+newstr = ereg_replace(pattern:"(.*) (.*) (.*)", replace:"\2 \1", string:str);
+
+# 'newstr' is now equal to 'great life'
+
+
+\end{verbatim}
+
+
+
+
+ 
+
+\subsection{The egrep() function}
+
+\verb+egrep()+ returns the first line that matches the pattern
+\verb+<pattern>+ in a multi-lined text. When it is used against
+a one-line text, then it is similar to \verb+ereg()+.
+If no line in the text matches, then it returns \verb+FALSE+.
+Syntax :
+\begin{verbatim}
+	str = egrep(pattern : <pattern>, string: <string>)
+\end{verbatim}
+
+Example :
+\begin{verbatim}
+
+	soc = open_soc_tcp(80);
+	str = string("HEAD / HTTP/1.0\r\n\r\n");
+	send(socket:soc, data:str);
+	
+	r = recv(socket:soc, length:1024);
+	server = egrep(pattern:"^Server.*", string : r);
+	
+	if(server)display(server);
+	
+\end{verbatim}
+
+\subsection{The crap() function}
+
+ The function \verb+crap()+ is very convenient to test for buffer overflows.
+ It has two syntaxes :
+ \begin{itemize}
+ \item \verb+crap(<length>)+ : Will return a string of length \verb+<length>+ 
+containing the character \verb+'X'+
+
+ \item \verb+crap(length:<length>, data:<data>)+ : Will return a string of length
+ \verb+<length>+, containing the data \verb+<data>+
+ 
+ Example :
+\begin{verbatim}
+  a = crap(5);         # a = "XXXXX";
+  b = crap(4096);      # b = "XXXX...XXXX" (4096 X's)
+  c = crap(length:12,  # c = "hellohellohe" (length: 12);
+          data:"hello");           
+\end{verbatim}
+
+\end{itemize}
+\subsection{The string() function}
+
+ This function is used to make strings of chars or of other strings.
+ It syntax is : \verb+string(<string1>, [<string2>, ..., <stringN>])+
+ 
+ This function will interpolate the backslashed characters such as \verb+\n+ or
+ \verb+\t+.
+ 
+ Example :
+\begin{verbatim}
+
+  name = "Renaud";
+    
+  a = string("Hello, I am ", name, "\n");       # a equals to "Hello, I am Renaud" 
+                                                # (with a new line at the end)
+  b = string(1, " and ", 2, " makes ", 1+2);    # b equals to "1 and 2 makes 3"
+  c = string("MKD ", crap(4096), "\r\n");       # c equals to "MKD XXXXX.....XXXX"
+                                                # (4096 X's) followed by a carriage
+                                                # return and a new line
+
+\end{verbatim}
+
+\subsection{The strlen() function}
+
+\verb+strlen()+ returns the length of a string :
+\begin{verbatim}
+
+a = strlen("abcd"); # a is equal to 4 
+
+\end{verbatim}
+
+\subsection{The raw\_string() function}
+
+Example : 
+\begin{verbatim}
+ a = raw_string(80, 81, 82); # a equals to 'PQR'
+\end{verbatim}
+
+\subsection{The tolower() function}
+ 
+ This function is used to convert a string to lower case. Its syntax is
+ \verb+tolower(<string>)+. This function will actually return the string
+ \verb+<string>+ in lowered letters.
+ 
+Example :
+
+\begin{verbatim}
+
+ a = "Hello";
+ b = tolower(a); # b equals to "hello"
+
+\end{verbatim}
+
+ 
+\newpage
+\section{Writing a Nessus Security test}
+
+\subsection{How to write an efficient Nessus test}
+
+All the security test are launched by nessusd, in a very short
+period of time, so a well written test must use the results of the
+other security test. For instance, a test which wants to open
+a connection to a FTP server should first check that the 
+remote port is open, before opening a connection on port 21. 
+This saves little time and bandwidth against a given host,
+but this dramatically speeds up the test against a firewalled host
+which would silently drop TCP packets going to port 21.
+
+\subsubsection{Determining whether a port is open}
+The function \verb+get_port_state(<portnum>)+ returns
+TRUE if the port is open, and FALSE if it is not.
+\textit{This function will return true if the port has not been
+scanned, that is, if its status is unknown}.
+
+This function uses very little CPU, so you should call it as
+much as you want.
+
+\subsubsection{The Knowledge Base (KB)}
+Each host is associated to an internal knowledge base, which contains
+all the information gathered by the tests during the scan. The security
+tests are encouraged to read it and to contribute to it. The status
+of the ports, for instance, is in fact written somewhere in the
+knowledge base.
+
+The KB is divided into categories. The ``Services'' category contains
+the port numbers associated to each known service. For instance, the element
+\verb+Services/smtp+ is very likely to have the value \verb+25+. However,
+if the remote host has a hidden SMTP server on port 2500, and none
+on port 25, then this item will have the value 2500.
+
+See Annex B for details about the knowledge base elements.
+
+Basically, there are two functions regarding the knowledge base. The
+\verb+get_kb_item(<name>)+ function will return the value of the knowledge
+base item \verb+<name>+. This function is anonymous. The function
+\verb+set_kb_item(name:<name>, value:<value>)+ will mark the new item 
+\verb+<name>+ of value \verb+<value>+ in the knowledge base.
+
+\textbf{Note : } You can not read back a knowledge base item you have added.
+For instance, the following piece of code will not work and never execute
+what it should :
+
+\begin{verbatim}
+
+set_kb_item(name:"attack", value:TRUE);
+if(get_kb_item("attack"))
+{
+ # Perform the attack - will not be executed
+ # because our local KB has not been updated
+}
+\end{verbatim}
+
+This is due to the fact that for some security and code stability reason, 
+the Nessus server will in fact start each new security test with a copy
+of the knowledge base, not the original one, and the function
+\verb+set_kb_item()+ will in fact add an element into the orginal knowledge
+base, within nessusd, but will not update the current security test knowledge
+base.
+
+\subsection{NASL script structure}
+
+Each NASL script must register itself to the Nessus server. That is,
+it must tell nessusd its name, its description, the name of its author, and
+more. Thus, each NASL script that will be run with nessusd must have the
+following structure :
+\begin{verbatim}
+
+#
+# Nasl script to be used with nessusd
+#
+
+if(description)
+{
+ # register information here...
+ 
+ #
+ # I will call this section the 'register' 
+ # section
+ #
+ 
+ exit(0);
+}
+
+#
+# Script code here. I will call this section the
+# 'attack' section.
+#
+
+\end{verbatim}
+
+
+The variable \verb+description+ is a global variable that will be set to
+\verb+TRUE+ or \verb+FALSE+ depending on whether the script must register or
+not.
+
+\subsubsection{The register section}
+
+The \textit{register} section \textbf{must} call the following functions :
+\begin{itemize}
+ \item \verb+script_id(<id>)+ which sets the script id. A script id is a unique number referencing the script. If you plan to distribute your nasl script, then the nessus.org folks will attribute one for you. If you plan to keep your set of scripts private (booo!), then you can use any ID number between 90000 and 99000.
+
+\item \verb+script_version(<version>)+ sets the version of a script. This is usually the \verb+Revision\verb+ tag of the CVS tree.
+
+
+ \item \verb+script_name(language1:<name>, [...])+ which sets the script name as
+it will appear in the Nessus client window.
+ 
+ \item \verb+script_description(language1:<desc>, [...])+ which sets the script
+description as it will appear in the client when the user clicks on the name.
+
+\item \verb+script_summary(language1:<summary>, [...])+ sets the script summary
+as it appears in the tooltips. It must be a sum up of the description that fits
+on one line.
+
+\item \verb+script_category(<category>)+ sets the script category. It must be
+one of \verb+ACT_ATTACK+, \verb+ACT_GATHER_INFO+, \verb+ACT_DENIAL+ or
+\verb+ACT_SCANNER+. 
+	\begin{itemize}
+	\item \verb+ACT_GATHER_INFO+ : the script will be launched among the
+	first. You know it will not harm the remote computer.
+	
+	\item \verb+ACT_ATTACK+ : the script will attempt to gain some
+	priviledges on the remote host. It may harm the remote system
+	(if it tests a buffer overflow for instance)
+	
+	\item \verb+ACT_DENIAL+ : the script will attempt to crash the remote
+	host
+	
+	\item \verb+ACT_SCANNER+ : the script is a port scanner
+	\end{itemize}
+\item \verb+script_copyright(language1:<copyright>, [...])+ sets the copyright
+of the script. It may be your name, a legal notice or whatever.
+
+\item \verb+script_family(language1:<family>, [...])+ sets the script family.
+There are no clearly defined families, so you may choose to register
+the script in the family ``Joe's PowerTools'', altough I do not recommand it.
+The currently used families are : 
+	\begin{itemize}
+	\item Backdoors
+	\item CGI abuses
+	\item Denial of Service
+	\item FTP
+	\item Finger abuses
+	\item Firewalls
+	\item Gain a shell remotely
+	\item Gain root remotely
+	\item Misc.
+	\item NIS
+	\item RPC
+	\item Remote file access
+	\item SMTP problems
+	\item Useless services
+	\end{itemize}
+\end{itemize}
+
+As you may have noticed, most of these functions take a \verb+language1+
+argument. In fact, this is not how they work. 
+
+NASL provides Nessus multilingual support. Each script must support the 
+\verb+english+ language, and the exact syntax for all these functions
+is in fact :
+\begin{verbatim}
+ script_function(english:english_text, [francais:french_text, 
+                                        deutsch:german_text,
+					...]);
+\end{verbatim}
+
+
+In addition to these functions, the function \verb+script_dependencies()+ may be
+called. It tells nessusd to launch the current script after some other script.
+This is useful when you want to use the results that another script must
+store in the KB. The syntax is :
+\begin{verbatim}
+script_dependencies(filename1 [,filename2, ..., filenameN]);
+\end{verbatim}
+
+where \verb+filename+ is the name of the script to be launched after, 
+as it is stored on disk.
+
+
+\subsubsection{The attack section}
+
+The attack section may contain anything you think is useful for an attack. Once
+your attack is done, you can report a problem using the
+\verb+security_warning()+, \verb+security_hole()+ and \verb+security_info()+ 
+functions which work the same way. \verb+security_info()+ must be used when
+the attack was a succes but is not an important security problem.
+\verb+security_warning()+ must be used when the attack was a success
+but is not a great security problem. That is, it will not allow instant access
+to an attacker. These two functions have the following syntaxes :
+\begin{verbatim}
+security_info(<port> [, protocol:<proto>]);
+security_warning(<port> [, protocol:<proto>]);
+security_hole(<port> [, protocol:<proto>]);
+
+security_info(port:<port>, data:<data> [, protocol:<proto>]);
+security_warning(port:<port>, data:<data> [, protocol:<proto>]);
+security_hole(port:<port>, data:<data> [, protocol:<proto>]);
+\end{verbatim}
+
+In the first case, the data displayed by the client is the script
+description, as entered with \verb+script_description()+. It is handy, because
+of the multilingual support. 
+
+In the second case the client will display the \verb+data+ argument. This
+is handy if you must display information caught on the fly, such as a version
+number.
+
+\subsubsection{CVE compatibility}
+
+CVE is an attempt to settle a common denominator to all the security-related
+products. See \verb+http://cve.mitre.org+ for more details.
+
+Nessus is fully CVE-compatible. If you write a script that tests
+for a CVE-defined security problem, then call the \verb+script_cve_id()+
+function in the description section of your plugin.
+\verb+script_cve_id()+ is defined as : 
+\begin{verbatim}
+	script_cve_id(string);
+\end{verbatim}
+
+Example :
+\begin{verbatim}
+	script_cve_id("CVE-1999-0991");
+\end{verbatim}
+
+It is important to make a separate call to this function, rather than
+just writing the CVE id in the report, so that the Nessus clients may
+make an active use of it.
+
+
+\subsubsection{An example}
+
+In addition to security tests, NASL can be used to do some maintenance.
+Here is a script example that will ensure that each host is running
+ssh, and tell the user which hosts are not running it :
+\begin{verbatim}
+#
+# Check for ssh
+#
+if(description)
+{
+ script_name(english:"Ensure the presence of ssh");
+ script_description(english:"This script makes sure that ssh is running");
+ script_summary(english:"connects on remote tcp port 22");
+ script_category(ACT_GATHER_INFO);
+ script_family(english:"Administration toolbox");
+ script_copyright(english:"This script was written by Joe U.");
+ script_dependencies("find_service.nes");
+ exit(0);
+}
+
+#
+# First, ssh may run on another port. 
+# That's why we rely on the plugin 'find_service'
+#
+
+
+port = get_kb_item("Services/ssh");
+if(!port)port = 22;
+
+# declare that ssh is not installed yet
+ok = 0;
+if(get_port_state(port))
+{
+ soc = open_sock_tcp(port);
+ if(soc)
+ {
+  # Check that ssh is not tcpwrapped. And that it's really
+  # SSH
+  data = recv(socket:soc, length:200);
+  if("SSH" >< data)ok = 1;
+ }
+ close(soc);
+}
+
+#
+# Only warn the user that SSH is NOT installed
+#  
+if(!ok)
+{
+  report = "SSH is not running on this host !";
+  security_warning(port:22, data:report);
+}
+\end{verbatim}
+
+
+\subsection{Tuning your script}
+
+During a test, nessusd will launch more than 600 scripts. If all of them were badly written, then a test would take even more time than it currently does. That's why you must absolutely make whatever you can to make your script go as fast as possible. 
+
+\subsubsection{Asking nessusd to execute the script only if it is necessary}
+
+The best way to optimize your script is to tell nessusd when to \textbf{not} launch it. For instance, let's imagine that your script attempts to connect to the remote TCP port 123. If nessusd knows that this port is closed, then it's no use to start your script, since it will not do anything. The functions \verb+script_require_ports()+, \verb+script_require_keys()+ and \verb+script_exclude_keys()+ are designed for this purpose. They must be called in the description section of the script.
+
+\begin{itemize}
+\item \verb+script_require_ports(<port1>, <port2>, ...)+ : will make \verb+nessusd+ execute your script if and only if at least one of the ports is open. \verb+<port>+ can be either a numeric value (ie: 80) or a symbolic value, as defined in the knowledge base (ie: "Services/www").\\
+Example : \verb+script_require_ports(80, "Services/www")+\\
+Note that if the state of a port is unknown (if, for instance, no portscan was made), then the script will be executed.
+
+
+
+\item \verb+script_require_keys(<key1>, <key2>, ...)+ : will make \verb+nessusd+ execute your script if and only if \textit{all the keys} given in argument are defined in the knowledge base. \\
+Example : \verb+script_require_keys("ftp/anonymous", "ftp/writeable_dir")+ will only execute the script if the remote FTP server offers an anonymous access and if there is a writeable directory in it.
+
+\item \verb+script_exclude_keys(<key1>, <key2>, ...)+ : will make \verb+nessusd+ \textit{not} execute your script if at least one of the keys given in argument is set in the knowledge base.
+\end{itemize}
+
+\subsubsection{Be smart enough to use the result of the other scripts}
+
+Be sure to read the appendix regarding the knowledge base to make sure that your script is as lazy as possible - that is, it must not do something that another script has already done. For instance, rather that directly opening a socket
+on a given tcp port (using \verb+open_sock_tcp()+), make sure that this port is open using \verb+get_port_state()+. The less your script will do, the faster things will go on.
+
+\subsection{So you want to share your new script ?}
+
+If you plan to share your script then you should obey to these rules :
+\begin{itemize}
+\item \textit{Your script must never interact with the user}. NASL scripts are
+executed on the server side. Therefore, all the output will not be seen by
+the user. 
+
+\item \textit{Your script must test one vulnerability}. If you know how to test
+multiple vulnerabilities, then write several scripts. So that you stay
+consistent with all the Nessus scripts
+
+\item \textit{Your script should belong to an existing family}. If you plan
+to share your script, then avoid to create a family like \textit{Joe's Power Tools}
+but try to stay consistent
+
+\item \textit{Look up in CVE to see if there is a definition of your script}.
+If you take care of CVE compatibility, then the Nessus maintainer will not
+have to do it by himself, and this will save his time
+ 
+\item \textit{Send it to the Nessus maintainer}. That is, me :) If you plan to share
+your script, then make it available to everyone, not only your friends or a newsgroup
+you hang on. Send it and see it being included in the Nessus distribution.
+Once your script has been included in the distribution, it will be given
+a unique ID.
+\end{itemize}
+
+\newpage
+\section{Conclusion}
+
+
+I hope you enjoyed this overview of NASL. Basically, the language should not
+evolve for a while, so it's safe to learn how to use it and to practice it.
+
+You will see bugs in the NASL interpretor. That is for sure. I do not know how you program, so it is very
+likely that you will manage to make it crash. Please, do not keep the bugs for you. Share them, and send them
+to me.
+
+
+I hope you enjoyed reading this guide. 
+
+
+
+\begin{verbatim}
+
+				   -- Renaud Deraison
+				   <deraison@cvs.nessus.org>
+\end{verbatim}
+
+\newpage
+\appendix
+\section{The knowledge base}
+
+
+The knowledge base is a set of keys which contains the results of the other
+plugins. Using the functions \verb+script_dependencies()+, \verb+get_kb_item()+ and \verb+set_kb_item()+, then you can make your scripts and upcoming scripts avoid to do something that has already been done.
+
+Here is a sum up of the keys that are set by the plugins : \\
+
+
+KB items may have several values. For instance, imagine that
+the remote host is running two FTP servers : one on port 21 and one
+on port 2100. Then, the key \verb+Services/ftp+, which is the symbolic
+name of the FTP server port is equal to 21 \textbf{and} 2100. If that is 
+the case, then the script will be executed twice : the first time, 
+\verb+get_kb_item("Services/ftp")+ will return 21, the second time
+it will return 2100. \textit{This behavior is automatic} and your
+script should not take care of this - that is, it should consider
+that a given key always has only \textbf{one} value. Even if that is not
+the case in real life, because \verb+nessusd+ is in charge of this.
+
+
+Not all these keys are useful. I have never used several of them. But putting
+too much elements in the KB is better than the opposite...
+
+
+
+\begin{itemize}
+\item \verb+Host/OS+\\
+\textbf{Defined in} : \verb+queso.nasl+ and \verb+nmap_wrapper.nasl+\\
+\textbf{Type} : string\\
+\textbf{Meaning} : Remote operating system type
+
+\item \verb+Host/dead+\\
+\textbf{Defined in} : \verb+ping_host.nasl+ and all the DoS plugins 
+\textbf{Type} : boolean\\
+\textbf{Meaning} : The remote host is dead. If you set this item, then nessusd
+will interrupt the test of the host.
+
+\item \verb+Services/www+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a web server is running. Returns 0 if no web
+server has been found.
+
+
+\item \verb+Services/auth+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an identd server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/echo+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which 'echo' is running. Returns 0 if no
+such service has been found
+
+
+\item \verb+Services/finger+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a finger server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/ftp+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an ftp server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/smtp+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an SMTP server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/ssh+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an SSH server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/http_proxy+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an HTTP proxy is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/imap+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an imap server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/pop1+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a POP-1 server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/pop2+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a POP-2 server is running. Returns 0 if no
+such server has been found
+
+
+\item \verb+Services/pop3+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a POP-3 server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/nntp+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which an NNTP server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/linuxconf+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a linuxconf server is running. Returns 0 if no
+such server has been found
+
+
+\item \verb+Services/swat+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a SWAT server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/wild_shell+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a shell is open to the world (usually
+a bad thing). Returns 0 if no such server has been found
+
+\item \verb+Services/telnet+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a telnet server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/realserver+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a RealServer server is running. Returns 0 if no
+such server has been found
+
+\item \verb+Services/netbus+\\
+\textbf{Defined in} : \verb+find_service.nes+
+\textbf{Type} : port number\\
+\textbf{Meaning} : port on which a NetBus server is running (usually not
+a good thing). Returns 0 if no such server has been found
+
+
+\item \verb+bind/version+\\
+\textbf{Defined in} : \verb+bind_version.nasl+
+\textbf{Type} : string\\
+\textbf{Meaning} : version of the remote BIND daemon
+
+
+\item \verb+rpc/bootparamd+\\
+\textbf{Defined in} : \verb+bootparamd.nasl+
+\textbf{Type} : string\\
+\textbf{Meaning} : The bootparam RPC service is running
+
+\item \verb+Windows compatible+\\
+\textbf{Defined in} : \verb+ca_unicenter_file_transfer_service.nasl+,
+\verb+ca_unicenter_transport_service.nasl+, \verb+mssqlserver_detect.nasl+ and
+\verb+windows_detect.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The remote host appears to be running a Windows-compatible
+operating system (this test is only done regarding the number of the
+opened-ports)
+
+
+\item \verb+finger/search.**@host+\\
+\textbf{Defined in} : \verb+cfinger_search.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The finger daemon dumps the list of users
+if the query \verb+.**+ is made
+
+\item \verb+finger/0@host+\\
+\textbf{Defined in} : \verb+finger_0.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The finger daemon dumps a list of users
+if the query \verb+0+ is made
+
+\item \verb+finger/.@host+\\
+\textbf{Defined in} : \verb+finger_dot.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The finger daemon dumps a list of users
+if the query \verb+.+ is made
+
+\item \verb+finger/user@host1@host2+\\
+\textbf{Defined in} : \verb+finger_0.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The finger daemon is vulnerable to a redirection attack
+
+\item \verb+www/frontpage+\\
+\textbf{Defined in} : \verb+frontpage.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The remote web server is running frontpage extensions
+
+\item \verb+ftp/anonymous+\\
+\textbf{Defined in} : \verb+ftp_anonymous.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The remote FTP server accepts anonymous logins
+
+
+\item \verb+ftp/root_via_cwd+\\
+\textbf{Defined in} : \verb+ftp_cwd_root.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : It is possible to gain root on the remote
+FTP server using the \verb+CWD ~+ bug (see CVE-1999-0082)
+
+\item \verb+ftp/microsoft+\\
+\textbf{Defined in} : \verb+ftp_overflow.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : The remote server is a Microsoft FTP server, which
+closes the connection whenever a too long argument is issued.
+
+\item \verb+ftp/false_ftp+\\
+\textbf{Defined in} : \verb+ftp_overflow.nasl+
+\textbf{Type} : boolean value\\
+\textbf{Meaning} : the remote FTP server is either protected
+by tcp wrappers or the FTP port is open but closes the connection
+
+\end{itemize}
+
+
+
+\section{The 'nasl' utility}
+
+The \textit{libnasl} package now comes with its own standalone interpretor
+\verb+nasl+. Do 'man nasl' for more details
+
+
+
+
+
+\end{document}
+

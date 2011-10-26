@@ -1,0 +1,138 @@
+<TABLE border=1>
+<TR><TD><PRE>
+/* asource.c: [one line description of file]
+*    --------------------------------------------------------------------
+*
+*   [Project Name]
+*
+*   [License Statement, eg.
+*   The contents of this file are subject to the Mozilla Public
+*   License Version 1.0 (the "License"); you may not use this file
+*   except in compliance with the License. You may obtain a copy of
+*   the License at http://www.mozilla.org/MPL/ ]
+*
+*   [Warranty Statement, eg.
+*   Software distributed under the License is distributed on an "AS
+*   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+*   implied. See the License for the specific language governing
+*   rights and limitations under the License. ]
+*
+*   [Author contact, eg.
+*   Copyright (C) 1998 AbsoluteValue Software, Inc.  All Rights Reserved.
+*
+*   Inquiries regarding the linux-wlan Open Source project can be
+*   made directly to:
+*
+*   AbsoluteValue Systems Inc.
+*   info@linux-wlan.com
+*   http://www.linux-wlan.com ]
+*
+*   [Change History]
+*
+*   [Verbose Description]
+*
+*   [Implementation and usage notes]
+*
+*   [References]
+*
+*    --------------------------------------------------------------------
+*/
+
+/* Portability/Compatibility header */
+#include &lt;wlan/wlan_compat.h&gt;
+
+/* The following prevents &quot;kernel_version&quot; from being set in this file. */
+#define __NO_VERSION__
+
+/* Non-project specific includes */
+/* PCMCIA headers generated during PCMCIA package installation */
+#include &lt;pcmcia/config.h&gt;
+#include &lt;pcmcia/k_compat.h&gt;
+
+/* Module related headers, non-module drivers should not include */
+#include &lt;linux/version.h&gt;
+
+#include &lt;assert.h&gt;
+#include &lt;linux/delay.h&gt;
+#include &lt;linux/kernel.h&gt;
+#include &lt;linux/types.h&gt;
+#include &lt;linux/fcntl.h&gt;
+#include &lt;linux/interrupt.h&gt;
+#include &lt;linux/ptrace.h&gt;
+#include &lt;linux/ioport.h&gt;
+#include &lt;linux/in.h&gt;
+#include &lt;linux/malloc.h&gt;
+#include &lt;linux/string.h&gt;
+#include &lt;linux/timer.h&gt;
+#include &lt;asm/system.h&gt;
+#include &lt;asm/bitops.h&gt;
+#include &lt;asm/io.h&gt;
+#include &lt;linux/errno.h&gt;
+
+/* Project Includes */
+#include &lt;wlan/version.h&gt;
+#include &lt;wlan/am930mib.h&gt;
+#include &lt;wlan/p80211hdr.h&gt;
+#include &lt;wlan/p80211mgmt.h&gt;
+#include &lt;wlan/wlan_ioctl.h&gt;
+#include &lt;wlan/wlan_stable.h&gt;
+#include &quot;am930di.h&quot;
+#include &quot;am930llc.h&quot;
+#include &quot;am930mac.h&quot;
+#include &quot;am930hw.h&quot;
+#include &quot;am930mgr.h&quot;
+
+/*====================================================================*/
+/* Local Constants                                                    */
+/*====================================================================*/
+
+#define ACONSTANT    22
+
+
+/*====================================================================*/
+/* Local Types                                                        */
+/*====================================================================*/
+
+typdef struct atype
+{
+    struct atype *next;
+    struct atype *prev;
+} atype_t;
+
+
+/*====================================================================*/
+/* Static data defined in this file                                   */
+/*====================================================================*/
+
+UINT8    wepkey[WLAN_WEP_NKEYS][WLAN_WEP_KEYLEN] =
+{
+    { 0xf1, 0x10, 0xec, 0xe0, 0xdc },
+    { 0x0f, 0xf2, 0x04, 0x09, 0xfb },
+    { 0x13, 0x37, 0xf2, 0xf9, 0x2d },
+    { 0xe9, 0x17, 0x19, 0x63, 0xc7 }
+};
+
+
+/*====================================================================*/
+/* Local Function Declarations                                        */
+/*====================================================================*/
+
+static void am930mgr_authen1_rx( am930mgr_t *mgr, wlan_fr_authen_t *f );
+static void am930mgr_authen2_rx( am930mgr_t *mgr, wlan_fr_authen_t *f );
+static void am930mgr_authen3_rx( am930mgr_t *mgr, wlan_fr_authen_t *f );
+static void am930mgr_authen4_rx( am930mgr_t *mgr, wlan_fr_authen_t *f );
+
+/*====================================================================*/
+/* Function Definitions                                               */
+/*====================================================================*/
+
+
+/*----------------------------------------------------------------
+*    am930mgr_assoc_begin_sta
+*
+*    Start the station association procedure.  Namely, send an
+*    association request frame to the AP.
+*
+*    returns: nothing for now
+----------------------------------------------------------------*/
+void am930mgr_assoc_begin_sta(am930mgr_t *mgr)

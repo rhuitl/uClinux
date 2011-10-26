@@ -1,0 +1,101 @@
+/**
+ * @ingroup libosip2 The GNU oSIP stack
+ * @defgroup howto5_sdp How-To use the sdp negotiator.
+
+ * @section howto5_1 Description.
+
+The SDP offer/answer model is where most SIP interoperability issue
+comes from.  The SDP specification (rfc2327.txt) is often not fully
+respected. As an example, most SIP applications forget to add the
+mandatory 's' field in the SDP packet. Another mistake is to assume
+that an SDP packet don't need a 'p' and a 'e' field. Even if they
+are both optional, at least of those is mandatory! I have never
+seen ONE implementation that send at least one 'p' or 'e' field!!
+For all those reasons, the negotiation happens to be a hard task
+
+ * @section howto5_2 osip_negotiation.h VS osip_rfc3264.h
+
+The include file osip_negotiation.h and osip_rfc3264.h both
+offer the same feature. osip_negotiation.h is now made obsolete
+as the result were poor. <B>PLEASE DON'T USE IT ANYMORE</B>
+
+The new negotiator is more promising and nearly finished. You
+can already use and test it, but <B>be aware that this is still
+work in progress and even the API has not yet been fixed.</B>
+
+ * @section howto5_3 Do you need to use a SDP negotiator?
+
+Of course, a SDP negotiator is only needed for SIP endpoint.
+
+Advanced applications may find it inappropriate, but as you can
+modify the SDP answer after running the negotiation, I see no
+reason why you should not use it. It will just simplify the amount
+of code you'll need to negotiate medias.
+
+If by using the new negotiator, you find some nice ideas to
+improve it, I'll be glad to think about implementing them.
+Trying to build a generic SDP negotiatior gave me headache...
+I hope the new one will be suitable for all needs.
+
+ * @section howto5_4 How-to initialize the SDP negotiator?
+
+Here is the way to initialize the new negotiator:
+
+<PRE>
+	struct osip_rfc3264 *cnf;
+	int i;
+	
+	i = osip_rfc3264_init(&cnf);
+	if (i!=0)
+	{
+		fprintf(stderr, "Cannot Initialize Negotiator feature.\n");
+		return -1;
+	}
+</PRE>
+
+ * @section howto5_5 How-to add support for medias?
+
+You then must add a set of known codecs. To simplify the
+implementation, you add sdp_media_t elements. The next code
+shows how you can add support for the G729 codec.
+
+<PRE>
+	sdp_media_t *med;
+	sdp_attribute_t *attr;
+	i = sdp_media_init(&med);
+	med->m_proto = osip_strdup("RTP/AVP");
+	med->m_media = osip_strdup("audio");
+	osip_list_add(med->m_payloads, osip_strdup("18"), -1);
+	
+	i = sdp_attribute_init (&attr);
+	attr->a_att_field = osip_strdup("rtpmap");
+	attr->a_att_value = osip_strdup("G729/8000");
+	osip_list_add (med->a_attributes, attr, -1);
+	
+	osip_rfc3264_add_audio_media(cnf, med, -1);
+</PRE>
+
+ * @section howto5_6 How-to execute the negotiation?
+
+Running the negotiator is still a complex sequence of calls.
+This is because I have oriented developments to make the
+negotiator enough flexible for all situations. This makes
+the negotiator quite complex to use but I hope you'll still
+find it enough powerfull.
+
+The test program is located in the source files of libosip2
+in src/test/torture_rfc3262.c. You'll find a complete
+negotiation process to build an answer to an offer.
+
+When the negotiation is finished for all media lines, you
+still MUST modify some elements missing in the SDP message.
+<B>Especially, you must replace the IP addresses and port numbers
+to reflect your configuration.</B>
+
+Note that at the end of the negotiation process, you can still
+modify the SDP message to make it closer to your own media
+capabilities. For example, you can add attributes such as
+"ptime" options for audio and video payloads.
+
+*/
+

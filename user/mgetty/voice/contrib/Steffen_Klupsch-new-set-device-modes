@@ -1,0 +1,314 @@
+From: Steffen Klupsch <steffen@vlsi.informatik.tu-darmstadt.de>
+Subject: Adding modes to *_set_device()
+Date: 24 Jun 1999 17:22:38 +0200
+Message-ID: <37724FBC.58FE2CFB@vlsi.informatik.tu-darmstadt.de>
+References: <376E7B43.510517F1@coldserver.com> <19990622210225.B28405@greenie.muc.de> <377128EB.53ACBEF2@coldserver.com> <19990623190119.A26102@greenie.muc.de> <3772187B.C2837B3B@coldserver.com>
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Vandoorselaere Yoann wrote:
+> So please here is the following question :
+> 1: How about adding SPEAKER_PHONE_MODE to *_set_device() ?
+>         ( Am i wrong or speaker phone mode is the same thing as local handset ?
+> ).
+
+voice.h defines the following modes:
+#define NO_DEVICE           (0x0001)
+#define DIALUP_LINE         (0x0002)
+#define EXTERNAL_MICROPHONE (0x0003)
+#define INTERNAL_MICROPHONE (0x0004)
+#define EXTERNAL_SPEAKER    (0x0005)
+#define INTERNAL_SPEAKER    (0x0006)
+#define LOCAL_HANDSET       (0x0007)
+
+I'd like to open a discussion about 'which entry means what' and 
+'what else could be needed'.
+
+Here my interpretation :-)
+
+Assumption: there is an external phone line - called telco line
+This telco line is connected to the modem.
+The modem uses a 4 wire connector - the local telephone (local handset)
+is connected to the modem. :-) Everything as the german telekom wants
+it.
+
+
+telephone   -------------|  |----------- local 
+company     ------------||  ||---------- telephone
+                        modem
+
+NO_DEVICE: 
+     The modem can not use any in/output devices.
+     This should be called just before the modem is supposed to
+go 	             on-hook. (e.g. just before a 'ATH')
+     (This should not be called befor switching to fax or data mode.)
+
+DIALUP_LINE: 
+     The modem sends/receives its voice stream to/from the telco line.
+     This is supposed to be a 'silent' operation. No modem speaker is
+working, 
+     no microphone is used.
+EXTERNAL_MICROPHONE:
+     The modem receives its voice stream from an external microphone.
+     No modem speaker is working, the telco line is NOT in use.
+     -If the modem doesn't support external microphones the mode 
+      INTERNAL_MICROPHONE should be automatic fallback.
+INTERNAL_MICROPHONE:
+     The modem receives its voice stream from an internal microphone.
+     No modem speaker is working, the telco line is NOT in use.
+     -If the modem has no internal microphone the  the mode 
+      EXTERNAL_MICROPHONE should be automatic fallback.
+EXTERNAL_SPEAKER:
+     The modem  sends its voice stream to an external speaker.
+     No microphone is working, the telco line is NOT in use.
+     -If the modem has no external speaker the mode INTERNAL_SPEAKER
+      should be automatic fallback.
+INTERNAL_SPEAKER:
+     The modem  sends its voice stream to an internal speaker.
+     No microphone is working, the telco line is NOT in use.
+     -If the modem has no internal speaker the mode EXTERNAL_SPEAKER
+      should be automatic fallback.
+LOCAL_HANDSET:
+     The modem sends/receives its voice stream to/from the local phone.
+     This is supposed to be a 'silent' operation. No modem speaker is
+working, 
+     no microphone is used, the telco line is NOT in use.
+
+I suggest to extend the possible device_modes with the following
+#define DIALUP_WITH_EXT_SPEAKER              (0x0008)
+#define DIALUP_WITH_INT_SPEAKER              (0x0009)
+#define DIALUP_WITH_LOCAL_HANDSET            (0x000A)
+#define DIALUP_WITH_EXTERNAL_MIC_AND_SPEAKER (0x000B)
+#define DIALUP_WITH_INTERNAL_MIC_AND_SPEAKER (0x000C)
+
+
+Definition:
+
+DIALUP_WITH_EXT_SPEAKER:            
+     The modem sends/receives its voice stream to/from the telco line.
+     The external speaker is used to echo the voice stream.
+     No microphone is used.
+     -If the modem has no external speaker the mode
+DIALUP_WITH_INT_SPEAKER 
+      should be automatic fallback. If both is not possible the mode
+      DIALUP_LINE should be fallback.
+DIALUP_WITH_INT_SPEAKER:
+     The modem sends/receives its voice stream to/from the telco line.
+     The internal speaker is used to echo the voice stream.
+     No microphone is used.
+     -If the modem has no internal speaker the mode
+DIALUP_WITH_EXT_SPEAKER 
+      should be automatic fallback. If both is not possible the mode
+      DIALUP_LINE should be fallback.
+DIALUP_WITH_LOCAL_HANDSET:
+     The modem sends/receives its voice stream to/from the telco line.
+     There is a shortcut between telco line and the local telephone, so
+anybody
+     can hear the voice stream in the local phone and can add additional
+noise 
+     using the telephone microphone :-)
+     -If the modem has no such 'speakerphone mode' the mode DIALUP_LINE
+should
+     be fallback.
+     (There is a hardware solution to achive dialup_with_local_handset -
+even 
+      when the modem does not support it: a 2-wire connection to the
+modem.
+ 
+         telephone   --------------|----------- local 
+         company     ------------|-|---------- telephone
+                                 | |
+                                modem
+      )
+DIALUP_WITH_EXTERNAL_MIC_AND_SPEAKER:
+     The modem sends/receives its voice stream to/from the telco line.
+     There is a shortcut between telco line and the external microphone
+and 
+     speaker, so anybody can hear the voice stream in the external
+speaker
+     and can add additional noise using the external microphone.
+     -If the modem has no such 'speakerphone mode' the mode 
+      DIALUP_WITH_LOCAL_HANDSET should be fallback. If both is not
+possible
+      DIALUP_LINE should be fallback.
+DIALUP_WITH_INTERNAL_MIC_AND_SPEAKER:
+     The modem sends/receives its voice stream to/from the telco line.
+     There is a shortcut between telco line and the internal microphone
+and 
+     speaker, so anybody can hear the voice stream in the internal
+speaker
+     and can add additional noise using the internal microphone.
+     -If the modem has no such 'speakerphone mode' the mode 
+      DIALUP_WITH_LOCAL_HANDSET should be fallback. If both is not
+possible
+      DIALUP_LINE should be fallback.
+
+
+Please send comments.
+Steffen
+From schaefer  Wed Jun 23 13:15:04 1999
+Return-Path: <schaefer>
+Received: (from schaefer@localhost)
+	by vulcan.alphanet.ch (8.9.3/8.9.3) id NAA04157;
+	Wed, 23 Jun 1999 13:15:04 +0200
+Date: Wed, 23 Jun 1999 13:15:04 +0200
+Message-Id: <199906231115.NAA04157@vulcan.alphanet.ch>
+From: Marc SCHAEFER <schaefer@alphanet.ch>
+To: schaefer
+Subject: (fwd) Re: set_device
+Newsgroups: alphanet.ml.mgetty
+Organization: ALPHANET NF -- Not for profit telecom research
+Status: RO
+X-Status: 
+
+-- forwarded message --
+Path: alphanet.ch!not-for-mail
+From: Vandoorselaere Yoann <yoann@coldserver.com>
+Newsgroups: alphanet.ml.mgetty
+Subject: Re: set_device
+Date: 23 Jun 1999 13:07:59 +0200
+Organization: ALPHANET NF - Research and information - Not for profit
+Lines: 130
+Distribution: alphanet
+Message-ID: <3770DFA1.CF0C1764@coldserver.com>
+References: <376E7B43.510517F1@coldserver.com> <376E7369.BC58E174@vlsi.informatik.tu-darmstadt.de> <376FABF2.FE152207@coldserver.com> <376FCAC6.445AEE62@vlsi.informatik.tu-darmstadt.de>
+NNTP-Posting-Host: localhost.alphanet.ch
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+X-Comment: Mail-to-News 1.0 MSC94
+Xref: alphanet.ch alphanet.ml.mgetty:8731
+
+Steffen Klupsch wrote:
+> OK. I vote for that too. You request an extension of
+> libvoice/*.c/*_set_device(int device) so that 'device' includes
+> 'SPEAKER_PHONE_MODE' or 'LOCAL_HANDSET' for all modems.
+
+LOCAL_HANDSET is already defined, and as far as i know
+it signify to use the modem microphone & speaker as input / output
+device.
+What i don't understand is
+in The libvoice/Rockwell.c set_value function...
+Where does these value come from ?
+I've an pdf explaining all Rockwell ( for modem based on rockwell
+chipset :
+RCV56ACx, RCV336ACx, RCV288ACx, and RCV144ACx) AT command,
+and what i have for AT#VLS is :
+
+
+********
+#VLS - Voice Line Select
+This action command can be used to select which devices are routed
+through the modem.
+
+Parameters:	n = 0-9 as supported by the modem model. [This is the device
+position number
+		(not device number) as reflected in responce to #VLS=?]
+
+Default:	0
+
+Result Codes:
+		OK if n = 0-9 as supported by the modem model.
+		VCON if device selected does not connect to the telephone line
+			( A speaker is such device, but a telephone line with speaker ON is
+not
+			such device, and generate OK.)
+
+Command options:
+
+#VLS? -> 
+This query returns the current setting of the #VLS command as an ASCII
+decimal value in result
+code format.
+
+#VLS=? ->
+This query requests a report of the device types available for
+selection. The response is a number
+from 0 to 4 corresponding the device position number (see Table 7-5).
+
+#VLS=0 ->
+The default option on the modem. This command instructs the modem that
+when entering any of
+the three voice operating submodes (Online Command, Transmit, or
+Receive), that the telephone
+line interface should be routed through the modem. The OK response is
+sent to the DTE, and any
+previous connection is lost (i.e., the modem ends up on-hook as a result
+of issuing this command
+to connect to the telephone line).
+
+
+#VLS=1 -> 
+This command instructs the modem to route only the handset through the
+modem. This setting
+can be chosen before recording a greeting message.
+
+#VLS=2 ->
+This command instructs the modem to route only the speaker through the
+modem. This setting
+can be chosen before playing back any message. The modem immediately
+switches to Online
+Voice Command Mode, and the VCON response is generated for completeness.
+However, since
+this is an output only device, nothing of consequence can happen until
+the DTE sends the #VTX
+command.
+
+#VLS=3 ->
+This command instructs the modem that only the auxiliary input device
+(microphone) 	 		should be routed through the modem. This setting can be
+chosen before recording a greeting message.
+
+#VLS=4 -> 
+This command is the same as #VLS =0, except that the modem enables the
+internal speaker as
+well as the telephone line/handset circuit.
+
+#VLS=5 ->
+This command selects telephone emulation mode while in #CLS=8 mode.
+Speakerphone
+operation is entered during Voice On-line (VCON) mode after completing
+dialing (ATD) or
+answering (ATA). #VLS=5 will respond ERROR if speakerphone is supported.
+
+#VLS=6 ->
+This command selects speakerphone mode while in #CLS=8 mode. Telephone
+emulation
+operation is entered during Voice On-line (VCON) mode after completing
+dialing (ATD) or
+answering (ATA). #VLS=6 will respond ERROR if speakerphone is not
+supported.
+
+#VLS=7 ->
+This command, valid after Voice On-line mode, mutes the local handset by
+switching the handset
+or speakerphone out of the telephone line path if in #VLS=0 or #VLS=6
+mode. To unmute, the
+host software should issue AT#VLS=0 or AT#VLS=6 to return to phone line
+or speakerphone
+mode, respectively. On hardware designs which incorporate the audio
+codec, #VLS=7 can be
+used to route the codec's output through the phone line to provide
+music-on-hold feature.
+
+#VLS=8 ->
+(Valid after Voice On-line mode.) This command engages the Caller ID
+relay to allow recording of
+conversation when using a handset by routing the signal to the audio
+codec (if populated). To
+deactivate the Caller ID relay, the host should issue an AT#VLS=0 or
+AT#VLS=6 to return to
+phone line or speakerphone mode, respectively.
+
+#VLS=9 ->
+This command routes the handset to the sound codec to allow
+recording/playback of audio (e.g.
+greeting messages) through the local handset.
+
+-- 
+             			  -- Yoann
+	It is well known that M$ products don't call free() after a malloc().
+	The Unix community wish them good luck for their future developments.
+-- end of forwarded message --
+

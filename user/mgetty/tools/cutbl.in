@@ -1,0 +1,36 @@
+#!@PERL@
+#
+# cut off blank lines
+#
+# (that is: cut off blank/empty lines at the end of a page, pages being
+# separated by newline characters)
+#
+# run as filter: cutbl <input | hp2hig3 >output, or so.
+#
+# RCS: $Id: cutbl.in,v 1.1 1998/09/29 10:54:07 gert Exp $
+
+$empties=0;
+$blank="\n";
+
+while( <> )
+{
+    if ( /\f/ )			# form feed anywhere -> new page
+    {
+	$empties=0;		# no "remembered blank lines"
+	if ( /^\f\r\n/ )	# extra newline after form feed?
+		{ $_ = "\f"; }	# yes: print only form feed!
+	print $_;
+    }
+    elsif ( /^\s*\r?\n$/ )	# blank line (whitespace only)
+    {
+	$empties++;		# remember number
+	$blank=$_;		# and type of "blank" line (CR/CR+NL/...)
+    }
+    else			# non-blank line
+    {
+	if ( $empties > 0 )
+		{ print $blank x $empties; }
+	$empties=0;
+	print $_;
+    }
+}

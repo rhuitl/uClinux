@@ -1,0 +1,215 @@
+Hitachi EDOSK2674
+-----------------
+
+The Hitachi/EDOSK2674 target uses the Hitachi H8300S processor.
+To build for this target you will need a working h8300-elf tool chain
+that includes elf2flt.  A precompiled chain can be found at:
+
+    http://www.uclinux.org/pub/uClinux/ports/h8/h8300-elf-tools-20030420.sh
+
+It is a self installing tar file. login as root and run:
+
+    sh h8300-elf-tools-20030420.sh
+
+Add /usr/local/bin to your path and then you will be able to use the tools.
+You do not need to be root to build the sources.
+
+The linux-2.4.x kernel and uClibc are the only working combinations for
+this board at the moment.
+
+When you have finished compiling there are several images in the "images"
+directory:
+
+    edosk2674-boot.mot       - a very small bootloader the boots a flash
+                               image.  This version can be loaded using the
+                               ROM monitor that comes with the board.
+    edosk2674-boot.bin       - a "netflash" version of the bootloader.
+    edosk2674-boot+image.mot - a full image (including bootloader) that can
+                               be flashed in using the ROM monitor that
+                               comes with the board.  This will take a
+                               while to load at 115200.
+    edosk2674-image.bin      - a "netflash" version of the kernel/romfs
+                               image that can be flashed into the unit using
+                               netflash.
+    edosk2674-imagez.bin     - a compressed image,  not much use for people
+                               other than me :-)
+
+First Time Through
+------------------
+The first time you load the image do the following steps:
+
+1) Boot the board using the builtin ROM monitor running from the boot rom
+   (boot mode) with writes to main flash enabled.
+
+2) Compile "tip" from the latest/patched uClinux-dist source with:
+
+    cc -o tip user/tip/tip.c
+
+3) Connect to the board using tip:
+
+    ./tip -l /dev/ttyS0 -s 115200 -d images/edosk2674-boot+image.mot
+
+4) reset the board to get the menu.  Make sure it says boot mode. Select
+   the following options:
+
+    ...
+
+    1. Flash Programming
+
+    ...
+
+    2. Main Flash (Intel)
+
+    ...
+
+    Are you sure you want to destroy existing Main Flash Data? (Y/N): y
+    Is MF_WEN jumper fitted? (Y/N): y
+
+    Data downloaded sucessfully.
+
+    Writing S-Records into Intel flash... [\]
+
+    Updating has completed successfully.
+
+    The system can now be restarted with the updated software...
+
+5) Now type ~s to send the file.  Be patient,  this will take some time.
+
+6) Remove the jumper so that you may boot from flash (normal mode).
+   type ~. to exit "tip" and then run:
+   
+    ./tip -l /dev/ttyS0 -s 38400
+
+   Reset the board and you should see:
+   
+    Hitachi EDOSK2674 Simple Boot Loader
+    Copyright (C) 2003 David McCullough <davidm@snapgear.com>
+    .............................................................
+    Linux version 2.4.20-uc0 (davidm@beast) (gcc version 3.2.2) #361 Sun Apr 20
+    22:29:55 EST 2003
+
+    uClinux H8S
+    Target Hardware: EDOSK-2674R
+    H8/300 series support by Yoshinori Sato <ysato@users.sourceforge.jp>
+    Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne
+    On node 0 totalpages: 3060
+    zone(0): 0 pages.
+    zone(1): 3060 pages.
+    zone(2): 0 pages.
+    Kernel command line: console=ttySC2,38400
+    Calibrating delay loop... 7.21 BogoMIPS
+    Memory available: 6292k/7122k RAM, 0k/0k ROM (848k kernel code, 165k data)
+    Dentry cache hash table entries: 2048 (order: 2, 16384 bytes)
+    Inode cache hash table entries: 1024 (order: 1, 8192 bytes)
+    Mount-cache hash table entries: 512 (order: 0, 4096 bytes)
+    Buffer-cache hash table entries: 1024 (order: 0, 4096 bytes)
+    Page-cache hash table entries: 4096 (order: 2, 16384 bytes)
+    POSIX conformance testing by UNIFIX
+    Linux NET4.0 for Linux 2.4
+    Based upon Swansea University Computer Society NET3.039
+    Initializing RT netlink socket
+    Starting kswapd
+    SuperH SCI(F) driver initialized
+    ttySC0 at 0x00ffff78 is a SCI
+    ttySC1 at 0x00ffff80 is a SCI
+    ttySC2 at 0x00ffff88 is a SCI
+    smc9194.c:v0.14 12/15/00 by Erik Stahlman (erik@vt.edu)
+    eth0: SMC91C94(r:9) at 0xf80000 IRQ:16 INTF:TP MEM:6144b ADDR:
+    00:00:87:d6:24:89 
+    Blkmem copyright 1998,1999 D. Jeff Dionne
+    Blkmem copyright 1998 Kenneth Albanowski
+    Blkmem 5 disk images:
+    0: 4FF684-5A9A83 [VIRTUAL 4FF684-5A9A83] (RO)
+    1: 0-1FFFF [VIRTUAL 0-1FFFF] (RW)
+    2: 20000-3FFFF [VIRTUAL 20000-3FFFF] (RW)
+    3: 40000-3FFFFF [VIRTUAL 40000-3FFFFF] (RW)
+    4: 0-3FFFFF [VIRTUAL 0-3FFFFF] (RW)
+    RAMDISK driver initialized: 16 RAM disks of 4096K size 1024 blocksize
+    PPP generic driver version 2.4.2
+    PPP MPPE compression module registered
+    NET4: Linux TCP/IP 1.0 for NET4.0
+    IP Protocols: ICMP, UDP, TCP
+    IP: routing cache hash table of 512 buckets, 4Kbytes
+    TCP: Hash tables configured (established 512 bind 1024)
+    NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.
+    VFS: Mounted root (romfs filesystem) readonly.
+    Freeing unused kernel memory: 0k freed (0x4e0000 - 0x4df000)
+    Shell invoked to run file: /etc/rc
+    Command: hostname EDOSK2674
+    Command: /bin/expand /etc/ramfs.img /dev/ram0
+    Command: /bin/expand /etc/ramfs.img /dev/ram1
+    Command: mount -t proc proc /proc
+    Command: mount -t ext2 /dev/ram0 /var
+    Command: mount -t ext2 /dev/ram1 /etc/config
+    Command: mkdir /var/tmp
+    Command: mkdir /var/log
+    Command: mkdir /var/run
+    Command: mkdir /var/lock
+    Command: flatfsd -r
+    FLATFSD: created 3 configuration files (36 bytes)
+    Command: cat /etc/motd
+    Welcome to
+              ____ _  _
+             /  __| ||_|                 
+        _   _| |  | | _ ____  _   _  _  _ 
+       | | | | |  | || |  _ \| | | |\ \/ /
+       | |_| | |__| || | | | | |_| |/    \
+       |  ___\____|_||_|_| |_|\____|\_/\_/
+       | |
+       |_|
+
+    Hitachi/EDOSK2764 port.
+    For further information check:
+    http://www.uclinux.org/
+
+    Execution Finished, Exiting
+    Shell invoked to run file: /etc/config/start
+    Execution Finished, Exiting
+
+    Sash command shell (version 1.1.1)
+    /> 
+
+From Now On
+-----------
+
+You can now upgrade this system over the Network.  Just config the board
+with an IP address,  for exmaple:
+
+    ifconfig eth0 192.168.20.2
+
+Then to load a file off a tftp server run: 
+
+    netflash -i 192.168.20.1 edosk2674-image.bin
+
+or to get the file from a HTTP server:
+
+    netflash -i http://192.168.20.1/edosk2674-image.bin
+
+This still takes a little while to load a new image but is much faster than
+the serial download.
+
+Changing the Setup
+------------------
+
+By default a whole nuch of things are running.  A Web server,  telnetd.
+You may want to add some config files or inittab entries and have the
+preserved across boots.
+
+While on the console (the tip login) just do something like:
+
+    /> cd /etc/config
+    /etc/config> vi start
+    ...
+    add a line 'ifconfig eth0 192.168.20.69' to set the IP address save
+    and quit.
+    ...
+    /etc/config> sync
+    /etc/config> reboot
+
+The sync command sends a signal to the flatfsd to save the contents of
+/etc/config to /dev/flash/config.  This is restored at boot time by the
+"flatfsd -r" command.
+
+
+If you need more info just ask me, David McCullough <davidm@snapgear.com>
+

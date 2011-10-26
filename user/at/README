@@ -1,0 +1,63 @@
+This is version of 3.1.x of the at/atrun pair for running commands at a
+specified time.  To install, do a
+
+$ ./configure
+
+You might want to change the default maximum load at which batch
+jobs are still started by specifying --with-loadavg_mx=... as
+argument to configure.  The default is 0.8, so that, normally, no
+batch job will be started when there's still activity going on.
+For an SMP system, you will want to increase this.
+
+Then, do
+
+$ make
+
+and, as root,
+
+# make install
+
+There are two ways of running at jobs.
+
+The new one is to start up an atd daemon at boot time.
+
+The old one is to put
+
+* * * * 0,5,10,15,20,25,30,35,40,45,50,55 /usr/lib/atrun
+
+into root's crontab file (or wherever you put the atrun binary;
+don't forget to start up cron.)
+
+(To place the line into crontab, do a
+
+# crontab -l > cront
+# vi cront
+
+[or whatever your favourite editor is.  Add the line above if it is
+not already in there.]
+
+# crontab -r cront
+)
+
+The new way has advantages on portable systems (where it doesn't wake up
+the disk every five minutes or so), and it also does immediate execution
+of batch jobs.  The old way is compatible with the setup that's being
+shipped with most Linux distributions, and doesn't have an extra process
+hanging around all the time.
+
+If you happen to have an older version of at around, make sure to delete
+it (it might lurk in /bin, for example).
+
+Bug reports to:
+	ig25@rz.uni-karlsruhe.de
+
+If at all possible, I'd appreciate you telling me which version you
+found a bug in; run at -V to find out which one.
+
+If you try to use at(1) on a system which does not support setreuid(2),
+i.e. if you get an error whch looks vaguely like
+
+undefined symbol _setreuid referenced from text segment
+
+DO NOT try to install at on your system by removing all that strange
+PRIV stuff.  You will install a rather glaring security hole that way.

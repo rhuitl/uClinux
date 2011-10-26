@@ -1,0 +1,91 @@
+REM Macro for printing a Word document onto a file and requesting 
+REM the faxnumber and recipients name from the user.
+REM
+REM Caution: this is not a foolproof program but a hack. But after
+REM it proved to be working for us we decided to keep it.
+REM
+REM (C) 1995 Stephan Gilbert, stephan@webforum.de
+REM Permission to use and modify as appropriate. Please retain the copyright
+REM notice if redistributing.
+REM
+REM
+REM Please check the source for system dependent information
+REM such as
+REM          drive where the server filesystem will be mounted
+REM          identification for the PC
+REM          installation of different printer drivers, as this
+REM             was performed on the German version of Word.
+REM
+Sub MAIN
+
+REM *** This information needs to be checked and activated
+
+Open "C:\MACHINE.ID" For Input As #1
+REM This reads a unique workstation number from the filesystem,
+REM Must not exceed 3 places!
+
+Read #1, a$
+Close #1
+
+MachineId$ = Left$(a$, 2)
+
+If MachineId$ = "" Then
+	MsgBox "Cannot identify your Workstation", "DATAPAT FAX", 16
+	Goto ProgrammEnd
+End If
+
+REM **** Generate the filenames
+
+REM on D:\fax we mount the filesystem from the server, via samba
+REM or NFS.
+
+FaxFile$  = "D:\fax\temp" + MachineId$ + ".fax"
+LockFile$ = "D:\fax\lck." + MachineId$
+
+REM *** Check if Lockfile is present
+
+CheckLockFile:
+
+a$ = Files$(LockFile$)
+If a$ <> "" Then
+	RetCode = MsgBox("Lockfile present, please wait ", "DATAPAT FAX", 5)
+	If RetCode <> 0 Then
+		Goto CheckLockFile
+	End If
+	Goto ProgramEnd
+End If
+
+REM *** Get all pertinent Information
+
+On Error Goto ProgramEnd
+FaxNumber$ = InputBox$("PC-" + MachineId$ + " : Please enter the faxnumber", "DATAPAT FAX")
+If FaxNumber$ = "" Then
+	Goto ProgramEnd
+End If
+
+On Error Goto ProgramEnd
+FaxMemo$ = InputBox$("Please enter recipient's name", "DATAPAT FAX")
+
+REM *** Switch the printer
+
+a$ = InputBox$(FaxFile$, "Test")
+
+DateiDruckereinrichtung .Drucker = "PostScript Printer an FILE:"
+DateiDrucken .DruckDateiAnf³gen = 0, .Bereich = "0", .InDateiUmleitenName = FaxFile$, .Von = "", .Bis = "", .Art = 0, .Exemplare = "1", .Seiten = "", .Reihenfolge = 0, .InDateiUmleiten = 1, .KopienSortieren = 1
+
+a$ = InputBox$(FaxFile$, "Test")
+
+REM *** Write the lock file
+
+Open LockFile$ For Output As #1
+Write #1, FaxNumber$
+Write #1, FaxMemo$
+
+Close #1
+REM *** This information has been checked and activated
+REM Restore the default printer installation
+
+DateiDruckereinrichtung .Drucker = "HP LaserJet IID an LPT2.DOS"
+DateiDrucken .DruckDateiAnf³gen = 0, .Bereich = "0", .Von = "1", .Bis = "1", .Art = 0, .Exemplare = "1", .Seiten = "", .Reihenfolge = 0, .InDateiUmleiten = 0, .KopienSortieren = 1
+ProgramEnd:
+End Sub

@@ -1,0 +1,67 @@
+			    03-Jun-2002
+		Notes on booting arbitrary REAL mode
+			binaries at 1000:0000
+
+
+THIS IS NOT A PART OF THE STANDARD LILO DISTRIBUTION.
+
+Arbitrary real mode binaries cannot be loaded directly by LILO.  However, if
+they are made to look like a "kernel image loaded LOW," then LILO can be
+induced to load them, thinking they are an out-of-date kernel image.
+
+Such files are limited to 512K bytes; less if you have a very large Extended
+BIOS Data Area (EBDA), which intrudes upon the 0x9000 segment.  The start
+addresss of the file MUST be at offset 0 in the file.  It will be loaded at
+0x1000:0000, and jumped to at that address (segment=0x1000, offset=0000) in
+16-bit real mode.
+
+In order to make the arbitrary binary, call it "foo.b", look like a kernel,
+the file "pseudo.b", the pseudo kernel header, must be pre-pended; viz.,
+
+	cat pseudo.b foo.b >foo.img
+
+"foo.img" is the bootable pseudo-kernel.
+
+In the configuration file, usually '/etc/lilo.conf', the following lines
+must be added:
+
+	image = foo.img
+	    root = current
+
+The root directory specification MUST be added (this is a "kernel" after
+all), to avoid a fatal LILO error message (unspecified numeric value). 
+Optionally, the arbitrary image may be given a name; viz.,
+
+	    label = foo-test
+
+The image should then be bootable from the LILO boot prompt.
+
+EXAMPLE:  Add the LILO diagnostic program "test4.com" to the LILO boot menu.
+
+The test program is created by "make floppy", which will write a floppy disk
+image, but it also may be added to the LILO boot menu with the following
+commands:
+
+	make all
+	cd diagnose
+	make test4.com
+	cd ..
+	cat pseudo.b diagnose/test4.com >/boot/test4.img
+
+Then append the following lines to '/etc/lilo.conf':
+
+	image = /boot/test4.img
+	  root = current
+          label = diagnostic
+
+Now, install the boot loader with the new menu item:
+
+	/sbin/lilo
+
+The last item on the boot menu should be "diagnostic", which will run
+"test4.com" from the LILO boot prompt.
+
+--John Coffman <johninsd@san.rr.com>
+(end)
+
+

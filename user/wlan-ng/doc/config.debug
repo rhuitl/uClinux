@@ -1,0 +1,90 @@
+* doc/config.debug
+*
+* Copyright (C) 1999 AbsoluteValue Systems, Inc.  All Rights Reserved.
+* --------------------------------------------------------------------
+*
+* linux-wlan
+*
+*   The contents of this file are subject to the Mozilla Public
+*   License Version 1.1 (the "License"); you may not use this file
+*   except in compliance with the License. You may obtain a copy of
+*   the License at http://www.mozilla.org/MPL/
+*
+*   Software distributed under the License is distributed on an "AS
+*   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+*   implied. See the License for the specific language governing
+*   rights and limitations under the License.
+*
+*   Alternatively, the contents of this file may be used under the
+*   terms of the GNU Public License version 2 (the "GPL"), in which
+*   case the provisions of the GPL are applicable instead of the
+*   above.  If you wish to allow the use of your version of this file
+*   only under the terms of the GPL and not to allow others to use
+*   your version of this file under the MPL, indicate your decision
+*   by deleting the provisions above and replace them with the notice
+*   and other provisions required by the GPL.  If you do not delete
+*   the provisions above, a recipient may use your version of this
+*   file under either the MPL or the GPL.
+*
+* --------------------------------------------------------------------
+*
+* Inquiries regarding the linux-wlan Open Source project can be
+* made directly to:
+*
+* AbsoluteValue Systems Inc.
+* info@linux-wlan.com
+* http://www.linux-wlan.com
+*
+* --------------------------------------------------------------------
+*
+* Portions of the development of this software were funded by 
+* Intersil Corporation as part of PRISM(R) chipset product development.
+*
+* --------------------------------------------------------------------
+
+The kernel components of linux-wlan currently have debugging code
+that can be enabled via a "make config" option.  If debug output
+has been compiled into a driver, enable it by setting the value of the 
+module parameter xxx_debug
+where xxx is the name of the component.  There are five levels of
+debugging (1-5).  Here's a summary of the levels and their usage:
+    1 - Enables most error messages for exception (but rare) conditions
+    2 - Enables more exceptions  
+    3 - Enables MAC status output
+    4 - More status
+    5 - Function entry and exit
+
+The levels are additive.  For example, level 3 includes level 3
+messages plus levels 1 and 2.
+
+To configure p80211.o for debug output, put the following line (with
+your own level number) in your modutils configuration file (usually
+/etc/conf.modules or /etc/modules.conf):
+ 
+  options p80211 wlan_debug=2
+
+To configure the prism2_cs driver for debug output, put the following
+line (with your own level number) in your /etc/pcmcia/config.opts
+file:
+
+  module "prism2_cs" opts "prism2_debug=2"
+
+To configure the PCI, PLX, or USB driver for debug output, put the following
+line (with your own level number) in your modutils configuration file (usually
+/etc/conf.modules or /etc/modules.conf):
+
+  options prism2_pci prism2_debug=3
+  options prism2_plx prism2_debug=3
+  options prism2_usb prism2_debug=3
+
+
+Then configure the collection and display of your kernel output.  This
+is usually done using syslog.  Here are the relevant entries from the
+/etc/syslog.conf file on one of our test machines:
+
+kern.*						/var/log/kernel
+kern.*						/dev/tty9
+*.info;mail.none;news.none;authpriv.none	/var/log/messages
+*.info;mail.none;news.none;authpriv.none	/dev/tty10
+
+

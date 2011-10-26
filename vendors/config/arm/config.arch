@@ -1,0 +1,192 @@
+############################################################################
+
+#
+#  A generic ARM config.arch that can be included by other platforms
+#  to reduce the number of places that need to be edited when something
+#  common changes. If you include this file you should provide:
+#
+#  CPUFLAGS           - cpu specific flags to pass to the compiler
+#  CPULDFLAGS          - cpu specific flags to pass to the linker
+#  VENDOR_CFLAGS       - vendor specific flags to pass to the compiler
+#
+#  Greg Ungerer <gerg@snapgear.com>
+#
+
+############################################################################
+
+#
+# Default console setting
+#
+
+ifndef CONSOLE_BAUD_RATE
+CONSOLE_BAUD_RATE = 115200
+endif
+
+ifndef HW_PRODUCT
+  HW_PRODUCT = $(CONFIG_PRODUCT)
+endif
+
+ifndef HW_VENDOR
+  HW_VENDOR = $(CONFIG_VENDOR)
+endif
+
+ifndef EXTRA_MODULE_DIRS
+ifeq ($(ROOTDIR)/modules,$(wildcard $(ROOTDIR)/modules))
+ifneq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules/
+else
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules
+endif
+endif
+endif
+
+ifndef RELFILES
+  RELFILES =	boot/boot.bin,.sgb boot/boot.elf		\
+  		images/image.bin,.sgu $(LINUXDIR)/linux		\
+		prop/config/metaconfig.conf
+endif
+
+ifndef NFIMAGE
+  NFIMAGE=image.bin
+endif
+
+############################################################################
+
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here.
+#
+# First settings we always want for all builds.
+#
+
+ENDIAN        ?= little
+MACHINE        = arm
+ARCH           = arm
+
+ifneq ($(shell which arm-linux-20070808-gcc),)
+ifeq ($(UCLINUX_BUILD_BOOT),1)
+CROSS_COMPILE  = arm-linux-20061213-
+else
+CROSS_COMPILE  = arm-linux-20070808-
+endif
+else
+CROSS_COMPILE  = arm-linux-
+endif
+
+ifeq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
+ifneq ($(shell which arm-linux-20061213-gcc),)
+KERNEL_CROSS_COMPILE = arm-linux-20061213-
+else
+KERNEL_CROSS_COMPILE = arm-linux-
+endif
+endif
+
+CROSS          = $(CROSS_COMPILE)
+CONFIGURE_HOST = arm-linux
+
+CC        = $(ucfront_cc) $(CROSS_COMPILE)gcc $(CPUFLAGS)
+AS        = $(CROSS_COMPILE)as $(CPUFLAGS)
+CXX       = $(ucfront_cxx) $(CROSS_COMPILE)g++ $(CPUFLAGS)
+AR        = $(CROSS_COMPILE)ar
+LD        = $(ucfront_ld) $(CROSS_COMPILE)ld $(CPULDFLAGS)
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+UCLINUX_BUILD_SET = 0					# have we set a special config below
+
+# REVISIT:
+# glibc -  crn += -lc_nonshared -lgcc
+
+# These can be used by configure.
+# Either configure $(CONFIGURE_OPTS)
+# or     configure --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+#
+TARGETARCH    := arm-linux
+HOSTARCH      := $(shell sh $(ROOTDIR)/tools/config.guess)
+CONFIGURE_OPTS := --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+
+############################################################################
+#
+# General purpose lib building rules, uClibc.config uses these when
+# possible.
+#
+
+ifdef UCLINUX_BUILD_LIB
+  ifeq ($(findstring glibc,$(LIBCDIR)),glibc)
+	GLIBC_TARGET_OPTS = arm-linux --enable-shared
+  endif
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  := -g
+	LDFLAGS :=
+  else
+	CFLAGS  := -O1
+	LDFLAGS := -Wl,-S
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+	CFLAGS  += $(VENDOR_CFLAGS) -DEMBED
+	LDFLAGS  += -fno-common -fno-builtin
+
+	CXXFLAGS = $(CFLAGS) -nostdinc++
+	CXXSUP := $(shell $(CXX) -print-file-name=libsupc++.a)
+
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CFLAGS)
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  := -g
+	LDFLAGS :=
+  else
+	CFLAGS  := -O1
+	LDFLAGS := -g
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += -Dlinux -D__linux__ -Dunix
+	CFLAGS  += $(VENDOR_CFLAGS) -DEMBED
+	LDFLAGS  += -fno-common -fno-builtin
+
+	CXXFLAGS = $(CFLAGS) -nostdinc++
+	CXXSUP := $(shell $(CXX) -print-file-name=libsupc++.a)
+
+	FLTFLAGS :=
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+	EXTRA_CFLAGS := $(CPUFLAGS)
+
+	CXXLIBS =
+  	 
+	LDLIBS = $(LIBBIND)
+	SH_LDFLAGS = $(LDFLAGS)
+	SH_LDLIBS = $(LDLIBS)
+
+	ucfront_cc  := ucfront-gcc
+	ucfront_cxx := ucfront-g++
+	ucfront_ld  := ucfront-ld
+endif
+
+############################################################################

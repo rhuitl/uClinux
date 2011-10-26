@@ -1,0 +1,70 @@
+'begin'
+	'comment'
+		The ever winning Mandelbrot.
+		Calculate the set and give a dump in char's to
+		the screen.
+	;
+
+	'real' x1, x2, y1, y2;
+	'integer' xn, yn, max;
+
+	x1 := -2.1; x2 := 0.7; y1 := -1.05;  y2 := - y1;
+	xn := 24;  yn := 11; max := 24;
+
+'begin'
+
+	'integer' 'procedure' mama (x, y, max);
+	'value' x, y, max;
+	'real' x, y;
+	'integer' max;
+	'begin'
+		'real'  x2, y2, xx, yy;
+		'integer' n;
+
+        xx := x; yy := y;
+        x2 := xx * xx; y2 := yy * yy;
+
+	n := 0;
+mado:
+	'if' n >= max 'or' (x2+y2) >= 4.0 'then' 'begin'
+		mama := n;
+		'goto' maexit
+	'end'
+	'else' 'begin'
+ 		yy := 2.0 * xx * yy + y;
+		xx := x2 - y2 + x;
+		x2 := xx * xx;
+		y2 := yy * yy;
+		n := n + 1;
+		'goto' mado
+        'end';
+maexit:
+'end';
+
+ 	'integer' val;
+ 	'real' x, y, dx, dy;
+
+	dx := (x2 - x1) / (xn - 1);
+	dy := (y2 - y1) / (yn - 1);
+	
+	y := y1;
+
+	'for' y := y1 'step' dy 'until' y2 'do' 'begin'
+
+		'for' x := x1 'step' dx 'until' x2 'do' 'begin'
+
+			val := mama (x, y, max);
+			'if' val = max 'then'
+				outsymbol (1, "#", 0)
+			'else'
+				outsymbol (1, "abcdef",
+					val - (val 'div' 6) * 6)
+		'end';
+
+		outsymbol (1, "\n", 0)
+	'end';
+'end'
+
+'end'
+
+

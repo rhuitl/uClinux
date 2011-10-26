@@ -1,0 +1,29 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+CSRC :=	allocrtsig.c killpg.c raise.c sigaction.c sigaddset.c sigandset.c \
+	sigblock.c sigdelset.c sigempty.c sigfillset.c siggetmask.c sighold.c \
+	sigignore.c sigintr.c sigisempty.c sigismem.c sigjmp.c signal.c \
+	sigorset.c sigpause.c sigrelse.c sigset.c sigsetmask.c sigsetops.c \
+	sysv_signal.c sigwait.c
+
+ifneq ($(strip $(ARCH_OBJS)),)
+CSRC := $(filter-out $(notdir $(ARCH_OBJS:.o=.c)),$(CSRC))
+endif
+
+SIGNAL_DIR := $(top_srcdir)libc/signal
+SIGNAL_OUT := $(top_builddir)libc/signal
+
+SIGNAL_SRC := $(patsubst %.c,$(SIGNAL_DIR)/%.c,$(CSRC))
+SIGNAL_OBJ := $(patsubst %.c,$(SIGNAL_OUT)/%.o,$(CSRC))
+
+libc-y += $(SIGNAL_OBJ)
+
+objclean-y += signal_objclean
+
+signal_objclean:
+	$(RM) $(SIGNAL_OUT)/*.{o,os}

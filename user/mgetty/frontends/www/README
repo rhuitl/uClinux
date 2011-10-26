@@ -1,0 +1,161 @@
+[ $Id: README,v 1.6 2002/12/03 22:09:35 gert Exp $ ]
+
+This is a collection of tools to maintain mgetty using a WWW interface
+(CGI binaries and a couple of static pages).
+
+Right now, it's not yet "plug and play", and it's only known to work
+with Apache and Roxen web servers (CERN and IBM have some weird problems).
+
+Please direct all questions concerning the WWW gui to Simone Demmel
+(neko@greenie.muc.de) or to the mgetty mailing list (mgetty@muc.de).
+--------------------------------------------------------------------
+INSTALLATION
+
+You need to have the following prerequisites installed and working - if
+some of those do not work, don't even start with the WWW gui, get the
+low level stuff to work first!
+
+* mgetty+sendfax (any version from 1.0.0 up will do)
+
+* pbmplus/netpbm tools (required programs are pnmscale, pnmflip and ppmtogif).
+
+* a WWW server that can execute "CGI"-Binaries
+
+* perl 5.  Version 5.004 or higher recommended.
+
+* to look at the stuff: a WWW browser that can do tables,  GIF images,
+  and forms.  The programs are developed using Netscape 3.x and 4.x, but
+  MSIE and others should work just fine.
+
+
+PATHNAMES
+
+The WWW stuff needs a couple of different directories.  The paths that
+are used by the "main" mgetty stuff as well are taken from the main
+mgetty Makefile (../../Makefile):
+
+  * CONFDIR is where "wwwgui.conf" will be stored.
+
+  * BINDIR is used as default path for the pbm tools - if that is not
+    correct, adapt "wwwgui.conf" after it has been created with "make".
+
+  * LIBDIR is used for the common subroutines (wwwsub.pl) and for 
+    the "simple pnm quantify" program (simplequant.pl)
+
+  * PERL the path to the Perl5 program on your system
+
+  * INSTALL the program used to install programs on your system
+
+  (if you have used the ../../Makefile to install mgetty+sendfax, don't
+  worry about those things, they will be OK).
+
+
+The following HAVE to be set in the Makefile in this directory:
+
+  * HTMLDIR - this is where the "index.html" file will go into.  It must
+    be accessible from the WWW server daemon!
+
+  * IMAGEDIR - where you want the navigation and logo pictures to be
+    stored in ("turn left", "next page", ...), can be the same as HTMLDIR.
+
+  * CGIBINDIR - this is where the CGI binaries go into.  If your WWW
+    server can execute ".cgi" files from any directory (apache, roxen),
+    this can be the same as HTMLDIR.  If you use an old WWW server that
+    cannot do this (IBM, CERN), it will be the "global" CGI-binary path.
+
+  * CGI_HREF - this is how the *.html files have to reference the *.cgi
+    binaries.  If the path names are the same, set this to "".  If they
+    differ, CGI_HREF will be something like CGI_HREF="/cgi-bin/" (this
+    is what shows up as pathname to the CGI programs in the WWW browser).
+
+If you don't know what this is all about, or what a CGI binary might be,
+ask your local WWW expert.  If you don't have one, ask on the mgetty 
+mailing list (mgetty@muc.de), but DO NOT EXPECT that we will find out
+what kind of WWW server you have running on your system, or how it is
+configured.  This is not easy without actually *looking* at the system!
+
+
+MAKE
+
+Now you just run "make", and all the binaries, HTML page, and the
+wwwgui.conf file are built from the corresponding "*.in"-Files.
+
+If you get any errors in this stage, send us the output from the "make"
+command!
+
+
+WWWGUI.CONF
+
+If "make" runs without errors, look into the newly created "wwwgui.conf"
+file.  Check all the path names to the programs listed there, and check
+the path names "$webtmpabs" and "$webtmprel" (description can be found 
+in the wwwgui.conf file).
+
+If you want to put a custom logo on top of the generated pages, edit
+"$www_logo".
+
+NOTE: wwwgui.conf is read from perl programs, so it has to be VALID PERL
+SYNTAX.  Do not remove any quotation marks, or semicolon characters.  If
+you're in doubt, do NOT change anything outside quotation marks (or change 
+it back if things didn't work).   You can test if you got the syntax
+right by running "perl -c wwwgui.conf".
+
+PICTURES, LOGOS
+
+In some places you can configure pictures. The pictures itself are not
+installes, you must put them manually in the right place.
+
+INSTALLATION
+
+If "make" runs fine without errors, do a "make install".
+
+Now everything should be accessible from a WWW client.  If you want to
+change any paths or logos now, change them in "LIBDIR/wwwgui.conf" - if
+there exists a config file, it will NOT be overwritten if you do another
+"make install".
+
+
+TROUBLESHOOTING
+
+If one of the path names or program specifications in the wwwgui.conf
+file is wrong, the CGI programs will tell you.
+
+If your WWW server doesn't want to execute .cgi programs, you will
+get an error message, or will see the program code (hairy perl stuff),
+instead of a nice flashy page.  If so, check the documentation for your
+WWW server!
+
+--------------------------------------------------------------------
+ACCESS PERMISSIONS
+
+Currently, these tools do NOT enforce any kind of access permissions.
+
+Make sure your WWW server doesn't allow access to the CGI programs
+unless you want everybody to be able to read your incoming faxes...
+
+How this is done for your WWW server is documented in the WWW server's
+manual, e.g. for the apache http server on www.apache.org.  If your WWW
+server supports it, you could, for example, put an .htaccess file into
+the CGIBINDIR that contains the following lines:
+
+    order deny,allow
+    deny from all
+    allow from <hostname/domain>
+
+or if you want to do username+password authentication (again assuming 
+apache) it could look like this:
+
+    deny from all
+    allow from localhost
+    AuthType Basic
+    AuthUserFile /var/lib/apache/conf/passwd
+    AuthName "special directory"
+    require valid-user 
+    satisfy any
+
+(Check with the WWW server documentation!)
+
+--------------------------------------------------------------------
+Please direct all questions concerning the WWW gui to Simone Demmel
+(neko@greenie.muc.de) or to the mgetty mailing list (mgetty@muc.de).
+--------------------------------------------------------------------

@@ -1,0 +1,126 @@
+1.10:
+  have fallback in case sendfile fails
+
+1.9:
+  chdir to cgi's base dir (Kuba Winnicki)
+  set HTTP_ACCEPT_ENCODING environment variable (Kuba Winnicki)
+    We actually should export all HTTP headers as HTTP_[header]
+    Any takers?
+  Try not to send error message HTTP headers if we already sent the
+    headers from the CGI (Kuba Winnicki)
+  <ims -> <=ims (Gerrit Pape)
+  64-bit file I/O cleanliness
+  fix HTTP ranges (Joachim Berdal Haga via Gerrit Pape)
+
+1.8a:
+  Steve Bennett <steveb@snapgear.com>
+  -----------------------------------
+  Raise SIGINT, not SIGQUIT if execv fails
+    otherwise we will get a nasty core dump message.
+  Add support for configuring the fnord web server as an alternative to boa
+  If logging is configured (at compile time), fnord now takes a -l flag to turn it on.
+  The full url, including cgi args is given in the log.
+  Don't die with content type but no content length
+  Make sure PATH_INFO and PATH_TRANSLATED are set correctly.
+  Only add index.html with a trailing slash if not executing a CGI script
+  Be more liberal in accepting byte ranges greater than the size of the file.
+    Just return everything we have in this case.
+  Implement the "virtual path" feature for cgis.
+    This is where the url can request a virtual path past the cgi executable.
+  Move into the uClinux build system
+  Add basic auth support, mostly taken directly from boa/src/auth.c
+  Add support for different index.cgi
+  Turn off use of mmap()
+  When using auth, REMOTE_USER is available to cgi
+  Request logging can be stderr, syslog or nothing - set at compile time.
+  Move large buffers off the stack to minimise stack usage
+  Fix a few compiler warnings
+  Allow the default dir to be specified at compile time
+
+1.8:
+  keep current environment in CGI (Laurent Bercot)
+  make fnord-conf use the UID and not the user name (Fridtjof Busse)
+  fix typo in buffer_putulonglong (Gerrit Pape)
+  fix CGI POST off-by-two typo (Mark Hopf)
+  fix gif->png conversion (Thomas Seck)
+  remove == bashism from fnord-conf (Thomas Seck)
+  add bittorrent mime type
+  make authorization data available to CGIs for GET, too (Paul Jarc)
+  fix conversion of host name to lower case (Gerrit Pape)
+  add small test cgi: cgi-post.c
+  fix CGI POST bug (Moe Wibble)
+  fix CGI PATH_TRANSLATED bug (Nicolas George)
+  add optional authentication support (Nicolas George, see README.auth)
+  make sure error messages are text/html
+  move /. -> /: conversion before demangling so it can actually be
+    used as security measure for installations that don't use chroot
+
+1.7:
+  add .mov and .qt for quicktime, .mpg for video/mpeg and .wav for audio/x-wav
+  add mmap based file serving (should do zero-copy tcp just like sendfile)
+  add Pragma: no-cache to CGI responses
+  fix (apparently not exploitable) buffer overrun in do_cgi
+    This bug was found by Ralf Wildenhues.  To my knowledge it is
+    impossible to exploit this bug on any platform known to me.
+  fix (harmless) access to uninitialized data
+
+1.6:
+  add support for $PATH_INFO in CGI environment.
+  add .pac for netscape proxy autoconfig
+  add .sig for application/pgp-signature
+
+1.5:
+  fix write timeout handling (found by Lukas Beeler)
+  fix fnord-conf to use the symbolic account name in run script
+    (Sebastian D.B. Krause)
+
+1.4:
+  add dangling symlink based whole-host redirection (see README).  This
+    has the advantage that it can serve normal sites and redirect sites
+    on the same IP.
+  add support for non-TCP UCSPI environments (like ucspi-ssl).  Please
+    get the latest version of my ucspi-tcp IPv6 patch as I violated the
+    UCSPI spec with all versions before 0.88-diff11.
+  change logging from "127.0.0.1 200 23 Links_(0.96;_Unix) none /index.html"
+    to "127.0.0.1 200 23 localhost Links_(0.96;_Unix) none /index.html"
+    (i.e. include the Host: header).  Suggested by Thomas Bader.
+  add "immediate mode".  If you give fnord a command line argument, it
+    will change to that directory and if no "default" directory is
+    given, it will assume there are no virtual hosts and serve from the
+    current directory.  I have a shell script called "http" that does
+      tcpserver -RHl localhost 0 8000 /home/leitner/bin/fnord-idx .
+    to share some directory on my hard drive with some poor Windows
+    users without npoll (http://www.fefe.de/ncp/).  fnord-idx is a new
+    target (a fnord with DIR_LIST) that is auto-built by make.
+
+1.3:
+  make directory listings use non-proportional fonts (thanks, Antonio Dias)
+  fnord will now optionally (default: enabled) normalize the incoming
+    host name, i.e. "www.domain.com" -> "www.domain.com:80".  That
+    should cut down on the number of symbolic links. ;)
+  remove timeout error message.  fnord will not drop the connection
+    without error message.  Mozilla used to display the error message
+    when the user caused another request on the connection with the
+    timeout.
+  Uwe Ohse found two more compilation problems.
+
+1.2:
+  Olaf: I changed my initial CGI-interface to NOT use the filesystem but
+    two pipes.
+  Add whole-host redirect (see README)
+  Olaf: added direcory-lists and "index.cgi" support (normal CGI only !
+    "nph-index.cgi" is not supported). Fixed some problematic parts in the
+    CGI-interface (\n -> \r\n converter for http-header and CGI crash
+    handling)
+  Fix gzip encoding bug that only happened with keep-alive
+
+1.1:
+  ship with the parts from libowfat that we actually use
+  minor speed-up.  sendfile is a drag for very small files, so those are
+    now sent through the same buffer the header is sent through.  That
+    sends the whole answer in one TCP packet if you are lucky, even
+    without the TCP_CORK magic from Linux.  Major speed-up for
+    benchmarks ;)
+
+1.0:
+  initial release

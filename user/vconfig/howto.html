@@ -1,0 +1,1231 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <title>LINUX VLAN + Cisco HOWTO</title>
+  </head>
+
+  <body bgcolor=#ffffff text=#000000>
+    <center><h1>LINUX VLAN + Cisco HOWTO</h1></center>
+<P>
+<center>0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0</center>
+<pre>
+
+  The Linux VLAN HOWTO
+ 
+  VLAN Mailing list: <a href="mailto:vlan@candelatech.com">vlan@candelatech.com</a>
+  Kristjan Kotkas <a href="mailto:kristjan@data.ee">kristjan@data.ee</a>
+  Ben Greear <a href="mailto:greearb@candelatech.com">greearb@candelatech.com</a>
+
+</pre>
+<P>
+
+<b>NOTE:  If you can get ping to work, but telnet/http/ssh/etc hangs, then you most
+likely have a driver that is broken with regard to 802.1Q vlans.  There are various
+patches for different drivers below.  As a last ditch effort, you can set the MTU
+on your VLAN interface to 1496 as opposed to 1500.  If you are unaware of the
+consequences of such a thing, please consider getting supported hardware and/or
+ask the writer of your driver for a patch. --Ben
+</b>
+<P>
+<h2>Contents</h2>
+<ol>
+  <li><a href="#targ1">Who, why and where</a></li>
+  <li><a href="#targ2">Actual info on how to make it work.</a></li>
+  <li><a href="#targ3">Specific work-arounds/patches for certain configurations.</a>
+    <ul>
+     <li><a href="#tulip">Tulip driver patch.</a></li>
+     <li><a href="#eepro">eepro100 driver patch.</a></li>
+     <li><a href="#syskonnect">SysKonnect sk98lin driver patch.</a></li>
+     <li><a href="#3c59x">3c59X driver patch.</a></li>
+     <li><a href="#natsemi">natsemi driver patch.</a></li>
+     <li><a href="#3c905b">3c509b driver patch.</a></li>
+     <li><a href="#pcmcia">pcmcia drivers.</a></li>
+    </ul>
+  <li><a href="#targ4">Scripts and Recipes.</a></li>
+</ol>
+<P>
+
+<ol>
+ <li><a name="targ1">META</a>
+  <ol>
+   <li>
+	This is the first HOWTO for the "802.1Q VLAN implementation for Linux"<P>
+	      
+	Homepage: <a href="http://scry.wanfear.com/~greear/vlan.html">http://scry.wanfear.com/~greear/vlan.html</a>
+	Mailing List: VLAN@Scry.WANfear.com
+   </li>  
+   <P>
+   <li>Copyright<P>
+
+  This document is part of the Linux HOWTO project. The copyright notice
+  is the following: Unless otherwise stated, Linux HOWTO documents are
+  copyrighted by their respective authors. Linux HOWTO documents may be
+  reproduced and distributed in whole or in part, in any medium physical
+  or electronic, as long as this copyright notice is retained on all
+  copies. Commercial redistribution is allowed and encouraged; however,
+  the author would like to be notified of any such distributions. All
+  translations, derivative works, or aggregate works incorporating any
+  Linux HOWTO documents must be covered under this copyright notice.
+  That is, you may not produce a derivative work from a HOWTO and impose
+  additional restrictions on its distribution. Exceptions to these rules
+  may be granted under certain conditions; please contact the Linux
+  HOWTO coordinator at the address given below. In short, we wish to
+  promote dissemination of this information through as many channels as
+  possible. However, we do wish to retain copyright on the HOWTO
+  documents, and would like to be notified of any plans to redistribute
+  the HOWTOs. If you have questions, please contact Tim Bynum, the Linux
+  HOWTO coordinator, at linux-howto@sunsite.unc.edu via email.
+   </li>
+   <P>
+   <li>Disclaimer<P>
+
+  As usual: the author IS NOT responsible for any damage. For the correct
+  wording, see the relevant part of the GNU GPL 0.1.1
+   </li>
+   <P>
+   <li>Credits<P>
+
+  Thanks to Ben Greear <a href="http://www.candelatech.com/~greear">http://www.candelatech.com/~greear</a>
+  for the VLAN project and also to all the people who have contributed to the project.
+   </li>
+   <P>
+   <li>General<P>
+
+  What is VLAN is not described in this document. Info on the VLAN protocol
+  can be found at
+   <a href="http://standards.ieee.org/getieee802/download/802.1Q-1998.pdf">http://standards.ieee.org/getieee802/download/802.1Q-1998.pdf</a>.
+   </li>
+  </ol>
+ </li>
+ <P>
+ <li><a name="targ2"><b>Software/Hardware (Cisco-specific setup, with some general info as well.)</b></a><P>
+  <ol>
+   <li>VLAN installation & Configuration on the Linux Side.<P>
+<PRE>
+
+NOTE:  This is fairly old.  I'm leaving it in for historical reasons, but
+be aware that VLAN is included in the later 2.4 kernels, so most folks do
+NOT have to patch their kernel. --Ben
+
+
+* Linux kernel 2.2.14
+* Vlan 0.0.10 Patched into it
+* Cisco Catalyst 2900XL
+* 3Com 3C509B NIC using patched driver 3c59x
+
+
+Currently VLAN is not part of the kernel distribution so you need to patch
+it into a supported Linux kernel and re-compile.
+
+You need the kernel source.  If you don't have it already, you can get from
+ftp.kernel.org or from one of its mirrors.  If this scares you, read the
+KERNEL-HOWTO.
+
+It is assumed that you have the linux kernel source extracted, and found at:
+$HOME/linux  If your setup is different, then some of these commands may
+need to be slightly different.
+
+Download the VLAN package from the vlan homepage and extract it's contents.
+tar -xvzf vlan*.tar.gz
+
+Go to the vlan directory, build the vlan tools by just typing:
+make
+
+After this you get a programm named &lt;vconfig>. This program manages all VLAN
+specific configurations.
+
+Now patch the kernel.
+Go to the linux directory 
+cd linux
+(if you installed the kernel source from some rpm based distribution it is 
+something like /usr/src/linux)
+patch the kernel by typing:
+
+patch -p 1 &lt; $HOME/vlan/vlan.patch (patch is in the vlan directory)
+
+Time to compile your kernel. Use the make menuconfig command in your
+linux directory to select your kernel options. The option related to
+802.1Q VLANs is found under the Networking options.
+
+Additional help for kernel compilation can be found in KERNEL-HOWTO
+
+Assuming your kernel compiled cleanly, you are now ready to use it. 
+Install your kernel in the normal manner (fix up your /etc/lilo.conf file 
+appropriately and run lilo as root.) 
+Reboot your computer and choose your new kernel. 
+
+As your computer comes back to life, there will be little sign that you are
+now 802.1Q capable.
+You should see something like this:
+
+        802.1Q VLAN Support v0.10  Ben Greear &lt;greearb@candelatech.com>
+        vlan Initialization complete.
+
+
+Your system is now vlan ready, lets configure some vlans:
+I'm assuming that your VLAN capable network card is eth0.
+
+First, set the eth0 state to down:
+
+ifconfig eth0 down
+</pre>
+
+<b>Ben's Note: &nbsp;  Regarding the next section, you can run plain ethernet
+and VLAN over the same NIC, but you may not want to..</b><pre>
+Whatever your previous netconf was, you should move everything to vlans.
+This means, that you don't set ip address to the real interface, but set it to
+vlan interface. To set your eth0 with no ip:
+
+ifconfig eth0 0.0.0.0 up
+
+!note!
+YOU MUST SET THE ETH0 TO UP, or it wont work. (ifconfig eth0 up)
+
+Add some vlans; goto your vlan directory where you previously compiled 
+vconfig and type:
+
+vconfig add eth0 2
+
+! Little note about VLAN 1. In Cisco systems it is the default VLAN
+so you MUST start using vlans from 2.
+
+This will create device vlan0002 to your system. Linux will think, that it
+is just another network device, so you can configure it like any other. Also
+you should see the interface by typing
+
+ifconfig -a
+
+Lets make some conf on the vlan then:
+ifconfig -i vlan0002 10.0.231.1 broadcast 10.0.231.0 netmask 255.255.255.0 up
+
+This ends the configuration at the linux side.
+</pre>
+</li>
+<P>
+<li> Specific Extreme Networks Configuration<P><pre>
+  From: Craig Metz: cmetz@inner.net
+
+Extreme configuration example:
+
+  create vlan v42
+  config vlan v42 tag 42
+  config vlan v42 add port 10 tagged
+
+  ... will create a vlan named v42, whose 802.1Q tag is 42, and connect port
+10 (tag 42) to that vlan.
+</pre>
+</li>
+<P>
+<li> Cisco-specific configuration<P>
+<pre>
+Cisco Conf
+configure the port you want to use as the trunk:
+
+telnet switch or use the console port
+
+ena
+(will prompt for password, so have it ready)
+
+conf t
+interface FastEthernet0/24 (it doesnt have to be 0/24)
+ duplex full
+ speed 100
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 2
+ switchport mode trunk
+
+
+This conf will do the following:
+
+Set the port to full duplex mode; force the port to 100Mb mode; set the port
+vlan encapsulation to support 802.1Q; tell the
+switch that the port is allowed to run vlans through (even if you set just
+VLAN 2, cisco will automatically add VLAN 1 and VLAN 1002-1005) to the port 
+and set the port to trunk mode aswell. Trunk mode tells the switch that 
+a number of VLANS can go through it.
+
+Last line is usually the mother of all screw-ups. If you forget that, you
+won't get your VLAN working. Simple as that.
+
+Now configure some other port to be used as the destination for the vlan:
+
+conf t
+interface FastEthernet0/1
+ duplex half
+ speed 10
+ switchport access vlan 2
+end
+
+Here we tell the switch to force the port 1 to half duplex 10Mb mode (normal
+10 Mb NIC) and only traffic from interface VLAN 2 can go through this port.
+also you can use a number of ports with VLAN 2, like a HUB ;)
+
+You should now connect some other device to port 1.
+
+Let it have an ip of eg. 10.0.231.2 mask 255.255.255.0
+
+Ping linux from it
+
+ping 10.0.231.1
+
+If it replies scream: "YESS!!" This means, that VLAN is working.
+
+Hard truth: It's not over, till its over.
+if this works, then you are out of the woods, if not, well I hear that
+tcpdump is a good tool ;-) and tcpdump that came with the vlan package even
+better tool. (if you want to dump, use the one that came with vlan package)
+</PRE>
+<b> NOTE:  <a href="http://ethereal.zing.org">Ethereal</a> also supports VLANs,
+and is much more beautiful than tcpdump, if you have GUI capabilities.</b>
+<pre>
+
+If you can ping the linux and from linux the host, you should try the
+following at linux side:
+
+ping -s 1476 10.0.231.2
+
+If there is no reply, there is something foggy with the NIC. and you
+should start debugging.  If ping -s 100 10.0.231.2 works, then it is most likely
+an MTU problem with your NIC/Driver.
+</PRE>
+</li>
+</ol>
+</li>
+<P>
+<li><a name="targ3"><h3>Specific patches and work-arounds for various configurations.</h3></a><P>
+ <ol>
+
+<a name="tulip">
+  <li><B>My Tulip-based card has MTU problems.</B><P>
+<pre>
+
+   Here is a patch sent in by Ben McKeegan:
+Dear VLAN list members,
+
+Courtesy of my new employer, I've finally got around to updating my tulip
+vlan patch for use with linux 2.4.x.  I've also taken the opportunity to
+do a rewrite and fix various (non-critical) flaws in my previous patch
+(which was against 2.2.x).  The patch allows the driver to receive vlan
+frames with maximum MTU.
+
+Hopefully this rewrite will help satisfy some of the concerns of the 2.4
+kernel driver maintainers and thus aid inclusion of the patch in the
+main driver.
+
+The old patch would erroneously allow incoming frames sized between 1519
+and 1536 bytes excluding the CRC.  The new patch should correctly limit
+this to 1518, the maximum size for VLANs.  The old patch also needlessly
+increased various constants.
+
+I believe there was some suggestion that the old patch disabled all length
+error checking and opened the system to DoS attacks from massively
+oversized packets.  This is was never really the case, although the above
+mentioned bug did exist.  The patch only disabled checking of the 'Frame
+Too Long' flag which indicates the frame exceeds 1518 bytes (including the
+CRC).  The NIC does not take any special action when this flag is set and
+it does not stop the buffers getting filled up - the protection against
+DoS comes from the receive timer which has a separate error flag that gets
+set when length exceeds 2048 bytes.  The 'Frame Too Long' flag is
+basically just a summary of the length bits that are passed as part of the
+same descriptor as the flag.  The patch just explicitly checks the length
+instead of relying on the flag.
+
+The unpatched driver uses 'magic number' constants to check the receive
+status code.  Having worked out what these meant from the documentation,
+in the old patch I replaced them with a similar magic number.  The new
+patch replaces them with a series of verbose enumerations.  Any worthwhile
+compiler should optimize these down to a single constant, but these make
+the code much easier to read.  (In fact, its a lot easier to tell what the
+patched driver does than what the unpatched driver does. 
+
+I have tested the new patch on our own systems (using chipset 21143 rev
+65), and it works ok, but I would appreciate feedback from other people.  
+With a lot of testing and a bit of luck and persuasion this patch might
+make it into the kernel.
+
+Ben, I would be grateful if you could update the section of your how-to
+containing my old patch, and add a note about the problems with the old
+patch alongside it.  (Perhaps someone else may wish to backport the new
+patch to 2.2)
+
+
+Regards,
+
+Ben McKeegan.
+
+
+diff -ur linux-2.4.19/drivers/net/tulip/interrupt.c linux-2.4.19-tulip-vlan/drivers/net/tulip/interrupt.c
+--- linux-2.4.19/drivers/net/tulip/interrupt.c	Fri Nov  9 21:45:35 2001
++++ linux-2.4.19-tulip-vlan/drivers/net/tulip/interrupt.c	Mon Sep 16 13:17:40 2002
+@@ -122,14 +122,36 @@
+ 	/* If we own the next entry, it is a new packet. Send it up. */
+ 	while ( ! (tp->rx_ring[entry].status & cpu_to_le32(DescOwned))) {
+ 		s32 status = le32_to_cpu(tp->rx_ring[entry].status);
++		short pkt_len;
+ 
+ 		if (tulip_debug > 5)
+ 			printk(KERN_DEBUG "%s: In tulip_rx(), entry %d %8.8x.\n",
+ 				   dev->name, entry, status);
+ 		if (--rx_work_limit < 0)
+-			break;
+-		if ((status & 0x38008300) != 0x0300) {
+-			if ((status & 0x38000300) != 0x0300) {
++		        break;
++			
++		/*
++		  Omit the four octet CRC from the length.
++		  (May not be considered valid until we have
++		  checked status for RxLengthOver2047 bits)
++                */
++		pkt_len = ((status >> 16) & 0x7ff) - 4;
++
++		/*
++		  Maximum pkt_len is 1518 (1514 + vlan header)
++		  Anything higher than this is always invalid
++		  regardless of RxLengthOver2047 bits
++		*/
++
++		if ((status & (RxLengthOver2047 |
++			       RxDescCRCError |
++			       RxDescCollisionSeen |
++			       RxDescRunt |
++			       RxDescDescErr |
++			       RxWholePkt))        != RxWholePkt
++		    || pkt_len > 1518 ) {
++			if ((status & (RxLengthOver2047 |
++				       RxWholePkt))         != RxWholePkt) {
+ 				/* Ingore earlier buffers. */
+ 				if ((status & 0xffff) != 0x7fff) {
+ 					if (tulip_debug > 1)
+@@ -138,31 +160,21 @@
+ 							   dev->name, status);
+ 					tp->stats.rx_length_errors++;
+ 				}
+-			} else if (status & RxDescFatalErr) {
++			} else {
+ 				/* There was a fatal error. */
+ 				if (tulip_debug > 2)
+ 					printk(KERN_DEBUG "%s: Receive error, Rx status %8.8x.\n",
+ 						   dev->name, status);
+ 				tp->stats.rx_errors++; /* end of a packet.*/
+-				if (status & 0x0890) tp->stats.rx_length_errors++;
++				if (pkt_len > 1518 ||
++				    status & RxDescRunt) tp->stats.rx_length_errors++;
+ 				if (status & 0x0004) tp->stats.rx_frame_errors++;
+ 				if (status & 0x0002) tp->stats.rx_crc_errors++;
+ 				if (status & 0x0001) tp->stats.rx_fifo_errors++;
+ 			}
+ 		} else {
+-			/* Omit the four octet CRC from the length. */
+-			short pkt_len = ((status >> 16) & 0x7ff) - 4;
+ 			struct sk_buff *skb;
+ 
+-#ifndef final_version
+-			if (pkt_len > 1518) {
+-				printk(KERN_WARNING "%s: Bogus packet size of %d (%#x).\n",
+-					   dev->name, pkt_len, pkt_len);
+-				pkt_len = 1518;
+-				tp->stats.rx_length_errors++;
+-			}
+-#endif
+-
+ #ifdef CONFIG_NET_HW_FLOWCONTROL
+                         drop = atomic_read(&netdev_dropping);
+                         if (drop)
+diff -ur linux-2.4.19/drivers/net/tulip/tulip.h linux-2.4.19-tulip-vlan/drivers/net/tulip/tulip.h
+--- linux-2.4.19/drivers/net/tulip/tulip.h	Fri Nov  9 21:45:35 2001
++++ linux-2.4.19-tulip-vlan/drivers/net/tulip/tulip.h	Mon Sep 16 11:55:33 2002
+@@ -186,11 +186,44 @@
+ 
+ enum desc_status_bits {
+ 	DescOwned = 0x80000000,
+-	RxDescFatalErr = 0x8000,
++
++        /* 
++	   Error summary flag is logical or of 'CRC Error',
++	   'Collision Seen', 'Frame Too Long', 'Runt' and 
++	   'Descriptor Error' flags generated within tulip chip.
++	*/
++        RxDescErrorSummary = 0x8000, 
++	
++	RxDescCRCError = 0x0002,
++        RxDescCollisionSeen = 0x0040,
++	
++        /* 
++	   'Frame Too Long' flag is set if packet length including CRC
++	   exceeds 1518.  However, a full sized VLAN tagged frame is
++	   1522 bytes including CRC.
++	   
++	   The tulip chip does not block oversized frames, and if this
++	   flag is set on a receive descriptor it does not indicate
++	   the frame has been truncated.  The receive descriptor also
++	   includes the actual length.  Therefore we can safety ignore
++	   this flag and check the length ourselves. 
++        */
++        RxDescFrameTooLong = 0x0080,
++	RxDescRunt = 0x0800,
++	RxDescDescErr = 0x4000,
+ 	RxWholePkt = 0x0300,
++	
++	/*
++	  Top three bits of 14 bit frame length (status bits 27-29) 
++          should never be set as that would make frame over 2047 bytes.
++	  The Receive Watchdog flag (bit 4) may indicate the length is
++          over 2048 and the length field is invalid.
++	*/
++	RxLengthOver2047 = 0x38000010
+ };
+ 
+ 
++
+ enum t21041_csr13_bits {
+ 	csr13_eng = (0xEF0<<4), /* for eng. purposes only, hardcode at EF0h */
+ 	csr13_aui = (1<<3), /* clear to force 10bT, set to force AUI/BNC */
+
+</pre>
+</li>
+
+<a name="eepro">
+  <li><B>My eepro100 has MTU problems.</B><P>
+
+NOTE:  Intel's e100 driver works out-of-the-box. --Ben
+<P>
+
+   Here is a patch sent in by gleb@nbase.co.il<br>
+
+<pre>
+     filename="linux-2.2.14-eepro100-vlan.patch"
+
+--- linux/drivers/net/eepro100.c        Tue Oct 26 20:53:40 1999
++++ linux1/drivers/net/eepro100.c       Sun May 14 07:47:34 2000
+@@ -377,12 +377,12 @@
+ const char i82557_config_cmd[22] = {
+        22, 0x08, 0, 0,  0, 0x80, 0x32, 0x03,  1, /* 1=Use MII  0=Use AUI */
+        0, 0x2E, 0,  0x60, 0,
+-       0xf2, 0x48,   0, 0x40, 0xf2, 0x80,              /* 0x40=Force full-duplex */
++       0xf2, 0x48,   0, 0x40, 0xfa, 0x80,              /* 0x40=Force full-duplex */
+        0x3f, 0x05, };
+ const char i82558_config_cmd[22] = {
+        22, 0x08, 0, 1,  0, 0x80, 0x22, 0x03,  1, /* 1=Use MII  0=Use AUI */
+        0, 0x2E, 0,  0x60, 0x08, 0x88,
+-       0x68, 0, 0x40, 0xf2, 0xBD,              /* 0xBD->0xFD=Force full-duplex */
++       0x68, 0, 0x40, 0xfa, 0xBD,              /* 0xBD->0xFD=Force full-duplex */
+        0x31, 0x05, };
+ 
+ /* PHY media interface chips. */
+</pre>
+</li>
+<P>
+<a name="syskonnect">
+<li><B>My SysKonnect sk98lin doesn't work</b> (submitted by:  Patrick Schaaf &lt;bof@bof.de>)<P>
+
+Here's a piece needed to get SysKonnect sk98lin
+driven cards to play nice; they recognize and drop incoming VLAN tagged
+frames in the driver, the patch below removes that check. Tested a bit
+with a Cisco Catalyst 6509 on the other side, and a fibre link, works
+like a charm. The card and driver already supports MTUs up to over 9000,
+so no problem on that side.
+<P>
+<PRE>
+diff -urN linux/drivers/net/sk98lin/skge.c blues/drivers/net/sk98lin/skge.c
+--- linux/drivers/net/sk98lin/skge.c    Mon Jun 19 20:42:38 2000
++++ blues/drivers/net/sk98lin/skge.c    Mon Aug  7 09:43:18 2000
+@@ -1948,7 +1948,7 @@
+                
+                if ((Control & RX_CTRL_STAT_VALID) == RX_CTRL_STAT_VALID &&
+                        (FrameStat & 
+-                       (XMR_FS_ANY_ERR | XMR_FS_1L_VLAN | XMR_FS_2L_VLAN))
++                       (XMR_FS_ANY_ERR /*| XMR_FS_1L_VLAN*/ | XMR_FS_2L_VLAN))
+                         == 0) {
+                        SK_DBG_MSG(NULL, SK_DBGMOD_DRV,
+                                SK_DBGCAT_DRV_RX_PROGRESS,("V"));
+
+</pre>
+</li>
+<P>
+<a name="3c59x">
+<li><b>My 3C59X has MTU problems.</b><P>
+<pre>
+<b>NOTE:  This patch was reported to work, but it is reversed!!  If anyone manages
+to fix it, please send email to:  vlan@www.candelatech.com</b>
+
+*********************************************************************************
+Finally have it all worked out.  I found a patch on the lists (by Andreas
+Ferber) made one basic change (by Jeff Garzik), and it works perfectly with
+the 3com(3c59x)!  I run a straight mtu of 1500.  Pings are no issue.  All is
+well.
+
+-Damian
+
+----CUT BELOW THIS LINE----
+--- 3c59x.c Thu Dec 13 12:37:54 2001
++++ 3c59x.c Sun Sep 30 14:26:06 2001
+@@ -308,9 +308,6 @@
+    code size of a per-interface flag is not worthwhile. */
+ static char mii_preamble_required;
+
+-/* The Ethernet Type used for 802.1q tagged frames */
+-#define ETH_P_8021Q     0x8100          /* 802.1Q VLAN Extended Header  */
+-
+ #define PFX DRV_NAME ": "
+
+
+@@ -654,7 +651,7 @@
+  Wn2_ResetOptions=12,
+ };
+ enum Window3 {   /* Window 3: MAC/config bits. */
+- Wn3_Config=0, Wn3_MaxPktSize=4, Wn3_MAC_Ctrl=6, Wn3_Options=8,
++ Wn3_Config=0, Wn3_MAC_Ctrl=6, Wn3_Options=8,
+ };
+
+ #define BFEXT(value, offset, bitcount)  \
+@@ -682,8 +679,7 @@
+  Media_LnkBeat = 0x0800,
+ };
+ enum Window7 {     /* Window 7: Bus Master control. */
+- Wn7_MasterAddr = 0, Wn7_VlanEtherType=4, Wn7_MasterLen = 6,
+- Wn7_MasterStatus = 12,
++ Wn7_MasterAddr = 0, Wn7_MasterLen = 6, Wn7_MasterStatus = 12,
+ };
+ /* Boomerang bus master control registers. */
+ enum MasterCtrl {
+@@ -780,8 +776,7 @@
+   pm_state_valid:1,    /* power_state[] has sane contents */
+   open:1,
+   medialock:1,
+-  must_free_region:1,    /* Flag: if zero, Cardbus owns the I/O region */
+-  large_frames:1;   /* accept large frames */
++  must_free_region:1;    /* Flag: if zero, Cardbus owns the I/O region */
+  int drv_flags;
+  u16 status_enable;
+  u16 intr_enable;
+@@ -849,9 +844,6 @@
+ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+ static void vortex_tx_timeout(struct net_device *dev);
+ static void acpi_set_WOL(struct net_device *dev);
+-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+-static void set_8021q_mode(struct net_device *dev, int enable);
+-#endif
+ 
+ /* This driver uses 'options' to pass the media type, full-duplex flag,
+etc. */
+ /* Option count limit only -- unlimited interfaces are supported. */
+@@ -1038,7 +1030,6 @@
+  dev->base_addr = ioaddr;
+  dev->irq = irq;
+  dev->mtu = mtu;
+- vp->large_frames = mtu > 1500;
+  vp->drv_flags = vci->drv_flags;
+  vp->has_nway = (vci->drv_flags & HAS_NWAY) ? 1 : 0;
+  vp->io_size = vci->io_size;
+@@ -1470,7 +1461,7 @@
+
+  /* Set the full-duplex bit. */
+  outw( ((vp->info1 & 0x8000) || vp->full_duplex ? 0x20 : 0) |
+-    (vp->large_frames ? 0x40 : 0) |
++    (dev->mtu > 1500 ? 0x40 : 0) |
+    ((vp->full_duplex && vp->flow_ctrl && vp->partner_flow_ctrl) ? 0x100 :
+0),
+    ioaddr + Wn3_MAC_Ctrl);
+
+@@ -1554,10 +1545,6 @@
+  }
+  /* Set receiver mode: presumably accept b-case and phys addr only. */
+  set_rx_mode(dev);
+-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+- /* enable 802.1q tagged frames */
+- set_8021q_mode(dev, 1);
+-#endif
+  outw(StatsEnable, ioaddr + EL3_CMD); /* Turn on statistics. */
+
+ // issue_and_wait(dev, SetTxStart|0x07ff);
+@@ -1693,7 +1680,7 @@
+       /* Set the full-duplex bit. */
+       EL3WINDOW(3);
+       outw( (vp->full_duplex ? 0x20 : 0) |
+-        (vp->large_frames ? 0x40 : 0) |
++        (dev->mtu > 1500 ? 0x40 : 0) |
+         ((vp->full_duplex && vp->flow_ctrl && vp->partner_flow_ctrl) ?
+0x100 : 0),
+         ioaddr + Wn3_MAC_Ctrl);
+       if (vortex_debug > 1)
+@@ -1913,10 +1900,6 @@
+    issue_and_wait(dev, RxReset|0x07);
+    /* Set the Rx filter to the current state. */
+    set_rx_mode(dev);
+-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+-   /* enable 802.1q VLAN tagged frames */
+-   set_8021q_mode(dev, 1);
+-#endif
+    outw(RxEnable, ioaddr + EL3_CMD); /* Re-enable the receiver. */
+    outw(AckIntr | HostError, ioaddr + EL3_CMD);
+   }
+@@ -2514,11 +2497,6 @@
+  outw(RxDisable, ioaddr + EL3_CMD);
+  outw(TxDisable, ioaddr + EL3_CMD);
+
+-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+- /* Disable receiving 802.1q tagged frames */
+- set_8021q_mode(dev, 0);
+-#endif
+-
+  if (dev->if_port == XCVR_10base2)
+   /* Turn off thinnet power.  Green! */
+   outw(StopCoax, ioaddr + EL3_CMD);
+@@ -2783,50 +2761,6 @@
+  outw(new_mode, ioaddr + EL3_CMD);
+ }
+
+-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+-/* Setup the card so that it can receive frames with an 802.1q VLAN tag.
+-   Note that this must be done after each RxReset due to some backwards
+-   compatibility logic in the Cyclone and Tornado ASICs */
+-static void set_8021q_mode(struct net_device *dev, int enable)
+-{
+- struct vortex_private *vp = (struct vortex_private *)dev->priv;
+- long ioaddr = dev->base_addr;
+- int old_window = inw(ioaddr + EL3_CMD);
+- int mac_ctrl;
+-
+- if (vp->drv_flags&IS_CYCLONE || vp->drv_flags&IS_TORNADO) {
+-  /* cyclone and tornado chipsets can recognize 802.1q
+-   * tagged frames and treat them correctly */
+-
+-  int max_pkt_size = dev->mtu+14; /* MTU+Ethernet header */
+-  if (enable)
+-   max_pkt_size += 4; /* 802.1Q VLAN tag */
+-
+-  EL3WINDOW(3);
+-  outw(max_pkt_size, ioaddr+Wn3_MaxPktSize);
+-
+-  /* set VlanEtherType to let the hardware checksumming
+-     treat tagged frames correctly */
+-  EL3WINDOW(7);
+-  outw(VLAN_ETHER_TYPE, ioaddr+Wn7_VlanEtherType);
+- } else {
+-  /* on older cards we have to enable large frames */
+-
+-  vp->large_frames = dev->mtu > 1500 || enable;
+-
+-  EL3WINDOW(3);
+-  mac_ctrl = inw(ioaddr+Wn3_MAC_Ctrl);
+-  if (vp->large_frames)
+-   mac_ctrl |= 0x40;
+-  else
+-   mac_ctrl &= ~0x40;
+-  outw(mac_ctrl, ioaddr+Wn3_MAC_Ctrl);
+- }
+-
+- EL3WINDOW(old_window);
+-}
+-#endif
+-
+ /* MII transceiver control section.
+    Read and write the MII registers using software-generated serial
+    MDIO protocol.  See the MII specifications or DP83840A data sheet
+
+
+</pre>
+</li>
+<P>
+
+<a name="natsemi">
+<li><b>My natsemi has MTU problems.</b><P>
+By Peter Stuge:
+<pre>
+
+--- natsemi.c.orig	2002-12-30 21:38:04.000000000 +0100
++++ natsemi.c	2002-12-30 22:25:19.000000000 +0100
+@@ -233,7 +233,7 @@
+ #define NATSEMI_REGS_SIZE	(NATSEMI_NREGS * sizeof(u32))
+ #define NATSEMI_EEPROM_SIZE	24 /* 12 16-bit values */
+ 
+-#define PKT_BUF_SZ		1536 /* Size of each temporary Rx buffer. */
++#define PKT_BUF_SZ		2064 /* Size of each temporary Rx buffer. */
+ 
+ /* These identify the driver base version and may not be removed. */
+ static char version[] __devinitdata =
+@@ -1290,7 +1290,7 @@
+ 	/* DRTH 0x10: start copying to memory if 128 bytes are in the fifo
+ 	 * MXDMA 0: up to 256 byte bursts
+ 	 */
+-	np->rx_config = RxMxdma_256 | 0x20;
++	np->rx_config = RxAcceptLong | RxMxdma_256 | 0x20;
+ 	writel(np->rx_config, ioaddr + RxConfig);
+ 
+ 	/* Disable PME:
+</pre>
+</li>
+<P>
+
+<a name="3c905b">
+<li><b>My 3C905B has MTU problems.</b><P>
+As found
+<a href="http://www.bewley.net/linux/vlan/patches/vlan-3c59x.patch">here</a>
+at one point in time.<br>
+Furnished by: Luis Miguel Cruz Miranda luismi@b2bi.es<br>
+(I don't know the original author --Ben).
+
+<PRE>
+--- linux.orig/drivers/net/3c59x.c	Sun Sep 30 21:26:06 2001
++++ linux/drivers/net/3c59x.c	Wed Oct 24 21:52:10 2001
+@@ -308,6 +308,9 @@
+    code size of a per-interface flag is not worthwhile. */
+ static char mii_preamble_required;
+ 
++/* The Ethernet Type used for 802.1q tagged frames */
++#define VLAN_ETHER_TYPE 0x8100
++
+ #define PFX DRV_NAME ": "
+ 
+ 
+@@ -651,7 +654,7 @@
+ 	Wn2_ResetOptions=12,
+ };
+ enum Window3 {			/* Window 3: MAC/config bits. */
+-	Wn3_Config=0, Wn3_MAC_Ctrl=6, Wn3_Options=8,
++	Wn3_Config=0, Wn3_MaxPktSize=4, Wn3_MAC_Ctrl=6, Wn3_Options=8,
+ };
+ 
+ #define BFEXT(value, offset, bitcount)  \
+@@ -679,7 +682,8 @@
+ 	Media_LnkBeat = 0x0800,
+ };
+ enum Window7 {					/* Window 7: Bus Master control. */
+-	Wn7_MasterAddr = 0, Wn7_MasterLen = 6, Wn7_MasterStatus = 12,
++	Wn7_MasterAddr = 0, Wn7_VlanEtherType=4, Wn7_MasterLen = 6,
++	Wn7_MasterStatus = 12,
+ };
+ /* Boomerang bus master control registers. */
+ enum MasterCtrl {
+@@ -776,7 +780,8 @@
+ 		pm_state_valid:1,				/* power_state[] has sane contents */
+ 		open:1,
+ 		medialock:1,
+-		must_free_region:1;				/* Flag: if zero, Cardbus owns the I/O region */
++		must_free_region:1,				/* Flag: if zero, Cardbus owns the I/O region */
++		large_frames:1;			/* accept large frames */
+ 	int drv_flags;
+ 	u16 status_enable;
+ 	u16 intr_enable;
+@@ -844,6 +849,9 @@
+ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+ static void vortex_tx_timeout(struct net_device *dev);
+ static void acpi_set_WOL(struct net_device *dev);
++#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
++static void set_8021q_mode(struct net_device *dev, int enable);
++#endif
+ 
+ /* This driver uses 'options' to pass the media type, full-duplex flag, etc. */
+ /* Option count limit only -- unlimited interfaces are supported. */
+@@ -1030,6 +1038,7 @@
+ 	dev->base_addr = ioaddr;
+ 	dev->irq = irq;
+ 	dev->mtu = mtu;
++	vp->large_frames = mtu > 1500;
+ 	vp->drv_flags = vci->drv_flags;
+ 	vp->has_nway = (vci->drv_flags & HAS_NWAY) ? 1 : 0;
+ 	vp->io_size = vci->io_size;
+@@ -1461,7 +1470,7 @@
+ 
+ 	/* Set the full-duplex bit. */
+ 	outw(	((vp->info1 & 0x8000) || vp->full_duplex ? 0x20 : 0) |
+-		 	(dev->mtu > 1500 ? 0x40 : 0) |
++		 	(vp->large_frames ? 0x40 : 0) |
+ 			((vp->full_duplex && vp->flow_ctrl && vp->partner_flow_ctrl) ? 0x100 : 0),
+ 			ioaddr + Wn3_MAC_Ctrl);
+ 
+@@ -1545,6 +1554,10 @@
+ 	}
+ 	/* Set receiver mode: presumably accept b-case and phys addr only. */
+ 	set_rx_mode(dev);
++#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
++	/* enable 802.1q tagged frames */
++	set_8021q_mode(dev, 1);
++#endif
+ 	outw(StatsEnable, ioaddr + EL3_CMD); /* Turn on statistics. */
+ 
+ //	issue_and_wait(dev, SetTxStart|0x07ff);
+@@ -1680,7 +1693,7 @@
+ 						/* Set the full-duplex bit. */
+ 						EL3WINDOW(3);
+ 						outw(	(vp->full_duplex ? 0x20 : 0) |
+-								(dev->mtu > 1500 ? 0x40 : 0) |
++								(vp->large_frames ? 0x40 : 0) |
+ 								((vp->full_duplex && vp->flow_ctrl && vp->partner_flow_ctrl) ? 0x100 : 0),
+ 								ioaddr + Wn3_MAC_Ctrl);
+ 						if (vortex_debug > 1)
+@@ -1900,6 +1913,10 @@
+ 			issue_and_wait(dev, RxReset|0x07);
+ 			/* Set the Rx filter to the current state. */
+ 			set_rx_mode(dev);
++#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
++			/* enable 802.1q VLAN tagged frames */
++			set_8021q_mode(dev, 1);
++#endif
+ 			outw(RxEnable, ioaddr + EL3_CMD); /* Re-enable the receiver. */
+ 			outw(AckIntr | HostError, ioaddr + EL3_CMD);
+ 		}
+@@ -2497,6 +2514,11 @@
+ 	outw(RxDisable, ioaddr + EL3_CMD);
+ 	outw(TxDisable, ioaddr + EL3_CMD);
+ 
++#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
++	/* Disable receiving 802.1q tagged frames */
++	set_8021q_mode(dev, 0);
++#endif
++
+ 	if (dev->if_port == XCVR_10base2)
+ 		/* Turn off thinnet power.  Green! */
+ 		outw(StopCoax, ioaddr + EL3_CMD);
+@@ -2760,6 +2782,50 @@
+ 
+ 	outw(new_mode, ioaddr + EL3_CMD);
+ }
++
++#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
++/* Setup the card so that it can receive frames with an 802.1q VLAN tag.
++   Note that this must be done after each RxReset due to some backwards
++   compatibility logic in the Cyclone and Tornado ASICs */
++static void set_8021q_mode(struct net_device *dev, int enable)
++{
++	struct vortex_private *vp = (struct vortex_private *)dev->priv;
++	long ioaddr = dev->base_addr;
++	int old_window = inw(ioaddr + EL3_CMD);
++	int mac_ctrl;
++	
++	if (vp->drv_flags&IS_CYCLONE || vp->drv_flags&IS_TORNADO) {
++		/* cyclone and tornado chipsets can recognize 802.1q
++		 * tagged frames and treat them correctly */
++
++		int max_pkt_size = dev->mtu+14;	/* MTU+Ethernet header */
++		if (enable)
++			max_pkt_size += 4;	/* 802.1Q VLAN tag */
++
++		EL3WINDOW(3);
++		outw(max_pkt_size, ioaddr+Wn3_MaxPktSize);
++
++		/* set VlanEtherType to let the hardware checksumming
++		   treat tagged frames correctly */
++		EL3WINDOW(7);
++		outw(VLAN_ETHER_TYPE, ioaddr+Wn7_VlanEtherType);
++	} else {
++		/* on older cards we have to enable large frames */
++
++		vp->large_frames = dev->mtu > 1500 || enable;
++
++		EL3WINDOW(3);
++		mac_ctrl = inw(ioaddr+Wn3_MAC_Ctrl);
++		if (vp->large_frames)
++			mac_ctrl |= 0x40;
++		else
++			mac_ctrl &= ~0x40;
++		outw(mac_ctrl, ioaddr+Wn3_MAC_Ctrl);
++	}
++
++	EL3WINDOW(old_window);
++}
++#endif
+ 
+ /* MII transceiver control section.
+    Read and write the MII registers using software-generated serial
+</pre>
+</li>
+<P>
+
+<a name="pcmcia">
+<li><b>How to make my PCMCIA ethernet card work with VLANs?</b><P>
+Per Peter Stuge:<P>
+
+The problem was that the VLAN code in kernel header files weren't included
+properly when compiling the PCMCIA stuff.  Exactly why?  I'm not sure, might
+be because the PCMCIA stuff isn't the actual kernel and that means it's
+missing defines that trigger the VLAN #ifdefs.
+<P>
+Commenting the #ifdefs in linux/netdevice.h and adding code to clear out
+the struct vlan_dev_info* vlan_dev after having created the new network
+device in the PCMCIA client for the networking card did the trick if I
+remember correctly.  (The reason it doesn't work out-of-the-box is that the
+kernel VLAN code has garbage data for the VLAN fields in struct device since
+the device creator (PCMCIA client driver) doesn't know about them.)
+<P>
+Ben Adds:<P>
+To clear out the garbage, the PCMCIA driver needs to mset the net_device structure
+to zero (it should do this anyway..)  If anyone has a patch, please send it to me
+and the owners of the PCMCIA code...
+</pre>
+</li>
+
+</ol>
+</li>
+<P>
+<li><a name="targ4"><h3>Scripts and Recipes.</h3></a><P>
+ <ol>
+  <li><B>Mandrake (RedHat-style) startup script for VLANs.</B><P>
+   Contributed by: "MaxiM Basunov" &lt;maxim@idknet.com>
+<PRE>
+#!/bin/sh
+#
+# network       Bring up/down networking
+#
+# chkconfig: 2345 10 90
+# description: Activates/Deactivates all network interfaces configured to \
+#              start at boot time.
+# probe: true
+
+# Source function library.
+. /etc/init.d/functions
+
+if [ ! -f /etc/sysconfig/network ]; then
+    exit 0
+fi
+
+. /etc/sysconfig/network
+
+if [ -f /etc/sysconfig/pcmcia ]; then
+ . /etc/sysconfig/pcmcia
+fi
+
+
+# Check that networking is up.
+[ ${NETWORKING} = "no" ] && exit 0
+
+[ -x /sbin/ifconfig ] || exit 0
+
+# Even if IPX is configured, without the utilities we can't do much
+[ ! -x /sbin/ipx_internal_net -o ! -x /sbin/ipx_configure ] && IPX=
+
+CWD=`pwd`
+cd /etc/sysconfig/network-scripts
+
+# find all the interfaces besides loopback.
+# ignore aliases, alternative configurations, and editor backup files
+interfaces=`ls ifcfg* | egrep -v '(ifcfg-lo|:)' | \
+            egrep -v 'ifcfg-ippp[0-9]+$' | \
+>            egrep 'ifcfg-[a-z0-9\.]+$' | \
+&lt;            egrep 'ifcfg-[a-z0-9]+$' | \
+            sed 's/^ifcfg-//g'`
+
+# See how we were called.
+case "$1" in
+  start)
+
+   action "Setting network parameters: " sysctl -p /etc/sysctl.conf
+
+ action "Bringing up interface lo: " ./ifup ifcfg-lo
+
+ case "$IPX" in
+   yes|true)
+     /sbin/ipx_configure --auto_primary=$IPXAUTOPRIMARY \
+       --auto_interface=$IPXAUTOFRAME
+     if [ "$IPXINTERNALNETNUM" != "0" ]; then
+        /sbin/ipx_internal_net add $IPXINTERNALNETNUM $IPXINTERNALNODENUM
+     fi
+     ;;
+ esac
+ # depreciated but we still use it.
+ if [ -f /proc/sys/net/ipv4/ip_forward ] && [ "$FORWARD_IPV4" = "yes" ] ||
+ "$FORWARD_IPV4" = "true" ];
+     then
+  action "Enabling IPv4 packet forwarding" sysctl -w net.ipv4.ip_forward=1
+ fi
+
+> action "Setting VLAN parameters: " vconfig set_name_type DEV_PLUS_VID
+
+ for i in $interfaces; do
+  if egrep -L "^ONBOOT=\"?[Nn][Oo]\"?" ifcfg-$i >/dev/null 2>&1; then
+   # Probe module to preserve interface ordering
+   /sbin/ifconfig $i >/dev/null 2>&1
+  else
+>   vlan=`echo $i | egrep -v '(lo|:)' | \
+>        egrep -v 'ippp[0-9]+$' | \
+>        egrep '[a-z0-9]+\.[0-9][0-9][0-9][0-9]$' | \
+>        sed "s/^[a-z0-9]*\.//g;s/^0*//g"`
+>   ifvlan=`echo $i | egrep -v '(lo|:)' | \
+>        egrep -v 'ippp[0-9]+$' | \
+>           egrep '[a-z0-9]+\.[0-9][0-9][0-9][0-9]$' | \
+>        sed "s/\.[a-z0-9]*$//g"`
+
+>   if [ -n "${vlan}" ]; then
+>    action "Enable ${vlan} on {$ifvlan}: " vconfig add ${ifvlan} ${vlan}
+>   fi
+   action "Bringing up interface $i: " ./ifup $i boot
+  fi
+ done
+
+ # Add non interface-specific static-routes.
+ if [ -f /etc/sysconfig/static-routes ]; then
+    grep "^any" /etc/sysconfig/static-routes | while read ignore type dest
+netmask mask bogus args; do
+       if [ "${bogus}" = "gw" ]; then
+        /sbin/route add -$type $dest $netmask $mask $args
+       else
+        /sbin/route add -$type $dest $netmask $mask $bogus $args
+       fi
+    done
+ fi
+
+        touch /var/lock/subsys/network
+        ;;
+  stop)
+   # If this is a final shutdown/halt, check for network FS,
+ # and unmount them even if the user didn't turn on netfs
+
+ if [ "$RUNLEVEL" = "6" -o "$RUNLEVEL" = "0" -o "$RUNLEVEL" = "1" ]; then
+  NFSMTAB=`grep -v '^#' /proc/mounts | awk '{ if ($3 ~ /^nfs$/ ) print $2}'`
+  SMBMTAB=`grep -v '^#' /proc/mounts | awk '{ if ($3 ~ /^smbfs$/ ) print
+$2}'`
+  NCPMTAB=`grep -v '^#' /proc/mounts | awk '{ if ($3 ~ /^ncpfs$/ ) print
+$2}'`
+  if [ -n "$NFSMTAB" -o -n "$SMBMTAB" -o -n "$NCPMTAB" ] ; then
+   /etc/init.d/netfs stop
+  fi
+ fi
+
+ for i in $interfaces ; do
+         if ifconfig $i 2>/dev/null | grep -q "UP" >/dev/null 2>&1 ; then
+     action "Shutting down interface $i: " ./ifdown $i boot
+  fi
+ done
+ case "$IPX" in
+   yes|true)
+     if [ "$IPXINTERNALNETNUM" != "0" ]; then
+        /sbin/ipx_internal_net del
+     fi
+     ;;
+ esac
+ ./ifdown ifcfg-lo
+ if [ -d /proc/sys/net/ipv4 ]; then
+   if [ -f /proc/sys/net/ipv4/ip_forward ]; then
+  if [ `cat /proc/sys/net/ipv4/ip_forward` != 0 ]; then
+   action "Disabling IPv4 packet forwarding: " sysctl -w
+net.ipv4.ip_forward=0
+  fi
+   fi
+   if [ -f /proc/sys/net/ipv4/ip_always_defrag ]; then
+         if [ `cat /proc/sys/net/ipv4/ip_always_defrag` != 0 ]; then
+          action "Disabling IPv4 automatic defragmentation: " sysctl -w
+net.ipv4.ip_always_defrag=0
+  fi
+   fi
+ fi
+ if [ -f /proc/sys/net/ipv4/tcp_syncookies ];then
+         if [ `cat /proc/sys/net/ipv4/tcp_syncookies` != 0 ]; then
+      sysctl -w net.ipv4.tcp_syncookies=0
+  fi
+ fi
+
+        rm -f /var/lock/subsys/network
+        ;;
+  status)
+ echo "Configured devices:"
+ echo lo $interfaces
+
+ if [ -x /bin/linuxconf ] ; then
+  eval `/bin/linuxconf --hint netdev`
+  echo "Devices that are down:"
+  echo $DEV_UP
+  echo "Devices with modified configuration:"
+  echo $DEV_RECONF
+ else
+  echo "Currently active devices:"
+  echo `/sbin/ifconfig | grep ^[a-z] | awk '{print $1}'`
+ fi
+ ;;
+  restart)
+        cd $CWD
+ $0 stop
+ $0 start
+ ;;
+  reload)
+ if [ -x /bin/linuxconf ] ; then
+  eval `/bin/linuxconf --hint netdev`
+  for device in $DEV_UP ; do
+   action "Bringing up device $device: " ./ifup $device
+  done
+  for device in $DEV_DOWN ; do
+   action "Shutting down device $device: " ./ifdown $device
+  done
+  for device in $DEV_RECONF ; do
+   action "Shutting down device $device: " ./ifdown $device
+   action "Bringing up device $device: " ./ifup $device
+  done
+  for device in $DEV_RECONF_ALIASES ; do
+   action "Briging up alias $device: "
+/etc/sysconfig/network-scripts/ifup-aliases $device
+  done
+  for device in $DEV_RECONF_ROUTES ; do
+   action "Bringing up route $device: "
+/etc/sysconfig/network-scripts/ifup-routes $device
+  done
+  case $IPX in yes|true)
+    case $IPXINTERNALNET in
+      reconf)
+   action "Deleting internal IPX network: " /sbin/ipx_internal_net del
+   action "Adding internal IPX network $IPXINTERNALNETNUM
+$IPXINTERNALNODENUM: " /sbin/ipx_internal_net add $IPXINTERNALNETNUM \
+            $IPXINTERNALNODENUM
+   ;;
+      add)
+   action "Adding internal IPX network $IPXINTERNALNETNUM
+$IPXINTERNALNODENUM: "/sbin/ipx_internal_net add $IPXINTERNALNETNUM \
+            $IPXINTERNALNODENUM
+   ;;
+      del)
+   action "Deleting internal IPX network: " /sbin/ipx_internal_net del
+   ;;
+    esac
+    ;;
+  esac
+ else
+         cd $CWD
+  $0 restart
+ fi
+ ;;
+  probe)
+ if [ -x /bin/linuxconf ] ; then
+  eval `/bin/linuxconf --hint netdev`
+  [ -n "$DEV_UP$DEV_DOWN$DEV_RECONF$DEV_RECONF_ALIASES" -o \
+    -n "$DEV_RECONF_ROUTES$IPXINTERNALNET" ] && \
+   echo reload
+  exit 0
+ else
+  # if linuxconf isn't around to figure stuff out for us,
+  # we punt.  Probably better than completely reloading
+  # networking if user isn't sure which to do.  If user
+  # is sure, they would run restart or reload, not probe.
+  exit 0
+ fi
+ ;;
+  *)
+        echo "Usage: network {start|stop|restart|reload|status|probe}"
+        exit 1
+esac
+
+exit 0
+</pre>
+</li>
+
+</ol>
+<P>
+<HR>
+<pre>
+Terv, 
+
+-----------------------------
+Kristjan Kotkas 
+KPNQwest Estonia
+kristjan.kotkas@kpnqwest.ee
+t + 372 62 66299 m + 372 51 60697 f + 372 62 66292
+
+</pre>
+
+
+    <hr>
+    <address><a href="mailto:greear@cyberhighway.net">Ben Greear</a></address>
+<!-- Created: Mon May 29 12:17:35 MST 2000 -->
+<!-- hhmts start -->
+Last modified: Thu Feb 27 22:14:47 PST 2003
+<!-- hhmts end -->
+  </body>
+</html>

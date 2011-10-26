@@ -1,0 +1,183 @@
+#!/usr/bin/perl
+#
+#From: mathews@ednet.gsfc.nasa.gov (Jason Mathews)
+#Message-Id: <199706022135.RAA23777@ednet.gsfc.nasa.gov>
+#Subject: MGETTY+SENDFAX's make.coverpg converted to perl - FYI
+#To: gert@greenie.muc.de
+#Date: Mon, 2 Jun 1997 17:35:43 -0400 (EDT)
+#
+#Hi Gert Doering,
+#
+#I've been playing with your fax package mgetty-1.1.6 and find
+#it useful.
+#
+#The following program is a direct conversion of your
+#shell/awk script to perl for better performance
+#and easier maint. IMHO so if you want it just take it. 
+#
+#Sincerely,
+#
+#jason
+#
+#-------------------------------------------------------------------------
+
+#!/usr/local/bin/perl 
+# 
+# make.coverpg -- slightly advanced version, use ghostscript 
+#                 (just a sample, naturally you have to adapt all the texts!) 
+# 
+# Author: gert@greenie.muc.de 
+#
+# Converted to perl by Jason Mathews <mathews@nssdc.gsfc.nasa.gov> 6/2/97
+# - Keeps postscript in memory opposed to writing a temp file
+# 
+# Syntax: 
+#       make.coverpg [-m memo string] <pages>  <sender-ID>   <sender-NAME>
+#                    <receiver-ID> <receiver-NAME> <date> <time> 
+ 
+# 
+# if called with "-m <memo-file>", put that file on cover page: 
+if ($ARGV[0] eq "-m") { 
+    shift;
+    $MEMO = shift;
+}
+
+#
+# get arguments
+#
+$PAGES=shift;
+$S_ID=shift;
+$S_NAME=shift;
+$R_ID=shift;
+$R_NAME=shift;
+$DATE=shift;
+$TIME=shift;
+
+#
+# chose proper driver for resolution
+
+$driver = $ENV{'normal_res'} ?  "dfaxlow" : "dfaxhigh";
+
+$out = <<'EOF';
+%! PS-Adobe-1.0
+%%Title: Sendfax Fax Header Page
+
+%
+% simple logo, "top right" corner is at x/y=570/750
+%
+1 5 100
+{
+   dup 100 div setgray
+   dup 10 div 1 add setlinewidth
+   dup 5 mul 570 exch sub	% x = 10*i + 50
+   750 moveto			% y = 100
+   dup 5 mul 750 exch sub
+   570 exch lineto	% x, y as above but swapped
+   pop
+   stroke
+} for
+
+%
+% change encoding to ISO8859-1 (important for my German umlauts) [Fritz Elfert]
+%
+/ISOfindfont {
+    dup 100 string cvs (ISO-) exch concatstrings cvn exch
+    findfont dup maxlength dict begin
+        { 1 index /FID ne {def}{pop pop} ifelse } forall
+        /Encoding ISOLatin1Encoding def
+        currentdict
+    end definefont
+} def
+
+%
+% page title
+%
+/Times-BoldItalic findfont 37 scalefont setfont
+0 setgray
+100 600 moveto
+(BOL Fax) dup 
+    gsave true charpath 1 setgray 1 setlinewidth stroke grestore
+    show
+EOF
+
+# now the page layout differs, depending on the use of "MEMO" or not
+
+if ($MEMO eq '') {
+    $out .= <<EOF;
+%
+% data
+%
+/Times-Roman ISOfindfont 19 scalefont setfont
+100 500 moveto (Sender:  ) show
+currentpoint ($S_ID) show
+-20 add moveto ($S_NAME) show
+
+100 420 moveto (Fax Number:  ) show
+currentpoint ($R_ID) show
+-20 add moveto ($R_NAME) show
+
+100 340 moveto (Date:  $TIME  $DATE) show
+
+100 280 moveto (Pages \(inc. Fax Cover\):  $PAGES) show
+
+showpage
+EOF
+
+# end "no memo"
+
+} else {
+
+# start "with memo"
+
+$out .= <<EOF;
+%
+% data (squeezed somewhat)
+%
+/Times-Roman ISOfindfont 19 scalefont setfont
+100 550 moveto (Sender:  ) show
+currentpoint ($S_ID) show
+-20 add moveto ($S_NAME) show
+
+100 500 moveto (Fax Number:  ) show
+currentpoint ($R_ID) show
+-20 add moveto ($R_NAME) show
+
+100 450 moveto (Date:  $TIME  $DATE) show
+
+100 420 moveto (Pages \(inc. Cover Page\):  $PAGES) show
+
+50 380 moveto (Kurznachricht:) show
+
+EOF
+
+  $x=50; $y=350;
+  open(FILE, $MEMO);
+  while (<FILE>) {
+      chop;
+      s/\(/\\\(/g;
+      s/\)/\\\)/g;
+      $out .= "$x $y moveto ($_) show\n";
+      $y -= 15;
+      last if $y < 0;
+  }
+  close(FILE);
+  $out .= "showpage\n";
+}
+
+$| = 1; # unbuffer output
+
+open(PIPE, "|-") || exec "gs", "-sDEVICE=$driver", "-sOutputFile=-",
+    "-dSAFER", "-dNOPAUSE","-q", "-";
+print PIPE $out;
+close(PIPE);
+
+#
+# end make.coverpg
+#
+
+#---------------------------------------------------------------------------
+#Jason Mathews, Code 633.2       |National Space Science Data Center
+#NASA/Goddard Space Flight Center|email: mathews@nssdc.gsfc.nasa.gov
+#Greenbelt, MD 20771-0001  USA   |http://coney.gsfc.nasa.gov/Mathews/jason.html
+#--------------------------------+
+

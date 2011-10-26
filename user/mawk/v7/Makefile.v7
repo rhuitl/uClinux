@@ -1,0 +1,132 @@
+
+# ###################################################
+# This is a makefile for mawk,
+# an implementation of The AWK Programmin Language, 1988.
+# 
+# 
+
+SHELL=/bin/sh
+
+####################################
+# user settable macros
+#
+
+CC = cc
+#CC = gcc 
+
+#CFLAGS =   -O
+#CFLAGS = -O -YSYSTEM_FIVE # ultrix_vax 4.1 (no SYSTEM_FIVE on MIPS)
+#CFLAGS - -O -YSYSTEM_FIVE -DHAVE_VOID_PTR=0 #ultrix 3.1
+#CFLAGS = -O -f68881  # sun3 with coprocessor
+CFLAGS = -O -Dvoid=int  # V7
+LDFLAGS =
+
+# use your favorite yacc
+# if you don't change parse.y or parse2.xc
+# then you can use the parse.c and parse.h provided and don't need yacc
+# The parse.c and parse.h in the distribution were made with
+# Berkeley yacc
+#
+YACC=yacc -d
+#YACC=bison -dy
+#YACC=byacc -d
+
+#######################################
+
+# The following stuff is for compilers whose symbols are unique only
+# to 7 (external) or 8 (local) characters.
+
+.SUFFIXES :
+.SUFFIXES : .o .c .cl .y .h .hl
+
+.cl.o:
+	hash8 -r va_alist -r va_start encode TABLE <$< >$*.c
+	$(CC) $(CFLAGS) $(CFLAGS2) -c $*.c 2>&1 | hash8 decode TABLE
+	rm $*.c
+
+.c.o:
+	$(CC) $(CFLAGS) $(CFLAGS2) -c $*.c 2>&1 | hash8 decode TABLE
+
+.cl.c:
+	hash8 -r va_alist -r va_start encode TABLE <$< >$*.c
+
+.hl.h:
+	hash8 -r va_alist -r va_start encode TABLE <$< >$@
+
+#######################################
+
+O=parse.o scan.o memory.o main.o hash.o execute.o code.o\
+  da.o error.o init.o bi_vars.o cast.o print.o bi_funct.o\
+  kw.o jmp.o array.o field.o  split.o re_cmpl.o zmalloc.o\
+  fin.o files.o  scancode.o matherr.o  fcall.o version.o
+
+REXP_O=rexp/rexp.o rexp/rexp0.o rexp/rexp1.o rexp/rexp2.o\
+    rexp/rexp3.o rexp/rexpdb.o
+
+
+mawk_and_test :  mawk  mawk_test  fpe_test
+
+mawk : $(O)  rexp/regexp.a
+	$(CC) $(LDFLAGS) -o mawk $(O) -lm rexp/regexp.a
+
+mawk_test :  mawk  # test that we have a sane mawk
+	@cp mawk test/mawk
+	cd test ; ./mawk_test.v7
+	@rm test/mawk
+
+fpe_test :  mawk # test FPEs are handled OK
+	@cp mawk test/mawk
+	@echo ; echo testing floating point exception handling
+	cd test ; ./fpe_test.v7
+	@rm test/mawk
+
+rexp/regexp.a :  $(REXP_O)
+	cd  rexp ; make  CC=$(CC)
+
+
+parse.cl  : parse.y  parse2.xcl
+	@echo  expect 4 shift/reduce conflicts
+	$(YACC)  parse.y
+	cat  y.tab.c parse2.xcl > parse.cl && rm y.tab.c
+	-if cmp -s y.tab.h parse.hl ;\
+	   then rm y.tab.h ;\
+	   else mv y.tab.h parse.hl ; fi
+
+scancode.cl :  makescan.cl  scan.h
+	hash8 -r va_alist -r va_start encode TABLE <makescan.cl >makescan.c
+	$(CC) -o makescan.exe  $(CFLAGS) makescan.c
+	./makescan.exe > scancode.cl
+	rm makescan.c makescan.exe
+
+clean :
+	rm -f *.o rexp/*.o rexp/regexp.a test/mawk core test/core
+
+
+# output from  mawk -f deps.awk *.c
+array.o : bi_vars.h sizes.h zmalloc.h memory.h types.h field.h mawk.h config.h symtype.h config/Idefault.h
+bi_funct.o : fin.h bi_vars.h sizes.h memory.h zmalloc.h regexp.h types.h field.h repl.h files.h bi_funct.h mawk.h config.h symtype.h init.h config/Idefault.h
+bi_vars.o : bi_vars.h sizes.h memory.h zmalloc.h types.h field.h mawk.h config.h symtype.h config/Idefault.h init.h
+cast.o : parse.h sizes.h memory.h zmalloc.h types.h field.h scan.h repl.h mawk.h config.h symtype.h config/Idefault.h
+code.o : sizes.h memory.h zmalloc.h types.h field.h code.h jmp.h mawk.h config.h symtype.h config/Idefault.h init.h
+da.o : sizes.h memory.h zmalloc.h types.h field.h repl.h code.h bi_funct.h mawk.h config.h symtype.h config/Idefault.h
+error.o : parse.h bi_vars.h sizes.h types.h scan.h mawk.h config.h symtype.h config/Idefault.h
+execute.o : bi_vars.h fin.h sizes.h memory.h zmalloc.h regexp.h types.h field.h code.h repl.h bi_funct.h mawk.h config.h symtype.h config/Idefault.h
+fcall.o : sizes.h memory.h zmalloc.h types.h code.h mawk.h config.h symtype.h config/Idefault.h
+field.o : parse.h bi_vars.h sizes.h memory.h zmalloc.h regexp.h types.h field.h scan.h repl.h mawk.h config.h symtype.h config/Idefault.h init.h
+files.o : fin.h sizes.h memory.h zmalloc.h types.h files.h mawk.h config.h config/Idefault.h
+fin.o : parse.h fin.h bi_vars.h sizes.h memory.h zmalloc.h types.h field.h scan.h mawk.h config.h symtype.h config/Idefault.h
+hash.o : sizes.h memory.h zmalloc.h types.h mawk.h config.h symtype.h config/Idefault.h
+init.o : bi_vars.h sizes.h memory.h zmalloc.h types.h field.h code.h mawk.h config.h symtype.h config/Idefault.h init.h
+jmp.o : sizes.h memory.h zmalloc.h types.h code.h mawk.h jmp.h config.h symtype.h config/Idefault.h init.h
+kw.o : parse.h sizes.h types.h mawk.h config.h symtype.h config/Idefault.h init.h
+main.o : fin.h bi_vars.h sizes.h memory.h zmalloc.h types.h field.h code.h files.h mawk.h config.h symtype.h config/Idefault.h init.h
+makescan.o : parse.h scan.h symtype.h
+matherr.o : sizes.h types.h mawk.h config.h config/Idefault.h
+memory.o : sizes.h memory.h zmalloc.h types.h mawk.h config.h config/Idefault.h
+parse.o : bi_vars.h sizes.h memory.h zmalloc.h types.h field.h code.h files.h bi_funct.h mawk.h jmp.h config.h symtype.h config/Idefault.h
+print.o : bi_vars.h parse.h sizes.h memory.h zmalloc.h types.h field.h scan.h files.h bi_funct.h mawk.h config.h symtype.h config/Idefault.h
+re_cmpl.o : parse.h sizes.h memory.h zmalloc.h regexp.h types.h scan.h repl.h mawk.h config.h symtype.h config/Idefault.h
+scan.o : parse.h fin.h sizes.h memory.h zmalloc.h types.h field.h scan.h repl.h code.h files.h mawk.h config.h symtype.h config/Idefault.h init.h
+split.o : bi_vars.h parse.h sizes.h memory.h zmalloc.h regexp.h types.h field.h scan.h bi_funct.h mawk.h config.h symtype.h config/Idefault.h
+version.o : patchlev.h sizes.h types.h mawk.h config.h config/Idefault.h
+zmalloc.o : sizes.h zmalloc.h types.h mawk.h config.h config/Idefault.h

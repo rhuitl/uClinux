@@ -1,0 +1,193 @@
+------------------------------------------------------------------------------
+                      Documentation sur les programmes pppoa
+------------------------------------------------------------------------------
+
+SOMMAIRE
+
+* DESCRIPTION GENERALE DE LA FAMMILE PPPOA2/2M/3
+
+* DESCRIPTION DE LA SERIE PPPOA2
+  ** Deroulement d'une execution normale de pppoa2
+  ** Gestion des erreurs de lecture/ecriture fatales
+  ** Gestion des signaux
+  ** Differences entre pppoa2 et pppoa2m (et genese de pppoa3)
+
+*DESCRIPTION DE PPPOA3
+  ** Changements entre pppoa3 et pppoa2
+  ** Deroulement d'une execution normale
+  ** Gestion des signaux
+  
+
+------------------------------------------------------------------------------
+
+*DESCRIPTION GENERALE DE LA FAMILLE PPPOA2/2M/3
+
+  Les FAI offrant un acces ADSL a sa clientele utilisent bien souvent le
+protocole PPP over ATM. Sur Linux et BSD la couche PPP est directement
+gérée par le noyau avec l'aide du programme ppp(d). Malheurresment ppp(d)
+ne connait strictement rien a l'ATM et a l'USB. Il est donc impossible d'
+utiliser directement ppp(d) pour communiquer avec votre modem (et donc votre
+FAI).
+
+  La famille de programme pppoa2/2m/3 resoud ce probleme en se placant entre
+ppp(d) et le modem grace a l'utilisation de l'option pty des demons ppp(d).
+
+Voici un schema resumant de facon simple le role de pppoax:
+
+
+__________          __________                   _______
+|        |--------->|        |----------------> /  ° °  \ 
+| ppp(d) |   pty    | pppoax |   USB bus       |  Modem  |  ADSL line<----> FAI
+|________|<---------|________|<---------------- \\     //   //
+          ppp packets    ^       atm cells        \   /____//
+                         |                         \_______/
+                         |
+               Gere l'en/decapsulation
+               des données en frame aal5
+               puis se charge de les envoyer
+               /recevoir via le bus USB
+               sous forme de cellules ATM
+
+
+------------------------------------------------------------------------------
+
+*DESCRIPTION DE LA SERIE DES PPPOA2
+
+  La premiere solution que nous avons trouve pour gerer les flux d'entee/sortie
+a été de creer un programme qui se fork en cours d'execution pour qu'une des
+copies du programme s'occupe de la lecture et l'autre de l'ecriture sur le bus
+USB.
+
+  ** Deroulement d'une execution (normale) de pppoa2:
+
+  1 - Le programme demarre et duplique ses descripteurs 0 (stdin) et 1 (stdout)
+  2 - Ouverture du log
+  3 - Duplication du descripteur du log en 0, 1, 2
+      A partir de ce point plus rien n'apparait sur les consoles, tout printf
+      se retouve loggué (car printf utilise stdout)
+  4 - Mise en place de la discipline de ligne N_HDLC sur les descripteurs
+      utilisés pour communiquer avec ppp(d)
+  5 - Recherche du modem USB
+  6 - Demande d'acces aux endpoints 0x07(lecture) et 0x87(ecriture)
+  7 - Mise en place du signal handler pour gerer les divers signaux
+      pouvant etre envoyés par ppp(d) (ou l'utilisateur)
+  8 - Le programme se fork
+      +Le fils rentre dans une boucle infinie ou il effectue toujours les memes
+       taches : lecture des données envoyées par ppp(d), encapsulation aal5,
+       hachage en cellules atm, envoi des cellules obtenues au modem
+      +Le pere continue son execution
+  9 - Maintenant le pere rentre lui aussi dans une boucle infinie ou il
+      se charge de :
+      recevoir les paquets atm du modem, reassembler les frames aal5, et
+      envoyer les paquets ppp ainsi obtenus vers ppp(d)
+
+  ** Gestion d'une erreur fatale de lecture/ecriture
+  
+    Voila, le programme est lancé et est censé communiquer "ad vidam eternam"
+  Mais la vie n'est pas si parfaite et des erreurs peuvent avoir lieux. Voici
+  ce qui se passe lorsqu'une telle injustice se produit :-)
+
+    Le fils ou le pere sort de sa boucle infinie et lance le signal TERM sur
+  l'autre. Et en s'assurant que les choses ne soient faites qu'une fois on
+  relache les devices usb etc etc etc et on sort aussi proprement qu'on peut
+  des programmes.
+  Les 2 process sont theoriquement tués.
+
+  ** Gestion des signaux
+  
+    pppoa2 n'est sensible qu'a SIGHUP sur les BSD, et SIGTERM sur Linux. Ceci
+  est du au fait que ppp(d) utilise ces signaux pour signaler la fermeture du
+  pty de communictaion a son esclave. Si un de ses signaux est recu par l'un
+  des process pppoa2, il se charge de l'envoyer a l'autre.
+
+  ** Qu'est ce qui change entre pppoa2 et pppoa2m
+
+    pppoa2 est fonctionnel mais son design limité ne permettait aucune
+  evolution de facon aisée. Le code n'était tout simplement pas assez modulaire
+  et toute modification mineure a un endroit, entrainait des modifications tres
+  importantes sur le reste. Le besoin s'est fait sentir de modulariser le code
+  de facon a avoir d'un coté des sortes de libraries crc, atm, aal5 et de
+  l'autre pppoa2 qui se servirait de ces librairies. Mais il n'a pas été
+  possible de separer de pppoa2 la moindre parcelle de code pour parvenir a
+  coder facilement ces librairies crc, atm, aal5.
+    Le besoin d'un nouveau design s'est fait ressentir. On est donc reparti de
+  zero pour recoder plus intelligemment pppoa2. Pour des raisons que
+  j'evoquerai plus tard, ce pppoa2 réecrit s'est vu attribué le nom de pppoa3.
+  Les librairies etaient pretes mais pppoa3 etait buggué. On a donc pensé qu'il
+  serait bon de back porter les nouveautés apportées par les librairies dans
+  le bon vieux pppoa2, qui lui etait epprouvé et fonctionnel. Pour ne pas
+  rompre totalement avec pppoa2 on a decidé de faire cohabiter les 2 versions.
+  C'est ainsi qu'on a donné a la version merged de pppoa2/3le nom  pppoa2m
+
+  En resumant:
+  pppoa2m = (pppoa2) - (le code deguelasse) + (nouvelles libs aal5/atm/crc)
+
+    pppoa2m a l'avantage de voir integrer les dernieres modifications faites
+  aux librairies atm/aal5 automatiquement et quelques nouveautés de pppoa3
+  lorsque cela est possible (syteme de log par exemple)
+
+NB:  Il est donc preferable d'utiliser pppoa2m a pppoa2
+
+------------------------------------------------------------------------------
+
+*DESCRIPTION DE PPPOA3
+
+  Si vous avez tout lu jusqu'ici vous aurez donc compris que pppoa3 est le
+successeur de pppoa2 dans la mesure ou il est le fruit d'un "redesign" de
+pppoa2. Mais pour des raisons de compatibilités avec certains BSD qui ne
+supportent pas les threads directement, on continue a faire cohabiter la
+serie pppoa2 et le nouveau pppoa3 (sous Linux toutes les versions fonctionnent)
+Bien entendu il est preferable d'utiliser pppoa2m a pppoa2)
+
+  ** Changements par rapport a pppoa2 (pppoa2m reprenant pas mal de choses)
+
+    1 - pppoa3 utilise des threads a la place de fork pour permettre
+        la gestion de la lecture/ecriture de facon parallele
+	Cela permet :
+         - Temps de switch inférieur entre la lecture/ecriture
+         - Utilisation de moins de memoire
+         - Controle plus fin du scheduling des lectures/ecritures
+	 - Meilleure gestion des signaux (car il'y a qu'un seul process)
+    2 - Tout le code a été modularisé
+    3 - Meilleure gestion ATM et AAL5 (ajout de certains CRC, verifications...)
+    4 - Nouveau systeme de log (utilisation de syslog possible)
+
+  ** Deroulement d'une execution normale
+
+   Main thread 
+   
+   1 - Demarrage du programme
+   2 - Mise en place de la discipline N_HDLC
+   3 - Initialisation des attributs des threads
+   4 - Initialisation de l'usb (detection et demande des endpoints 0x07, 0x87)
+   5 - Mise en place d'un signal handler
+   5 - Creation des E/S threads
+   6 - arret en attendant qu'un semaphore soit posté
+   7 - Le semaphore a été posté cela peut signifier 3 choses
+         + Erreur de lecture fatale
+         + Erreur d'ecriture fatale
+         + Un signal a été saisi par le signal handler
+   8 - Cleanup des ressources, abort des threads -> sortie
+
+   E/S thread (cree a l'etape 5 du main thread)
+
+   1 - Validation des abort
+   2 - Blocage des signaux (ainsi seul le main thread s'en occupe)
+   3 - Entree dans une boucle infinie de lecture/ecriture :
+       encapsulation/decapsulation aal5, creation/recuperation des
+       cellules atm
+   4 - Si une erreur a eu lieu, postage du semaphore pour le signifier au
+       main thread qui s'occupera de tout fermer correctement
+   5 - quitter le thread
+
+PS : le systeme de log n'est demarré qu'au premier mesage envoyé via la
+     fonction report. C'est pour cela que la creation d'un log n'apparait
+     pas dans ce résumé
+
+  ** Gestion des signaux
+
+    On l'aura compris, seul le main thread s'occupe des signaux. Lorsqu'un
+  signal est traité, il l'est par le main thread. Dans le signal handler on
+  poste le semaphore d'erreur de facon a reveiller le main thread qui se charge
+  de quitter l'application proprement. L'atomicité de sem_post garantit le fait
+  que le programme se termine bien au niveau du main thread.

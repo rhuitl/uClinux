@@ -1,0 +1,40 @@
+## $Id: Makefile-files,v 1.6 2004/06/16 10:34:34 ensc Exp $  ---*- makefile -*---
+
+## Copyright (C) 2002,2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+##  
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; version 2 of the License.
+##  
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##  
+## You should have received a copy of the GNU General Public License
+## along with this program; if not, write to the Free Software
+## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+##  
+
+contrib_FILES		=  contrib/ip-sentinel.init		\
+			   contrib/ip-sentinel.sysconfig	\
+			   contrib/ip-sentinel.params
+
+rhsysconfigdir		=  $(sysconfdir)/sysconfig
+minitdir		=  $(sysconfdir)/minit
+
+install-contrib:	$(contrib_FILES)
+			$(mkinstalldirs) $(DESTDIR){$(initrddir),$(rhsysconfigdir),$(minitdir)/services/ip-sentinel}
+			$(INSTALL_SCRIPT) contrib/ip-sentinel.init      $(DESTDIR)$(initrddir)/ip-sentinel
+			$(INSTALL_DATA)   contrib/ip-sentinel.sysconfig $(DESTDIR)$(rhsysconfigdir)/ip-sentinel
+
+			ln -s $(sbindir)/ip-sentinel                    $(DESTDIR)$(minitdir)/services/ip-sentinel/run
+			$(INSTALL_DATA) contrib/ip-sentinel.params	$(DESTDIR)$(minitdir)/services/ip-sentinel/params
+			touch $(DESTDIR)$(minitdir)/services/ip-sentinel/respawn
+			chmod 0644 $(DESTDIR)$(minitdir)/services/ip-sentinel/respawn
+
+uninstall-contrib:
+			rm -f $(DESTDIR)$(minitdir)/services/ip-sentinel/run
+			rm -f $(DESTDIR)$(minitdir)/services/ip-sentinel/respawn
+			rm -f $(DESTDIR)$(initrddir)/ip-sentinel   
+			rm -f $(DESTDIR)$(rhsysconfigdir)/ip-sentinel

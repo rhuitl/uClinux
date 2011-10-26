@@ -1,0 +1,124 @@
+diff -uNr linux-2.4.20.orig/Documentation/Configure.help linux-2.4.20/Documentation/Configure.help
+--- linux-2.4.20.orig/Documentation/Configure.help	2002-11-28 15:53:08.000000000 -0800
++++ linux-2.4.20/Documentation/Configure.help	2002-12-21 20:25:06.000000000 -0800
+@@ -9377,6 +9377,53 @@
+   say M here and read <file:Documentation/modules.txt>.  The module
+   will be called orinoco_cs.o.
+ 
++Host AP support for Prism2/2.5/3 IEEE 802.11b
++CONFIG_HOSTAP
++  A driver for 802.11b wireless cards based on Intersil Prism2/2.5/3
++  chipset. This driver supports so called Host AP mode that allows
++  the card to act as an IEEE 802.11 access point.
++
++  See <http://hostap.epitest.fi/> for more information about the
++  Host AP driver configuration and tools.
++
++  This option includes the base Host AP driver code that is shared by
++  different hardware models. You will also need to enable support for
++  PLX/PCI/CS version of the driver to actually use the driver.
++
++  The driver can be compiled as modules and they will be called
++  "hostap.o" and "hostap_crypt_wep.o".
++
++Host AP driver for Prism2/2.5/3 in PLX9052 based PCI adaptors
++CONFIG_HOSTAP_PLX
++  Host AP driver's version for Prism2/2.5/3 PC Cards in PLX9052 based
++  PCI adaptors.
++
++  "Host AP support for Prism2/2.5/3 IEEE 802.11b" is required for this
++  driver and its help text includes more information about the Host AP
++  driver.
++
++  The driver can be compiled as a module and will be named "hostap_plx.o".
++
++Host AP driver for Prism2.5 PCI adaptors
++CONFIG_HOSTAP_PCI
++  Host AP driver's version for Prism2.5 PCI adaptors.
++
++  "Host AP support for Prism2/2.5/3 IEEE 802.11b" is required for this
++  driver and its help text includes more information about the Host AP
++  driver.
++
++  The driver can be compiled as a module and will be named "hostap_pci.o".
++
++Host AP driver for Prism2/2.5/3 PC Cards
++CONFIG_HOSTAP_CS
++  Host AP driver's version for Prism2/2.5/3 PC Cards.
++
++  "Host AP support for Prism2/2.5/3 IEEE 802.11b" is required for this
++  driver and its help text includes more information about the Host AP
++  driver.
++
++  The driver can be compiled as a module and will be named "hostap_cs.o".
++
+ Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards
+ CONFIG_AIRO
+   This is the standard Linux driver to support Cisco/Aironet ISA and
+diff -uNr linux-2.4.20.orig/MAINTAINERS linux-2.4.20/MAINTAINERS
+--- linux-2.4.20.orig/MAINTAINERS	2002-11-28 15:53:08.000000000 -0800
++++ linux-2.4.20/MAINTAINERS	2002-12-21 20:27:03.000000000 -0800
+@@ -664,6 +664,13 @@
+ L:	linux-hippi@sunsite.dk
+ S:	Maintained
+ 
++HOST AP DRIVER
++P:	Jouni Malinen
++M:	jkmaline@cc.hut.fi
++L:	hostap@shmoo.com
++W:	http://hostap.epitest.fi/
++S:	Maintained
++
+ HP100:	Driver for HP 10/100 Mbit/s Voice Grade Network Adapter Series
+ P:	Jaroslav Kysela
+ M:	perex@suse.cz
+diff -uNr linux-2.4.20.orig/drivers/net/wireless/Config.in linux-2.4.20/drivers/net/wireless/Config.in
+--- linux-2.4.20.orig/drivers/net/wireless/Config.in	2002-11-28 15:53:14.000000000 -0800
++++ linux-2.4.20/drivers/net/wireless/Config.in	2002-12-21 20:29:23.000000000 -0800
+@@ -7,6 +7,7 @@
+ fi
+ 
+ tristate '  Hermes chipset 802.11b support (Orinoco/Prism2/Symbol)' CONFIG_HERMES
++tristate '  Host AP support for Prism2/2.5/3 IEEE 802.11b' CONFIG_HOSTAP
+ 
+ if [ "$CONFIG_ALL_PPC" = "y" ]; then
+    dep_tristate '    Apple Airport support (built-in)' CONFIG_APPLE_AIRPORT $CONFIG_HERMES
+@@ -15,6 +16,8 @@
+ if [ "$CONFIG_PCI" = "y" ]; then
+    dep_tristate '    Hermes in PLX9052 based PCI adaptor support (Netgear MA301 etc.) (EXPERIMENTAL)' CONFIG_PLX_HERMES $CONFIG_HERMES $CONFIG_EXPERIMENTAL
+    dep_tristate '    Prism 2.5 PCI 802.11b adaptor support (EXPERIMENTAL)' CONFIG_PCI_HERMES $CONFIG_HERMES $CONFIG_EXPERIMENTAL
++   dep_tristate '    Host AP driver for Prism2/2.5/3 in PLX9052 based PCI adaptors' CONFIG_HOSTAP_PLX $CONFIG_HOSTAP
++   dep_tristate '    Host AP driver for Prism2.5 PCI adaptors' CONFIG_HOSTAP_PCI $CONFIG_HOSTAP
+ fi
+ 
+ # If Pcmcia is compiled in, offer Pcmcia cards...
+@@ -22,6 +25,7 @@
+    comment 'Wireless Pcmcia cards support' 
+ 
+    dep_tristate '  Hermes PCMCIA card support' CONFIG_PCMCIA_HERMES $CONFIG_HERMES
++   dep_tristate '  Host AP driver for Prism2/2.5/3 PC Cards' CONFIG_HOSTAP_CS $CONFIG_HOSTAP $CONFIG_PCMCIA
+    tristate '  Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards' CONFIG_AIRO_CS
+ fi
+ 
+diff -uNr linux-2.4.20.orig/drivers/net/wireless/Makefile linux-2.4.20/drivers/net/wireless/Makefile
+--- linux-2.4.20.orig/drivers/net/wireless/Makefile	2002-08-02 17:39:44.000000000 -0700
++++ linux-2.4.20/drivers/net/wireless/Makefile	2002-12-21 20:25:06.000000000 -0800
+@@ -12,7 +12,7 @@
+ obj-		:=
+ 
+ # Things that need to export symbols
+-export-objs	:= airo.o orinoco.o hermes.o
++export-objs	:= airo.o orinoco.o hermes.o hostap.o
+ 
+ obj-$(CONFIG_HERMES)		+= orinoco.o hermes.o
+ obj-$(CONFIG_PCMCIA_HERMES)	+= orinoco_cs.o
+@@ -23,4 +23,9 @@
+ obj-$(CONFIG_AIRO)		+= airo.o
+ obj-$(CONFIG_AIRO_CS)		+= airo_cs.o airo.o
+ 
++obj-$(CONFIG_HOSTAP)		+= hostap.o hostap_crypt_wep.o
++obj-$(CONFIG_HOSTAP_CS)		+= hostap_cs.o
++obj-$(CONFIG_HOSTAP_PLX)	+= hostap_plx.o
++obj-$(CONFIG_HOSTAP_PCI)	+= hostap_pci.o
++
+ include $(TOPDIR)/Rules.make

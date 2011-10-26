@@ -1,0 +1,115 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(pppoe.c)
+
+AC_CONFIG_HEADER(config.h)
+
+AC_PREFIX_DEFAULT(/usr)
+
+dnl Checks for programs.
+AC_PROG_CC
+
+dnl Checks for libraries.
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(fcntl.h sys/ioctl.h sys/time.h syslog.h unistd.h netinet/if_ether.h getopt.h sys/uio.h sys/param.h fcntl.h net/bpf.h netpacket/packet.h net/ethernet.h asm/types.h linux/if_packet.h linux/if_ether.h sys/socket.h sys/cdefs.h net/if.h net/if_dl.h net/if_ether.h net/if_types.h netinet/if_ether.h net/if_types.h net/if_dl.h sys/dlpi.h )
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_PID_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+
+dnl Check for sockaddr_ll
+echo -n "checking for struct sockaddr_ll... "
+AC_TRY_COMPILE([#include <asm/types.h>
+#include <linux/if_packet.h>
+#include <linux/if_ether.h>
+], [struct sockaddr_ll sa;],
+ac_cv_struct_sockaddr_ll=yes, ac_cv_struct_sockaddr_ll=no)
+echo $ac_cv_struct_sockaddr_ll
+if test "$ac_cv_struct_sockaddr_ll" = yes ; then
+AC_DEFINE(HAVE_STRUCT_SOCKADDR_LL)
+fi
+
+dnl Check for N_HDLC line discipline
+echo -n "checking for N_HDLC line discipline... "
+AC_TRY_COMPILE([#include <linux/termios.h>],
+	[int x = N_HDLC;],
+	ac_cv_n_hdlc=yes, ac_cv_n_hdlc=no)
+echo $ac_cv_n_hdlc
+if test "$ac_cv_n_hdlc" = yes ; then
+AC_DEFINE(HAVE_N_HDLC)
+fi
+
+dnl Checks for library functions.
+AC_FUNC_MEMCMP
+AC_FUNC_SETVBUF_REVERSED
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(select socket strerror strtol)
+AC_PROG_INSTALL
+
+dnl Integer sizes
+AC_CHECK_SIZEOF(unsigned short)
+AC_CHECK_SIZEOF(unsigned int)
+AC_CHECK_SIZEOF(unsigned long)
+
+dnl Check for location of pppd
+AC_PATH_PROG(PPPD, pppd, NOTFOUND, $PATH:/sbin:/usr/sbin:/usr/local/sbin)
+
+dnl Check for setsid (probably Linux-specific)
+AC_PATH_PROG(SETSID, setsid, "", $PATH:/sbin:/usr/sbin:/usr/local/sbin)
+
+dnl GCC warning level
+if test "$GCC" = yes; then
+	CFLAGS="$CFLAGS -Wall -Wstrict-prototypes -ansi -pedantic"
+fi
+
+dnl If we couldn't find pppd, die
+if test "$PPPD" = "NOTFOUND"; then
+	echo ""
+	echo "*** Oops!  I couldn't find pppd, the PPP daemon anywhere."
+	echo "*** You must install pppd, version 2.3.10 or later."
+	echo ""
+	exit 1
+fi
+
+dnl Figure out pppd version.  2.3.7 to 2.3.9 -- issue warning.  Less than
+dnl 2.3.7 -- stop
+
+PPPD_VERSION=`$PPPD --version 2>&1 | awk '{print $NF}'`
+
+case "$PPPD_VERSION" in
+1.*|2.0.*|2.1.*|2.2.*|2.3.0|2.3.1|2.3.2|2.3.3|2.3.4|2.3.5|2.3.6)
+	echo ""
+	echo "*** Oops! Your version of pppd is $PPPD_VERSION, which is too old."
+	echo "*** You need at least 2.3.7 (2.3.10 or newer recommended.)"
+	echo ""
+	exit 1
+	;;
+
+2.3.7|2.3.8|2.3.9)
+	echo ""
+	echo "*** Warning.  Your version of pppd is $PPPD_VERSION.  You will"
+	echo "*** not be able to use connect-on-demand.  Upgrade to pppd"
+	echo "*** 2.3.10 or newer if you need connect-on-demand."
+	echo ""
+	;;
+
+2*|3*|4*|5*|6*|7*|8*|9*)
+	;;
+
+*)
+	echo ""
+	echo "*** Oops.  I cannot figure out what version of pppd you have."
+	echo "*** All I got back was '$PPPD_VERSION'"
+	echo ""
+	exit 1
+	;;
+esac
+
+AC_OUTPUT(Makefile adsl-connect adsl-start adsl-stop adsl-init adsl-init-suse adsl-setup)
+
+echo ""
+echo "Type 'make' to compile the software."

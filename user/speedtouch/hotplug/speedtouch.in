@@ -1,0 +1,41 @@
+#!/bin/sh -e
+
+# Author: Benoit PAPILLAULT <benoit.papillault@free.fr>
+# Creation: 13/05/2005
+
+# Ensure to have a working PATH
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin:@sbindir@:@bindir@
+
+setup_remover() {
+  [ "$REMOVER" ] || return 0
+
+cat > "${REMOVER}" <<EOF
+#!/bin/sh
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:@bindir@:@sbindir@
+
+speedtouch-stop -d "${DEVICE}"
+
+# remove the file used by speedtouch-start to indicate that the modem
+# has been initialized
+
+rm -f /var/run/speedtouch-up
+
+EOF
+
+  chmod +x "${REMOVER}"
+  return 0
+}
+
+##############################################################################
+case "$ACTION" in
+  add)
+    setup_remover
+    speedtouch-start -d "${DEVICE}"
+    ;;
+esac
+
+exit 0
+

@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Firewalling and NAT is configured with the iptables program; the
+# Linux firewalling/NAT capabilities are much too mighty to explain
+# them here. Look at http://www.netfilter.org/documentation/index.html
+# for learning more about it.
+#
+# The default rules given here (which lets anything from the LAN to the 
+# WAN through and blocks anything from the WAN except pings) should be 
+# very reasonable and you shouldn't have to change them in most 
+# cases
+#
+# Please put your own rules which do not require to change the rules
+# in this file (e.g. port forwarding to your LAN, excluding certain LAN 
+# hosts from internet access, blocking access to certain internet hosts)
+# into /etc/sysconfig/firewall_extended
+#
+
+# First of all, clear all rules; this way you can call this script
+# as often as you want to after making changes to try things out
+iptables -t filter -F
+iptables -t nat -F
+iptables -t mangle -F
+
+# The default is to drop everything as this is the most secure
+# configuration; the exception is the OUTPUT chain, where all
+# packets are allowed through as you wouldn't be be able to
+# ping anything from your DPCM otherwise
+iptables -P FORWARD DROP
+iptables -P INPUT DROP
+iptables -P OUTPUT ACCEPT
+
+# The first rule of all should be that packets related to already
+# established connections are allowed through (this is what's called
+# "stateful packet inspection" or SPI); do not move this to an other
+# position than the first - most IP packets going through a router
+# belong to established connections and as the rules are checked
+# from the first to the last, it would impact the performance to
+# not have this as first rule
+iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# By default accept all traffic coming from the ethernet interfaces
+# (and bridged interfaces) as this usually are the LAN interfaces
+iptables -A FORWARD -i eth+ -j ACCEPT
+iptables -A FORWARD -i br+ -j ACCEPT
+iptables -A INPUT -i eth+ -j ACCEPT
+iptables -A INPUT -i br+ -j ACCEPT
+
+# Accept echo requests (pings) from any host (even from the internet) 
+# because they are really useful for testing out your internet
+# connectivity
+iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+
+# Masquerade all traffic going out through the PPP interfaces as
+# these usually are the WAN interfaces
+iptables -t nat -A POSTROUTING -o ppp+ -j MASQUERADE

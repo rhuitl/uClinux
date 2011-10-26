@@ -1,0 +1,29 @@
+echo "/etc/rc processing..."
+hostname SE5000 
+
+echo "Making Filesystems..."
+expand /etc/ramfs.img /dev/ram1
+expand /etc/ramfs.img /dev/ram2
+
+echo "Mounting Filesystems..."
+mount -t proc proc /proc
+#mount -o remount,rw /dev/root /
+mount -t ext2 /dev/ram1 /var
+mount -t ext2 /dev/ram2 /etc/config
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+
+echo "Loading WiFi modules..."
+insmod hostap_crypt
+insmod hostap_crypt_wep
+insmod hostap
+insmod hostap_pci
+
+echo "Processing Config Filesystem..."
+flatfsd -r
+cp /etc/config/resolv.user /etc/config/resolv.config
+
+echo "/etc/rc complete."

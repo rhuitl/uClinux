@@ -1,0 +1,139 @@
+#
+# MIPS 34K
+#
+# 34K has usually 4 counters per core which can optionally be limited to count
+# events only on a single VPE or even TC.
+#
+event:0 counters:0,1,2,3 um:zero minimum:500 name:CYCLES : Cycles
+event:1 counters:0,1,2,3 um:zero minimum:500 name:INSTRUCTIONS : Instructions completed
+event:11 counters:0,1,2,3 um:zero minimum:500 name:DCACHE_MISSES : Data cache misses
+event:22 counters:0,1,2,3 um:zero minimum:500 name:L2_MISSES : L2 cache misses
+
+#
+# Events specific to counter 0 and 2
+#
+event:2 counters:0,2 um:zero minimum:500 name:BRANCH_INSNS_LAUNCHED : Branch instructions launched (whether completed or mispredicted)
+event:3 counters:0,2 um:zero minimum:500 name:JR_31_INSN_EXECED : jr $31 (return) instructions executed.
+event:4 counters:0,2 um:zero minimum:500 name:JR_NON_31_INSN_EXECED : jr $xx (not $31), which cost the same as a mispredict.
+event:5 counters:0,2 um:zero minimum:500 name:ITLB_ACCESSES : Instruction micro-TLB accesses
+event:6 counters:0,2 um:zero minimum:500 name:DTLB_ACCESSES : Data micro-TLB accesses
+event:7 counters:0,2 um:zero minimum:500 name:JTLB_INSN_ACCESSES : Joint TLB instruction accesses
+event:8 counters:0,2 um:zero minimum:500 name:JTLB_DATA_ACCESSES : Joint TLB data (non-instruction) accesses
+event:9 counters:0,2 um:zero minimum:500 name:INSN_CACHE_ACCESSES : Instruction cache accesses
+event:10 counters:0,2 um:zero minimum:500 name:DCACHE_ACCESSES : Data cache accesses
+event:14 counters:0,2 um:zero minimum:500 name:INTEGER_INSNS_COMPLETED : Integer instructions completed
+event:15 counters:0,2 um:zero minimum:500 name:LOADS_COMPLETED : Loads completed (including FP)
+event:16 counters:0,2 um:zero minimum:500 name:J_JAL_INSN_COMPLETED : j/jal instructions completed
+event:17 counters:0,2 um:zero minimum:500 name:NO_OPS_COMPLETED : no-ops completed, ie instructions writing $0
+event:18 counters:0,2 um:zero minimum:500 name:ALL_STALLS : All stalls (no action in RF pipe stage)
+event:19 counters:0,2 um:zero minimum:500 name:SC_INSNS_COMPLETED : sc instructions completed
+event:20 counters:0,2 um:zero minimum:500 name:PREFETCH_INSNS_COMPLETED : Prefetch instructions completed
+event:21 counters:0,2 um:zero minimum:500 name:L2_CACHE_WRITEBACKS : L2 cache writebacks
+event:23 counters:0,2 um:zero minimum:500 name:EXCEPTIONS_TAKEN : Exceptions taken
+event:24 counters:0,2 um:zero minimum:500 name:CACHE_FIXUP_EVENTS : cache fixup events (specific to the 34K family microarchitecture)
+event:25 counters:0,2 um:zero minimum:500 name:IFU_STALLS : IFU stalls (when no instruction offered) ALU stalls
+
+#
+# 28-31      Available to count implementation-specific events signalled by wires from configurable
+#          interfaces.
+event:28 counters:0,2 um:zero minimum:500 name:EXT_POLICY_MANAGER : External policy manager
+event:30 counters:0,2 um:zero minimum:500 name:COREEXTEND_LOGIC : CorExtend logic
+event:31 counters:0,2 um:zero minimum:500 name:EXTERNAL_YIELD_MANAGER_LOGIC : External Yield Manager logic
+event:32 counters:0,2 um:zero minimum:500 name:ITC_LOADS : ITC Loads
+event:33 counters:0,2 um:zero minimum:500 name:UNCACHED_LOADS : Uncached Loads
+event:34 counters:0,2 um:zero minimum:500 name:FORK_INSTRUCTIONS : fork instructions
+event:35 counters:0,2 um:zero minimum:500 name:CP2_REG_TO_REG_INSNS : CP2 register-to-register instructions
+event:36 counters:0,2 um:zero minimum:500 name:DSP_INSTRUCTIONS : DSP instructions
+
+#
+# 37-46      Count number of cycles (most often ``stall cycles'', ie time lost), not just number of events.
+#
+event:37 counters:0,2 um:zero minimum:500 name:L1_ICACHE_MISS_STALLS : L1 I-cache miss stalls
+event:38 counters:0,2 um:zero minimum:500 name:L2_IMISS_STALLS : L2 I-miss stalls
+event:39 counters:0,2 um:zero minimum:500 name:L1_DCACHE_MISS_PENDING_CYCLES : Cycles where L1 D-cache miss pending
+event:40 counters:0,2 um:zero minimum:500 name:UNCACHED_LOAD_STALLS : Uncached load stalls
+event:41 counters:0,2 um:zero minimum:500 name:MDU_STALLS : MDU stalls
+event:42 counters:0,2 um:zero minimum:500 name:CP2_STALLS : CP2 stalls
+event:44 counters:0,2 um:zero minimum:500 name:CACHE_INSTRUCTION_STALLS : Stalls due to cache instructions
+event:45 counters:0,2 um:zero minimum:500 name:LOAD_USE_STALLS : Load to Use stalls
+event:46 counters:0,2 um:zero minimum:500 name:OTHER_INTERLOCK_STALLS : Other interlock stalls
+event:47 counters:0,2 um:zero minimum:500 name:RELAX_BUBBLES : ``Relax bubbles'' - when thread scheduler chooses to schedule nothing to reduce power consumption.
+event:48 counters:0,2 um:zero minimum:500 name:IFU_FB_FULL_REFETCHES : IFU FB full re-fetches
+
+#
+# 50-55    Monitor the state of various FIFO queues in the load/store unit: FSB (``fill/store buffer''), LDQ
+#                                                        a
+#        (``load queue'') and WBB (``write-back buffer'').
+#        Some count events, others count stall cycles. None can be filtered per-TC or per-VPE.
+#
+event:50 counters:0,2 um:zero minimum:500 name:FSB_LESS_25_FULL : FSB < 25% full
+event:51 counters:0,2 um:zero minimum:500 name:FSB_OVER_50_FULL : FSB > 50% full
+event:52 counters:0,2 um:zero minimum:500 name:LDQ_LESS_25_FULL : LDQ < 25% full
+event:53 counters:0,2 um:zero minimum:500 name:LDQ_OVER_50_FULL : LDQ > 50% full
+event:54 counters:0,2 um:zero minimum:500 name:WBB_LESS_25_FULL : WBB < 25% full
+event:55 counters:0,2 um:zero minimum:500 name:WBB_OVER_50_FULL : WBB > 50% full
+
+#
+# Events specific to counter 0 and 2
+#
+
+event:2 counters:0,2 um:zero minimum:500 name:BRANCH_MISPREDICTS : Branch mispredictions
+event:3 counters:0,2 um:zero minimum:500 name:JR_31_MISPREDICTS : jr $31 mispredictions.
+event:4 counters:0,2 um:zero minimum:500 name:JR_31_NOT_PREDICTED : jr $31 not predicted (stack mismatch).
+event:5 counters:0,2 um:zero minimum:500 name:ITLB_MISSES : Instruction micro-TLB misses
+event:6 counters:0,2 um:zero minimum:500 name:DTLB_MISSES : Data micro-TLB misses
+event:7 counters:0,2 um:zero minimum:500 name:JTLB_INSN_MISSES : Joint TLB instruction misses
+event:8 counters:0,2 um:zero minimum:500 name:JTLB_DATA_MISSES : Joint TLB data (non-instruction) misses
+event:9 counters:0,2 um:zero minimum:500 name:ICACHE_MISSES : Instruction cache misses
+event:10 counters:0,2 um:zero minimum:500 name:DCACHE_WRITEBACKS : Data cache writebacks
+event:14 counters:0,2 um:zero minimum:500 name:FPU_INSNS_COMPLETED : FPU instructions completed (not including loads/stores)
+event:15 counters:0,2 um:zero minimum:500 name:STORES_COMPLETED : Stores completed (including FP)
+event:16 counters:0,2 um:zero minimum:500 name:MIPS16_INSNS_COMPLETED : MIPS16 instructions completed
+event:17 counters:0,2 um:zero minimum:500 name:INT_MUL_DIV_UNIT_INSNS_COMPLETED : integer multiply/divide unit instructions completed
+event:18 counters:0,2 um:zero minimum:500 name:REPLAY_CYCLES : Cycles lost due to ``replays'' - when a thread blocks, its instructions in the pipeline are discarded to allow other threads to advance.
+event:19 counters:0,2 um:zero minimum:500 name:SC_FAILED_INSNS : sc instructions completed, but store failed (because the link bit had been cleared).
+event:20 counters:0,2 um:zero minimum:500 name:SUPERFLUOUS_PREFETCHES : ``superfluous'' prefetch instructions (data was already in cache).
+event:21 counters:0,2 um:zero minimum:500 name:L2_ACCESSES : L2 cache accesses
+event:24 counters:0,2 um:zero minimum:500 name:CYCLES_INSN_NOT_IN_SKID_BUFFER : Cycles lost when an unblocked thread's instruction isn't in the skid buffer, and must be re-fetched from I-cache.
+event:25 counters:0,2 um:zero minimum:500 name:ALU_STALLS : ALU stalls
+
+#
+# 28-31      Available to count implementation-specific events signalled by wires from configurable
+#          interfaces.
+event:28 counters:0,2 um:zero minimum:500 name:COP2 : Co-Processor 2
+event:29 counters:0,2 um:zero minimum:500 name:DATA_SIDE_SCRATCHPAD_RAM_LOGIC : Data-side scratchpad RAM logic
+event:30 counters:0,2 um:zero minimum:500 name:SYSTEM_INTERFACE : System interface
+event:31 counters:0,2 um:zero minimum:500 name:ITC_LOGIC : ITC logic
+event:32 counters:0,2 um:zero minimum:500 name:ITC_STORES : ITC Stores
+event:33 counters:0,2 um:zero minimum:500 name:UNCACHED_STORES : Uncached Stores
+event:34 counters:0,2 um:zero minimum:500 name:YIELD_INSNS : yield instructions.
+event:35 counters:0,2 um:zero minimum:500 name:MFC2_MTC2_INSNS : CP2 move to/from instructions.
+event:36 counters:0,2 um:zero minimum:500 name:DSP_RESULT_SATURATED : DSP result saturated
+
+#
+# 37-46      Count number of cycles (most often ``stall cycles'', ie time lost), not just number of events.
+#
+event:37 counters:0,2 um:zero minimum:500 name:L1_DCACHE_MISS_STALLS : L1 D-cache miss stalls
+event:38 counters:0,2 um:zero minimum:500 name:L2_DCACHE_MISS_STALLS : L2 D-miss stalls
+event:39 counters:0,2 um:zero minimum:500 name:L2_MISS_PENDING_CYCLES : Cycles where L2 miss is pending
+event:40 counters:0,2 um:zero minimum:500 name:ITC_LOAD_STORE_STALLS : ITC load/store stalls
+event:41 counters:0,2 um:zero minimum:500 name:FPU_STALLS : FPU stalls
+event:42 counters:0,2 um:zero minimum:500 name:COREEXTEND_STALLS : CorExtend stalls
+event:43 counters:0,2 um:zero minimum:500 name:DATA_SIDE_SCRATCHPAD_ACCESS_STALLS : Data-side scratchpad access stalls
+event:44 counters:0,2 um:zero minimum:500 name:STALLS_NO_ROOM_PENDING_WRITE : Stalls when no more room to store pending write.
+event:45 counters:0,2 um:zero minimum:500 name:ALU_TO_AGEN_STALLS : ALU to AGEN stalls
+event:46 counters:0,2 um:zero minimum:500 name:BRANCH_MISPREDICT_STALLS : Branch mispredict stalls
+event:48 counters:0,2 um:zero minimum:500 name:FB_ENTRY_ALLOCATED : FB entry allocated
+
+#
+# 50-55    Monitor the state of various FIFO queues in the load/store unit: FSB (``fill/store buffer''), LDQ
+#                                                        a
+#        (``load queue'') and WBB (``write-back buffer'').
+#        Some count events, others count stall cycles. None can be filtered per-TC or per-VPE.
+#
+event:50 counters:0,2 um:zero minimum:500 name:FSB_25_50_FULL : FSB 25-50% full
+event:51 counters:0,2 um:zero minimum:500 name:FSB_FULL_PIPE_STALLS : FSB full pipeline stalls
+event:52 counters:0,2 um:zero minimum:500 name:LDQ_25_50_FULL : LDQ 25-50% full
+event:53 counters:0,2 um:zero minimum:500 name:LDQ_FULL_PIPE_STALLS : LDQ full pipeline stalls
+event:54 counters:0,2 um:zero minimum:500 name:WBB_25_50_FULL : WBB 25-50% full
+event:55 counters:0,2 um:zero minimum:500 name:WBB_FULL_PIPE_STALLS : WBB full pipeline stalls

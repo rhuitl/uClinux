@@ -1,0 +1,148 @@
+$Id: compile.txt,v 1.7 2004/01/25 10:39:48 andrew_belov Exp $ 
+
+INTRODUCTION 
+
+        This is  a collection of  developers' notes for  the open-source
+        ARJ project.
+
+
+HOW TO COMPILE 
+
+        UNIX-like systems,  as well as OS/2  EMX,  need to be configured
+        first.   Run "cd gnu;  autoheader; autoconf; ./configure; cd .."
+        to proceed with the standard GNU configuration process.
+
+        Tip: the   "configure" script would  be  different for UNIX-like
+        systems and OS/2  EMX. That is the  reason for not including  it
+        into the source code distribution.
+
+        ** TODO: on OS/2, InnoTek GCC v 3.2.x has not been tested yet **
+
+        Next,  run  GNU  make in the toplevel directory.  If you specify
+        "DEBUG=1", the executables will be built with debug information.
+        See GNUmakefile for details on available options).  Example:
+
+        gmake DEBUG=1
+        gmake
+
+        ARJ  may be  packaged  in a SFX  file  by choosing the "package"
+        target instead of    the default target, "all".    The  packages
+        created by  the open-source distribution   would  be similar  to
+        those distributed by ARJ  Software Russia.  Unlike the  previous
+        closed-source releases, the  open-source ARJ distribution  is no
+        longer stamped with a signature known as ARJ-SECURITY.
+
+
+CODE ORGANIZATION CONSIDERATIONS 
+
+        For clarity, handle NULL as it might be !=0, so actions like "if
+        (!strchr(...))" are deprecated. 
+
+        The  data structures  are   described  with a simple    "struct"
+        statement. "typedef struct" is only  used to emphasize a complex
+        type with a "hidden"  implementation, like FILE  in C, which  is
+        different   in various C  implementations.  In  other words, the
+        "typedef struct" construct has never to be  used in ARJ modules,
+        although it takes longer time  to type the extra word, "struct",
+        in declarations.
+
+        Some  variables may have doubtful  names,  like bytes_written in
+        hollow_decode().    These   result  from   countless   cut+paste
+        operations.
+
+        Despite  our attempts to keep  the code scattered within several
+        files, DOS-hosted   compilers    may run out   of   memory while
+        compiling the  source. Even more, the fact  that some  files are
+        larger than 64K adversely affects the portability.
+
+        Be   careful  when you convert  an   array  definition like char
+        p[SOME_CONSTANT]; to a pointer for dynamic allocation.  The size
+        of such array may be referenced with sizeof() statement.
+
+        No  dependencies are made on  the  *.H files (and actually there
+        are very  deep,  sometimes even  circular dependencies).    Most
+        oftenly, all   targets must be   recompiled when an  .H  file is
+        changed.  An exception may be  the introduction of an equate  or
+        declaration - in this case, obviously, there is no need to force
+        the recompile.
+
+
+CODING STYLE 
+
+        ** TODO: this section will have to be revised ** 
+
+        The coding style is distinct  in that the single space character
+        is used as indentation. 
+
+        Oftenly, the conditional expressions are writen in the following
+        form: 
+
+        (control_expression)?result1:result2. 
+
+        Although the brackets around  control_expression are a  waste of
+        space, we use them to highlight the control_expression. 
+
+        One  may  use  the  "BUGBUG:",  "TODO:"  and  "FIXME:"  comments
+        ("BUGBUG:" is the  preferred style) to designate  code  portions
+        that need further work.
+
+
+COMPILER ISSUES 
+
+        Some compilers (e.g. Turbo C++  v 1.0) do not automatically pick
+        default include file   subdirectory  from   INCLUDE  environment
+        varibable. In such cases, the include  path is usually specified
+        in a corresponding .STS file. 
+
+        Dynamic linkage with  LIBC when  using IBM  C Set/2 is  possible
+        only if the libraries have  been converted to LINK386-compatible
+        format (LIBCS.LIB) and the headers  have been patched to fix the
+        stdin/stdout  macro abuse  (results   in null pointers  once the
+        optimization is turned on).
+
+        The "-O2" GCC optimization  parameter may impose problems in GCC
+        v 2.9x through 3.1x.   Upgrade to GCC v  3.2 is suggested.  "-O2
+        -fno-expensive-optimizations" may also serve as a workaround.
+
+
+COMPILER BUGS
+
+        Microsoft C compiler v 6.00A performs optimizations incorrectly,
+        resulting in broken code. Therefore, register optimizations have
+        been disabled.
+
+        Microsoft C compiler v 6.00A (unsure about the others) prefers a
+        function over the label with the same name in ASM clauses within
+        functions. 
+
+        The run-time library   in MS C    v 7.00 (even  with  the Sep'92
+        patches applied) has  some quirks with converting  dates to/from
+        unixtime. ARJ will report the  date in M_ARCHIVE_CREATED one day
+        before  than the  actual date. This  bug  does not occur neither
+        with MS C v 6.0, nor with subsequent releases (Visual C/C++).
+ 
+        Microsoft Visual C  v 1.00 compiler (CL.EXE  v 8.00) fails  when
+        /Os is specified. /Olerg is  used  as a  workaround to this.  An
+        extensive analysis of  the exact optimization switch that causes
+        the failure  has  not been   yet  performed so the  optimization
+        efficiency has been scaled down to pretty inaccurate. 
+
+        This hasn't    been investigated thoroughly    but it seems that
+        Borland C++ v 4.00 is not able to link COM files with C0T.OBJ. A
+        workaround for this  is to use C0T.OBJ from  Borland C++  v 3.10
+        package instead. 
+
+        MASM   v 6.00 occasionally  may  end up with  an exception under
+        OS/2, leaving a blank object  file and therefore obstructing the
+        compilation.  Microsoft claims that it has been fixed in version
+        6.01. Note that  this problem may no longer  be observed in ARJ,
+        as the ASM  portions have been  mostly eliminated in ARJ  v 2.71
+        and at early stages of ARJ v 2.72 development. 
+
+
+PLATFORM ISSUES
+
+        When compiling under DOS, version 4.00 or higher is required due
+        to use  of "@" modifiers  in MAKEFILE.  Compiled executables may
+        be  run  in  lower  versions of DOS   if it's   allowed by their
+        implementation.

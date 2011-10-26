@@ -1,0 +1,161 @@
+
+                                Port Forwarding
+                                       
+   This is my first attempt at documenting the code I wrote to expand on
+   the functionality of the IP Masquerading code included in Linux 2.0.*
+   kernels.
+   
+New
+
+   Thanks to Ray Bagley for producing new patches for 2.0.31. They are
+   now available
+   at[1]ftp://ftp.ox.compsoc.org.uk/pub/users/steve/ipsubs/subs-patch-1.3
+   2.gz
+   
+Port Forwarding - Why?
+
+   Before I describe what port forwarding is, let me describe the
+   situation that persuaded me to write this code. A local computer group
+   had 3 computers and 1 IP address. They had implemented an IP
+   masquerading solution to allow people to use all 3 computers with the
+   configuration:
+   
+                          INTERNET
+                              | (194.160.1.1)
+                         linux box 1
+                              | (10.0.0.1)
+                +--------------------------+ internal ethernet
+                | (10.0.0.2)               | (10.0.0.3)
+           linux box 2                linux box 3
+
+   The first linux box was a 386SX20 with only 4Mb and couldn't have
+   coped with any real users. We then redirected telnet, mail, web, etc.
+   to one of the two internal machines with plug-gw or nc (netcat) from
+   inetd.
+   
+   This had a number of problems:
+   
+     * Some services such as rlogin in to the cluster didn't work
+       properly
+     * Logs on internal machines were difficult to interpret as all
+       connections originated at the gateway host.
+     * Making internal services which use UDP visible externally was
+       difficult.
+     * Redirecting inward connections was much slower than masquerading
+       outward ones.
+     * It confused the users.
+       
+Port Forwarding - What is it?
+
+   The easiest way to imagine Port Forwarding is a combination of routing
+   by port combined with packet rewriting. A convention router examines
+   the packet header and dispatches the packet on one of its other
+   interfaces, depending on the packet's destination address. Port
+   Forwarding examines the packet header and forwards it on to another
+   host (after a little header rewriting) depending on the destination
+   port.
+   
+   In more detail: Port forwarding forwards all packets intended for one
+   forwarding port on the gateway from the external networks to routed on
+   a specified port on one of the internal machines (after a little
+   rewriting of headers). This is (in some ways) a reverse of
+   masquerading and uses many of the maquerading functions - particularly
+   the packet header rewriting code.
+   
+   Confused? Here's an example:
+   
+   On the gateway, we setup the rule that all connections to port 80/tcp
+   should be redirected to port 80 on 10.0.0.2 (an internal machine). The
+   incoming web connection would be labelled:
+Source: 163.158.1.2/7890  Dest: 194.160.1.1/80
+
+   This would be forwarded on to the internal host as:
+Source: 163.158.1.2/7890  Dest: 10.0.0.2/80
+
+   Replies would be labelled:
+Source: 10.0.0.2/80       Dest: 163.158.1.2/7890
+
+   and would be rewritten by the gateway to:
+Source 194.160.1.1        Dest: 163.158.1.2/7890
+
+   This has a number of advantages over using tools like nc and plug-gw
+   to do the forwarding:
+     * As there is less copying of packets in memory, its much faster.
+     * Internal hosts see the original connection source so so logs are
+       meaningful.
+     * It's easy to load split between the internal hosts. The choice of
+       host can also depend on live feedback such as which machine has
+       the lower load average. This decision making is done entirely in
+       userspace so is easy to implement.
+     * As redirection is done at a packet level, you don't need different
+       gatewaying tools for different services.
+     * It's very stable. Our gateway machine has been crashed many times
+       (it's not difficult to crash a machine with only 4Mb of memory)
+       but it's carried on forwarding/masquerading although someone
+       notices that they can't log in and reboots it.
+       
+Port Forwarding - How does it work?
+
+   [This section is optional reading and is not necessary to use Port
+   Forwarding]
+   
+   Port forwarding uses the existing masquerading scheme to do all the
+   rewriting of packets. The masquerading table (what you see when you
+   type netstat -M or ipfwadm -M -l) is setup as if the connection
+   started internally. When the existing masquerading code receives a
+   packet from the external interface, it checks whether the destination
+   port is in the range 61000-64999 and, if so, checks for any current
+   entries in the masquerading table. If there is a matching entry, it
+   rewrites the packet header and forwards it onto its new desintation.
+   Port forwarding performs an additional check on the destination port
+   if it isn't in the masquerading range to see whether it's a forwarding
+   port. If it is, we let the existing code check for an entry in the
+   masquerading table. If a corresponding entry exists in the
+   masquerading table, the existing masquerading code rewrites the header
+   and sends the packet out. If the destination port is a forwarding port
+   but doesn't have an entry in the masquerading table, we create a
+   suitable entry in the table before rewriting the packet and sending it
+   out.
+   
+Port Forwarding - How do I use it?
+
+   The code was original written for Linux 2.0.27-29 and worked with many
+   other 2.0.* kernel. Changes were made to the kerne's masquerading code
+   in 2.0.30 and this provoked me to improve and upgrade my patches while
+   converting them for 2.0.30. The new patches use 17k less memory when
+   in use and are smaller, neater and better integrated into the kernel
+   distribution and with a Makefile option.
+   
+   [2]Using the Linux 2.0.27-29 patches.
+   [3]Using the Linux 2.0.30-31 patches.
+   
+Port Forwarding - Anything else?
+
+   When I wrote this code, I didn't imagine anyone else ever using this
+   code other than the computer group I mentioned. I would appreciate all
+   comments on the idea of port forwarding and its implementation,
+   whether it's "didn't you know there's a much easier way of doing it"
+   or "I liked the idea but I extended it by doing ...". If there are any
+   mistakes or areas that aren't clear in the above documentation, please
+   also let me know. My email address is: [4]steven@monmouth.demon.co.uk
+   
+   First FAQ: I now know what port forwarding is but what's IP
+   Substitution or IPSubs?
+   
+   Answer: IP Substitution was the original name I gave to the code I
+   wrote. I subsequently decided I didn't like the name and changed it to
+   Port Forwarding instead.
+   
+   Lastly...
+   
+     _________________________________________________________________
+   
+   Last updated on 27th October, 1997
+
+References
+
+   1. ftp://ftp.ox.compsoc.org.uk/pub/users/steve/ipsubs/subs-patch-1.32.gz
+   2. http://www.monmouth.demon.co.uk/ipsubs/portfw-2.0.29.html
+   3. http://www.monmouth.demon.co.uk/ipsubs/portfw-2.0.30.html
+   4. mailto:steven@monmouth.demon.co.uk
+   5. http://www.monmouth.demon.co.uk/

@@ -1,0 +1,160 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V4.2//EN">
+
+<book>
+    <bookinfo>
+	<title>gflags Module</title>
+	<authorgroup>
+	    <author>
+		<firstname>Jiri</firstname>
+		<surname>Kuthan</surname>
+		<email>jiri@iptel.org</email>
+	    </author>
+	</authorgroup>
+	<copyright>
+	    <year>2004</year>
+	    <holder>FhG FOKUS</holder>
+	</copyright>
+	<revhistory>
+	    <revision>
+		<revnumber>$Revision: 1.1.2.1 $</revnumber>
+		<date>$Date: 2005/06/22 23:16:52 $</date>
+	    </revision>
+	</revhistory>
+    </bookinfo>
+    <toc></toc>
+    
+    <chapter>
+	<title>User's Guide</title>
+	
+	<section>
+	    <title>Overview</title>
+	    <para>
+		The module implements global flags. The difference between the
+		global flags and flags that can be used in the configuration
+		file or AVPs is that they the scope of the global flags is not
+		limited to the SIP message or transaction being
+		processed. Global flags are always available, their contents is
+		not forgotten when a SIP transaction gets destroyed in SER.
+	    </para>
+	    <para>
+		Global flags can be accessed from the configuration script, for example:
+	    </para>
+	    <programlisting>
+if (is_gflag("1")) {
+    t_relay_to_udp("10.0.0.1", "5060");
+} else {
+    t_relay_to_udp("10.0.0.2", "5060");
+};
+</programlisting>
+	    <para>
+		The value of the global flags can be manipulated by external
+		tools such as the web interface of SER or cmd line
+		administration tools. One particular application of global
+		flags could be runtime configuration changes without the need
+		to restart SER.
+	    </para>
+	</section>
+	<section>
+	<title>Dependencies</title>
+	    <para>
+		None.
+	    </para>
+	</section>
+	<section>
+	    <title>Exported Parameters</title>
+	    
+	    <section>
+		<title><varname>initial</varname> (integer)</title>
+		<para>
+		    The initial value of global flags. Each bit in the integer
+		    represents one flag.
+		</para>
+		<para>
+		    Default value is 0.
+		</para>
+	    </section>
+	</section>
+	
+	<section>
+	    <title>Exported Functions</title>
+
+	    <section>
+		<title><function moreinfo="none">set_gflag(flag_num)</function></title>
+		<para>
+		    Set the flag identified by flag_num to 1. The range of
+		    flag_num is 0 to 31.
+		</para>
+		<example>
+		    <title><function moreinfo="none">set_gflag</function> usage</title>
+		    <programlisting format="linespecific">
+...
+set_gflag("2");
+...
+</programlisting>
+		</example>
+	    </section>
+
+	    <section>
+		<title><function moreinfo="none">reset_gflag(flag_num)</function></title>
+		<para>
+		    Set the flag identified by flag_num to 0. The range of
+		    flag_num is 0 to 31.
+		</para>
+		<example>
+		    <title><function moreinfo="none">reset_gflag</function> usage</title>
+		    <programlisting format="linespecific">
+...
+reset_gflag("2");
+...
+</programlisting>
+		</example>
+	    </section>
+
+	    <section>
+		<title><function moreinfo="none">is_gflag(flag_num)</function></title>
+		<para>
+		    Returns 1 when flag identified by flag_num is set, 0
+		    otherwise. The range of flag_num parameter is 0 to 31.
+		</para>
+	    </section>
+
+	</section>
+	<section>
+	    <title>FIFO Interface</title>
+	    <para>
+		The state of the global flags can be read and modified over the
+		FIFO interface of SER. This module implements the following
+		FIFO interface functions:
+	    </para>
+	    <itemizedlist>
+		<listitem>
+		    <para>
+		    <emphasis>set_gflag</emphasis> - Set the value of a flag to 1. The
+		    function accepts one parameter which is the number of the
+		    flag to be set.
+		    </para>
+		</listitem>
+		<listitem>
+		    <para>
+		    <emphasis>reset_gflag</emphasis> - Reset the value of a flag to
+		    0. The function accepts one parameter which is the number
+		    of the flag to be reset.
+		    </para>
+		</listitem>
+		<listitem>
+		    <para>
+		    <emphasis>is_gflag</emphasis> - Return the status of a flag. The
+		    FIFO function would return TRUE if the flag is set and
+		    FALSE if it is not set. The only parameter of this function
+		    is the number of the flag.
+		    </para>
+		</listitem>
+	    </itemizedlist>
+	</section>
+    </chapter>
+</book>
+
+<!-- Keep this element at the end of the file
+Local Variables:
+End:
+-->

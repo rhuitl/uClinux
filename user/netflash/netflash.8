@@ -1,0 +1,71 @@
+.Dd May 26, 2001
+.Dt NETFLASH 8
+.Os "uClinux-coldfire-tools"
+.Sh NAME
+.Nm netflash
+.Nd upgrade firmware on uclinux-coldfire platforms using the blkmem interface.
+.Sh SYNOPSIS
+.Nm netflash
+.Op Fl vnbhk?
+.Op Fl d Ar delay
+.Op Fl c Ar console
+.Op Fl r Ar flash-device
+.Op Ar net-server
+.Ar file-name
+.Sh DESCRIPTION
+.Nm netflash 
+is a program that allows upgrading to the latest versions of software 
+available.  It is able to download these images over the network using either 
+.Tn http
+or
+.Tn tftp.
+It can flash into any /dev/rom device that provides a blkmem 
+interface.
+.Sh OPERATION
+.Pp
+When invoked,
+.B netflash
+attempts to entirely load the specified file into main memory, and then write 
+out the file to the desired flash device.  If there is not enough memory to 
+entirely load the file into memory,
+.B netflash
+exists in error.
+.Pp
+A file can be loaded from a local file, over an IP network using either
+http or tftp, on some systems ftp is available.
+.Sh COMMAND LINE
+.Bl -tag -width Ds
+.It Fl v 
+Output version information for the netflash.
+.It Fl n
+Don't check the checksum at the end of the file that is downloaded.
+.It Fl b
+Don't reboot the system once the file has been programmed into the flash device.
+.It Fl h
+Print online help.
+.It Fl k
+Don't kill processes to try and make enough room for the downloaded image.  On
+units that are running a lot of services (i.e. a lot of pptp-server connections)
+, or units that don't have much RAM, this option may not work.
+.It Fl d Ar delay
+Wait
+.Ar delay
+seconds before starting to aqcuire the requested image.
+.It Fl c Ar console
+Use the specified device as the main tty when the program is run.
+.It Fl r Ar flash-device
+Once the image is acquired, try to load the image into the specified flash 
+device.
+.It Ar net-server
+Either the name, or IP address of the server that contains the device.  If you
+are flashing a local file, or downloading a file using http, then you don't need
+this option.
+.It Ar file-name
+The filename which you are trying to load locally.  For http transfers this
+should be of the type:
+.Pp
+http://my.server.com/filename.
+.Sh SEE ALSO
+.Xr flashw 8
+.Sh AUTHOR
+Matthew Natalier (matthewn@snapgear.com)

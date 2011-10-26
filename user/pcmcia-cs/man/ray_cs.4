@@ -1,0 +1,153 @@
+.\"
+.\" Man page for ray_cs Raylink wireless LAN Card Services
+.\"
+.\" Copyright (c) 1999 Corey Thomas
+.\"
+.\" You may distribute under the terms of the GNU General Public
+.\" License version 2 only
+.\"
+.\" Corey Thomas
+.\" corey@world.std.com
+.\"
+.TH ray_cs "January 20, 1999"
+.LO 4
+.SH NAME
+ray_cs \- Raylink wireless LAN \- PCMCIA card device driver
+.br
+.SH SYNOPSIS
+.B insmod ray_cs 
+.RB [essid=string]
+.RB [irq_mask=n]
+.RB [net_type=[0-1]]
+.RB [ray_debug=[0-5]]
+.RB [phy_addr=xNNNNNNNNNNNN]
+.RB [hop_dwell=n]
+.RB [beacon_period=n]
+.RB [psm=[0-1]]
+.RB [translate=[0-1]]
+.RB [country=[1-8]]
+.RB [sniffer=[0-1]]
+.RB [bc=[0-1]]
+.SH DESCRIPTION
+.B ray_cs
+is the low level Card Services device driver for the Raylink wireless
+LAN PCMCIA adapter.  It is normally loaded automatically by card
+services according to the parameters specified in
+.IR /etc/pcmcia/ray_cs.opts .
+.SH PARAMETERS
+.TP
+.B essid=string
+ESS ID - network name to join string with maximum length of 32 chars
+default value = "LINUX"
+
+.TP
+.B irq_mask=n
+linux standard 16 bit value 1bit/IRQ lsb is IRQ 0, bit 1 is IRQ 1 etc.
+Used to restrict choice of IRQ's to use.
+
+.TP
+.B net_type=n
+0 = adhoc network (default)
+1 = infrastructure
+
+.TP
+.B ray_debug=n
+(0-5) larger values for more verbose logging.
+.TP
+.B phy_addr=string          
+string of 12 hex digits containing new MAC address.
+must be started with x e.g. x00008f123456
+
+.TP
+.B hop_dwell=n
+hop dwell time in Kilo-microseconds legal values = 16,32,64,128(default),256
+
+.TP
+.B beacon_period=n
+Beacon period in Kilo-microseconds.
+.br
+Legal values = 16,32,64,128,256(default) 
+must be integer multiple of hop dwell.
+
+.TP
+.B psm=n
+Power save mode
+.br
+0 = continuously active
+.br
+1 = power save mode (significantly slower)
+
+.TP
+.B bc=n
+Power save mode
+.br
+0 = 802.11 timing
+.br
+1 = 802.11 modified timing.  Interframe spacing is slowed down for
+compatibility with older Breezecom access points.
+
+.TP
+.B translate
+.br
+0 = no translation (encapsulate frames)
+.br
+1 = translation (default)
+
+.TP
+.B country=n
+.br
+Country code
+.br
+1 = USA (default)
+.br
+2 = Europe
+.br
+3 = Japan
+.br
+4 = Korea
+.br
+5 = Spain
+.br
+6 = France
+.br
+7 = Israel
+.br
+8 = Australia
+
+.TP
+.B sniffer=n
+.br
+0 = normal network interface - not sniffer (default)
+.br
+1 = sniffer which can be used to record all network traffic using
+tcpdump or similar, but no normal network use is allowed.  This is
+because linux has no knowledge of 802.11 headers and cannot parse them
+correctly.  Note that tcpdump does not understand 802.11 headers,
+either so it can't interpret the contents, but it can record to a
+file.
+
+.TP
+.SH BUGS
+ray_cs can lock the machine if the card is pulled out while active.
+I have never observed a crash if card is deactivated as follows before
+removal:
+.br
+.B	ifconfig eth0 down
+.br
+The above command assumes that the Raylink card is configured as eth0.
+
+This driver only does encapsulation of ethernet frames within 802.11
+frames.  Most vendors, including Raytheon, are moving to a frame
+translation method.  Translation support has been started, but is not
+yet functional.
+
+Support for defragmenting frames is not yet tested.
+
+The ioctl support is incomplete.  The hardware address cannot be set
+using ifconfig yet.  If a different hardware address is needed, it may
+be set using the phy_addr parameter in ray_cs.opts.
+
+.SH AUTHOR
+Corey Thomas \- corey@world.std.com
+.SH "SEE ALSO"
+cardmgr(8), pcmcia(5), ifconfig(8).

@@ -1,0 +1,21 @@
+watchdog /dev/watchdog
+hostname SE4200
+expand /etc/ramfs.img /dev/ram1
+expand /etc/ramfs.img /dev/ram2
+mount -t proc proc /proc
+cp /etc/2 /proc/cpu/alignment
+mount -t ext2 /dev/ram1 /var
+mount -t ext2 /dev/ram2 /etc/config
+mkdir -m 1777 /var/tmp
+mkdir -m 755 /var/log
+mkdir -m 755 /var/run
+mkdir -m 1777 /var/lock
+mkdir -m 755 /var/empty
+mkdir -m 755 /var/mnt
+flatfsd -r
+insmod authd
+#cardctl bind orinoco_cs
+cardmgr
+initconf -v
+ifconfig lo 127.0.0.1
+echo "/etc/rc complete."

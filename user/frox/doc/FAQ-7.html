@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 0.9.21">
+ <TITLE>Frox FAQ: Troubleshooting</TITLE>
+ <LINK HREF="FAQ-8.html" REL=next>
+ <LINK HREF="FAQ-6.html" REL=previous>
+ <LINK HREF="FAQ.html#toc7" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="FAQ-8.html">Next</A>
+<A HREF="FAQ-6.html">Previous</A>
+<A HREF="FAQ.html#toc7">Contents</A>
+<HR>
+<H2><A NAME="s7">7.</A> <A HREF="FAQ.html#toc7">Troubleshooting</A></H2>
+
+<H2><A NAME="ss7.1">7.1</A> <A HREF="FAQ.html#toc7.1">I can't connect to an ftp site through frox?</A>
+</H2>
+
+<P>Look at the log file that frox produces and see if it gives
+you any clues. It should say ``Connect from A to B''. If it
+doesn't say anything then you aren't getting through to frox
+at all - check the config file to see frox is listening on the
+right address/interface. Have you remembered to do the
+ipchains/iptables command that is in the INSTALL file?</P>
+<P>If the log file suggests frox is connecting back to itself
+then you are probably contacting it directly and
+non-transparent proxying is switched off. Either switch
+non-transparent proxying on in the config file, or make sure
+that your ftp client is not trying to connect directly to frox
+- either from you specifying the frox machine as the ftp host
+on the command line, or from the client trying to use it
+explicitly as a proxy.</P>
+<P>If you have a complicated network setup then check the
+<A HREF="FAQ-8.html#networking">Network Problems</A> section. </P>
+<P>Read the 
+<A HREF="FAQ-3.html#client-ref">client configuration</A>
+section again</P>
+<H2><A NAME="ss7.2">7.2</A> <A HREF="FAQ.html#toc7.2">Frox says "unable to determine destination address"</A>
+</H2>
+
+<P>There are two likely causes for this. One is that you are
+trying to do non-transparent proxying, but the config file is
+not setup correctly. Ensure that <CODE>DoNTP</CODE> is set to
+<CODE>yes</CODE> in the config file, and comment out
+<CODE>NTPAddress</CODE> - it is never necessary and only serves
+a purpose if you are doing a mixture of transparent and
+non-transparent proxying.</P>
+<P>The other possiblity is that your connection is
+transparently redirected to frox, but frox is unable to
+determine the orriginal destination. The most likely cause is
+if you are using Linux kernel 2.4.x with ipchains
+compatability. I do not know of a way around this short of
+changing from ipchains to iptables (or changing back to a
+2.2.x kernel!).</P>
+<H2><A NAME="ss7.3">7.3</A> <A HREF="FAQ.html#toc7.3">Non transparent proxying won't work</A>
+</H2>
+
+<P>Check whether you have NTPAddress set. If this is set then
+it must be set to the address and port that the ftp clients
+are using to contact the proxy, otherwise clients will not be
+offered non transparent proxying. If you unset it then all
+clients will be offered non transparent proxying.</P>
+<H2><A NAME="ss7.4">7.4</A> <A HREF="FAQ.html#toc7.4">Frox ignores the Squid proxy I am using</A>
+</H2>
+
+<P>If you have HTTP caching set up then frox should conduct
+all anonymous downloads through your proxy. But, frox also
+needs to make an ftp connection to the remote ftp server for
+retrieving directory listings etc. Therefore if you do netstat
+or equivalent you will not see a connection from frox to squid
+unless a file download is actually in progress.</P>
+<P>This also means that you cannot use frox + squid and then
+firewall off ftp access to the outside world altogether. Your
+best bet is to keep frox (with or without squid), and set
+<CODE>ApConv</CODE> to <CODE>yes</CODE> in the config file. You will
+still need to allow frox to make outbound tcp connections on
+port 21, and any ports in the PasvPorts range, but you should
+not have any of the usual problems associated with firewalling
+ftp.</P>
+<H2><A NAME="ss7.5">7.5</A> <A HREF="FAQ.html#toc7.5">HTTP caching doesn't work for a particular host</A>
+</H2>
+
+<P>With HTTP caching frox makes a connection to the ftp server
+initially, and then the http proxy/cache makes its own connection
+when you initiate a download. If the http proxy and frox are both
+at the same IP address then there will be problems with any ftp
+server (and there are a few) which only allow one connection per
+host.</P>
+<P>The workaround is not to use http caching! You can either do
+this globally, or put in a specific config file subsection to
+turn off caching for any hosts that you have this problem with.
+A better workaround should appear in a future version.</P>
+<H2><A NAME="ss7.6">7.6</A> <A HREF="FAQ.html#toc7.6">Non transparent proxy when usernames contain @</A>
+</H2>
+
+<P>As of version 0.7.8 frox scans the username from right to
+left when looking for the dividing @. If your username on the
+remote server is abc@def.org and you are logging in to
+ftp.gnu.org you can simply give "abc@def.org@ftp.gnu.org" to
+frox as your username.</P>
+<P>If you are using both transparent and non-transparent
+proxying then you will need to use the <CODE>NTPAddress</CODE>
+option so that when your direct connection to ftp.gnu.org is
+intercepted by frox it won't interpret your username
+"abc@def.org" as a login to def.org with username abc.</P>
+<H2><A NAME="ss7.7">7.7</A> <A HREF="FAQ.html#toc7.7">Audiogalaxy</A>
+</H2>
+
+<P>Audiogalaxy is a music sharing program. Although
+audiogalaxy works through port 21 it does not use the ftp
+protocol, and therefore frox does not allow its connections
+through. If you are using frox as a transparent proxy and you
+wish to use audiogalaxy then you need to change your
+iptables/netfilter rules so that packets addressed to the
+audiogalaxy servers do not pass through frox. Fortunately
+audiogalaxy does not use port 21 to contact other machines
+using the audiogalaxy client so these do not also need to be
+added.</P>
+<H2><A NAME="ss7.8">7.8</A> <A HREF="FAQ.html#toc7.8">I still can't get it to work</A>
+</H2>
+
+<P>There is a mailing list at <CODE>frox-user at lists.sourceforge.net</CODE>.
+Please say what version of frox you are running, what
+version of the linux kernel, whether you gave any options to
+<CODE>./configure</CODE> at compile time, and what point exactly
+it fails at. The log file should give you some info, especially if
+you set LogLevel to 25.</P>
+<HR>
+<A HREF="FAQ-8.html">Next</A>
+<A HREF="FAQ-6.html">Previous</A>
+<A HREF="FAQ.html#toc7">Contents</A>
+</BODY>
+</HTML>

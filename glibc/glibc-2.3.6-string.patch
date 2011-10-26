@@ -1,0 +1,142 @@
+--- glibc-2.3.6/sysdeps/i386/bits/string.h.old	2008-07-20 09:45:26.000000000 +1000
++++ glibc-2.3.6/sysdeps/i386/bits/string.h	2008-07-20 10:08:32.000000000 +1000
+@@ -562,21 +562,20 @@
+   register unsigned long int __d0;
+   register char *__res;
+   __asm__ __volatile__
+-    ("cld\n\t"
+-     "1:\n\t"
+-     "lodsb\n\t"
++    ("1:\n\t"
++     "movb	(%0),%%al\n\t"
+      "cmpb	%%ah,%%al\n\t"
+      "je	2f\n\t"
++     "leal	1(%0),%0\n\t"
+      "testb	%%al,%%al\n\t"
+      "jne	1b\n\t"
+-     "movl	$1,%1\n"
+-     "2:\n\t"
+-     "movl	%1,%0"
+-     : "=a" (__res), "=&S" (__d0)
+-     : "0" (__c), "1" (__s),
++     "xorl	%0,%0\n"
++     "2:"
++     : "=r" (__res), "=&a" (__d0)
++     : "0" (__s), "1" (__c),
+        "m" ( *(struct { char __x[0xfffffff]; } *)__s)
+      : "cc");
+-  return __res - 1;
++  return __res;
+ }
+ 
+ 
+@@ -651,15 +650,14 @@
+ strcspn (__const char *__s, __const char *__reject)
+ {
+   register unsigned long int __d0, __d1, __d2;
+-  register char *__res;
++  register __const char *__res;
+   __asm__ __volatile__
+     ("pushl	%%ebx\n\t"
+-     "cld\n\t"
+      "movl	%4,%%edi\n\t"
++     "cld\n\t"
+      "repne; scasb\n\t"
+      "notl	%%ecx\n\t"
+-     "decl	%%ecx\n\t"
+-     "movl	%%ecx,%%ebx\n"
++     "leal	-1(%%ecx),%%ebx\n"
+      "1:\n\t"
+      "lodsb\n\t"
+      "testb	%%al,%%al\n\t"
+@@ -670,10 +668,9 @@
+      "jne	1b\n"
+      "2:\n\t"
+      "popl	%%ebx"
+-     : "=&S" (__res), "=&a" (__d0), "=&c" (__d1), "=&D" (__d2)
+-     : "d" (__reject), "0" (__s), "1" (0), "2" (0xffffffff),
+-       "m" ( *(struct { char __x[0xfffffff]; } *)__s)
+-     : "cc");
++     : "=S" (__res), "=&a" (__d0), "=&c" (__d1), "=&D" (__d2)
++     : "r" (__reject), "0" (__s), "1" (0), "2" (0xffffffff)
++     : "memory", "cc");
+   return (__res - 1) - __s;
+ }
+ # else
+@@ -781,21 +778,20 @@
+ __STRING_INLINE char *
+ strpbrk (__const char *__s, __const char *__accept)
+ {
+-  unsigned long int __d0, __d1, __d2;
++  register unsigned long int __d0, __d1, __d2;
+   register char *__res;
+   __asm__ __volatile__
+     ("pushl	%%ebx\n\t"
++     "movl	%%edx,%%edi\n\t"
+      "cld\n\t"
+-     "movl	%4,%%edi\n\t"
+      "repne; scasb\n\t"
+      "notl	%%ecx\n\t"
+-     "decl	%%ecx\n\t"
+-     "movl	%%ecx,%%ebx\n"
++     "leal	-1(%%ecx),%%ebx\n"
+      "1:\n\t"
+      "lodsb\n\t"
+      "testb	%%al,%%al\n\t"
+      "je	2f\n\t"
+-     "movl	%4,%%edi\n\t"
++     "movl	%%edx,%%edi\n\t"
+      "movl	%%ebx,%%ecx\n\t"
+      "repne; scasb\n\t"
+      "jne	1b\n\t"
+@@ -805,10 +801,9 @@
+      "xorl	%0,%0\n"
+      "3:\n\t"
+      "popl	%%ebx"
+-     : "=&S" (__res), "=&a" (__d0), "=&c" (__d1), "=&D" (__d2)
+-     : "r" (__accept), "0" (__s), "1" (0), "2" (0xffffffff),
+-       "m" ( *(struct { char __x[0xfffffff]; } *)__s)
+-     : "cc");
++     : "=S" (__res), "=&a" (__d0), "=&c" (__d1), "=&D" (__d2)
++     : "d" (__accept), "0" (__s), "1" (0), "2" (0xffffffff)
++     : "memory", "cc");
+   return __res;
+ }
+ # else
+@@ -857,28 +852,27 @@
+   register unsigned long int __d0, __d1, __d2;
+   register char *__res;
+   __asm__ __volatile__
+-    ("pushl	%%ebx\n\t"
+-     "cld\n\t" \
+-     "movl	%4,%%edi\n\t"
++    ("cld\n\t"
+      "repne; scasb\n\t"
+      "notl	%%ecx\n\t"
++     "pushl	%%ebx\n\t"
+      "decl	%%ecx\n\t"	/* NOTE! This also sets Z if searchstring='' */
+      "movl	%%ecx,%%ebx\n"
+      "1:\n\t"
+-     "movl	%4,%%edi\n\t"
++     "movl	%%edx,%%edi\n\t"
+      "movl	%%esi,%%eax\n\t"
+      "movl	%%ebx,%%ecx\n\t"
+      "repe; cmpsb\n\t"
+      "je	2f\n\t"		/* also works for empty string, see above */
+-     "xchgl	%%eax,%%esi\n\t"
+-     "incl	%%esi\n\t"
+-     "cmpb	$0,-1(%%eax)\n\t"
++     "cmpb	$0,-1(%%esi)\n\t"
++     "leal	1(%%eax),%%esi\n\t"
+      "jne	1b\n\t"
+-     "xorl	%%eax,%%eax\n\t"
++     "xorl	%%eax,%%eax\n"
+      "2:\n\t"
+      "popl	%%ebx"
+      : "=&a" (__res), "=&c" (__d0), "=&S" (__d1), "=&D" (__d2)
+-     : "r" (__needle), "0" (0), "1" (0xffffffff), "2" (__haystack)
++     : "0" (0), "1" (0xffffffff), "2" (__haystack), "3" (__needle),
++       "d" (__needle)
+      : "memory", "cc");
+   return __res;
+ }

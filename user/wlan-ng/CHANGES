@@ -1,0 +1,1104 @@
+* CHANGES
+*
+* Copyright (C) 1999 AbsoluteValue Systems, Inc. All Rights Reserved.
+* --------------------------------------------------------------------
+*
+* linux-wlan
+*
+*   The contents of this file are subject to the Mozilla Public
+*   License Version 1.1 (the "License"); you may not use this file
+*   except in compliance with the License. You may obtain a copy of
+*   the License at http://www.mozilla.org/MPL/
+*
+*   Software distributed under the License is distributed on an "AS
+*   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
+*   implied. See the License for the specific language governing
+*   rights and limitations under the License.
+*
+*   Alternatively, the contents of this file may be used under the
+*   terms of the GNU Public License version 2 (the "GPL"), in which
+*   case the provisions of the GPL are applicable instead of the
+*   above.  If you wish to allow the use of your version of this file
+*   only under the terms of the GPL and not to allow others to use
+*   your version of this file under the MPL, indicate your decision
+*   by deleting the provisions above and replace them with the notice
+*   and other provisions required by the GPL.  If you do not delete
+*   the provisions above, a recipient may use your version of this
+*   file under either the MPL or the GPL.
+*
+* --------------------------------------------------------------------
+*
+* Inquiries regarding the linux-wlan Open Source project can be
+* made directly to:
+*
+* AbsoluteValue Systems Inc.
+* info@linux-wlan.com
+* http://www.linux-wlan.com
+*
+* --------------------------------------------------------------------
+*
+* Portions of the development of this software were funded by 
+* Intersil Corporation as part of PRISM(R) chipset product development.
+*
+* --------------------------------------------------------------------
+-pre21
+ - Add a per frame rx structure for OOB data to be passed to p80211
+	This is a step in the right direction for a major overhaul of 
+	internal frame representation.  The prism2 driver shouldn't care 
+	about sniff headers or any of that crap; it should always pass
+	everything to p80211  (via this metadata) and the p80211conv_* 
+	functions should do that work.  It's also needed to eventually
+	support different encryption types.
+ - Added in beginnings of IWSPY support via patch from Josef Kriegl
+ - Install modules to $MOD_DIR/linux-wlan-ng instead of $MOD_DIR/kernel
+ - Primary/Secondary firmware (finally) bundled with the driver.
+ - Convert to newer 2.6 module parameter code.
+ - Fix an inverted test in GIWENCODE wireless extension (Shiro Ninomiya)
+ - Minor script fix for SSF cards (Pavel Roskin)
+ - Card idents.
+ - Fixes for SSF PCI cards; default to x16 SRAM as that's more common.
+   (download script now automatically detects hardware type)
+ - Fix script problems that result in a failed init returning success.
+ - Fix an endian-ness buglet in prism2sta.c (Federico Pellegrin)
+ - Compile fixes for 2.2.x kernels. (no tasklets or spin_lock_bh)
+ - Fix up pci resources on card init failure on plx card.
+-pre20
+ - Fix up pci resources on card init failure
+ - Ident for "ROPEX FreeLan 802.11b USB Adapter" (Francesco Bochicchio)
+ - ETHTOOL support now optional, fixes build on older kernels.
+ - Fix prism2dl to not use kernel headers to fix 2.6.3 build (Pavel Roskin) 
+-pre19
+ - Add a 'lnxind_roam' indication.
+ - minor typo in the nwepgen makefile (Pavel Roskin)
+ - More makefile fixes (Pavel Roskin)
+-pre18a
+ - brown-paper-bag fix for the 2.4 build.  And it no longer builds on 
+   2.2 thanks to an accidental makefile commit.
+-pre18
+  - Fix broken makefiles so that prism2dl and the rc script install
+  - Get rid of the txfid lock, it's not necessary.
+  - Tasklet-driven RX handlers.
+  - Further work towards a Wireless Extension-enabled future.
+    - SIWFRAG, SIWRETRY, SIWFREQ, SIWRTS implemented
+    - SIWENCODE, SIWESSID taken from zdsta-1.0.3 (needs work)
+    - SIWCOMMIT Implemented ala autojoin.
+    - write support defaults to disabled, override via module parameter
+  - fix a warning in the wireless extension code.
+  - hfa384x.h header updates
+  - Fix prism2dl to handle the S7 record being elsewhere in the image.
+    (Pavel Roskin)
+  - Fix up brown paper bag script error for SSF hardware.
+-pre17
+  - Spruce up the GIWNAME wireless extension ioctl. (Natsakis Konstantinos)
+  - Added in basic ethtool support; for link status reflection.
+  - Fixed a double-locked spinlock which deadlocked on SMP boxes.
+  - /proc/net/p80211/wlanX/nsd now has useful information about the
+    prism2 hardware/firmware revisions.
+  - eliminate the unused 'collptr' from the mib structures.
+  - Fix a bug with the pcmcia script and scanning (Dan Noe)
+  - Fix a crash on a VCC mismatch.
+  - Split out most pci/plx/pcmcia/usb specific code into their own .c files.
+  - Make prism2_cs build on 2.6.2-rc
+  - Changes to support SSF hardware.
+  - Card ident for D-Link DWL-650P1
+  - Move the prism2 link notification handler operate in scheduler 
+    context to avoid a hang in softirq context.
+  - Melco WLI-USB-KB11 USB widget added (Bela Fenyvessy)
+  - Add in x86-64 support, plus other cleanups in wlan_compat.h
+  - Support the Netgear MA311 PCI card.  (Steve Berry)
+-pre16
+  - Implement wireless extension SETCHANNEL. (SIOCSIWFREQ)
+    - Currently broken.  :)
+  - Fix several sniffing-related bugs:
+    - disable when we're already disabled
+    - no longer perform a full h/w reset when we're already enabled
+    - Vastly reduce CPU usage on channel hop.
+  - Fix a crash on unload for pci/plx widgets (Pavel Roskin)
+-pre15
+  - Minor fix for the shared script (Jeff Chua)
+  - fix "bad: schedule while atomic" bug introduced by recent 2.6.0-test 
+    kernels and wireless extensions.
+  - Switch to using spin_[un]lock_bh for the cmdlock; this way we 
+    disable the transmit bh from running while issuing a card command.
+    Also have the txframe function obtain the lock.
+  - Hawking HighDB USB Widget (Allan Claghorn)
+  - Fix a double-lock in hfa384x_cmd_notify
+  - Identity for "T-Sinus 111 USB WlAN Adapter" (Roman Koutny)
+  - Fix up alignment problems on frame rx. (Ranjit Deshpande)
+-pre14
+  - Update the HAS_HOTPLUG test to something considerably more foolproof
+  - Add ids for the Airvast Prism3 USB widget
+  - bap locking was broken when illegal parameters were passed. (Andre McCurdy)
+  - Don't use jiffies for timeouts when interrupts are disabled. (Andre McCurdy)
+  - Make the Configure script a little saner.
+  - Remove the Zydas 1201 USB widget.  Use the Zydas modified 
+    linux-wlan-ng release instead (we hope to merge it in eventually)
+-pre13
+  - Fix two big-endian bugs in the scan code.
+  - Hotplug agent executes '/sbin/ifup INTERFACE' if possible.
+  - Planex GW-US11H USB adaptor (Henry Ip)
+  - Averatec USB Wlan Adapter (Stephan Miller)
+  - D-Link DWL-122 USB widget (Andrew Beresford)
+  - ASUS-WL140 Wireless USB widget
+  - Fix the WLAN_LOG_NOTICE macro for gcc 2.95.x
+-pre12
+  - Fix up endian bugs in lnxerq_commsquality.
+  - Get rid of the pcmcia release timer for >2.6.0-test5
+  - Card ident for 'ZyDAS ZD1201 Wireless USB Adapter' (Albert Pauw)
+  - More tweaks for 2.6.0-test4
+  - fix some bash-isms in /etc/wlan/shared (Daniel Song)
+  - Collapsed the BOUNDEDINT and INT types into one.
+  - Eliminated the WLAN_LOG_***0() macros at long last thanks to CPP 
+    trickery.  Also eliminated more cruft from wlan_compat.h
+  - Card ident for the Samsung SWL-2210P PCI card
+  - Try not to schedule a USB endpoint reset if there's one already 
+    pending. (Chris Rankin)
+  - Fix pci/plx operation on architechures with >32bit physical address 
+    sizes. (namely mips64 & some mips32)
+  - get rid of save_flags/cli/restore_flags in prism2_cs on >2.2 builds
+    (tweaked from patch by Pavel Roskin)
+  - pci_device_id tables should not be marked __devinitdata
+-pre11
+  - support genesis mode for RAM download of primary fimware
+  - prism2_usb now builds on 2.5/2.6.  
+    - endpoint numeration removed.
+    - hfa384x_usb_corereset unimplemented for 2.5/2.6
+  - hfa384x.h updates.
+  - p80211conv_* functions should work with netdev->mtu, not MAX_ETHFRM.
+  - Simply erase the bogus '3rdparty' drivers on Mandrake systems.
+  - Card idents for Adaptec AWN-8030/AWN-8020, and Netgear MA111
+  - Strip out all 2.2.x stuff from prism2_usb, it doesn't work.
+  - add proper __devinit/__devexit/etc tags to prism2sta.c
+  - Minor USB janitorial patch from Chris Rankin.
+  - Make most card commands require superuser access (exception is 
+    mibget)  (Original patch by Pavel Roskin)
+-pre10
+  - Make the wakeup flag in the usbctlx structure volatile, as well as 
+    other wait condition variables.
+  - Make the rx_urb buffer dynamically allocated so we can re-post the 
+    URB as soon as possible.
+  - Get rid of completion.h
+  - More wlan_compat updates.
+  - Disable TXEX reporting on USB as well as TXOK.  should improve
+    stability a tad.
+  - Further 2.5 USB work.  Not quite there yet.
+-pre9 
+  - Properly initialize the prism2_cs release timer (Pavel Roskin)
+  - Eliminate the CONFIG_ISA requirement for prism2_cs (Pavel Roskin)
+  - netlink build fixes for 2.5.71
+  - Hopefully fix the 2.2.x build.
+  - More USB fixes (Chris Rankin)
+  - Compile fixes for < 2.4.20
+-pre8
+  - Fix the pcmcia breakage introduced in -pre2.  
+  - On USB widgets, only signal txcomplete if there was a tx error.
+  - Minor cleanups in the PCMCIA code.
+-pre7
+  - Add in the 'JVC MP-XP7250" USB Widget.
+  - Don't call ev_alloc on tx_complete event; only the tx urb completion.
+  - Minor tweaks to tx_timeout code
+  - More USB updates; primarily with error-handling.  (Chris Rankin) 
+-pre6
+  - On USB transmits, don't return 'success' if the tx_urb is still
+    pending.  Also don't wake the netdev queue if the tx fails.
+  - Hook up the tx watchdog timer and add a p80211-level handler.
+  - Fix compilation with older (<= 2.4.18) kernels.
+  - Another massive USB+other patch from Chris Rankin:
+    - a separate list for "finished" CTLX objects.
+    - correct (hopefully!) handling of -EPIPE errors, shamelessly copied
+      from^W^Winspired by David Brownell's usbnet driver.
+    - finished support for asynchronous commands, with proper tracking 
+      through the CTLX lifecycle, clean-up etc. Each asynchronous command now 
+      completes in its own tasklet.
+    - CTLX cancellation and error handling.
+    - further work on the timers and spin locks.
+    - clean up setconfig16() and setconfig32() functions so that they 
+      take appropriate value parameters, even if the underlying 
+      setconfig() commands don't.
+    - use an asynchronous command in setmulticast(). (CS, PCI and PLX 
+      are still synchronous; they just pretend not to be.)
+    - further clean up in the disconnect() handler. However, it's still 
+      not a good idea to remove the adapter while the 
+      prism2sta_inf_hostscanresults() function is sleeping, and the wlandevice
+      struct could easily have been freed before the p80211req_dorequest() 
+      function manages to clear the request_pending bit. It would be 
+      nice if we could cancel both of these operations when we call 
+      prism2sta_ifstate(P80211ENUM_ifstate_disable). 
+    - extra support for Linux 2.5 (task queue -> work queue).
+    - reset the link status when we stop the driver.
+  - Some work on module locking.  Not there yet, but getting better.
+  - Remove magic numbers from USB endpoint probe (Chris Rankin)
+  - Eliminate useless timer in p80211do_request, as all calls are 
+    synchronous.  Also clena up more function pointers, and a few other 
+    doodads. (Modified from patch by Chris Rankin)
+  - Track the current SSID in the wlandev; Make the WEXT stuff key from 
+    this.  Update the SSID when we get a linkstatus_connect notification.
+  - A couple of misc cleanups from Chris Wilson
+  - Cleanups in the 2.5 makefile code. (Pavel Roskin)
+  - Add in another PCI device ID, to handle Sony VAIO PCG-V505AP
+  - Make sure CONFIG_ISA is enabled for the prism2_cs build. (x86 only)
+-pre5  
+  - Get rid of generic manfids in  /etc/pcmcia/wlan.conf (Pavel Roskin)
+  - Fix the 'make install' target.
+  - only call flush_scheduled_tasks() if DECLARE_TASKLET not defined.
+    (fixes 2.5.x compile)
+-pre4
+  - More script work; mostly cleanups and other enhancements. 
+  - Substantial prism2_usb patch from Chris Rankin.
+    - using 2 Linux lists for CTLXs
+    - remove race condition and double-free with CTLXs in disconnect()
+    - initialise URBs correctly (vital for Linux 2.5+)
+    - separate callbacks for data/CTLX OUT URBs
+    - flush task queue on shutdown
+    - more thorough use of spinlocks with CTLXs
+    - set the ASYNC_UNLINK flag when it is time to unlink an URB 
+      asynchronously, and not before.
+    - ensure we stop submitting URBs once the disconnect function 
+      is called.
+  - More USB idents (Jeff Chua)
+  - Scan now uses active scans only; should speed things up a bit.
+  - Proper module init/cleanup in prism2sta.c, plus more work for 2.5.69
+  - Added in descriptions for module parameters.
+  - Major overhaul of the hotplug stuff.  Now we use our own hotplug
+    event class, and use that to kick off configuration and whatnot.
+    All device types (pci/plx/pcmcia/usb) now use this mechanism.
+    Also brings us things like unified power management (suspend/resume)
+  - Supress spurious output when setting WEP parameters.
+  - Only query PrivacyOptionImplemented if wep was enabled in the config
+    Works around an apparent firmware bug, see http://bugs.debian.org/190851
+  - Eliminate hw->name.  
+  - Card ident for NL-2511CD Plus pcmcia card.
+  - Minor tweak on pcmcia removal.
+  - Fix the USB compile on <2.4.20
+-pre3
+  - get rid of wlandev_get_index and whatnot.
+  - URB cleanup in the USB code.  (Chris Rankin)
+  - Moved host auth sequence out of interrupt context.
+  - USB paranoia checks (Chris Rankin)
+  - Partial rewrite of the USB shutdown sequence
+  - eliminate wlandev->hwremovedfn().
+  - Minor tweaks to the mib.
+  - Get rid of the horridly outdated skeleton driver.
+-pre2  
+  - Fix a crash-on-unload affecting pci and plx adapters
+  - have the init script load the module if needed.
+  - Handle the new 2.5.69+ irq handler semantics
+  - Fix 2.5 with pcmcia (Pavel Roskin)
+  - Massive cleanup of the prism2/driver/Makefile (Pavel Roskin)
+  - Don't wrap the [un]register_netdevice() calls in rtnl_[un]lock()
+    And use the [un]register_netdev() calls instead.
+  - Call the hwremoved() functions on pci/plx_remove
+  - Eliminate the prism2sta_priv_t structure.
+  - Fix a memory leak on ifstate_disable
+  - Minor changes to the USB driver
+  - Widget id for "Melco WLI-USB-KS11G" (Ichiro Doi)
+  - Function pointer syntax cleanup (Chris Rankin)
+  - Push the multicast/promisc set into the prism2 driver.
+  - Move type/multicast filtering into the p80211 layer.
+  - Format fix for p802addr_to_str (Pavel Roskin)
+  - Add a check for non-Intersil firmware.
+  - Fix a infinite recursion in the usb lowlevel code. (Chris Rankin)
+-pre1
+  - Header updates.
+  - Add a card ident for the USR 1120 USB widget (Juan Conde)
+  - Cleaner shutdown; fixed a possible leak and a race condition.
+  - Another rearrangement of the command locks, to eliminate use of the
+    spin_is_locked() call.
+  - Fix a rare deadlock with cmd_initialize (Pavel Roskin)
+  - Add a Lucent-compatible key-generator in add-ons/lwepgen
+  - Fix a stack overflow problem. (Pavel Roskin)
+  - Further monitor mode fix for control frames (Pavel Roskin)
+  - Cleanups in the dependency generation code
+  - Initial 2.5 support.  USB currently broken.
+  - Minor build system cleanups.
+0.2.0
+  - Use PSUEDOIBSS mode for monitor mode; this should eliminate spurious
+    beacon generation.  (Ryan Veety)
+  - Don't drop "unrecognized" frame types in monitor mode.
+  - Added ident for the Linksys WUSB12 (Brad Davidson)
+  - Eliminated most of the WLAN_LOG_???n macros.
+  - Minor fixups in /etc/wlan/shared
+  - Cleaned up some of the error messages in the conversion code.
+  - changed the "Host de-WEP failed" error to a debug message, as the 
+    /proc/net/wireless stats are updated to reflect undecryptable frames
+-pre10
+  - Added the p2TxPowerMax MIB item to specify the TxPower level.
+    0-30 dBm.  Needs STA>=1.7.0 or AP>=1.4.0.
+  - Clean up some spurious warnings in prism2sta.c (Pavel Roskin)
+  - A series of patches from Pavel Kankovsky, somewhat tweaked.  :)
+    - Properly set skb->mac.raw in non-monitor mode
+    - Enhancments to the p80211 frame conversion code
+    - Handle A4 frames.
+    - Don't issue linkstatus notifications in monitor mode
+    - Supress Linkstatus messages in monitor mode
+  - hfa384x.h updates for latest firmware.
+-pre9
+  - ZyXEL ZyAir B200 Wireless USB widget ID added (Paul Lacatus)
+  - Only enable interrupts in one place (hfa384x_drvr_start)
+  - Fix the startup scripts to disable WEP completely if not enabled.
+  - ALLNET 0193 USB widget ID (Kurt Huwig)
+  - Disable the hfa384x port before issuing the autojoin stuff.
+  - Fixed a subtle flaw in the 802.11->802.3 conversion code.
+  - Updates to hfa384x.h
+  - Add productinfo for dlink DRC650 from Petr Slansky.
+  - Minor changes to the rfmon code.
+  - Only notify us on linkstatus changes if it actually changes.
+  - Fixed the path the manpages were installed to.
+-pre8
+  - Properly reset the hardware state after a flash/ram download.
+  - Patch to allow escaped characters in the scan list (Derek Atkins)
+  - Re-added the txfid queue locking which somehow got dropped.
+  - Added DellTrueMobile 1180 USB ident. (Michael Hackett)
+  - Changed linkstatus messages to INFO level reporting.
+  - Ident info for the Intel Anypoint II 802.11b PCMCIA card.
+  - Added support for the SH architechure and many changes necessary for
+    2.5 support.  Modified from the patches by Ryan Veety.
+  - Compile fixes for 2.2.x introduced as part of the new hotplug support.
+  - Added man pages contributed by Joey Hess
+  - Add ident info for the Z-Com 725/726 USB Widgets.
+  - Fixes to silence GCC 3.2 warnings. (Pavel Roskin)
+-pre7
+  - Patch to fix int array mib manipulation.  (Pavel Roskin)
+  - Minor improvements to the build system.
+  - Moved RX processing to a bottom half instead of hard irq context.
+  - Further script improvements:  signal strength filtering, and some 
+    space handling stuff.  The latter is not complete yet.
+  - lnxreq_commsquality wasn't setting the status field properly on the
+    response messages.  
+  - Workaround for spurious interrupts generated before initialization
+    is complete. (Clay Jones)
+  - hotplug script now invokes 'ifup $DEVICE' if present.
+  - Minor cleanups (Pavel Roskin)
+  - Tenative SPARC support. (Olivier Bornet)
+  - After leaving monitor mode, disable the port if we had to enable it.
+  - Updates to hfa384x.h
+-pre6
+  - Further script enhancements; automatically use scan mode on hardware
+    that is known to support it properly.
+  - Fixed errors in the hotplug script, and other misc fixes.
+  - 2.2.x fixes for the new proc stuff and deferred processing stuff.
+  - Add support for the new sniff frame capture. (doc/capturefrm.txt)
+  - Get rid of some bitrot with the sniffing code.
+  - Populate the tx dropped frames statistics.
+-pre5
+  - Fixes for host scan when not currently joined.
+  - /proc support; some informational stuff is kept in /proc/wlandev/wlanX
+  - Complete rewrite of the configuration files and startup scripts.
+     hotplug(pci+usb), pcmcia, rc, everything uses same config file(s).
+     per-network configuration
+     supports scanning and automatically choosing a network from a set.
+  - Fix the TMD7160/ncp130 support so it acually works.  :)
+  - Make the BUG() call in cmd_access enabled only in debug builds.
+  - Minor makefile fixes.
+  - Microsoft MN520 PCMCIA ident info added.
+  - p2cnfShortPreamble is not a boolean value.  (Clay Jones)
+-pre4
+  - BAP access fixes for PCI platforms.  This mostly affects SMP 
+    arrangements.
+  - Back out W200 USB ident info; it's not prism-based.
+  - Patch from Tom Prado to make 'keygen' more user-friendly.
+  - bap_timeout parameter only valid on non-usb platforms
+-pre3
+  - Added Ident info for the USB Compaq/Intel W200 widget
+  - dot11req_scan requires firmware >=1.3.2.
+  - Added the "Acer Warplink USB Adapter" id.
+  - Rework the prism2sta_inf_linkstatus call to defer processing of
+    results until outside interrupt context.  Should fix the SMP
+    deadlocks seen on some machines.
+  - Rework the usb_disconnect code to hopefully alleviate the occasional
+    crash-on-disconnect some people see.  Solution is not SMP-safe yet.
+  - Add the D-Link DCF-660W ident info.
+-pre2
+  - New parameter, 'prism2_bap_timeout' to specify the timeout on
+    bap setup.  timeout*10 == timeout in microseconds.  Note that this
+    timeout occurs in spinlock context, so increasing it arbitrarily is
+    BAD!  Defaults to 1000, ie 10000us.  
+  - compile fix for prism2sta in debug mode.
+  - Only prompt for pcmcia sources if we're using non-kernel pcmcia.
+    (original patch by Beat Bolli, rewritten a bit..)
+  - Add the Linksys WCF12 CF ident info.
+  - A bunch of compile fixes for older versions of wireless extensions.
+  - Added implementations of GIWTXPOWER and GIWRETRY
+  - Some fixes to the wireless extension code (thanks to Jean Tourrilhes)
+-pre1
+  - wland was incorrectly using kernel headers in its compile. 
+  - Adhoc mode was auto-roaming onto "any" SSID.  Fixed.
+  - Implemented the dot11req_scan & dot11req_scan_results functions.
+      This, combined with more intelligent startup scripts, will allow
+      you per-network profiles.   Scripts are unwritten as yet.  :)
+  - hfa384x.h and MIB updates.
+  - Rewrote the wireless extension support code; moved to p80211 layer.
+      Now we're compatible with at least v6-v14, and everything
+      inbetween.   We hook up to the new iw_request structure, which
+      makes further wireless extension support much easier to add.
+  - Add the Microsoft MN510 USB device ID.
+  - Finally fix the 'crash on unload' problem for 2.2.x kernels with PCI.
+    Turns out the kcompat24 code wasn't quite complete.  (Matthew Rush)
+  - Cleaned up our usage of __FUNCTION__ to make gcc 3.x happy.
+  - Fix a typo in the prism2 makefile.  
+0.1.15
+  - Fix an obscure PCMCIA build problem. (modversions disabled but
+    header present, and using non-kernel pcmcia)
+-pre8
+  - Added code to optionally truncate packets in monitor mode. (Clay Jones)
+  - Fix a polarity problem with the stripfcs argument to monitor mode.
+  - Add a test to make sure wireless.h is included.
+  - Netgear MA401A card ident.
+  - Further cleanups of the build system (Makefiles)
+-pre7
+  - Include wireless.h so wireless extensions work again.  :)
+  - Work around the braindead RedHat kernel build system.
+  - Fix a class of unaligned accesses in the message structures 
+    (kernel driver) and user space parsers (wlanctl-ng, etc)
+  - Fix an unpacked struct problem that affected ARM platforms
+    (thanks to Clay Jones for spotting this one)
+-pre6
+  - Support the new auto-unknown mode present in firmware >1.3.3
+    When issuing an autojoin, we try to join a BSS, then an IBSS, and if
+    all fails, we create a new IBSS with the given parameters. 
+ 	*note*  currently disabled.
+  - Updates to hfa384x.h to reflect latest documentation
+  - Build system mini-enema.  Automagically detect kernel version,
+    pcmcia status, and modversions.  Pick up the kernel compile flags.
+  - Hopefully fixed the 'crash on unload' for 2.2.x kernels and PCI.
+  - 'p2req_join' command, see doc/wlanctl-ng.p2req_join.txt 
+    This lets you join a specific SSID.  Thanks to Clay Jones.
+  - A couple more pcmcia/cf card idents
+  - More deletions/fixes in wlan_compat.h
+-pre5
+  - Due to new hotplug code, atmel device detection removed
+  - Further cleanups in wlan_compat.h and non-kernel makefiles
+  - Debian package stuff yanked in favor of the "official" deb packages
+  - Rearranged the wireless extension support code a bit
+  - A fix for the promisc/allmulti stuff on USB devices
+-pre4
+  - Hotplug support for PCI/PLX/USB widgets
+  - A compile fix for 2.2.x (x < 18) kernels and PCI adapters
+  - Support for TMD7160-based "almost but not quite PLX" boards
+  - HP-PA support.  In theory.  Anyone care to test?
+  - pcmcia script cleanups
+  - Add ident info for the "Intel PRO/Wireless 2011B LAN USB Device"
+  - Include an almost-sane fix to the modversion madness
+  - Tweak the init order of the PCI driver structs
+-pre3
+  - Added ident info for ASUS WL-110/WL-100 cards
+  - Support for PCI power managment
+  - Fixed a wep hang on the transmit side
+  - Compile fixes; mainly for 2.2 kernels
+  - Add support for the SIOCGIWRATE wireless extension
+-pre2
+  - Restructured the driver locking.  SMP should be MUCH better now.
+  - Stripped out more dead code. (mainly FID_STACK)
+  - Fix an skb access after we call netif_rx
+  - Fixes for XScale CPUs.
+  - Added added a MiniUSB ident info
+  - Restructure of the docmd_* functions
+-pre1
+  - Host-based WEP decryption and encryption
+  - Partial rewrite of copy_to_bap.
+  - Debian package metadata updated to 3.0-STABLE. (David Everley)
+  - Stripped out a lot of crap from wlan_compat.h
+  - More atmel adapters added to the USB exclude list.
+  - James Goodwin's patch to fix a bug in the 80211conv code.
+  - The 3COM AirConnect board is a PLX adapter. 
+0.1.14
+  - Added PCI ident info for the 3Com AirConnect PCI.
+  - FCS toggle now (really) defaults to false.
+  - Added PCMCIA ident info for the 3Com AirConnect 3CRW737A/3CRW777A
+  - David Everly's patch to kernel detection in the Configure script
+  - David Everly's patch to add better debian packaging bits.
+-pre7
+  - Added kernel tags stuff.
+  - Added PCMCIA ident info for the Actiontec 802CI2 card.
+  - Added PCMCIA ident info for the Proxim RangeLAN-DS/LAN card.
+  - Endian "fixes" for PCI PowerMacs.  This fix may be relevant for other
+    BigEndian/PCI (and PLX) platforms.
+  - FCS in monitor mode now optional; defaults to off.
+  - Populate the monitor channel in the prismheader.
+-pre6
+  - monitor mode now works on USB widgets.
+  - Fix an alignment bug in the rx path.
+  - Fix a brown-paper-bag bug in the usb flash code.
+  - Explicitly enumerate the USB widget endpoints, and use 'em.
+  - REALLY fix the wlan.conf overwriting.
+  - More minor cleanups in the PCI/PLX init code.
+  - endian-ness fixes in the monitor code
+  - Applied a patch from David Everly to fix another 2.2.x compile problem.
+-pre5
+  - Add USB entries for the "Melco WLI-USB-S11 11Mbps WLAN Adapter"
+  - Don't overwrite /etc/wlan.conf if it already exists.
+  - Compile sniffing code if packet socket is modularized.
+  - Fix a typo with the init script.
+  - Fix a compile problem with 2.2.x kernels
+-pre4
+  - First bits of the SMP/locking fixes.
+  - Partial rewrite of the PCI/PLX/USB driver internals.
+  - Added a makefile for the 'addons/keygen' tool.
+  - Fixed a race condition in the USB code.
+  - Applied Godmar Back's "SSIDs with spaces" patch.
+-pre3
+  - Applied pizza's patch to remove the pb_t structure and make all 
+    802.11<->ether conversions happen in-place.  Noticeably reduces
+    cpu load.  Also includes a few misc bugfixes to the conversion code.
+  - Workaround for the kernel panic on bringing up a USB interface
+  - Applied Mike Klar's USB patch that adds support for the MIPS
+    target and should, among other things, fix WEP under USB.
+  - Added Remy Cool's patch to add the Dynalink prism2 card ids.
+  - Tim Miller's pcmcia script install path patch
+  - Applied Tim Fletcher's patch to allow compilation against
+    the newest versions of the wireless extensions. (V13)
+  - Added jwyatt's patch for the Compaq Evo N600C USB adapter thing.
+  - Per mwelk's suggestion, changed the displaystring totext to single
+    quote the strings.  Hopefully this will take care of some of the 
+    "SSID w/ space" problems.
+-pre2
+  - tseward's ID code patch for Siemens SpeedStream USB adapters.
+  - pizza's patch for dropping/ignoring frames in promisc and allmulti
+    modes.
+  - crankin's new Actiontec USB IDs.
+  - crankin's fix for wext /proc zero vs. garbage problem.
+-pre1
+  - pizza's chkconfig comment in rc.wlan.
+  - pizza's patch to add true promiscious support to 0.1.13. Also includes
+    Experimental ALLMULTI support.
+  - pizza's patch to add PF_PACKET capture and raw transmit to 0.1.13-pre2, 
+    (with toggles for WEP in sniffing and prism header)
+    NOTE: this patch _removes_ the old netlink monitor mode (sniff) interface.
+    If you're sniffing, you need to use the latest libpcap (v7.2-pre..from CVS),
+    you'll also need to build your own ethereal (0.9.0 or greater) using the
+    latest libpcap.
+  - bhuang's fix for the hfa384x_test_command() function.
+0.1.13
+-pre4
+  - crankin's revised USB ID patch.
+  - Fixed a little buggage in the p80211knetdev_set_mac_address() function.  
+-pre3
+  - crankin's patch for a bug in usb rrid, DBFENTER/EXIT, and Actiontec
+    USB IDs.
+  - hmuurimaa's ID patch for the Omnibook500 integrated USB adapter
+  - proskin's patch for MODULE_LICENSE conditional
+  - dstates (JediElite) submission (others submitted it too) for the
+    NDC PLX card.
+  - crankin's patch for src/prism2/driver/Makefile. PCI and USB were
+    linking with PLX's prism2wext.o file.  DOH!
+-pre2
+  - Synch'd the etc/pcmcia/wlan-ng scripts with the etc/wlan* scripts.
+    This should help PCI/PLX/USB Adhoc users.
+  - Added cmulliner's patch for set_mac_address(). Also changed it to
+    use dot11StationID instead of the prism2 specific mib item...Oh
+    Yeah, I also changed to comments to /*...*/  ;-)
+  - Fixed PDA reads and PDA validation.
+  - KNOWNBUG: prism2_usb + linux-2.4.17 + uhci.o : Very slow performance.
+    We need to look into having multiple posted tx and rx urbs (this is
+    also a TODO).
+  - KNOWNBUG: prism2_usb + linux-2.2.20 + uhci.o : Physically 
+    disconnecting the device causes a Panic.  The logs look like the
+    usbdev is still holding some buffers (urbs?) associated with the
+    device despite the fact that I've explicitly unlinked them.  This
+    problem does not occur on 2.4.17 and, unfortunately, I don't have
+    time to debug 2.2.20 this time around.
+  - Made all corereset() calls dependent on the prism2_doreset module
+    argument.
+  - Added corereset() support for all device types.
+  - Added the lnxreq_ifstate request message.  This request is used
+    to bring the device up to an operable state _after_ the
+    [hostbus]_probe() function is finished.  It can also be used to
+    shutdown and/or restart the driver+device.  This takes the place
+    of the "activate hardware on ifconfig up" code that was introduced
+    in 0.1.11.  This is the change that should fix most of our dhcp
+    client problems.
+  - Massive changes/cleanups to the driver init/shutdown code for all
+    device types (pcmcia|pci|plx|usb).
+  - Removed the add-ons/mibedit application from the linux-wlan-ng package.
+    We'll be re-releasing it as a separate tarball.
+  - Modified hfa384x_usb.c per dbrownell's suggestion to mark the request
+    urb's with the USB_ASYNC_UNLINK flag.  This because we're calling
+    unlink_urb() from the timer callback (intterupt context).
+  - Added arichter's patch for the RRID framelength.  It's a good catch
+    to make things truly correct.  Unfortunately, I don't think it will
+    have any effect.  Because of the 64-byte minimum, the actual RID value
+    is being transferred regardless.  Also, I don't think the RRID handler
+    in the MAC even looks at the framelen field of RRID frames.
+  - Added mwelwarsky's patch for the tx path that may fix some of the
+    "queue empty" errors.  Had to update it for 0.1.13.
+  - Added new PLX device IDs from cyokoyama's patch, but deferred the rest 
+    until we can get a clean patch against the latest release.
+  - Added pizza's v2.1 NETLINK enable/disable patch.  Note that this whole
+    NETLINK enable/disable thing is only barely tested by me.  I _always_
+    have netlink available so maintaining a separate kernel setup just to
+    test this feature is a pain.
+  - Added jdiedrich's pcmcia card ids for the Compaq ipaq PCMCIA card.
+  - Added crankin's patch fixing some more wext induced problems and adding
+    the Actiontec USB ids.
+  - Added abridgett's patch for PRIV_GENSTRING handling.
+  - Added emckee's malloc.h -> slab.h patch and made the mods to the usb
+    and wext files he missed. Some kind list soul told me
+    that the change to slab.h goes way back in the 2.2.x history, so we
+    should be OK.  If this change proves to be a problem for someone with
+    an old kernel, please submit a patch with ifdefs for the version where
+    things changed (not just the version you're using....thanks).
+  - Added jtourrhiles patch for wext reporting level and noise in dbm.
+    To enable the reporting in dbm, you must add "#define WEXT_IN_DB"
+    to the top of src/prism2/driver/prism2wext.c.
+  - Added support for the dbm-normalized RID for CommsQuality in prep
+    for working with Jean's patch.  The mibs are called p2dbmCommsQuality*.  
+    Note that this will only work for secondary firmware versions 1.2.0 
+    and higher. Earlier versions will return with a 
+    'resultcode=implementation_failure'.  Note also: The values returned
+    are signed 16-bit integers that have been stuffed into unsigned 32-bit
+    integers for the trip up to userland.  The following shell expression
+    will convert them back to the signed quantity you want:
+       if [ $val -lt 32767 ]; then
+           echo $1
+       else
+           echo $[ $1 | 0xffff0000 ]
+       fi
+  - Added mkershaw's suggestion to lengthen the wait interval for 
+    commands in hfa384x.c.
+  - Added a note to the README about dleffler's observation regarding
+    netlink troubles and using 'make mrproper'.
+  - Added gback's patch to initialize wireless extensions for non-pcmcia
+    targets.
+-pre1
+  - Fixed a patch induced (not sure which patch) Makefile syntax error.
+  - Added rfloeter's cool Wireless Extensions patch which was kindly 
+    updated to 0.1.12 by pizza.  Note that my own testing of this patch has
+    been minimal but I've had reports of folks who are using it successfully.
+    NOTE: The addition of this patch adds the requirement that Wireless
+    Extensions (version >= 10) be compiled into one's kernel.
+  - DOH! some somewhat kind soul on the lists pointed out that the keygen
+    program wasn't in the distributed tarball.  Basically, I forgot to 
+    check it into CVS, therefore the distribution build script couldn't
+    find it.  Ahem...it's now in CVS and should be included in the tarballs.
+  - Added pizza's patch fixing the "netlink disable" patch.  The 
+    p80211ind_* functions need to be handled individually instead of two
+    giant #if's, but that's a task for another day.
+  - Added theBS's patch for making the /etc stuff installation relative and
+    installing the FIXINST scripts for USB.
+  - Added crankin's SMP deadlock fix patch.
+0.1.12
+  - Added dlyddy's string.h includes and comma fix.  Changing all malloc.h's
+    to slab.h's will have to wait until I figure which kernel version marks
+    the switch so we can ifdef it.
+  - Added bgertfield's Corega support patch.
+  - I added a check to Configure so we add the CONFIG_NETLINK symbol
+    on the compile command line if necessary.
+  - proskin's patches for netlink disable when not configured in kernel,
+    mkprintstr fix, and turn off skeleton install.  The netlink patch
+    pointed out something that might be the root cause of some problems
+    with the _cs driver.  pcmcia_cs now strips the kernel CONFIG items
+    it cares about and puts them in it's own include/linux/config.h 
+    (which is symlinked to include/pcmcia/config.h).
+  - Added mtaylor's suggested close() to do_ioctl() in wlanctl.
+  - Added mkarmak's suggested change for the GL24110P device ID as
+    PCI_DEVICE_GL24110P_ALT and an additional item in the device table
+    for PLX devices.
+  - Added crankin's suggested MODULE_LICENSE statements.  Had to figure
+    out the version ifdefs myself though.  ;-)
+  - Added vragor's patch for arm updates to the Makefiles and Configure.
+  - Added jsuhr's patch of the PLX9052 irq enable code from the orinoco
+    driver.  Note: PLX contributions are highly valued here because we rarely
+    use these devices ourselves.
+  - Added cfang's PCMCIA ident info for AirEZY card.
+  - Made USB port reset in open() an option, DEFAULT IS OFF.
+  - Cleaned up the top edge of hfa384x*.c (needs some more).
+  - Added the notion of CMD vs. AUX format MAC chip addresses.
+  - Modified isgoodpdr() to accept anything less than 0x1000.
+  - Updated the wlan-ng scripts for the new open/close behavior.
+  - Fixed a bunch of issues that caused bad breakage for hot-plugging
+    the USB module.
+  - Added a module argument to enable/disable the MAC (or usbport) reset
+    performed in prism2sta_open().
+  - Moved the port reset corereset() and the call to the open(). This
+    gets the port reset out of the probe_usb() context and appears to
+    solve the recursive probe problem in some cases.
+  - Cleaned up the overlength usb packet problems
+  - Added rmemreq/resp and wmemreq/resp support
+  - Fixed some of the 64-byte packet problems in a few commands.
+0.1.11-usbonly
+  - Note: hfa384x*.c are currently undergoing some changes.  I believe
+    these changes have broken some things for pcmcia/pci/plx support.  I'm
+    not certain since I haven't tested them.  As such, this is a USB ONLY
+    release.
+  - Cleaned up the use of hfa384x_drvr_*() vs. hfa384x_cmd_*() a little.
+    This is a work in progress.
+  - Rewrote the USB request/response machine again.
+  - Added tnewsham's keygen program to the add-ons directory.  I don't
+    include it in the overall build because I'm not comfortable with making
+    this package dependent on openssl right now.  It is supposed to generate
+    keys in a manner identical to the windows software.  I have not personally
+    verified this.  If someone wants to contribute more complete build
+    instructions for this program, please do.
+  - IMPORTANT! Note that we've changed the up/down behavior.  You now
+    must 'up' the linux netdevice interface (e.g. ifconfig wlan0 up) prior
+    to using wlanctl-ng.  Also, wlanctl commands aren't available after
+    "ifconfig down".  From a low-level perspective, this is how most
+    linux netdevices work.  We originally started trying to create a 
+    setup where "ifconfig up" on an interface that wasn't associated would
+    fail.  With PCI and even more so with USB, that has proven unworkable.
+    The idea now is:
+      Step 1: ifconfig wlan0 up 
+               Enables the hardware so it's ready to handle wlanctl-ng commands.
+      Step 2: wlanctl-ng <various commands>, repeat 
+               Set up the dot11 configuration and get yourself associated or
+               whatever.
+      Step 3: ifconfig wlan0 <address>  
+               After getting a "real" 802.11 connection, assign the address
+               to the interface (via static numbers, dhcp or whatever).
+
+      Note that it is very important that you do _not_ down the interface
+      between the initial 'ifconfig up' and the later ifconfig that assigns
+      the address.  'ifconfig down' will shut down and reset the hardware.
+      If you down the interface, all that good work in step 2 will be lost.
+  - Rewrote the USB request/response machine
+  - Moved all memmapped/irq interface elements from prism2*.c to hfa384x.c
+    in preparation for adding USB support.
+  - Fixed 'make clean' so it doesn't generate .depend files.
+  - Removed some leftover pcmcia-cs dependencies for non-pcmcia targets.
+0.1.10
+  - Added module param "prism2_ignorevcc".  If set to non-zero, we just
+    accept the Voltage we get from pcmcia-cs without checking.  USE WITH
+    CAUTION!!!!
+  - Changed the voltage setting code such that we never try to change it.
+  - Added NETGEAR PCI info.
+  - Fixed a problem with the interrrupt enable in mlme_start().
+  - Fixed the netdevice_t problem.
+  - Added some new CIS entries.
+  - Fixed some byte order things re: dblythe's patch.  The problem went
+    a little farther than the patch so I had to change some things.
+  - Added lye's fix for the netdevice_t problem on various targets.
+  - Added an Ad-Hoc support patch from ????? (please identify yourself,
+    it's a nice bit of code and stays within the spirit of things).  Adhoc
+    still needs work though.  Remember, only the _first_ STA in an IBSS
+    should issue an MLME-Start.request.  All the rest should scan/join
+  - Re-added the monitor mode stuff.  At this point I guess Intersil won't 
+    be taking it out.  Many thanks to those who maintained the patches and
+    my apologies for the hassle.
+0.1.9
+  - As part of the PCI stuff, rewrote the scripts for 'fixed' (i.e. non-
+    hotswappable) cards like the ISL3874 and PLX based PCI adapters.
+  - Added support for the dot11req_reset command.  It should perform a
+    complete reset of the MAC and driver.  Note that the MAC needs to be
+    completely reconfigured from userland after the reset has occurred.
+    Also added an internal call to the reset function when unloading a
+    PCI or PLX driver.  We need this reset to make sure that the card is
+    no longer generating interrupts.  Fixed this problem:  If the driver
+    is unloaded, the card is still generating interrupts, and another active
+    device+driver is using the same interrupt....system locks up.  DDT.
+  - Rewrote the PCI support for PLX and ISL3874.  The rewrite was targeted
+    at 2.4.7 with additional code to provide backward compatibility for
+    2.2.x.  NOTE:  the PCI code still doesn't support the PCI power
+    management stuff.  It will probably need more work when laptops w/
+    the ISL3874 based mini-PCI cards show up.
+  - Whoops, forgot to put this in the original 0.1.9 release
+0.1.9-pre1
+  - Added support for the ISL3874 based mini-pci card.  Also cleaned 
+    up some of the PLX stuff (needs more work though).
+0.1.8
+  - Fixed some script bugs relating to WEP and generated keys.
+  - Fixed the autojoin auth type control
+  - Added/Changed some PDR numbers (thanks to BroMax for supplying hardware)
+  - Received a large patch from bjames of Rebel Computing.  Here's a 
+    summary in his words:
+
+     > Minor bugs (not already found in 0.1.8-pre10):
+     > 
+     > 1. p80211metamsg.c:
+     > - Wrong conversion functions for "p2req_mmi_read" (value).  enumint ==>
+     > int
+     > 
+     > 2. prism2sta.c:
+     > - "dot11_desired_bss_type" in "priv" structure left at 0 (i.e. an
+     > invalid value) after initialization so mibget could not retrieve a value
+     > unless the network was started.  Initialized to 1.
+     > 
+     > 3. prism2mgmt.c:
+     > - "prism2mgmt_channel_info()" uses HFA384x_RID_SCANREQUEST_LEN instead
+     > of ...CHANNELINFOREQUEST...  (However, they're the same size.)
+     > 
+     > 4. prism2mgmt.c:
+     > - "prism2mgmt_auxport_read()" did not set the resultcode to "success" if
+     > the read succeeded.
+     > 
+     > 5. p80211types.c:
+     > - "p80211_fromtext_displaystr()" tests for length < maxlen.  This
+     > probably should have been <= maxlen (i.e. excluding the \0), based on
+     > the maxlen values in "p80211metamib.c" and based in what
+     > "p80211_isvalid_displaystr()" checks.  Also,
+     > "p80211_isvalid_displaystr()" assumes that "pstr->len" includes the \0
+     > when it does the minlen check.  It probably shouldn't do this.
+     > 
+     > 6. p80211metamsg.c:
+     > - dot11_reassociate command has a "dot11req_reassociatefailuretimeout"
+     > argument which should probably be "reassociatefailuretimeout".
+     > 
+     > 7. prism2sta.c:
+     > - WLAN_PCI ==> WLAN_PLX in "init_module()".
+     > 
+     > Enhancements:
+     > 
+     > 1. All Prism2 RIDs are now accessible.  Unfortunately, rather a lot was
+     > changed to do this:
+     > - Rather than cut and paste many more cases into the monster
+     > "prism2mib.c" switch statement, "prism2mib.c" was completely reworked to
+     > be table-driven with a bunch of semi-generic processing functions.  That
+     > made it a lot easier to add new DIDs.  Several RID lengths in hfa384x.h
+     > had to be changed from 0 to their actual value since more of the lengths
+     > get used, now.  (Changed: prism2mib.c, hfa384x.h)
+     > - 2 new data types were added to "p80211types.c".  One to handle integer
+     > arrays (i.e. multi-word RID records...so that a DID didn't need to be
+     > added for each element) and bit arrays (just to make them easier to deal
+     > with).  However, there wasn't enough room in the packed DID to add new
+     > types, so the type was removed from the DID (and from P80211DID_MKID)
+     > and a function written to determine the type based on the conversion
+     > functions.  (Changed: p80211meta.h, p80211types.h, p80211meta.c,
+     > p80211types.c, mkmetastruct.c, p80211metamib.c p80211metamsg.c,
+     > wlanctl/help.c)
+     > Integer arrays look like: p2PRIIdentity=21,0,0,3
+     > "meta->maxlen" specifies the number of integers.
+     > Bit arrays look like: p2ChannelList=0,1,2,3,4,5,6,7,8,9,10
+     > for bits 0-10.  "meta->min" and "meta->max" give the range of bits
+     > allowed.
+     > - The "p2Table" DIDs were split into p2Static, p2Dynamic, p2Behavior,
+     > etc., in order to correspond with the Prism Driver Programmer's Manual.
+     > A few of the names were also changed in order to correspond to the
+     > manual.  (Changed: p80211metamib.c, prism2mib.c)  The changed names (of
+     > the supported DIDs) are:
+     > p2SystemScale ==> p2CnfSystemScale
+     > p2MaxDataLen ==> p2CnfMaxDataLength
+     > p2EnhancePowerSaveMode ==> p2CnfPMEPS
+     > p2MaxSleepDurection ==> p2CnfMaxSleepDuration
+     > p2PMHoldoverDuration ==> p2CnfPMHoldoverDuration
+     > p2OwnName ==> p2CnfOwnName
+     > p2McastPMBuffer ==> p2CnfMulticastPMBuffering
+     > p2TxControlDepth ==>p2CnfTxControl
+     > p2RoamingMode ==> p2CnfRoamingMode
+     > p2MMLife ==> p2CnfMMLife
+     > p2AltRetryCount ==> p2CnfAltRetryCount
+     > p2ReserveDuration ==> p2CnfAPPCFInfo (bit 1)
+     > p2ExcludeLongPreamble ==> p2CnfExcludeLongPreamble
+     > - Added new RIDS from the Prism Driver Programmer's Manual 1.70
+     > (2000-11-29).  Added p2CnfPriorityQUsage, p2CnfTimCtrl,
+     > p2CnfThirty2Tally, p2CnfEnhSecurity.  Added "algorithm" to AuthRequest.
+     > 
+     > 2. A user utility program was written to do such things as query all
+     > read-able MIBs, query all write-able MIBs, set all write-able MIBs,
+     > etc.  A "p2req_enable" command was added (similar to the
+     > "dot11req_start" command but without requiring all the 802.11
+     > arguments).  This allows the driver to be started in a straight forward
+     > manner, simply by setting all write-able MIBs and then enabling it.
+     > (Changed: p80211metamsg.c, prism2sta.c, prism2mgmt.c, prism2mgmt.h)
+     > 
+     > 3. Support added for Prism2 CommTallies and a DID added to query the
+     > values.  The values will come back as an array of integers.  Support
+     > also added for 32-bit tallies (i.e. p2CnfThirty2Tally).  (Changed:
+     > prism2mib.c, prism2sta.c, prism2mgmt.h, p80211metamib.c, hfa384x.h)
+     > 
+     > 4. Access Point support:
+     > - Added support for maintaining a list of authenticated/associated
+     > stations and a DID added to query the list.  (Changed: prism2mib.c,
+     > prism2sta.c, prism2mgmt.h, p80211metamib.c)
+     > - Added support for host control of authentications (allowed and denied
+     > lists) and a DID added to set and query the lists.  Support for Prism2
+     > AuthenticationRequest information frames.  Not tested yet.  (Changed:
+     > prism2mib.c, prism2sta.c, prism2mgmt.h, p80211metamib.c)
+     > - Added support for Prism2 PowerSaveUserCount information frames and a
+     > DID added to query the value.  (Changed: prism2mib.c, prism2sta.c,
+     > prism2mgmt.h, p80211metamib.c)
+     > - Added a new data type to "p80211types.c" to handle arrays of MAC
+     > address (used to set/query the above lists).  (Changed: p80211types.h,
+     > p80211types.c, mkmetastruct.c, wlanctl/help.c)
+     > Address arrays look like:
+     > p2Authenticated=00:50:51:52:53:54,00:60:61:62:63:64,00:70:71:72:73:74
+     > "meta->maxlen" specifies the maximum number of addresses.
+     > - Unforetunately, all these lists are limited in length by the length of
+     > the mibattribute parameter in mibget/mibset.  This is not very nice but
+     > it was the quickest/easiest way to implement it.
+     > 
+     > 5. Changed maximum mibattribute length from 256 to 384 to support
+     > querying commtallies and MAC address arrays.  (Changed: p80211types.h)
+     > 
+     > 6. 128-bit WEP key support:
+     > - Rather than creating different MIB's for 64-bit and 128-bit WEP keys,
+     > the "octetstr" definition for dot11WEPDefaultKey0, etc., was changed to
+     > allow for a range of lengths (e.g. from 5 to 13).  The
+     > dot11WEP128DefaultKey0, etc., MIBs were removed.  (Changed:
+     > p80211meta.c, p80211types.c, p80211metamib.c, p80211metamsg.c,
+     > mkmetastruct.c, wlanctl/help.c)
+     > - WLAN_WEP_KEYLEN changed to WLAN_WEP_MAXKEYLEN and set to 13.
+     > (Changed: p80211hdr.h)
+     > - Optional "length" argument added to "nwepgen.c" so that either 5 or 13
+     > byte keys can be handled.  (Changed: nwepgen.c)
+     > - 128-bit-specific parts of "etc/pcmcia/wlan-ng" are no longer
+     > necessary.  Genstr changes to handle generation of 13-byte keys using
+     > nwepgen.  (Changed: etc/pcmcia/wlan-ng)
+     > - WEPDefaultKey's were made write-only.  A new
+     > "P80211ENUM_resultcode_cant_get_writeonly_mib" was added.  (Changed:
+     > p80211types.h, p80211types.c, p80211metamib.c, prism2mib.c)
+     > 
+     > 7. Access code in DID:
+     > - This was changed from a single bit flag (P80211DID_ACCESS_READONLY and
+     > P80211DID_ACCESS_READWRITE) to a pair of flags (P80211DID_ACCESS_READ
+     > and P80211DID_ACCESS_WRITE) since some MIBs are read/write, some are
+     > read-only, and some are write-only (e.g. WEP keys).  This makes it
+     > easier to determine which MIBs are read-able and write-able without
+     > having to go all the way to the driver and then interpret a failure
+     > error code.  (Changed: p80211types.h, p80211metamib.c)
+     > 
+     > 8. It was a bit of a hassle switching between the station driver and the
+     > AP driver...which we seemed to be doing a lot.  The additional cost was
+     > not particulary high to simply compile in both station functionality and
+     > AP functionality.    A change was made so that "prism2sta_initmac()" set
+     > an "ap" flag when it detected AP firmware.  "prism2mgmt.c" then uses the
+     > flag to determine whether or not to allow station-only or AP-only
+     > commands to be executed.  "prism2mib.c" also uses this to handle the
+     > mode-specific MIBs.  This made it possible for the same module to
+     > support either stations or APs, thereby simplifying the "make", the
+     > install, and switching between stations and APs.  The only thing that
+     > needs to change, is the value of "IS_AP" in "wlan-ng.opts".
+     > 
+     > 9. Miscellaneous small additions:
+     > - Network state (stopped, started) added and a DID to query it.
+     > - User-settable comment string added and a DID to set/query it.
+     > - Some event logging (authentications, associations, etc.) can be
+     > enabled/disabled at run time rather than only at compile time.  A DID
+     > was added to set/query it.
+     > - A "p2req_readcis" command (similar to "p2req_readpda") was added.
+     > 
+     > 10. Small changes:
+     > - Added bounds checking to "p80211item_fromtext_boundedint".  This was
+     > the only "fromtext" function that did not already do complete
+     > validation.  It should no longer be necessary to call the "isvalid"
+     > function if "fromtext" has just been called.  The call to "isvalid" was
+     > removed from "wlanctl".  (Changed: p80211types.c, wlanctl.c)
+     > - "p80211item_maxitemlen()" wasn't really adding much of value so it was
+     > amalgamated into "p80211item_getoffset()".  The DID type is now only
+     > checked once instead of three times.  (Changed: p80211meta.h,
+     > p80211meta.c)
+     > - "hfa384x_drvr_setconfig16()" and "hfa384x_drvr_setconfig32()" changed
+     > their input parameters when converting to hf384x byte order.  Potential
+     > source of bugs.  Changed to use a local variable.  (Changed: hfa384x.c)
+     > - ScanRequest, JoinRequest, etc., moved from the "Information Record"
+     > section to the "Configuration Record" section.  (Changed: hfa384x.h)
+     > - Re-worked "p80211_fromtext_setmibattribute()" to make it a little
+     > easier to follow the logic.  (Changed: p80211types.c)
+     > - Type of "channellist" argument in "p2req_channel_info" command changed
+     > from "octetstr" to "bitarray" to make it easier to deal with (can
+     > specify a variable number of channels and don't need to use hex
+     > values).  (Changed: p80211metamsg.c, prism2mgmt.c)
+     > - "auxctl" parameter set to HFA384x_AUX_CTL_EXTDS in
+     > "prism2mgmt_auxport_read()" and "prism2mgmt_auxport_write()" so that
+     > they are still compatible with 0.1.7.  (Changed: prism2mgmt.c)
+     > - Re-worked "prism2mgmt_set_grpaddr()" and added comments so that it's
+     > more obvious what is going on.  Also, deleted the check which produced
+     > an error if an attempt was made to delete an address from an empty
+     > list.  This makes things more consistent and predictable (i.e. the same
+     > as attempting to delete an address which is above the last group
+     > address...the attempt is simply ignored).  Replaced the "memcpy()" call
+     > with "memmove()" since "memcpy()" is not guaranteed to work with
+     > overlapping ranges.  (Changed: prism2mib.c)
+     > - Minimum length of "dot11OperationRateSet" changed from 126 to 1 to
+     > match the 802.11 standard.  (Changed: p80211metamib.c)
+
+  - Fixed some ci/co related problems pointed out by wbinjie.
+  - Added ygalayda's startup scripts for PCI in the directory 
+    ./etc/wlan_pci.  They aren't installed, that will have to be done
+    by hand.  I have not tested these scripts myself.
+  - Added sbaer's 'NULL check' fix in p80211_indicate_shutdown().
+  - Added ctedrow's 'alloc not checked' fix in prism2sta_int_rx().
+  - Added pkundrat's auth mib changes.
+  - fgrau's conf.modules/modules.conf fix.
+  - Added ygalayda's submission for the Global Sun GL24110P PLX based
+    adapter.  Also included a Makefile fix.
+  - Fixed some script bugs relating to 128-bit WEP based on smmclusky's
+    observations.  These changes have not yet been tested by me.
+  - Added rlazarev's additions to the pcmcia startup scripts
+  - Added pkundrat's wlandev-name fix for 2.3.99+ kernels
+  - Fixed some type/(to|from)text mismatches per note from pkundrat
+  - Fixed some missing MKITEMNAMEs per note from pkundrat
+  - Added D-LINK and SMC to the linux-wlan-ng.conf file
+  - Added Zoom, Linksys and Addtron to the linux-wlan-ng.conf file
+  - Added pkundrat's meta-item minlen stuff.
+  - Added conditionals for PLX vs. PCMCIA build
+  - Changed _pci driver filename to _plx
+  - Fixed undconditional MOD_INC in prismt2sta_open()
+  - Removed identification of old PCF firmware.
+  - Fixed version.h generation bug from pre5
+  - Added dhsu's (Eumitcom) code for supporting the PLX based PCI cards.
+  - pkundrat's (whoops, sorry peter) PDA display program in ./scripts.  
+    I haven't used it because my perl setup is messed up and I'm perl 
+    challenged.
+  - bcarr's patches for alpha boxes.
+  - wwoods's patches for 2.2.18 and adding bytes received to the 
+    statistics.
+  - proskin's patch adding 'network stop'
+  - Most of proskin's patch containing Configure fixes, adding file
+    existence checks, and making sure directories are present.
+  - tgriffin's patch for mrproper/memleak/nullcheck/freeonsuccess.  
+    conf.modules change is already there.
+  - Added most of jhicks ARM related patches.  I had to leave out the 
+    HOST vs. TARGET compile variables in the Makefiles though.  Some folks
+    are using that stuff.
+  - Added script changes and new mib items to support 128-bit WEP per hong's
+    suggestion.
+  - Added conf.modules alias instead of symlink
+  - Added a compat macro for kfree_s to wlan_compat.h per the suggestion
+    from rbraun.
+  - Added pkundrat's 'chinfo' patch
+  - Added pkundrat's 'small fixes' patch
+  - Added some contributed patches supporting a fix to our 'reassoc
+    under load' problem
+  - Added wlannoenable pcmcia scheme support to prevent card initialization.
+  - Removed a PDR patch requirement.
+0.1.7
+  - Fixed the "converting eth in unknown mode" bug
+  - Added APM/ACPI suspend/resume handling
+  - Added PPC support
+  - Added Prism test command support
+  - Integrated patch to fix some structure alignment problems for ARM
+  - Added multi-transmit buffer support
+  - And much, much more.....
+0.1.6
+  - Fixed usage of pcmcia scheme file so we're not stomping on the user's
+    scheme setting.
+  - Updated the wlan-ng script for the new config variable names and added
+    configurable download utility and a set of user MIB settings.
+  - Added support for the Samsung and Z-Com cards.
+  - Changed the name of the module (from pcmcia's point of view).
+  - Fixed the "echo \c" problem in Configure
+  - Added new and rearranged existing wlan-ng.opts configuration variables.
+  - Created a scheme for "addon software" in the ./src/Makefile
+  - Made some changes to the target detection conditionals in wlan_compat.h
+    to better support LinuxPPC (port isn't finished yet).
+  - Finally fixed the byteorder stuff to use (duh) byteorder.h
+  - Fixed a bad free of the TX skb when we signal an error to higher layers.
+  - Moved some code around and added rules to the prism2/driver (new directory
+    too) Makefile.  This is so we build two separate drivers; one for STA,
+    one for AP.  Both drivers are built from the same source files with
+    the code conditional on the WLAN_AP and WLAN_STA defines.
+  - Fixed the plugging in prism2dl so it reports ALL missing PDRs.
+  - Added an anonymously contributed patch that adds support for the -m
+    and -s cmdline options for prism2dl.  Thanks! You know who you are.@-)
+  - Added some fixes to the dependency file generation.
+  - Fixed a flash programming timeout miscalculation...and fixed it again 
+    when I introduced an integer promotion problem.
+  - Added the STA vs. AP conditionals to prism2mgmt.  Note that this causes
+    a few compile time warnings.  They're harmless and will go away in the
+    next release.
+  - Created the file prism2mib.c to hold all the MIB get/set stuff which is
+    getting a little out of hand.
+  - Added pcmcia config support for the Z-Com (supposedly) dual voltage card.
+    Unfortunately the engineering sample I have doesn't seem to work at 5v,
+    or it might be the code.....not sure yet.  We're still a little
+    bleeding edge with that card.
+  - Cleaned up the version, compatibility range, and serial number 
+    log messages.
+  - Added a loop limit to the interrupt handler. (duh)
+  - Changed the names of the driver modules for STA and AP.  make install
+    then creates a softlink depending on the make config selection.  One
+    note, both drivers report the same dev_info string to pcmcia-cs.  Trying
+    to load both of them simultaneously would be bad (I have no idea what 
+    would happen, I just thought of it).
+  - Changed a bunch of types and constants for hfa384x.
+  - Added functions for a couple of new commands in the hfa384x.
+  - Began adding support for the Prism2 unique MIB items.

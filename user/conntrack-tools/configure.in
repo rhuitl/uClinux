@@ -1,0 +1,107 @@
+AC_INIT(conntrack-tools, 0.9.5, pablo@netfilter.org)
+
+AC_CANONICAL_SYSTEM
+
+AM_INIT_AUTOMAKE
+
+AC_PROG_CC
+AM_PROG_LIBTOOL
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AM_PROG_LEX
+AC_PROG_YACC
+
+case $target in
+*-*-linux*) ;;
+*) AC_MSG_ERROR([Linux only, dude!]);;
+esac
+
+dnl Dependencies
+LIBNFNETLINK_REQUIRED=0.0.25
+LIBNETFILTER_CONNTRACK_REQUIRED=0.0.81
+
+PKG_CHECK_MODULES(LIBNFNETLINK, libnfnetlink >= $LIBNFNETLINK_REQUIRED,,
+        AC_MSG_ERROR(Cannot find libnfnetlink >= $LIBNFNETLINK_REQUIRED))
+
+PKG_CHECK_MODULES(LIBNETFILTER_CONNTRACK, libnetfilter_conntrack >= $LIBNETFILTER_CONNTRACK_REQUIRED,,
+        AC_MSG_ERROR(Cannot find libnetfilter_conntrack >= $LIBNETFILTER_CONNTRACK_REQUIRED))
+
+AC_CHECK_PROGS(XYACC,$YACC bison yacc,none)
+if test "$XYACC" = "none"
+then
+	echo "*** Error: No suitable bison/yacc found. ***"
+	echo "    Please install the 'bison' package."
+	exit 1
+fi
+AC_CHECK_PROGS(XLEX,$LEX flex lex,none)
+if test "$XLEX" = "none"
+then
+	echo "*** Error: No suitable flex/lex found. ***"
+	echo "    Please install the 'flex' package."
+	exit 1
+fi
+
+AC_CHECK_HEADERS([linux/capability.h],, [AC_MSG_ERROR([Cannot find linux/capabibility.h])])
+
+# Checks for libraries.
+# FIXME: Replace `main' with a function in `-lc':
+dnl AC_CHECK_LIB([c], [main])
+# FIXME: Replace `main' with a function in `-ldl':
+
+AC_CHECK_LIB([nfnetlink], [nfnl_talk] ,,,[-lnfnetlink])
+AC_CHECK_LIB([netfilter_conntrack], [nfct_dump_conntrack_table] ,,,[-lnetfilter_conntrack])
+AC_CHECK_LIB([pthread], [pthread_create] ,,,[-lpthread])
+
+AC_CHECK_HEADERS(arpa/inet.h)
+dnl check for inet_pton
+AC_CHECK_FUNCS(inet_pton)
+dnl Some systems have it, but not IPv6
+if test "$ac_cv_func_inet_pton" = "yes" ; then
+AC_MSG_CHECKING(if inet_pton supports IPv6)
+AC_TRY_RUN(
+   [
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+int main()
+  {
+     struct in6_addr addr6;
+     if (inet_pton(AF_INET6, "::1", &addr6) < 1)
+        exit(1);
+     else
+        exit(0);
+  }
+  ], [ AC_MSG_RESULT(yes)
+       AC_DEFINE_UNQUOTED(HAVE_INET_PTON_IPV6, 1, [Define to 1 if inet_pton supports IPv6.])
+  ], AC_MSG_RESULT(no), AC_MSG_RESULT(no))
+fi
+
+# Checks for header files.
+dnl AC_HEADER_STDC
+dnl AC_CHECK_HEADERS([netinet/in.h stdlib.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+dnl AC_C_CONST
+dnl AC_C_INLINE
+
+# Checks for library functions.
+dnl AC_FUNC_MALLOC
+dnl AC_FUNC_VPRINTF
+dnl AC_CHECK_FUNCS([memset])
+
+dnl AC_CONFIG_FILES([Makefile
+dnl                  debug/Makefile
+dnl                  debug/src/Makefile
+dnl                  extensions/Makefile
+dnl                  src/Makefile])
+
+AC_OUTPUT(Makefile src/Makefile include/Makefile extensions/Makefile)

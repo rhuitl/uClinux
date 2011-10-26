@@ -1,0 +1,99 @@
+
+DCE/RPC
+====
+Andrew Mullican <amullican@sourcefire.com>
+
+
+-- Overview --
+The dcerpc preprocessor detects and decodes SMB and DCE/RPC traffic.
+It is primarily interested in DCE/RPC data, and only decodes SMB
+to get at the DCE/RPC data carried by the SMB layer.
+
+Currently, the preprocessor only handles reassembly of fragmentation
+at both the SMB and DCE/RPC layer.  Snort rules can be evaded by
+using both types of fragmentation; with the preprocessor enabled
+the rules are given a buffer with a reassembled SMB or DCE/RPC
+packet to examine.
+
+At the SMB layer, only fragmentation using WriteAndX is currently
+reassembled.  Other methods will be handled in future versions of
+the preprocessor.
+
+Autodetection of SMB is done by looking for "\xFFSMB" at the start of
+the SMB data, as well as checking the NetBIOS header (which is always
+present for SMB) for the type "SMB Session".
+
+Autodetection of DCE/RPC is not as reliable.  Currently, two bytes are
+checked in the packet.  Assuming that the data is a DCE/RPC header,
+one byte is checked for DCE/RPC version (5) and another for the either
+the type "DCE/RPC Request" or "DCE/RPC Bind".  If both match, the
+preprocessor proceeds with that assumption that it is looking at DCE/RPC
+data.  If subsequent checks are nonsensical, it ends processing.
+
+
+-- Configuration --
+The proprocessor has several configuration options.  They are described
+below:
+
+The configuration options are described below:
+
+* autodetect
+  Ignore configured ports - examine all packets in attempt to determine
+    SMB or DCE/RPC traffic.
+  Default is on
+
+* ports smb { <int> [<int>] } ports dcerpc { <int> [<int>] }
+  Ports that the preprocessor monitors for SMB or DCE/RPC traffic
+  Default is not configured
+    (although default values would be 139 and 445 for SMB, and 135 for DCE/RPC)
+
+* disable_smb_frag
+  Do not attempt to reassemble SMB fragmentation
+  Default is off (not configured)
+
+* disable_dcerpc_frag
+  Do not attempt to reassemble DCE/RPC fragmentation
+  Default is off (not configured)
+
+* max_frag_size
+  Maximum reassembled fragment size, in bytes
+  Default 3000
+
+* memcap
+  Maximum amount of memory available to the DCE/RPC preprocessor, in kilobytes
+  Default 100000
+   
+* alert_memcap
+  Alert if memcap is exceeded
+  Default is off (not configured)
+   
+
+Examples:
+preprocessor dcerpc: \
+  autodetect \
+  disable_smb_frag \
+  max_frag_size 4000
+  
+preprocessor dcerpc: \
+  ports smb { 139 445 } dcerpc { 135 } \
+  disable_dcerpc_frag \
+  memcap 50000
+  
+Default:
+preprocessor dcerpc: \
+  autodetect \
+  max_frag_size 3000 \
+  memcap 100000 \
+  alert_memcap
+
+
+-- Alerts --
+There is currently only one alert, which is triggered when the preprocessor
+has reached the "memcap" limit for memory allocation.  The alert is
+gid 130, sid 1.
+
+
+-- Conclusion --
+At the current time, there is not much to do with the dcerpc preprocessor
+other than turn it on and let it reassemble fragmented DCE/RPC packets.
+

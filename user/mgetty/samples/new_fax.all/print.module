@@ -1,0 +1,23 @@
+# MODULE print
+# A function to print out a fax
+#
+# Written 1996 by Darko Krizic
+#
+print()
+{
+	# optionally take data as new archive directory
+	if [ ! -z "$data" ]
+	then
+		printer=$data
+	fi
+	for file in $*
+	do
+		log "print $file to $printer"
+		g32pbm $file \
+		| pnmscale -xysize 2479 3508 \
+		| pgmtopbm -fs \
+		| pbmtolj -resolution 300 \
+		| lpr -P $printer
+	done
+
+}

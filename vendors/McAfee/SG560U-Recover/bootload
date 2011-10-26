@@ -1,0 +1,41 @@
+#!/bin/sh
+echo
+echo "Snapgear Linux Boot Loader..."
+echo
+
+SGU=""
+if [ -f /sda1/boot.cfg ]
+then
+	# Use first entry in the boot.cfg file.
+	SGU=`head -1 /sda1/boot.cfg`
+	if [ -n "$SGU" ]
+	then
+		SGU=/sda1/$SGU
+	fi
+fi
+if [ -z "$SGU" ]
+then
+	# No boot.cfg file list, so find anything we can boot!
+	SGU=`find /sda1/ | grep ".sgu$" | head -1`
+fi
+if [ -z "$SGU" ]
+then
+	echo "Couldn't find any image to boot on USB flash device?"
+	echo
+	while [ 1 ]; do
+		sleep 10;
+	done
+	exit 1
+fi
+
+echo "Boot $SGU..."
+if sgutool -k /tmp/zImage $SGU
+then
+	ARGS=`flash arg -r`
+	ARGS="$ARGS rootdelay=10 root=/dev/sda1 rootflags=data=journal init=/etc/rc"
+	kexec --command-line="$ARGS" -f /tmp/zImage
+fi
+while [ 1 ]; do
+	sleep 10;
+done
+exit 0

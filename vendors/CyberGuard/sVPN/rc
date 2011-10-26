@@ -1,0 +1,49 @@
+echo "/etc/rc processing ..."
+echo "Starting watchdog ..."
+watchdog /dev/watchdog
+hostname sVPN
+echo "Making Filesystems ..."
+expand /etc/ramfs.img /dev/ram1
+expand /etc/ramfs.img /dev/ram2
+echo "Mounting Filesystems ..."
+mount -t proc proc /proc
+echo 2 > /proc/cpu/alignment
+mount -t ext2 /dev/ram1 /var
+mount -t ext2 /dev/ram2 /etc/config
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+mkdir /var/mnt
+echo "Processing Config Filesystem ..."
+flatfsd -r
+logd boot
+echo "Loading network drivers."
+insmod ixp400
+insmod ixp425_npe
+rmmod ixp425_npe
+insmod ixp425_eth
+setmac -o 0x1c000
+echo "Checking CF socket ..."
+ivpnset eth1 0
+ivpnset wifi 1
+cardctl eject
+cardctl reset
+cardctl insert
+if (cardctl ident | grep "no product info") ; then 
+cardctl eject
+ivpnset wifi 0
+ivpnset eth1 1
+else
+insmod hostap_crypt
+insmod hostap_crypt_wep
+insmod hostap
+insmod hostap_cs
+cardctl bind hostap_cs
+ifconfig eth2 up
+fi
+initconf -v
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+echo "/etc/rc complete."

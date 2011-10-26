@@ -1,0 +1,150 @@
+Only in kismet-2010-01-R1/: config.log
+Only in kismet-2010-01-R1/: configure.lineno
+diff -c -r ../kismet-2010-01-R1/gpscore.h kismet-2010-01-R1/gpscore.h
+*** ../kismet-2010-01-R1/gpscore.h	2010-01-03 18:00:47.000000000 +1000
+--- kismet-2010-01-R1/gpscore.h	2010-02-19 11:21:15.000000000 +1000
+***************
+*** 165,171 ****
+  	double min_lat, min_lon, min_alt, min_spd;
+  	double max_lat, max_lon, max_alt, max_spd;
+  	// Aggregate/avg center position
+! 	long double aggregate_lat, aggregate_lon, aggregate_alt;
+  	long aggregate_points;
+  };
+  
+--- 165,171 ----
+  	double min_lat, min_lon, min_alt, min_spd;
+  	double max_lat, max_lon, max_alt, max_spd;
+  	// Aggregate/avg center position
+! 	double aggregate_lat, aggregate_lon, aggregate_alt;
+  	long aggregate_points;
+  };
+  
+Only in kismet-2010-01-R1/: gpscore.h.orig
+diff -c -r ../kismet-2010-01-R1/Makefile.in kismet-2010-01-R1/Makefile.in
+*** ../kismet-2010-01-R1/Makefile.in	2009-12-15 05:04:11.000000000 +1000
+--- kismet-2010-01-R1/Makefile.in	2010-02-19 11:21:15.000000000 +1000
+***************
+*** 68,74 ****
+  # HOPPERO = util.o configfile.o getopt.o kismet_hopper.o
+  # HOPPER = kismet_hopper
+  
+! all:	Makefile $(DEPEND) $(PS) $(CS) $(DRONE) $(NC)
+  
+  all-with-plugins:
+  	@make plugins-clean
+--- 68,74 ----
+  # HOPPERO = util.o configfile.o getopt.o kismet_hopper.o
+  # HOPPER = kismet_hopper
+  
+! all:	Makefile $(DEPEND) $(PS) $(CS) $(DRONE)
+  
+  all-with-plugins:
+  	@make plugins-clean
+***************
+*** 85,91 ****
+  	$(LD) $(LDFLAGS) -o $(DRONE) $(DRONEO) $(LIBS) $(CXXLIBS) $(PCAPLNK) $(KSLIBS)
+  
+  $(NC):	$(NCO)
+! 	$(LD) $(LDFLAGS) -o $(NC) $(NCO) $(CXXLIBS) $(CLIENTLIBS)
+  
+  #$(HOPPER):	$(HOPPERO)
+  #	$(LD) $(LDFLAGS) -o $(HOPPER) $(HOPPERO)
+--- 85,91 ----
+  	$(LD) $(LDFLAGS) -o $(DRONE) $(DRONEO) $(LIBS) $(CXXLIBS) $(PCAPLNK) $(KSLIBS)
+  
+  $(NC):	$(NCO)
+! 	$(LD) $(LDFLAGS) -o $(NC) $(NCO) $(CXXLIBS) $(CLIENTLIBS) -lncurses -lm
+  
+  #$(HOPPER):	$(HOPPERO)
+  #	$(LD) $(LDFLAGS) -o $(HOPPER) $(HOPPERO)
+***************
+*** 100,124 ****
+  	mkdir -p $(ETC)
+  	mkdir -p $(BIN)
+  
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 555 scripts/kismet $(BIN)/kismet
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 555 $(NC) $(BIN)/$(NC)
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 555 $(PS) $(BIN)/$(PS); 
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 555 $(DRONE) $(BIN)/$(DRONE);
+! 
+! 	mkdir -p $(MAN)/man1
+! 	$(INSTALL) -o $(INSTUSR) -g $(MANGRP) -m 644 man/kismet.1 $(MAN)/man1/kismet.1
+! 	$(INSTALL) -o $(INSTUSR) -g $(MANGRP) -m 644 man/kismet_drone.1 $(MAN)/man1/kismet_drone.1
+! 
+! 	mkdir -p $(MAN)/man5
+! 	$(INSTALL) -o $(INSTUSR) -g $(MANGRP) -m 644 man/kismet.conf.5 $(MAN)/man5/kismet.conf.5
+! 	$(INSTALL) -o $(INSTUSR) -g $(MANGRP) -m 644 man/kismet_drone.conf.5 $(MAN)/man5/kismet_drone.conf.5
+! 
+! 	mkdir -p $(WAV)
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 wav/new.wav $(WAV)/new.wav
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 wav/packet.wav $(WAV)/packet.wav
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 wav/alert.wav $(WAV)/alert.wav
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 wav/gpslost.wav $(WAV)/gpslost.wav
+! 	$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 wav/gpslock.wav $(WAV)/gpslock.wav
+  
+  suidinstall: $(CS)
+  	-groupadd -f $(SUIDGROUP)
+--- 100,108 ----
+  	mkdir -p $(ETC)
+  	mkdir -p $(BIN)
+  
+! 	$(INSTALL) -m 555 scripts/kismet $(BIN)/kismet
+! 	$(INSTALL) -m 555 $(PS) $(BIN)/$(PS); 
+! 	$(INSTALL) -m 555 $(DRONE) $(BIN)/$(DRONE);
+  
+  suidinstall: $(CS)
+  	-groupadd -f $(SUIDGROUP)
+***************
+*** 154,168 ****
+  	@echo "all of Kismet as root.  ONLY users in this group will be able to "
+  	@echo "run Kismet and capture from physical network devices."
+  
+! install: $(PS) $(CS) $(DRONE) $(NC)
+  	$(MAKE) -e commoninstall
+  	@if test -f $(ETC)/kismet.conf; then \
+  		echo "$(ETC)/kismet.conf already installed, not replacing it.  HOWEVER"; \
+  		echo "if there have been any changes to the base config you will need"; \
+  		echo "to add them to your config file."; \
+      else \
+! 		$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 conf/kismet.conf $(ETC)/kismet.conf;  \
+! 		echo install -o $(INSTUSR) -g $(INSTGRP) -m 644 conf/kismet.conf $(ETC)/kismet.conf;  \
+  		echo "Installed config into $(ETC)/kismet.conf."; \
+  	fi
+  	@if test -f $(ETC)/kismet_drone.conf; then \
+--- 138,152 ----
+  	@echo "all of Kismet as root.  ONLY users in this group will be able to "
+  	@echo "run Kismet and capture from physical network devices."
+  
+! install: $(PS) $(CS) $(DRONE)
+  	$(MAKE) -e commoninstall
+  	@if test -f $(ETC)/kismet.conf; then \
+  		echo "$(ETC)/kismet.conf already installed, not replacing it.  HOWEVER"; \
+  		echo "if there have been any changes to the base config you will need"; \
+  		echo "to add them to your config file."; \
+      else \
+! 		$(INSTALL) -m 644 conf/kismet.conf $(ETC)/kismet.conf;  \
+! 		echo install -m 644 conf/kismet.conf $(ETC)/kismet.conf;  \
+  		echo "Installed config into $(ETC)/kismet.conf."; \
+  	fi
+  	@if test -f $(ETC)/kismet_drone.conf; then \
+***************
+*** 170,177 ****
+  		echo "if there have been any changes to the base config you will need"; \
+  		echo "to add them to your config file."; \
+      else \
+! 		$(INSTALL) -o $(INSTUSR) -g $(INSTGRP) -m 644 conf/kismet_drone.conf $(ETC)/kismet_drone.conf;  \
+! 		echo install -o $(INSTUSR) -g $(INSTGRP) -m 644 conf/kismet_drone.conf $(ETC)/kismet_drone.conf;  \
+  		echo "Installed drone config into $(ETC)/kismet_drone.conf."; \
+  	fi
+  	@echo "Installed kismet into $(BIN)/."
+--- 154,161 ----
+  		echo "if there have been any changes to the base config you will need"; \
+  		echo "to add them to your config file."; \
+      else \
+! 		$(INSTALL) -m 644 conf/kismet_drone.conf $(ETC)/kismet_drone.conf;  \
+! 		echo install -m 644 conf/kismet_drone.conf $(ETC)/kismet_drone.conf;  \
+  		echo "Installed drone config into $(ETC)/kismet_drone.conf."; \
+  	fi
+  	@echo "Installed kismet into $(BIN)/."
+Only in kismet-2010-01-R1/: Makefile.in.orig

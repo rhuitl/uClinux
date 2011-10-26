@@ -1,0 +1,203 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" pcmcia.5 1.28 2001/06/20 04:28:08
+.\"
+.TH PCMCIA 5 "2001/06/20 04:28:08" "pcmcia-cs"
+.SH NAME
+/etc/pcmcia/config \- PCMCIA card configuration database
+
+.SH DESCRIPTION
+The PCMCIA card configuration file is read by \fIcardmgr\fR(8)
+at startup time.  It defines what resources are available for use by
+Card Services, describes how to load and initialize device drivers,
+and describes specific PCMCIA cards.
+
+.SH Resource descriptions
+There are three kinds of resource entries: \fBinclude\fR,
+\fBexclude\fR, and \fBreserve\fR. Including a resource enables Card
+Services to allocate that resource for client drivers.  Part of a
+resource that is under Card Services control can be excluded if a
+specific device in the system uses that resource.  And, a resource can
+be reserved, so that it will only be assigned to a client if that
+client specifically asks for that resource, or no other suitable
+resources are available.
+.PP
+There are three resource types: \fBport\fR, \fBmemory\fR, and
+\fBirq\fR. By default, Card Services assumes that it can use any
+interrupt that is not bound by another device driver.  However, it
+makes no assumptions about IO port and address ranges, because some
+Linux drivers do not register their resource usage.  So, port and
+memory ranges must be explicitly made available for use by PCMCIA
+devices.
+.PP
+So, here is a portion of a config file:
+.sp
+.RS
+.nf
+include port 0x300-0x3ff, memory 0xd0000-0xdffff
+reserve irq 3
+exclude irq 4, port 0x3f8-0x3ff
+.RE
+.fi
+.sp
+This says that Card Services can allocate ports in the range 0x300 to
+0x3ff, and memory in the range 0xd0000 to 0xdffff.  It should not use
+irq 4 or ports 0x3f8-0x3ff (even if they seem to be available).  And
+irq 3 should only be allocated if a client specifically asks for it.
+.PP
+Card Services will never allocate resources already allocated by
+another kernel device driver.  The
+.BR include / exclude / reserve
+mechanism just provides a way of controlling what resources it will
+try to use, to accomodate devices that are not registered with the
+Linux resource manager.
+
+.SH Device driver descriptions
+All Card Services client drivers are identified by a 32-character tag.
+\fBDevice\fR entries in the config file describe client drivers.  The only
+required field is the device tag.  Additional fields can specify
+kernel modules that need to be loaded to make the device available,
+and a script to be executed to enable and disable instances of
+a device.  When an instance of a driver is assigned to a socket, it
+gives cardmgr a device name by which this device will be known by the
+system (for example, \fIeth0\fR for a net device, or \fIcua1\fR for a
+modem).  This name will be passed to the configuration script.  For
+example:
+.sp
+.RS
+.nf
+device "pcnet_cs"
+  class "network"
+  module "net/8390" opts "ei_debug=4", "pcnet_cs"
+.RE
+.fi
+.sp
+This says that the \fBpcnet_cs\fR device requires two loadable modules.
+The first one is located in the \fInet\fR module subdirectory and will
+be loaded with a specific parameter setting.  The second module should
+be in the \fIpcmcia\fR module subdirectory.  The device is in the
+network class, so the \fInetwork\fR script in the configuration
+directory will be used to start or stop the device.
+.PP
+It is also possible to specify default options for a particular kernel
+module, outside of a device driver declaration.  This is convenient
+for keeping local configuration options in a file separate from the
+main card configuration file.  For example:
+.sp
+.RS
+.nf
+module "pcnet_cs" opts "mem_speed=600"
+.RE
+.fi
+.sp
+
+.SH Card descriptions
+Card declarations map PCMCIA cards to their client drivers.  A card
+declaration consists of a descriptive name, a method for identifying
+the card when it is inserted, and driver bindings.  There are six
+identification methods: the \fBversion\fR method matches a card using
+its VERSION_1 id strings, the \fBmanfid\fR method matches a card using
+its MANFID tuple codes, the \fBpci\fR method matches a CardBus card
+using its PCI device ID's, the \fBtuple\fR method matches a card using
+any string embedded in any arbitrary CIS tuple, the \fBfunction\fR
+method matches a card using its function ID, and the \fBanonymous\fR
+method matches any card that does not have a CIS.  This last method
+is only intended to be used for old-style Type I memory cards.  The
+\fBmanfid\fR and \fBversion\fR methods can be combined to provide more
+discrimination; the other methods cannot be combined.  For example:
+.sp
+.RS
+.nf
+card "Linksys Ethernet Card"
+  tuple 0x40, 0x0009, "E-CARD PC Ethernet Card"
+  bind "pcnet_cs"
+.RE
+.fi
+.sp
+This card is identified by a string at offset 0x0009 in tuple 0x40,
+and will be bound to the \fBpcnet_cs\fR driver (which must be already
+declared in a \fBdriver\fR declaration).
+.sp
+.RS
+.nf
+card "Connectware LANdingGear Adapter"
+  manfid 0x0057, 0x1004
+  bind "pcnet_cs"
+.RE
+.fi
+.sp
+This card is identified by its MANFID tuple contents.  The \fBpci\fR
+method has the same form, with \fBpci\fR replacing \fBmanfid\fR.
+.sp
+.RS
+.nf
+card "D-Link DE-650 Ethernet Card"
+  version "D-Link", "DE-650"
+  bind "pcnet_cs"
+.RE
+.fi
+.sp
+This card will be identified using its VERSION_1 tuple, and will also
+be bound to the \fBpcnet_cs\fR driver.
+.sp
+.RS
+.nf
+card "Serial port device"
+  function serial_port
+  bind "serial_cs"
+.RE
+.fi
+.sp
+This binds the \fBserial_cs\fR driver to any card with a CIS function
+ID of 0x02, which corresponds to a serial port card.  The function ID
+can either be a number, or one of the following predefined functions:
+\fBmemory_card\fR, \fBserial_port\fR, \fBparallel_port\fR,
+\fBfixed_disk\fR, \fBvideo_adapter\fR, \fBnetwork_adapter\fR, and
+\fBaims_card\fR.
+.PP
+Finally, the configuration file can specify that Card Services should
+use a replacement for the configuration information found on a card.
+This can be useful if a card's configuration information is
+particularly incomplete or inaccurate.  The new information is read
+from a file as in this example:
+.sp
+.RS
+.nf
+card "Evil broken card"
+  manfid 0x1234, 0x5678
+  cis "fixup.cis"
+  bind "serial_cs"
+.RE
+.fi
+.sp
+
+.SH Memory region definitions 
+Memory region definitions are used to associate a particular type of
+memory device with a Memory Technology Driver, or "MTD".  An MTD is
+used to service memory accesses in a device-independent fashion.  When
+a card is identified, Card Services will attempt to load MTD's for all
+its memory regions.
+.PP
+A memory region definition begins with the \fBregion\fR keyword and a
+descriptive string.  This is followed by an identification method:
+either \fBdefault\fR to identify an MTD to be used for any otherwise
+unclassified region, or \fBjedec\fR to identify a region based on its
+JEDEC identification codes.  Thus, for example,
+.sp
+.RS
+.nf
+region "Intel Series 2 Flash"
+  jedec 0x89 0xa2
+  mtd "iflash2_mtd"
+.RE
+.fi
+.sp
+specifies that the \fBiflash2_mtd\fR driver will be loaded based on a
+JEDEC match.
+
+.SH BUGS
+The \fBreserve\fR keyword has not actually been implemented in a
+useful way for this version of Card Services.
+.SH AUTHOR
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+cardmgr(8).

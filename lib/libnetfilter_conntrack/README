@@ -1,0 +1,62 @@
+libnetfilter_conntrack - userspace library for the connection tracking system
+(C) 2005-2007 Pablo Neira Ayuso <pablo@netfilter.org>
+=============================================================================
+
+= Connection Tracking System =
+
+The connection tracking system is a in-kernel subsystem that stores information
+about the state of a connection in a memory structure that contains the source
+and destination IP addresses, port number pairs, protocol types, state, and 
+timeout. With this extra information, we can define more intelligent filtering
+policies. 
+
+Moreover, there are some application protocols, such as FTP, TFTP, IRC, PPTP 
+that have aspects that are hard to track for a firewall that follows the 
+traditional static filtering approach. The connection tracking system defines 
+a mechanism to track such aspects.
+
+The connection tracking system does not alter the packets themselves; the 
+default behavior always lets the packets continue their travel through the
+network stack, although there are a couple of very specific exceptions where 
+packets can be dropped (e.g., under memory exhaustion). So keep in mind that 
+the connection tracking system just tracks packets; it does not filter.
+
+For further information on the connection tracking system, please see the
+reference section at the bottom of this document.
+
+= What is libnetfilter_conntrack? =
+
+libnetfilter_conntrack is an userspace library that provides an interface to 
+the in-kernel connection tracking system.
+
+= Prerequirements for libnetfilter_conntrack =
+
+Linux kernel version >= 2.6.18 (http://www.kernel.org) and enable support for:
+
+ * connection tracking system (quite obvious ;)
+ * nfnetlink
+ * ctnetlink (ip_conntrack_netlink)
+ * connection tracking event notification API 
+
+= Documentation =
+
+The libnetfilter_conntrack API is well documented, however we don't have any
+tool yet to automate the document generation. So, you'll have to consult the 
+documentation from the source code.
+
+= Examples =
+
+You can find a set of handy examples on the use of libnetfilter_conntrack 
+under the directory utils/ distributed with this library.
+
+= Heads Up =
+
+Currently libnetfilter_conntrack supports two different APIs: The old one that 
+has several limitations and the new one that solves such deficiencies. Thus, 
+make sure you use the new API for your new applications since the old one will
+be removed soon.
+
+= References =
+
+[1] Pablo Neira Ayuso. Netfilter's Connection Tracking System:
+    http://people.netfilter.org/pablo/docs/login.pdf

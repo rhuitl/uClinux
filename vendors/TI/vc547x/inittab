@@ -1,0 +1,52 @@
+# /etc/inittab
+#
+# Copyright (C) 2001 Erik Andersen <andersen@codepoet.org>
+#
+# Note: BusyBox init doesn't support runlevels.  The runlevels field is
+# completely ignored by BusyBox init. If you want runlevels, use
+# sysvinit.
+#
+# Format for each entry: <id>:<runlevels>:<action>:<process>
+#
+# id        == tty to run on, or empty for /dev/console
+# runlevels == ignored
+# action    == one of sysinit, respawn, askfirst, wait, and once
+# process   == program to run
+
+# Startup the system
+#null::sysinit:/bin/mount -o remount,rw /
+null::sysinit:/bin/mount -t proc proc /proc
+null::sysinit:/bin/mount -a
+
+# now run any rc scripts
+::sysinit:/etc/rcS
+
+::askfirst:-/bin/sh
+#vc/1::askfirst:-/bin/sh
+#vc/2::askfirst:-/bin/sh
+#vc/3::askfirst:-/bin/sh
+#vc/4::askfirst:-/bin/sh
+#vc/5::askfirst:-/bin/sh
+#vc/6::askfirst:-/bin/sh
+
+# Set up a couple of getty's
+#tty1::respawn:/bin/getty 38400 tty1
+#tty2::respawn:/bin/getty 38400 tty2
+
+# Put a getty on the serial port
+#ttyS0::respawn:/bin/getty -L ttyS0 115200 vt100
+
+# Logging junk
+#null::sysinit:/bin/touch /tmp/messages
+#null::respawn:/bin/syslogd -n -m 0 -O /tmp/messages
+#null::respawn:/bin/klogd -n
+#tty3::respawn:/usr/bin/tail -f /var/log/messages
+
+# Stuff to do for the 3-finger salute
+::restart:/bin/init
+::ctrlaltdel:/bin/reboot
+
+# Stuff to do before rebooting
+null::shutdown:/bin/killall klogd
+null::shutdown:/bin/killall syslogd
+null::shutdown:/bin/umount -a -r

@@ -1,0 +1,434 @@
+.\"
+.\"	$Id: ipfwadm.8,v 1.1.1.1 1999-11-22 03:48:00 christ Exp $
+.\"
+.\"
+.\"	Copyright (c) 1995,1996 by X/OS Experts in Open Systems BV.
+.\"	All rights reserved.
+.\"
+.\"	Author: Jos Vos <jos@xos.nl>
+.\"
+.\"		X/OS Experts in Open Systems BV
+.\"		Kruislaan 419
+.\"		1098 VA  Amsterdam
+.\"		The Netherlands
+.\"
+.\"		E-mail: info@xos.nl
+.\"		WWW:    http://www.xos.nl/
+.\"
+.\"
+.\"	This program is free software; you can redistribute it and/or modify
+.\"	it under the terms of the GNU General Public License as published by
+.\"	the Free Software Foundation; either version 2 of the License, or
+.\"	(at your option) any later version.
+.\"
+.\"	This program is distributed in the hope that it will be useful,
+.\"	but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"	GNU General Public License for more details.
+.\"
+.\"	You should have received a copy of the GNU General Public License
+.\"	along with this program; if not, write to the Free Software
+.\"	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\"
+.TH IPFWADM 8 "July 30, 1996" "" ""
+.SH NAME
+ipfwadm \- IP firewall and accounting administration
+.SH SYNOPSIS
+.BR "ipfwadm -A " "command parameters [options]"
+.br
+.BR "ipfwadm -I " "command parameters [options]"
+.br
+.BR "ipfwadm -O " "command parameters [options]"
+.br
+.BR "ipfwadm -F " "command parameters [options]"
+.br
+.BR "ipfwadm -M " "[ -l | -s ] [options]"
+.SH DESCRIPTION
+.B Ipfwadm
+is used to set up, maintain, and inspect the IP
+firewall and accounting rules in the Linux kernel.
+These rules can be divided into 4 different
+categories: accounting of IP packets,
+the IP input firewall, the IP output firewall, and
+the IP forwarding firewall.
+For each of these categories, a separate list of rules is 
+maintained.
+See
+.IR ipfw (4)
+for more details.
+.SH OPTIONS
+The options that are recognized by
+.B ipfwadm
+can be divided into several different groups.
+.SS "CATEGORIES"
+The following flags are used to select the category
+of rules to which the given command applies:
+.TP
+.BR -A " [\fIdirection\fP]"
+IP accounting rules.
+Optionally, a
+.I direction
+can be specified
+.RI ( in ,
+.IR out ,
+or
+.IR both ),
+indicating whether only incoming or outgoing packets should
+be counted.
+The default direction is
+.IR both .
+.TP
+.B -I
+IP input firewall rules.
+.TP
+.B -O
+IP output firewall rules.
+.TP
+.B -F
+IP forwarding firewall rules.
+.TP
+.B -M
+IP masquerading administration.
+This category can only be used in
+combination with the
+.B -l
+(list) or
+.B -s
+(set timeout values) command.
+.PP
+Exactly one of these options has to be specified. 
+.SS COMMANDS
+The next options specify the specific action to perform.
+Only one of them can be specified on the command line,
+unless something else is listed in the description.
+.TP
+.BR -a " [\fIpolicy\fP]"
+Append one or more rules to the end of the selected list.
+For the accounting chain, no policy should be specified.
+For firewall chains, it is required to specify one of the following policies:
+.IR accept ,
+.IR deny ,
+or
+.IR reject .
+When the source and/or destination names resolve to more than one
+address, a rule will be added for each possible address combination.
+.TP
+.BR -i " [\fIpolicy\fP]"
+Insert one or more rules at the beginning of the selected list.
+See the description of the
+.B -a
+command for more details.
+.TP
+.BR -d " [\fIpolicy\fP]"
+Delete one or more entries from the selected list of rules.
+The semantics are equal to those of the append/insert commands.
+The specified parameters should exactly match the parameters given
+with an append or insert command, otherwise no match will be found and the
+rule will not be removed from the list.
+Only the first matching rule in the list will be deleted.
+.TP
+.B -l
+List all the rules in the selected list.
+This command may be combined with the
+.B -z
+(reset counters to zero) command.
+In that case, the packet and byte counters will be reset immediately after
+listing their current values.
+Unless the
+.B -x
+option is present, packet and byte counters (if listed) will be shown as
+.IR number K
+or
+.IR number M,
+where 1K means 1000 and 1M means 1000K (rounded to the
+nearest integer value).
+See also the
+.B -e
+and
+.B -x
+flags for more capabilities.
+.TP
+.B -z
+Reset the packet and byte counters of all the rules in
+selected list.
+This command may be combined with the
+.B -l
+(list) command.
+.TP
+.B -f
+Flush the selected list of rules.
+.TP
+.BI -p " policy"
+Change the default policy for the selected type of firewall.
+The given policy
+has to be one of
+.IR accept ,
+.IR deny ,
+or
+.IR reject .
+The default policy is used when no matching rule is found.
+This operation is only valid for IP firewalls, that is, in combination
+with the
+.BR -I ,
+.BR -O ,
+or
+.B -F
+flag.
+.TP
+.BI -s " tcp tcpfin udp"
+Change the timeout values used for masquerading.
+This command always takes 3 parameters, representing the timeout values
+(in seconds) for TCP sessions, TCP sessions after receiving
+a FIN packet, and UDP packets, respectively.
+A timeout value 0 means that the current timeout value of the
+corresponding entry is preserved.
+This operation is only allowed in combination with the
+.B -M
+flag.
+.TP
+.B -c
+Check whether this IP packet would be accepted, denied, or
+rejected by the selected type of firewall.
+This operation is only valid for IP firewalls, that is, in combination
+with the
+.BR -I ,
+.BR -O ,
+or
+.B -F
+flag.
+.TP
+.B -h
+Help.
+Give a (currently very brief) description of the command syntax.
+.SS PARAMETERS
+The following parameters can be used in combination with the append,
+insert, delete, or check commands:
+.TP
+.BI "-P " protocol
+The protocol of the rule or of the packet to check.
+The specified protocol can be one of
+.IR tcp ,
+.IR udp ,
+.IR icmp ,
+or
+.IR all .
+Protocol
+.I all
+will match with all protocols and is taken as default when this
+option is omitted.
+.I All
+may not be used in in combination with the check command.
+.TP
+.BR "-S " "\fIaddress\fP[/\fImask\fP] [\fIport\fP ...]"
+Source specification (optional).
+.I Address
+can be either a hostname, a network name, or a plain IP address.
+The
+.I mask
+can be either a network mask or a plain number,
+specifying the number of 1's at the left side of the network mask.
+Thus, a mask of
+.I 24
+is equivalent with
+.IR 255.255.255.0 .
+.sp 0.5
+The source may include one or more port specifications or ICMP types.
+Each of them can either be a service name, a port number, or a
+(numeric) ICMP type.
+In the rest of this paragraph, a
+.I port
+means either a port specification or an ICMP type.
+One of these specifications may be a range of ports, in the format
+.IR port : port .
+Furthermore, the total number of ports specified with the source and
+destination addresses should not be greater than
+.B IP_FW_MAX_PORTS
+(currently 10).
+Here a port range counts as 2 ports.
+.sp 0.5
+Packets not being the first fragment of a TCP, UDP, or ICMP packet
+are always accepted by the firewall.
+For accounting purposes, these second and further fragments are
+treated special, to be able to count them in some way.
+The port number 0xFFFF (65535) is used for a match with the second
+and further fragments of TCP or UDP packets.
+These packets will be treated for accounting purposes
+as if both their port numbers are 0xFFFF.
+The number 0xFF (255) is used for a match with the second
+and further fragments of ICMP packets.
+These packets will be treated for acounting purposes
+as if their ICMP types are 0xFF.
+Note that the specified command and protocol may imply restrictions on the ports
+to be specified.
+Ports may only be specified in combination with the
+.IR tcp ,
+.IR udp ,
+or
+.I icmp
+protocol.
+.sp 0.5
+When this option is omitted, the default address/mask
+.I 0.0.0.0/0
+(matching with any address) is used as source address.
+This option is required in combination with the check command,
+in which case also exactly one port has to be specified.
+.TP
+.BR "-D " "\fIaddress\fP[/\fImask\fP] [\fIport\fP ...]
+Destination specification (optional).
+See the desciption of the
+.B -S
+(source) flag for a detailed description of the syntax, default
+values, and other requirements.
+Note that ICMP types are not allowed in combination with the
+.B -D
+flag: ICMP types can only be specified after the the
+.B -S
+flag.
+.TP
+.BI "-V " address
+Optional address of an interface via which a packet is received,
+or via which is packet is going to be sent.
+.I Address
+can be either a hostname or a plain IP address.
+When a hostname is specified, it should resolve to exactly one IP address.
+When this option is omitted, the address
+.I 0.0.0.0
+is assumed, which has a special meaning and will match with any
+interface address.
+For the check command, this option is mandatory.
+.TP
+.BI "-W " name
+Optional name of an interface via which a packet is received,
+or via which is packet is going to be sent.
+When this option is omitted, the empty string is assumed,
+which has a special meaning and will match with any interface name.
+For the check command, this option is mandatory.
+.SS "OTHER OPTIONS"
+The following additional options can be specified:
+.TP
+.BI -b
+Bidirectional mode.
+The rule will match with IP packets in both directions.
+This option is only valid in combination with the append, insert,
+or delete commands.
+.TP
+.BI -e
+Extended output.
+This option makes the list command also show the
+interface address and the rule options (if any).
+For firewall lists, also the packet and byte counters
+(the default is to only show these counters
+for the accounting rules) and the TOS masks will be listed.
+When used in combination with
+.BR -M ,
+information related to delta sequence numbers will also be listed.
+This option is only valid in combination with the list command.
+.TP
+.BI -k
+Only match TCP packets with the ACK bit set (this option will be
+ignored for packets of other protocols).
+This option is only valid in combination with the append, insert,
+or delete command.
+.TP
+.BI -m
+Masquerade packets accepted for forwarding.
+When this option is set, packets accepted by this rule
+will be masqueraded as if they originated from the local host.
+Furthermore, reverse packets will be recognized as such and they will
+be demasqueraded automatically,
+bypassing the forwarding firewall.
+This option is only valid in forwarding firewall rules
+with policy
+.I accept
+(or when specifying
+.I accept
+as default policy)
+and can only be used when the kernel is compiled with
+.B CONFIG_IP_MASQUERADE
+defined.
+.TP
+.BI -n
+Numeric output.
+IP addresses and port numbers will be printed in numeric format.
+By default, the program will try to display them as host names,
+network names, or services (whenever applicable).
+.TP
+.BI -o
+Turn on kernel logging of matching packets.
+When this option is set for a rule, the Linux kernel will print
+some information
+of all matching packets (like most IP header fields) via
+.IR printk ().
+This option will only be effective when the Linux kernel is compiled
+with
+.B CONFIG_IP_FIREWALL_VERBOSE
+defined.
+This option is only valid in combination with the append,
+insert or delete command.
+.TP
+.BR "-r " [\fIport\fP]
+Redirect packets to a local socket.
+When this option is set, packets accepted by this rule
+will be redirected to a local socket, even if they were sent to
+a remote host.
+If the specified redirection port is 0, which is the default value,
+the destination port of a packet will be used as the redirection port.
+This option is only valid in input firewall rules
+with policy
+.IR accept
+and can only be used when the Linux kernel is compiled with
+.B CONFIG_IP_TRANSPARENT_PROXY
+defined.
+.TP
+.BI "-t " "andmask xormask"
+Masks used for modifying the TOS field in the IP header.
+When a packet is accepted (with or without masquerading) by a
+firewall rule, its TOS field is first bitwise and'ed with
+first mask and the result of this will be bitwise xor'ed with
+the second mask.
+The masks should be specified as hexadecimal 8-bit values.
+This option is only valid in combination with the append,
+insert or delete command and will have no effect when used
+in combination with accounting rules or firewall rules for
+rejecting or denying a packet.
+.TP
+.BI -v
+Verbose output.
+Print detailed information of the rule or packet
+to be added, deleted, or checked.
+This option will only have effect with the append, insert, delete,
+or check command.
+.TP
+.BI -x
+Expand numbers.
+Display the exact value of the packet and byte counters,
+instead of only the rounded number in K's (multiples of 1000)
+or M's (multiples of 1000K).
+This option will only have effect when the counters are listed
+anyway (see also the
+.B -e
+option).
+.TP
+.BI -y
+Only match TCP packets with the SYN bit set and the ACK bit cleared
+(this option will be ignored for packets of other protocols).
+This option is only valid in combination with the append, insert,
+or delete command.
+.SH FILES
+.I /proc/net/ip_acct
+.br
+.I /proc/net/ip_input
+.br
+.I /proc/net/ip_output
+.br
+.I /proc/net/ip_forward
+.br
+.I /proc/net/ip_masquerade
+.\" .SH BUGS
+.SH SEE ALSO
+ipfw(4)
+.SH AUTHOR
+Jos Vos <jos@xos.nl>
+.br
+X/OS Experts in Open Systems BV, Amsterdam, The Netherlands

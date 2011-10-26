@@ -1,0 +1,80 @@
+#!/bin/sh
+#***********************************************************************
+#
+# adsl-status
+#
+# Shell script to report on status of ADSL connection
+#
+# Copyright (C) 2000 Roaring Penguin Software Inc.
+#
+# $Id: adsl-status,v 1.1.1.1 2000-11-17 05:28:41 davidm Exp $
+#
+# This file may be distributed under the terms of the GNU General
+# Public License.
+#
+# Usage: adsl-status [config_file]
+# If config_file is omitted, defaults to /etc/ppp/pppoe.conf
+#
+#***********************************************************************
+
+# Defaults
+CONFIG=/etc/ppp/pppoe.conf
+case `uname -s` in
+    *BSD)
+	VARRUN="/etc/ppp"
+	;;
+    *)
+	VARRUN="/var/run"
+	;;
+esac
+case "$#" in
+    1)
+	CONFIG="$1"
+	;;
+esac
+
+if [ ! -f "$CONFIG" -o ! -r "$CONFIG" ] ; then
+    echo "$0: Cannot read configuration file '$CONFIG'" >& 2
+    exit 1
+fi
+
+. $CONFIG
+
+PPPOE_PIDFILE="$PIDFILE.pppoe"
+PPPD_PIDFILE="$PIDFILE.pppd"
+
+# If no PPPOE_PIDFILE, connection is down
+if [ ! -r "$PPPOE_PIDFILE" ] ; then
+    echo "adsl-status: Link is down (can't read pppoe PID file $PPPOE_PIDFILE)"
+    exit 1
+fi
+
+# If no PPPD_PIDFILE, something fishy!
+if [ ! -r "$PPPD_PIDFILE" ] ; then
+    echo "adsl-status: Link is down (can't read pppd PID file $PPPD_PIDFILE)"
+    exit 1
+fi
+
+PPPD_PID=`cat "$PPPD_PIDFILE"`
+# Search the $VARRUN/pppn.pid files
+for i in $VARRUN/ppp*.pid ; do
+    if [ -r $i ] ; then
+	PID=`cat $i`
+	if [ "$PID" = "$PPPD_PID" ] ; then
+	    IF=`basename $i .pid`
+	    netstat -rn | grep "${IF}\$" > /dev/null
+	    # /sbin/ifconfig $IF | grep "UP.*POINTOPOINT" > /dev/null
+	    if [ "$?" != "0" ] ; then
+		echo "adsl-status: Link is attached to $IF, but $IF is down"
+		exit 1
+	    fi
+	    echo "adsl-status: Link is up and running on interface $IF"
+	    /sbin/ifconfig $IF
+	    exit 0
+	fi
+    fi
+done
+
+echo "adsl-status: Link is down -- could not find interface corresponding to"
+echo "pppd pid $PPPD_PID"
+exit 1

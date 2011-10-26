@@ -1,0 +1,195 @@
+.\" faxview.man -- manual page for FAXview.
+.\"
+.\" Copyright (C) 1995 Ralph Schleicher <rs@purple.in-ulm.de>
+.\"
+.\" This program is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program; if not, write to the Free Software
+.\" Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\"
+.TH faxview 1 "November 9, 1995"
+.UC 4
+.SH NAME
+faxview \- a simple file dialog for managing fax messages.
+.SH SYNOPSIS
+.B faxview
+.SH DESCRIPTION
+.B FAXview
+is a user interface to view, print and delete incoming fax messages.
+You should be able to use
+.B FAXview
+if you know how to handle a serial pointing device (some aliens call
+such devices \`mouse\').  Thus, stop reading here unless you want to
+know the secrets of live, the universe and anything else.
+
+There are five major regions in the dialog.  The top-most entry-field
+labeled
+.B Selected\ filenames
+displays the currently selected filename.  Multiple filenames have to be
+separated with spaces.  All names are relative to the current working
+directory and may contain globbing patterns.  Typing
+.I Return
+in the entry-field invokes the viewing command on all selected files.
+
+The second entry-field labeled
+.B Type\ of\ file
+and the two list-boxes
+.B Files
+and
+.B Directories
+represent the actual file dialog.  You can select a file from the
+.B Files
+list-box with a single-click on the first mouse-button.  A double-click
+invokes the viewing command on the file underneath the mouse cursor.
+Dragging the mouse while holding mouse-button one down selects multiple
+files.  A double-click in the
+.B Directories
+list-box changes the current working directory and updates the contents of
+the list-boxes.  The globbing pattern specified in the
+.B Type\ of\ file
+entry-field controls the contents of the
+.B Files
+list-box (entering a directory name selects all files in that directory;
+things like \`~user\' are of course allowed).  Typing
+.I Return
+in the
+.B Type\ of\ file
+entry-field updates the contents of the
+.B Files
+and
+.B Directories
+list-boxes.  The
+.B Collect\ pages
+check-button of the
+.B Files
+list-box controls whether multiple filenames with a unique base-name are
+listed on a single line using a brace globbing pattern or not.  Enabling
+this feature is the only way to view multiple files with a simple
+double-click.  This appeals to the laziness of most users.
+
+The two entry-fields
+.B Viewing\ command
+and
+.B Printing\ command
+below the file dialog specify the command to be used for viewing and
+printing the selected files.  The check-button
+.B Single\ filenames
+decides whether the token
+.B $f
+will be replaced with all selected filenames or if the command will be
+invoked for each filename separately.  You must put an ampersand
+.B &
+at the end of the command line if you want to execute the command
+asynchronously.  You also have to obey the rules of the Tcl-command
+.B exec
+if you want to redirect any file handles.  Example entries for viewing
+and printing are
+
+     xli -pixmap $f &
+
+and
+
+     g3topbm $f | pbmtolps | lpr &
+
+The
+.I Return
+key is bound to invoke the entered command within these two entry-fields.
+
+The last window named
+.B Process\ information
+logs most actions and it is used to display warning and error messages,
+too.  You can control if the lines should be truncated or wrapped with
+the check-box
+.BR Wrap\ lines .
+
+After all, there are six push-buttons at the bottom of the dialog.  The
+.B View
+and
+.B Print
+button invoke the corresponding command from the
+.B Viewing\ command
+and
+.B Printing\ command
+entry-fields.  The
+.B Remove
+button deletes the selected files after your confirmation.  The
+.B Update
+button can be used to re-read the contents of the current directory.
+You can go back to your startup directory with the
+.B Home
+button (in case you get lost in the file system).  The right-most button
+.B Exit
+terminates
+.BR FAXview .
+This event is globally bound to the
+.I Escape
+key, too.
+.SH OPTIONS
+There are none.
+.SH ENVIRONMENT
+See the manual page of your shell for how to set environment variables.
+.TP
+.B FAXVIEW
+The startup directory of
+.BR FAXview .
+Users who get their fax messages delivered from a real fax administrator
+can set this variable to their own spool directory.  The directory
+\`/var/spool/fax/incoming\' will be used as the startup directory if the
+.B FAXVIEW
+variable is not set.
+.SH SEE\ ALSO
+.B Tcl/Tk
+is a programming system for developing GUI applications written by John
+K. Ousterhout.  You need at least the windowing shell
+.B wish(1)
+to run
+.BR faxview(1) .
+
+.B mgetty(1)
+from the
+.B mgetty+sendfax
+package written by Gert Döring <gert@greenie.muc.de> allows to use a fax
+modem for receiving fax messages and handling external logins without
+interfering with outgoing calls.
+
+.BR xli(1) ,\  xloadimage(1) ,\  xv(1)
+and
+.B display(1)
+(the last one is from the
+.B ImageMagick
+package) can be used to view fax pages under X directly.  All these
+programs are much slower than
+.B viewfax(1)
+(AKA
+.BR viewfax(1) )
+written by Frank D. Cringle <fdc@cliwe.ping.de> because it is highly
+optimized for fax messages received by
+.B mgetty(1)
+(it takes less than a second to display an average fax page).
+
+.B g3topbm(1)
+from the
+.BR pbmplus ,\  netpbm
+or
+.B mgetty+sendfax
+package may help you to convert a fax page into other formats.
+.SH BUGS
+Bugs are by far the largest and most successful class of
+entity.  (Prof. Snopes' Encyclopedia of Animal Life)
+.SH AUTHOR
+Ralph Schleicher <rs@purple.in-ulm.de>.
+
+.B FAXview
+is free software and comes with ABSOLUTELY NO WARRANTY; see the GNU
+General Public License as published by the Free Software Foundation for
+details.

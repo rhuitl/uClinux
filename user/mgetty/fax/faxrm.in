@@ -1,0 +1,64 @@
+#!@SHELL@
+#
+# faxrm <job ids>
+#
+# remove faxes with job_id passed on the command line (if writable)
+#
+# There are still a lot rough edges - but it works, and should give you an
+# idea how to improve it
+#
+# SCCS: $Id: faxrm.in,v 4.6 2003/02/04 16:46:36 gert Exp $ Copyright (C) 1994 Gert Doering
+
+FAX_SPOOL=@FAX_SPOOL@
+FAX_SPOOL_OUT=@FAX_SPOOL_OUT@
+#
+# echo program that will accept escapes (bash: "echo -e", sun: /usr/5bin/echo)
+echo="@ECHO@"
+#
+# helper program for privileged queue access
+FAXQ_HELPER=@LIBDIR@/faxq-helper
+#
+
+if [ ! -d $FAX_SPOOL_OUT ]
+then
+    echo "$FAX_SPOOL_OUT does not exist" >&2
+    exit 1
+fi
+
+cd $FAX_SPOOL_OUT
+
+interactive=""
+if [ "X$1" = "X-i" ]
+then
+    interactive="i"
+    shift
+fi
+
+if [ $# -eq 0 ]
+then
+    echo "usage: faxrm [-i] job-id ..."
+    exit 1
+fi
+    
+for jobid
+do
+    if [ ! -d "$jobid" ]
+    then
+        echo "$jobid: no such job found." >&2
+        continue
+    fi
+#
+# check lock (there's a small race here, but this is only informational
+# anyway - the real locking is inside the helper)
+    if [ -f "$jobid"/JOB.locked ]
+    then
+        echo "$jobid: JOB is locked, try again later." >&2
+        continue
+    fi
+#
+# throw away - faxq-helper will do all the checks & all the work
+#
+    $FAXQ_HELPER remove $jobid
+#
+# end for (all jobs)
+done

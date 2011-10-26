@@ -1,0 +1,65 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" netwave_cs.4 1.7 2000/06/12 21:24:48
+.\"
+.TH NETWAVE_CS 4 "2000/06/12 21:24:48" "pcmcia-cs"
+.SH NAME
+netwave_cs \- Xircom Creditcard Netwave device driver
+.SH SYNOPSIS
+.B insmod netwave_cs.o
+.RB [ pc_debug=\c
+.IR n ]
+.RB [ domain=\c
+.IR n ]
+.RB [ scramble_key=\c
+.IR n ]
+.RB [ mem_speed=\c
+.IR n ]
+.RB [ irq_list=\c
+.IR i,j,... ]
+.SH DESCRIPTION
+.B Netwave_cs
+is the low-level Card Services driver for the Xircom Creditcard
+Netwave PCMCIA wireless network adapter.  When this driver is attached
+to a card, it allocates the next available ethernet device
+.RB ( eth0 .. eth# ).
+This
+device name will be reported in the kernel log file, and will be
+passed on to
+.BR cardmgr (8).
+.PP
+The wireless domain number and scrambling key can be specified using
+module parameters when the module is loaded.  These parameters should
+be specified in
+.IR /etc/pcmcia/config.opts .
+.SH PARAMETERS
+.TP
+.BI pc_debug= n
+Selects the PCMCIA debugging level.  This parameter is only available
+if the module is compiled with debugging enabled.  A non-zero value
+enables debugging.
+.TP
+.BI domain= n
+Selects what access point(s) to talk to, by their domain number.
+Values from 0 to 0x1ff are valid; 0x100 is the default.
+.TP
+.BI scramble_key= n
+Selects the scramble key for domains that are scrambled.  Values from
+0 to 0x1ff are valid.  The default is 0 (no scrambling).
+.TP
+.BI mem_speed= n
+Sets the access speed of the shared memory window, in nanoseconds.
+The default is 0 (i.e., no extra wait states).  Values of up to 1000
+are legal.
+.TP
+.BI irq_list= i,j,...
+Specifies the set of interrupts that may be allocated by this driver.
+.SH BUGS
+The statistics reported back from the driver are wrong.
+.SH AUTHORS
+Dag Brattli \- dagb@cs.uit.no
+.br
+John Markus Bjorndalen \- johnm@staff.cs.uit.no
+.br
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+cardmgr(8), pcmcia(5).

@@ -1,0 +1,62 @@
+\subsection{002: address inertia}
+
+\subsubsection{002: Definition of requirement}
+
+The essence of this requirement is that gateway's can remember where the
+wild-side address of road warriors are. Should a reboot (or a restart of
+\pluto\ ) occur, it would re-initiate to these clients.
+
+There are three levels of support which may be desireable:
+
+\begin{enumerate}
+\item[Level 1] 	record only the wild-side address for re-initiation.
+
+\item[Level 2]  record the wild-side address, and all current phase 1 (DH and
+			SKEYID) keying materials.
+
+\item[Level 3] 	record the wild-side address, and phase 1 and phase 2 keying materials.
+\end{enumerate}
+
+\subsubsection{002: response}
+
+Satisfaction of level 1 of this requirement will require changes only to 
+\pluto, specifically to provide a way to get a list of current connections,
+to record this in a stable file, and a for the boot up scripts to read the
+alternate list of configurations as well. So, this requirement can be
+satisfied without impact to KLIPS2 design.
+
+Level 2 of this requirement has some issues. The storage of keying material
+on disk may be a source of concern. This issue would need to be addressed
+in the design. The source of this requirement is to provide reliable recovery
+and fast reboots, systems that involve operator intervention may not satisfy
+this. The chief advantage of storing the phase 1 information is that it
+reduces the amount of time required to do DH exponentiation after a reboot. 
+A new phase 2 would have to be done as well.
+
+Level 3 of this requirement has further issues. It requires some help from
+KLIPS2 to provide for the retrieval of keying materials (including replay
+state) from the kernel, and subsequent reloading of it. There are clearly
+even more issues with making sure that the materials are not inappropriately
+revealed. 
+In addition, the state of eroutes, filtering, etc. will need to be
+captured. Saving of this information may have very strong advantages in the
+opportunistic case, as the information on whether or not to set up an
+opportunistic tunnels is valuable as well. Further, in the opportunistic
+case the risk of disclosure of the keying material may be considered low
+enough that storing it is worthwhile.
+
+In all three cases, there is a cost-benefit analysis to do, weighing the
+improvements in reliability and performance against the risks of
+inappropriate disclosure. The answer to this analysis may always be a local
+matter. 
+
+In addition, all three cases would apply to restarting of \pluto\ either on
+purpose (to facilitate easy updates), or due to program error (core dump).
+
+There are further legal issues. Access to the keying materials may facilitate 
+cooperation with law enforcement access. This is not regarded as a feature.
+
+Opportunistic encryption would benefit from any amount of key maintenance.
+Road warriors are the ones most likely to benefit as they are turned
+off/suspended most often. However, their wildside address is also most likely 
+to change, rendering any saved state that they have useless.

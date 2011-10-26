@@ -1,0 +1,677 @@
+#!/usr/bin/perl -w
+#
+# Quiet make.
+#
+# Reduces the amount of output from make.
+# Recognises commands from glibc and linux kernel builds.
+#
+# Copyright 2002 Philip Craig (philipc@snapgear.com)
+# Based on Rob Landley's blueberry.py
+
+
+### Start of configurable options...
+
+# Print the full file paths instead of the "Entering $dir" messages
+$fullpath = 1;
+
+# Print errors highlighted
+$highlighterror = 1;
+# Using ^H to make errors bold (less understands this)
+$errorbold = 0;
+# Use a color ("1;38" is light grey) (less needs the -R option for this)
+$errorcolour = "1;38";
+
+# Display "Installing ... " messages
+$showinstall = 0;
+# Display "Archiving to ... " messages
+$showarchive = 0;
+
+# Exec make instead of reading stdin
+$runmake = 0;
+# Run make based on whether stdin is a tty
+# This lets you use qmake as a replacement for make if stdin is a tty,
+# or otherwise pipe the output of make into qmake.
+$autorunmake = 1;
+
+### ...end of options
+
+
+$nexttarget = '(unknown)';
+@target = ('(default)');
+chomp($topdir = `pwd`);
+@dir = ("$topdir");
+$firstline = 1;
+$neednewline = 0;
+
+
+sub nice_file {
+	my($file) = @_;
+
+	if ($fullpath) {
+		if ($file !~ /^\//) {
+			$file = "$dir[$#dir]/$file";
+		}
+		if ($file =~ /^\Q$topdir\E\/(.*)$/) {
+			$file = $1;
+		}
+	}
+	else {
+		if ($file =~ /^\Q$topdir\E\/(.*)$/) {
+			if ($1 =~ /^\Q$dir[$#dir]\E\/(.*)$/) {
+				$file = $1;
+			}
+		}
+	}
+
+	return $file;
+}
+
+{
+	my $splitline;
+	my $fromsplit;
+	my $raw;
+
+	undef($splitline);
+	$fromsplit = 0;
+
+	sub get_line {
+		my($fh) = @_;
+		local $_;
+
+		if (defined($splitline)) {
+			$_ = $splitline;
+			undef($splitline);
+			$fromsplit = 1;
+		}
+		else {
+			$_ = <$fh>;
+			defined($_) || return $_;
+			chomp($_);
+
+			# Join lines at \
+			while (/\\$/) {
+				$nextline = <$fh>;
+				defined($nextline) || last;
+				chop;
+				$_ = join(' ', split(/\s+/, $_.' '.$nextline));
+			}
+			$fromsplit = 0;
+		}
+		# Split lines at ;
+		# We're not smart enough to split loop constructs yet though
+		if (!(/^\s*for\s+/ || /^\s*do\s+/ || /^\s*if\s+/)
+			&& /^([^\[\]\(\)\{\}\`\;]+);\s+(.+)$/) {
+			$_ = $1;
+			$splitline = $2;
+		}
+		$raw = $_;
+		return $_;
+	}
+
+	my $lasthidden;
+	undef($lasthidden);
+
+	sub hide_line {
+		$lasthidden = $raw;
+	}
+
+	sub put_message {
+		my($message) = @_;
+
+		if ($neednewline) {
+			print "\n";
+			$neednewline = 0;
+		}
+		print "$message\n";
+		$firstline = 0;
+	}
+
+	sub put_line {
+		my($line) = @_;
+
+		if (!$fullpath && (!defined($lastdir) || $lastdir ne $dir[$#dir])) {
+			$lastdir = $dir[$#dir];
+			if ($target[$#target] !~ /dep/) {
+				if (!$firstline) {
+					put_message('');
+				}
+				put_message("Entering $lastdir\n");
+			}
+		}
+
+		if ($neednewline) {
+			print "\n";
+		}
+
+		if (defined($line)) {
+			print "$line";
+			$lasthidden = $raw;
+		}
+		else {
+			print "$raw";
+			#print "Unknown: $raw";
+			undef($lasthidden);
+		}
+		$neednewline = 1;
+		$firstline = 0;
+	}
+
+	sub put_raw {
+		my $line;
+
+		undef($line);
+		put_line($line);
+	}
+
+	sub put_action_file {
+		my($action, $file) = @_;
+		my $line;
+
+		if (defined($action) && defined($file)) {
+			$line = "$action " . nice_file($file);
+		}
+		put_line($line);
+	}
+
+	sub show_lasthidden {
+		if (defined($lasthidden)) {
+			put_message($lasthidden);
+			undef($lasthidden);
+		}
+	}
+
+	sub put_error {
+		my($error1, $error2) = @_;
+		my $line;
+
+		show_lasthidden();
+		if ($highlighterror) {
+			if ($errorbold) {
+				$raw = '';
+				foreach $i (split(//, $error1)) {
+					$raw .= "$i\b$i";
+				}
+				$raw .= $error2;
+			}
+			else {
+				$raw = "\033[" . $errorcolour . "m"
+					. $error1 . "\033[0m" . $error2;
+			}
+		}
+		else {
+			$raw = $error1 . $error2;
+		}
+		put_raw();
+	}
+}
+
+if ($autorunmake) {
+	if (-t STDIN) {
+		$runmake = 1;
+	}
+	else {
+		$runmake = 0;
+	}
+}
+if ($runmake) {
+	open(MAKE, '-|', "make " . join(' ', @ARGV) . " 2>&1")
+		|| die 'Could not execute make';
+	$fh = *MAKE;
+}
+else {
+	$fh = *STDIN;
+}
+
+$genromfs = 0;
+$ar = 0;
+$mkcramfs = 0;
+$makewait = "";
+
+
+LINE: while (defined($_ = get_line($fh))) {
+	if ($genromfs) {
+		next LINE if /^\d+\s+/;
+		$genromfs = 0;
+	}
+	if ($ar) {
+		next LINE if /^[ar]\s+-\s+/;
+		$ar = 0;
+	}
+	if ($mkcramfs) {
+		next LINE if /^  /;
+		next LINE if /^'/;
+		next LINE if /^\s*-?\d+\.\d+%/;
+		next LINE if /^Directory/;
+		$mkcramfs = 0;
+	}
+	if ($makewait ne "") {
+		@word = split;
+		next LINE if ($#word <= 0 || $word[0] ne $makewait);
+		$makewait = "";
+	}
+
+	# Remove '[ ... ] || ' from start
+	if (/^\[[^\[\]]*\]\s*\|\|\s*(.*)$/) {
+		$_ = $1;
+		redo;
+	}
+
+	# Remove ENVVAR="..." from start
+	if (/^\w+=\"[^\"]*\"\s+(.*)$/) {
+		$_ = $1;
+		redo;
+	}
+
+	# Remove 'cd dir && " from start
+	if (/^cd\s+\S+\s+\&\&\s+(.*)$/) {
+		# TODO: should remember dir for displaying filenames
+		$_ = $1;
+		redo;
+	}
+
+	# Remove '(echo ...) | ' from start (glibc stuff)
+	if (/^\(echo.*\)\s+\|\s+(gcc.*)$/) {
+		$_ = $1;
+		redo;
+	};
+
+	# Remove 'ld-linux.so.2' from start (glibc stuff)
+	if (/^\S*\/ld-linux.so.2\s+(--library-path\s+\S+)?\s+(.*)$/) {
+		$_ = $2;
+		redo;
+	}
+
+	# Remove + from the start (from bash set +x)
+	if (/^\+\s+(.*)$/) {
+		$_ = $1;
+	}
+
+	# Handle 'In file included from xxx.c:dd:' errors
+	if (/^In file included from /) {
+		show_lasthidden();
+		put_raw();
+		next LINE;
+	}
+
+	#libssl noise
+	if (/^[mM]aking all in /
+			|| /^You may get an error following this line./) {
+		hide_line();
+		next LINE;
+	}
+
+	#uClinux-dist noise
+	if (/ --> /) {
+		hide_line();
+		next LINE;
+	}
+
+	#busybox noise
+	if (/ -> .*busybox/) {
+		hide_line();
+		next LINE;
+	}
+
+	#parallel job output during configure check
+	if (/^checking .*\.\.\. (make.*[^.])$/) {
+		print("Found checking continuation\n");
+		$_ = $1;
+	}
+
+	$allwords = $_;
+	@word = split;
+	($#word >= 0) || next LINE;
+
+	for ($word[0]) {
+		/^(.*[-\/])?ar$/ && do {
+			if ($#word == 2) {
+				if ($showarchive) {
+					put_action_file('Creating empty', $word[2]);
+					next LINE;
+				}
+			}
+			elsif ($#word > 2) {
+				$ar = 1;
+				if ($showarchive) {
+					put_action_file('Archiving to', $word[2]);
+					next LINE;
+				}
+			}
+			hide_line();
+			next LINE;
+		};
+
+		(/^(.*[-\/])?as$/ || /^(.*\/)?as86$/) && do {
+			if ($#word >= 1) {
+				put_action_file('Assembling', $word[$#word]);
+				next LINE;
+			}
+			last;
+		};
+
+		(/^(.*[-\/])?(k?g)?cc$/ || /^(.*[-\/])?g\+\+$/) && do {
+			$action = 'Linking';
+			undef($file);
+			for $i (@word[1 .. $#word]) {
+				if ($i eq '-E') {
+					$action = 'Preprocessing';
+				}
+				elsif ($i eq '-c' || $i eq '-S') {
+					$action = 'Compiling';
+				}
+				elsif ($i eq '-M') {
+					$action = 'Generating dependencies for';
+				}
+			}
+			if ($action eq 'Linking') {
+				for ($i=1; $i<$#word; $i++) {
+					if ($word[$i] eq '-o') {
+						$file = $word[$i+1];
+						last;
+					}
+				}
+			}
+			else {
+				WORD: for $i (@word[1 .. $#word]) {
+					if ($i =~ /\.[sS]$/) {
+						if ($action eq 'Compiling') {
+							$action = 'Assembling';
+						}
+						$file = $i;
+						last WORD;
+					}
+					elsif ($i =~ /\.c(pp)?$/ || $i =~ /\.ld$/) {
+						$file = $i;
+						last WORD;
+					}
+					elsif ($i eq '-') {
+						for ($i=1; $i<$#word; $i++) {
+							if ($word[$i] eq '-o') {
+								$action .= ' from stdin to';
+								$file = $word[$i+1];
+								last WORD;
+							}
+						}
+					}
+				}
+			}
+			if (defined($file)) {
+				put_action_file($action, $file);
+				next LINE;
+			}
+			last;
+		};
+
+		/^checking$/ && do {
+			# configure
+			hide_line();
+			next LINE;
+		};
+
+		/^echo$/ && do {
+			# glibc stamp files
+			if ($#word >=3 && $word[$#word-1] eq '>'
+					&& $word[$#word] =~ /\/stamp\.o[sS]?T$/) {
+				hide_line();
+				next LINE;
+			}
+			# mysql stamp files
+			if ($#word >=3 && $word[$#word-1] eq '>'
+					&& $word[$#word] =~ /\.lo$/) {
+				hide_line();
+				next LINE;
+			}
+			last;
+		};
+
+		/^genromfs$/ && do {
+			undef($from);
+			undef($to);
+			for ($i=1; $i<$#word; $i++) {
+				if ($word[$i] eq '-f') {
+					$to = $word[$i+1];
+				}
+				if ($word[$i] eq '-d') {
+					$from = $word[$i+1];
+				}
+			}
+			if (defined($from) && defined($to)) {
+				put_line("Generating romfs $to from $from");
+			}
+			else {
+				put_raw();
+			}
+			$genromfs = 1;
+			next LINE;
+		};
+
+		(/^(.*\/)?install$/ || /^romfs-inst.sh$/) && do {
+			if (!$showinstall) {
+				hide_line();
+				next LINE;
+			}
+			if ($#word >= 1) {
+				if ($word[$#word] =~ /(.*)\.new$/) {
+					put_action_file('Installing', $1);
+				}
+				else {
+					put_action_file('Installing', $word[$#word]);
+				}
+				next LINE;
+			}
+			last;
+		};
+
+		(/^(.*[-\/])?ld$/ || /^(.*\/)?ld86$/) && do {
+			for ($i=1; $i<$#word; $i++) {
+				if ($word[$i] eq '-o') {
+					put_action_file('Linking', $word[$i+1]);
+					next LINE;
+				}
+			}
+			last;
+		};
+
+		/^(.*\/)?ln$/ && do {
+			if ($#word >= 2 && $word[1] =~ /^-.*s/) {
+				hide_line();
+				next LINE;
+			}
+			last;
+		};
+
+		/^(.*\/)m4$/ && do {
+			if ($#word >= 1) {
+				put_action_file('Preprocessing', $word[$#word]);
+				next LINE;
+			}
+			last;
+		};
+
+		/^make$/ && do {
+			if ($#word >= 3 && $word[1] eq '-C') {
+				$nexttarget = join(' ', @word[3 .. $#word]);
+			}
+			elsif ($#word >= 1) {
+				$nexttarget = join(' ', @word[1 .. $#word]);
+			}
+			else {
+				$nexttarget = '(default)';
+			}
+			# TODO: nexttarget needs more cleaning to be printable,
+			# but it's good enough to determine 'make dep' targets...
+			hide_line();
+			next LINE;
+		};
+
+		/^make(\[[0-9]+\])?:$/ && do {
+			if ($#word >= 3) {
+				if ($word[2] eq 'directory') {
+					if ($word[1] eq 'Entering') {
+						$dir = $word[3];
+						if ($dir =~ /^\`(.*)\'$/) {
+							$dir = $1;
+						}
+						if ($dir =~ /^\Q$topdir\E\/(.*)$/) {
+							$dir = $1;
+						}
+						push @dir, $dir;
+						push @target, $nexttarget;
+						$nexttarget = '(unknown)';
+					}
+					elsif ($word[1] eq 'Leaving') {
+						pop @dir;
+						pop @target;
+					}
+					hide_line();
+					next LINE;
+				}
+				elsif ($word[1] eq 'Nothing') {
+					hide_line();
+					next LINE;
+				}
+				elsif ($word[$#word] eq 'date.') {
+					hide_line();
+					next LINE;
+				}
+				elsif ($word[2] eq 'jobserver'|| $word[$#word-1] eq 'jobserver') {
+					hide_line();
+					next LINE;
+				}
+				elsif ($word[2] eq 'Waiting') {
+					$makewait = $word[0];
+					hide_line();
+					next LINE;
+				}
+			}
+			put_error($word[0], substr($allwords, length($word[0])));
+			next LINE;
+		};
+
+		/^\.\/mkbuiltins$/ && do {
+			# bash
+			hide_line();
+			next LINE;
+		};
+
+		/^(.*\/)?mkcramfs$/ && do {
+			$mkcramfs = 1;
+			last;
+		};
+
+		/mkdep$/ && do {
+			put_line("Finding dependencies in $dir[$#dir]");
+			next LINE;
+		};
+
+		(/\/mkinstalldirs$/ || /^mkdir$/) && do {
+			hide_line();
+			next LINE;
+		};
+
+		/^mv$/ && do {
+			if ($#word >= 2) {
+				# glibc stamp files
+				if ($word[$#word-1] eq $word[$#word].'T') {
+					hide_line();
+					next LINE;
+				}
+				# glibc installs
+				if ($word[$#word-1] eq $word[$#word].'.new') {
+					hide_line();
+					next LINE;
+				}
+			}
+			last;
+		};
+
+		/^(.*[-\/])?nm$/ && do {
+			if ($#word >= 1) {
+				put_action_file('Extracting symbols to', $word[$#word]);
+				next LINE;
+			}
+			last;
+		};
+
+		/^(.*[-\/])?objcopy$/ && do {
+			if ($#word >= 1) {
+				put_action_file('Objcopy to', $word[$#word]);
+				next LINE;
+			}
+			last;
+		};
+
+		/^(.*[-\/])?ranlib$/ && do {
+			hide_line();
+			next LINE;
+		};
+
+		/^(.*\/)?rm$/ && do {
+			hide_line();
+			next LINE;
+		};
+
+		/^source=/ && do {
+			# mysql dependency checking
+			hide_line();
+			next LINE;
+		};
+
+		/^(.*[-\/])?strip$/ && do {
+			hide_line();
+			next LINE;
+		};
+
+		/^touch$/ && do {
+			#glibc stamp files
+			if ($#word >=1 && $word[$#word] =~ /\/stamp.o[sS]?$/) {
+				hide_line();
+				next LINE;
+			}
+			last;
+		};
+
+		/^unset$/ && do {
+			if ($#word == 1) {
+				if ($word[1] eq 'GCC_EXEC_PREFIX') {
+					hide_line();
+					next LINE;
+				}
+			}
+		};
+
+		/\/zic$/ && do {
+			if ($#word >= 1) {
+				put_action_file('Compiling timezone', $word[$#word]);
+				next LINE;
+			}
+			last;
+		};
+
+		/^\:$/ && do {
+			hide_line();
+			next LINE;
+		};
+
+		/^\#/ && do {
+			hide_line();
+			next LINE;
+		};
+
+		/^\**$/ && do {
+			put_error($allwords, '');
+			next LINE;
+		};
+
+		/.+:$/ && do {
+			put_error($word[0], substr($allwords, length($word[0])));
+			next LINE;
+		};
+	}
+
+	put_raw();
+}
+
+if ($neednewline) {
+	print "\n";
+}

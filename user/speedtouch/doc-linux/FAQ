@@ -1,0 +1,431 @@
+Speedtouch USB FAQ
+
+Last changes :
+$Id: FAQ,v 1.14 2002/05/31 22:02:43 edgomez Exp $
+
+General
+ 0.0 I'm confused - there seem to be several speedtouch drivers, which
+     one is this?
+
+Configuration
+ 1.1 Which linux kernel version was used to develop this software
+ 1.2 What configurations have been tested?
+ 1.3 Do I need to patch the kernel or pppd?
+ 1.4 What about the HDLC BUG?
+ 1.5 What to do about USB messages
+ 1.6 USB messages are filling up my log.
+ 1.7 I'd like to start my connection when linux is started. How to do that?
+
+ISP Settings
+ 2.1 What login should I use for my ISP?
+ 2.2 Which vpi.vci should I use? 
+
+Known Problems
+ 3.1 I have heard about upload problems. What is the current status?
+ 3.2 Downloads from some web-sites don't work 
+ 
+Troubleshooting
+ 4.1 pppd says that there is no PPP support.
+ 4.2 I get the message "ADSL line is blocked?" and modem run just terminates - Why?
+ 4.3 I have seen messages like "usbdevfs: process 833 (pppoa2) did not claim interface 1 before use".
+ 4.4 When I got disconnect by my Internet provider, pppd is unable to reconnect automatically...
+ 4.5 pppoa3 is not closing when a ppp session fails?
+ 4.6 pppd can't load some modules!
+ 4.8 What interesting files I should look at in case of problems?
+ 4.9 My microcode upload has failed!
+ 4.10 I get lot of LCP-Config-Request Timeouts
+ 4.11 I get "USBDEVFS_BULK failed dev 2 ep 0x85 len 512 ret -110" when running
+      modem_run
+ 4.12 Everything seems to work but ifconfig still shows no IP on ppp0
+ 4.13 I can a see a couple of IPs in my logs but I can't browse the web !
+ 4.14 I've tried everything you said and it still does not work.
+
+General
+=======
+
+0.0 I'm confused - there seem to be several speedtouch drivers, which
+    one is this?
+
+There are two USB Speedtouch drivers available for Linux. For the sake
+of argument we shall call the "user-mode" and "kernel-mode". This package and
+documentation refers to the "user-mode" version which is not related to the
+"kernel-mode" drivers in any way (except we use the managment code to provide
+the microcode for the modem).
+
+Do not mix and match instructions/faqs/howto's between the two projects as you
+will get very confused (and probably confuse everyone else). If your interested
+in the kernel-mode version then please see:
+
+    http://sourceforge.net/project/showfiles.php?group_id=3581
+    and
+    http://www.linuxdude.co.uk/docs/Alcatel-Speedtouch-USB-mini-HOWTO/speedtouchusb.html
+
+Briefly the kernel-mode driver is built into the linux kernel as an ATM device
+and uses a patched version of pppd to terminate the ATM and give you IP. This
+means the data spends more time in kernel-mode (which should improve latency).
+
+The user-mode driver terminates the USB device in user-space and demangles the
+ATM into "normal" ppp packets for a normal pppd. Although we recommend some
+kernel options you generally don't need to patch anything.
+
+We of course recommend the user-mode as being easier to set-up but then again
+we are biased :-)
+
+
+Configuration Questions
+=======================
+
+1.1 Which linux kernel version was used to develop this software:
+	linux kernel version 2.4.3 >=
+
+1.2 What configurations have been tested?
+  (and what kernel version is known to work?)
+
+  See the file results.txt for some systems that have been tested.
+
+  2.2.x series : 2.2.17, 2.2.17-21mdk, 2.2.19-5mdk, 2.2.20,
+                 2.2.19 shipped with the debian potato.
+  2.4.x series : 2.4.0, 2.4.2<->2.4.18
+
+  2.5 development series are not supported (because the usb stack
+  changes too much, between each kernel release). If you find a
+  problem with modem_run on a development kernel please re-test with
+  the latest 2.4 stock kernel before asking the list or report the bug
+  to the linux-usb kernel hackers.
+
+  Kernel older than 2.2.17 does not work
+  Kernel 2.4.1 freezes.
+
+1.3. Does it need kernel patches or pppd patches to work?
+
+This solution uses a standard kernel ppp and all the ATM handling is done
+outside of the kernel. There is another driver that uses a patched kernel
+(for ATM support) and patched pppd (for the pppoa bit). They are not required
+for this solution they may even be incompatible with this driver. 
+
+1.4 What about the HDLC BUG?
+
+Well ok you may need a kernel patch for that, see HDLC_BUG for more details.
+(Addendum : the patch is included in vanilla kernels since 2.4.18-pre1)
+
+1.5 I can see a lot of line like
+  "usbdevfs: USBDEVFS_BULK failed dev 2 ep 0x81 len 16 ret -110", what's that?
+
+There are "normal" error messages output by your linux kernel.
+Don't worry too much about them. It may be fixed in a future release.
+
+1.6 I can see a lot of line like:
+  "usbdevfs: async_completed: status -2 errcount 0 actlen 0 pipe 0xc0008280"
+
+This is entirely normal message output by your kernel. If this is a worry
+for you (log file are too big), there is only one solution :
+
+  - go to /usr/src/linux/drivers/usb/devio.c 
+  - change #if 1 to #if 0 in async_completed() function
+  - compile/install your new usbcore.o module.
+
+
+1.7 I'd like to start my connection when linux is started. How to do that?
+
+We provide a SysV init script suitable for debian/rh/mdk. The script
+is called speedtouch and is usualy copied into /etc/init.d by the
+install process. RPM installs also use this
+
+The configuration file for the script is kept in your system config
+directory (usually /etc/speedtouch.conf).
+
+It suppose the modem is the only usb device and that it can shut down
+usb without interfering with other usb devices. But the script is as
+flexible as we could code it. See howto use it :
+
+Then configure the speedtouch.conf in /etc :
+
+  First set of variables : Those variables tell the script what module to load
+
+    LOAD_USBCORE= (0 when usbcore is in kernel | 1 when it is a module) 
+    LOAD_USBINTERFACE= (0 when the usb interface is in kernel | 1 when it is
+                        a module) 
+    LOAD_NHDLC= (0 when compiled in kernel | 1 when compiled as a module)
+
+  Then   : This will give the script a fallback usb interface when it doesn't
+           find your usb-interafce module in /etc/modules.conf (Debian users
+           must set this value)
+
+    DEFAULT_USBINTERFACE=("usb-uhci" | "usb-ohci")
+
+  (do not use "uhci" which is buggy with some kernel versions)
+
+  NB: Some distributions (e.g. Mandrake) already load the USB drivers
+  on startup (look for /etc/init.d/usb) so the LOAD_USBCORE and
+  LOAD_USBINTERFACE cariables can be set to 0.
+  
+  Then   : Sets the modem_run verbosity
+    VERBOSE=(0 | 1 | 2)
+
+  Then   : Defines the peer pppd shall try to "call"
+    PEER="adsl" if you followed the HOWTO
+
+  And finally : Defines the firmware location
+    MICROCODE="the_right_path_to_find_the_firmware/(mgmt.o | alcaudsl.sys)"
+
+NB : No other variables should be changed
+
+Then it depends on your distro
+
+  For RH/Mandrake distros :
+    cd /etc/rc.d/init.d
+    chkconfig speedtouch on
+
+  For Debian distros (stable, testing, unstable)
+    update-rc.d speedtouch start 90 2 3 4 5 . stop 10 0 1 6 .
+
+It should be activated during next reboot.
+
+ISP Settings
+============
+
+2.1 What login I should use with my ISP?
+
+Logins vary with various ISP's and the wrong format can cause problems
+with things like authentication.
+
+ISP			Format
+
+Club Internet		login@clubadsl1
+BT Openworld		user.name@hg<n>.btinternet.com
+
+2.2 Which vpi.vci should I use? 
+
+Here are some working values for some people, your configuration may differ
+
+Country/ISP	      VPI    VCI
+Belgium, ?	      8	     35
+Denmark, Orange	      8	     35
+France, wanadoo	      8	     35
+France, ?	      8	     67
+Italy, ?	      8	     35
+Netherlands, ?	      8	     48
+UK, BTopenworld	      0	     38
+US, BellSouth	      8	     35
+
+
+Known Problems
+==============
+
+3.1. I have heard about upload problems. What is the current status?
+
+This problem is solved by using the HDLC line discipline. No upload or
+download limits are hardcoded in the driver. The upstream/downstream speed 
+messages is purely informationnal and is not use in any part of this driver.
+
+3.2 Downloads from some web-sites don't work!
+
+Several people have reported such problems. We are not sure of the
+exact reason but the consensus seems to be its a dodgy USB chipset
+problem. If can try on different USB hardware it may solve your
+problem.
+
+Some patches exist that increase the time-outs seem to of helped some
+people. See:
+
+http://www.mail-archive.com/speedtouch@ml.free.fr/msg02818.html
+http://www.mail-archive.com/speedtouch@ml.free.fr/msg02794.html
+
+If you've tested with different hardware and your still seeing
+problems and are willing to help in the diagnosis then contact the
+mailing list.
+
+Troubleshooting
+===============
+
+4.1 pppd says that there is no PPP support.
+
+=> look at /dev/ppp. "ls -la"  should give
+crw-rw----    1 root     root     108,   0 sep 27  2000 /dev/ppp
+
+If not, create /dev/ppp with the following commands:
+mknod /dev/ppp c 108 0
+
+4.2  I get the message "ADSL line is blocked?" and modem_run just
+terminates - Why?
+
+Perhaps you have missed the -m flag off the modem_run command line?
+
+4.3 I have seen messages like:
+"usbdevfs: process 833 (pppoa2) did not claim interface 1 before use".
+Does it mean that something is wrong?
+
+No. It is just a programmer error in the source code of the program. It has
+no consequence on the behaviour of the driver. Just signal them to the 
+maintainer.
+
+4.4 When I got disconnect by my Internet provider, pppd is unable to
+reconnect automatically, saying "Modem hangup". If I look at the pppoaX logging
+in syslog files, it shows the following messages
+
+"usbfs_claimintf: Device or resource busy".
+
+This is a known pb. See the file HDLC_BUG for instructions on how to patch
+your kernel sources. If the problem persist, get in touch.
+
+
+4.5 pppoa3 is not closing when a ppp session fails?
+
+On some versions of pppd it fails to signal to its pty's to let them know to
+close down. I think this is a bug in the version of pppd, if anyone can work
+out who the maintainer is then let me know. This can cause a new instance of
+pppoa to start not get anywhere (and lock up your machine if pppd is setup
+for infinate retries).
+
+The workaround is to invoke pppoa with the -c option and it will clean up any
+rougue pppoa's before attemptiing to access the previously locked resources.
+
+4.6 pppd can't load some modules!
+
+Example:
+> May 18 01:53:43 panoramix pppd[908]: pppd 2.4.0 started by Stephane, uid 0
+> May 18 01:53:43 panoramix pppd[908]: ioctl(PPPIOCSDEBUG): Invalid argument
+> May 18 01:53:43 panoramix pppd[908]: ioctl(PPPIOCGFLAGS): Invalid argument
+> May 18 01:53:43 panoramix pppd[908]: Exit.
+> May 18 01:53:43 panoramix modprobe: modprobe: Can't locate module
+> tty-ldisc-13
+
+Have you set your aliases up in modules.conf?
+
+
+4.8 What interesting files I should look at in case of problems?
+
+/var/log/messages
+/var/log/syslog
+/var/log/daemong.log
+/var/log/pppoaX.log (for systems without syslog support only)
+
+If /var/log/daemon.log does not exist, you can create it by adding
+"daemon.* /var/log/daemon.log" at the end of "/etc/syslog.conf"
+Next, restart syslog with '/etc/rc.d/init.d/syslog restart'
+
+4.9 My microcode upload has failed!
+
+We hear this from time to time and are not sure what causes this (except
+maybe some strangeness on the USB's part). If your reporting this problem
+to the mailing list please tell us what version and preferably what the
+md5sum of your microcode source is.
+
+We know of the following:
+
+7d0e028a8e3901bc0b5b569c575203ef  alcaudsl.sys windows version 1.3.1 (BTO CDROM?)
+3423810ba8d43ec7cdd01dd83698762b  alcaudsl.sys windows version 1.3.4
+aae9dd2d6ad69878d7899b24fa40cb08  alcaudsl.sys windows version 1.3.4
+b1bc2524451b8b238fca773d8642f60a  alcaudsl.sys windows version 1.4.0 
+d77a03513c8abddc6f95395515f2973e  alcaudsl.sys windows version 1.4.2-2e.sys
+aefca4891a64fd6f76d517406abd9407  alcaudsl.sys windows version 1.6-beta
+
+b35276ce6871cc2ba8c23e50a87043ab  mgmt.o       linux   original version? 
+0ee210ea42613cf43c72310672aae6c6  mgmt.o       linux   version 1.3.3
+ce3582cc9c3b967baa0e918f2708075d  mgmt.o       linux   version 1.3.4
+
+cb3ddd0a6100d405db7e84b6a12e08a5  <weird name> macosx  ?
+
+4.10 I get lot of LCP-Config-Request Timeouts
+
+When trying to dial with pppd, I see this in my syslogd logs :
+>Apr 27 11:26:05 leloo pppd[262]: pppd 2.4.1 started by root, uid 0
+>Apr 27 11:26:05 leloo pppd[262]: Using interface ppp0
+>Apr 27 11:26:05 leloo pppd[262]: Connect: ppp0 <--> /dev/pts/0
+>Apr 27 11:26:05 leloo pppd[262]: LCP: timeout sending Config-Requests 
+>Apr 27 11:26:05 leloo pppd[262]: Connection terminated.
+
+and the last 3 lines repeating as many times as the maxfail value.
+
+There're 3 possible problems causing this :
+
+  - Your ISP does not respond to your config requests. This cannot be solved
+    by the driver :-)
+  - You may have done a mistake in user/password between the adsl peer file
+    and the chap/pap-secrets file.
+  - Sometimes pppoa3 fails to remove its pid/lock file in /var/run/
+    Then check  your daemon.log, and if you see lines where pppoa3 is waiting
+    like this :
+
+    >Mar 24 13:56:12 leloo pppoa3[25981]: Sending the kill signal to 1381 and
+    >waiting
+      but this line is missing :
+    >Mar 24 13:56:12 leloo pppoa3[25981]: Ok, the previous instance seems to
+    >quit
+
+     To solve the problem, remove the pppoa3 pid file in /var/run and try
+     again
+
+4.11 I get "USBDEVFS_BULK failed dev 2 ep 0x85 len 512 ret -110 " when running
+     modem_run
+
+Alcatel has released two types of modems. For some of them, modem_run has to
+read from the modem before trying to send it the firmware. This type of modem
+is the less common. But to make sure all modems work with modem_run out of the
+box, we have been obliged to put a read instruction by default.
+
+You can disable this first read instruction with the -s option (man modem_run).
+
+Anyway, if you see this error, it doesn't hurt. That's just you don't have this
+rare type of modem.
+
+4.12 Everything seems to work but ifconfig still shows no IP on ppp0
+
+Chances are the ppp authentication is failing. You can up the debug
+information ppp gives you in the logs by adding debug and kdebug to
+your peers file (man pppd for details).
+
+You probably should check the login's in your ppp peers file and
+chap/pap-secrets is in the correct format. 
+
+4.13 I can a see a couple of IPs in my logs but I can't browse the web !
+
+Well, you're probably connected but you forgot to configure your DNS entries
+or pppd doesn't create them as it should do if you specified the usepeerdns
+option in the peer file.
+
+To see if you're connected try to ping a know IP, the best one is the peer ip
+in the ppp interface output generated by ifconfig. If you can't ping your peer
+then you're even connected, try checking your configuration again.
+
+If you can ping your peer, you're connected so you can solve this problem
+easily:
+
+    - making a symlink between /etc/resolv.conf and /etc/ppp/resolv.conf
+         # ln -sf /etc/ppp/resolv.conf /etc/resolv.conf
+    - copying this file
+         # cp /etc/ppp/resolv.conf
+    - writing down manually the DNS IPs in this file
+
+4.14 I've tried everything you said and it still does not work.
+
+First you can try the speedtouch doctor in doc-linux/doctor. To build the
+doctor, just type : # make and then run the speedtouch-doctor.sh script.
+
+It will output usefull hints to you. If the hints it gave you were not
+so usefull, then read the next advise.
+
+You may get some help from the mailing list speedtouch@ml.free.fr and should
+read the mail list archive, perhaps your problem has been solved in a previous
+thread.
+
+The mailing list archive is at :
+http://www.mail-archive.com/speedtouch@ml.free.fr/
+
+However, you must give as many details about your configuration as possible.
+
+- your USB controller : cat /proc/pci
+- your kernel version : uname -a
+- your pppd version   : pppd -V
+- your driver version : modem_run --help
+- your vpi/vci
+- your ADSL provider & ISP name
+- relevant section of your system logs (See 4.8), you can modify your ppp
+  option file to run the pppoaX program with option -v 2. This will result
+  in a more detailed log.
+- your problem description : crash, can't connect, poor performance
+- anything you think it might be usefull
+
+You are of course encouraged to modify the source code yourself & post
+your working modification to the list.
+

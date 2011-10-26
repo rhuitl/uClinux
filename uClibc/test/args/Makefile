@@ -1,0 +1,11 @@
+# uClibc args tests
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+
+include ../Test.mak
+
+OPTS_arg_test = a b c d e f g h
+WRAPPER_arg_test = \
+	env -i \
+	ENVVAR=123 \
+	SOMETHING=sldajfasdf \
+	BLAHBLAH=" hi hi "

@@ -1,0 +1,124 @@
+'begin'
+	'comment'
+		Find a solution for the `N queen' problem.
+		(got the algorithm from a Modula program from
+		 Martin Neitzel).
+	;
+
+	'integer' N, MAXN;
+
+	MAXN := 9;		'comment' maximum size;
+	N := 2;			'comment' current size;
+
+try next N:
+
+	'begin'
+
+	'integer' 'array' column [1 : N];
+	'boolean' 'array' empcol [1 : N];
+	'boolean' 'array' empup [-N+1 : N-1];
+	'boolean' 'array' empdo [2 : 2*N];
+	'integer' i;
+
+	'procedure' print;
+	'comment'
+		print the current solution in a chessboard alike
+		picture ;
+	'begin'
+		'integer' i, j;
+
+		'procedure' outframe;
+		'begin'
+			'integer' i;
+
+			'for' i := 1 'step' 1 'until' N 'do'
+				outstring (1, `+---');
+			outstring (1, `+\n')
+		'end';
+
+		outstring (1, `see:\n') ;
+
+		'for' j := 1 'step' 1 'until' N 'do' 'begin'
+			outframe;
+			outstring (1, `|');
+			'for' i := 1 'step' 1 'until' N 'do' 'begin'
+				'if' N + 1 - j = column [i] 'then'
+					outstring (1, ` Q |')
+				'else'
+					outstring (1, `   |')
+			'end';
+			outstring (1, `\n')
+		'end';
+		outframe
+	'end';
+
+
+	'procedure' set (x);
+	'value' x;
+	'integer' x;
+	'begin'
+		'integer' y;
+	
+		'for' y := 1 'step' 1 'until' N 'do'
+		'begin'
+	    		'if' empcol [ y ] 'and' empup [ x-y ] 
+					'and' empdo [ x+y ] 'then'
+			'begin'
+				column [ y ] := x ;
+				empcol [ y ] := 'false' ;
+				empup [ x-y ] := 'false' ;
+				empdo [ x+y ] := 'false' ;
+				'if' x = N 'then'
+					'goto' gotone
+				'else'
+					set ( x + 1 ) ;
+				empdo [ x+y ] := 'true' ;
+				empup [ x-y ] := 'true' ;
+				empcol [ y ] := 'true' ;
+				column [ y ] := 0
+			'end'
+		'end'
+	'end';
+
+	'comment'
+		main program start
+	;
+
+	outstring (1, `looking onto a ');
+	outinteger (1, N);
+	outstring (1, ` x ');
+	outinteger (1, N);
+	outstring (1, ` chessboard...\n');
+
+	'for' i := 1 'step' 1 'until' N 'do'
+	'begin'
+		 column [ i ] := 0 ;
+		 empcol [ i ] := 'true'
+	'end';
+
+	'for' i := -N+1 'step' 1 'until' N-1 'do'
+		 empup [ i ] := 'true' ;
+
+	'for'  i := 2 'step' 1 'until' 2*N 'do'
+		 empdo [ i ] := 'true' ;
+
+	set ( 1 ) ;
+
+	outstring (1, `NO SOLUTION.\n');
+	'goto' contN;
+
+gotone:
+	print;
+
+contN:
+	'if' N < MAXN 'then' 'begin'
+		N := N + 1;
+		'goto' try next N
+	'end';
+
+	outstring (1, `done.\n')
+
+	'end'
+'end'
+
+

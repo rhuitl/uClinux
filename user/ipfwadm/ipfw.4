@@ -1,0 +1,607 @@
+.\"
+.\"	$Id: ipfw.4,v 1.1.1.1 1999-11-22 03:48:00 christ Exp $
+.\"
+.\"
+.\"	Copyright (c) 1995,1996 by X/OS Experts in Open Systems BV.
+.\"	All rights reserved.
+.\"
+.\"	Author: Jos Vos <jos@xos.nl>
+.\"
+.\"		X/OS Experts in Open Systems BV
+.\"		Kruislaan 419
+.\"		1098 VA  Amsterdam
+.\"		The Netherlands
+.\"
+.\"		E-mail: info@xos.nl
+.\"		WWW:    http://www.xos.nl/
+.\"
+.\"
+.\"	This program is free software; you can redistribute it and/or modify
+.\"	it under the terms of the GNU General Public License as published by
+.\"	the Free Software Foundation; either version 2 of the License, or
+.\"	(at your option) any later version.
+.\"
+.\"	This program is distributed in the hope that it will be useful,
+.\"	but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"	GNU General Public License for more details.
+.\"
+.\"	You should have received a copy of the GNU General Public License
+.\"	along with this program; if not, write to the Free Software
+.\"	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\"
+.TH IPFW 4 "June 17, 1996" "" ""
+.SH NAME
+ipfw \- IP firewall and accounting
+.SH SYNOPSIS
+.BR "#include <sys/types.h>"
+.br
+.BR "#include <sys/socket.h>"
+.br
+.BR "#include <netinet/in.h>"
+.br
+.BR "#include <linux/ip.h>"
+.br
+.BR "#include <linux/tcp.h>"
+.br
+.BR "#include <linux/udp.h>"
+.br
+.BR "#include <linux/icmp.h>"
+.br
+.BR "#include <linux/if.h>"
+.br
+.BR "#include <linux/ip_fw.h>"
+.sp 0.75
+.BI "int setsockopt (int " socket ", IPPROTO_IP, int " command ", void *" data ", int " length ")"
+.SH DESCRIPTION
+The IP firewall and accounting
+facilities in the Linux kernel provide mechanisms for accounting
+IP packets, for building firewalls based on packet-level filtering,
+for building firewalls using transparent proxy servers (by redirecting
+packets to local sockets), and for masquerading forwarded packets.
+The administration of these functions is maintained in the kernel as
+4 separate lists, each containing zero or more rules.
+Each rule contains specific information about source and
+destination addresses, protocols, port numbers, and some
+other characteristics.
+A packet will match with a rule when the characteristics of the
+rule match those of the IP packet.
+The 4 categories of rules are:
+.TP
+Accounting
+The accounting rules are used for all IP packets that are sent or received
+via one of the local network interfaces.
+Every packet will be compared with all rules in this list, and every match
+will cause an increment of the packet and byte counters associated
+with that rule.
+.TP
+Input firewall
+These rules regulate the acceptance of incoming IP packets.
+All packets coming in via one of the local network interfaces
+are checked against the input firewall rules.
+The first rule that matches with a packet determines the policy to use
+and will also cause the rule's packet en byte counters being adapted.
+When no matching rule is found, the default policy for the
+input firewall is used.
+.TP
+Output firewall
+These rules define the permissions for sending IP packets.
+All packets that are ready to be be sent via one of the local
+network interfaces are checked against the output firewall rules.
+The first rule that matches with a packet determines the policy to use
+and will also cause the rule's packet and byte counters being adapted.
+When no matching rule is found, the default policy for the
+output firewall is used.
+.TP
+Forwarding firewall
+These rules define the permissions for forwarding IP packets.
+All packets sent by a remote host having another remote host as
+destination are checked against the forwarding firewall rules.
+The first rule that matches with a packet determines the policy to use
+and will also cause the rule's packet and byte counters being adapted.
+When no matching rule is found, the default policy for the
+forwarding firewall is used.
+.PP
+Each of the firewall rules (not the accounting rules) contains a policy,
+which specifies what action has to be taken when a packet matches with the rule.
+There are 3 different policies possible:
+.I accept
+(let the packet pass the firewall),
+.I reject
+(do not accept the packet and send an ICMP host unreachable
+message back to the sender as notification),
+and
+.I deny
+(ignore the packet without sending any notification).
+For all 3 types of firewalls there also exists a default policy,
+which applies to all packets for which none of the rules match.
+.PP
+The input rules also define whether or not packets should be
+redirected to a local socket after being accepted by the input firewall.
+In this case, the packet will be received by a local process, even if it
+was sent to another host and/or another port number.
+This function only applies to TCP or UDP packets.
+.PP
+The forwarding rules also define whether or not packets should be masqueraded
+when being forwarded.
+In that case, the sender address in the IP packets is replaced by the
+address of the local host and the source port in the TCP or UDP header
+is replaced by a locally generated (temporary) port number
+before being forwarded.
+Because this administration is kept in the kernel, reverse packets
+(sent to the temporary port number on the local host) are recognized
+automatically.
+The destination address and port number of these packets will be replaced 
+by the original address and port number that was saved when the first packet
+was masqueraded.
+This function only applies to TCP or UDP packets.
+.PP
+This paragraph describes the way a packet goes through the
+firewall and accounting rules.
+Packets received via one of the local network interface will pass
+the following sets of rules:
+.RS
+.I accounting
+(incoming device)
+.br
+.I input firewall
+(incoming device)
+.RE
+Here, the device (network interface) that is used when trying to
+match a rule with an IP packet is listed between brackets.
+After this step, a packet will optionally be redirected to a local socket.
+When a packet has to be forwarded to a remote host, it will also pass
+the next set of rules:
+.RS
+.I forwarding firewall
+(outgoing device)
+.RE
+After this step, a packet will optionally be masqueraded.
+Responses to masqueraded packets will never pass the forwarding firewall
+(but they will pass both the input and output firewalls).
+All packets sent via one of the local network interfaces, either
+locally generated or being forwarded, will pass the following sets
+of rules:
+.RS
+.I output firewall
+(outgoing device)
+.br
+.I accounting
+(outgoing device)
+.RE
+Note that masqueraded packets will pass the output firewall and accounting
+rules with the new packet headers (after passing the input and forwarding
+firewall with the original headers).
+Also, responses to masqueraded packets will have different headers
+when passing the input and output firewall rules.
+.PP
+The firewall and accounting administration can be changed via
+calls to
+.IR setsockopt (2).
+The existing rules can be inspected by looking at 4 files in
+the
+.I /proc/net
+directory:
+.IR ip_acct ,
+.IR ip_input ,
+.IR ip_output ,
+and
+.IR ip_forward .
+The current administration related to masqueraded sessions can
+be found in the file
+.I ip_masquerade
+in the same directory
+(note that the rules specifying which sessions should be
+masqueraded are in
+.IR ip_forward ).
+.SH COMMANDS
+Commands for changing the lists of rules or the default policies
+have to be given as options to the
+.IR setsockopt (2)
+system call, working on a raw IP socket.
+Most commands require some additional data to be passed.
+A pointer to this data and the length of the data are passed
+as option value and option length arguments to
+.IR setsockopt .
+The following commands are available:
+.PP
+.B IP_ACCT_APPEND
+.br
+.B IP_FW_APPEND_IN
+.br
+.B IP_FW_APPEND_OUT
+.br
+.B IP_FW_APPEND_FWD
+.RS
+Add a rule to one of the accounting or firewall lists.
+Depending on the command, the rule is added to the list for
+accounting, input firewall, output firewall, or forwarding firewall,
+repectively.
+The new rule rule is appended to the end of the list.
+The data passed with this command is an
+.I ip_fw
+structure, defining the contents of the new rule.
+.RE
+.PP
+.B IP_ACCT_INSERT
+.br
+.B IP_FW_INSERT_IN
+.br
+.B IP_FW_INSERT_OUT
+.br
+.B IP_FW_INSERT_FWD
+.RS
+These commands are equal to the append commands, except that the
+new rule is inserted at the beginning of the list.
+.RE
+.PP
+.B IP_ACCT_DELETE
+.br
+.B IP_FW_DELETE_IN
+.br
+.B IP_FW_DELETE_OUT
+.br
+.B IP_FW_DELETE_FWD
+.RS
+Remove a rule from one of the accounting or firewall lists.
+Depending on the command, the rule will be removed from the list for
+accounting, input firewall, output firewall, or forwarding firewall,
+repectively.
+The data passed with this command is an
+.I ip_fw
+structure, defining the contents of the rule to be removed.
+The first rule conforming to the given definition is removed from the list.
+.RE
+.PP
+.B IP_ACCT_ZERO
+.br
+.B IP_FW_ZERO_IN
+.br
+.B IP_FW_ZERO_OUT
+.br
+.B IP_FW_ZERO_FWD
+.RS
+Reset the packet and byte counters in all rules
+of the list for accounting, input firewall, output firewall,
+or forwarding firewall, repectively.
+Note that a (dummy) integer has to be passed as data
+with this command.
+See also the description of the
+.I /proc/net
+files for a way to atomically list and reset the counters.
+.RE
+.PP
+.B IP_ACCT_FLUSH
+.br
+.B IP_FW_FLUSH_IN
+.br
+.B IP_FW_FLUSH_OUT
+.br
+.B IP_FW_FLUSH_FWD
+.RS
+Remove all rules from the list for accounting, input firewall,
+output firewall,
+or forwarding firewall, repectively.
+Note that a (dummy) integer has to be passed as data
+with this command.
+.RE
+.PP
+.B IP_FW_POLICY_IN
+.br
+.B IP_FW_POLICY_OUT
+.br
+.B IP_FW_POLICY_FWD
+.RS
+Change the default policy for the input firewall, output firewall,
+or the forwarding firewall.
+The new policy is passed as integer data with the following
+possible values:
+.B IP_FW_F_ACCEPT
+(accept a packet),
+.B IP_FW_F_ICMPRPL
+(reject a packet
+by sending an ICMP host unreachable message back to
+the sender), or 0
+(deny a packet, without any further notification).
+The policy is used when none of the available firewall rules in the
+appropriate list matches the packet being screened.
+For the forwarding firewall, the given policy may also be
+.B
+IP_FW_F_ACCEPT | IP_FW_F_MASQ
+.R
+(accept a packet to be forwarded, but also use
+masquerading for TCP and UDP packets).
+.RE
+.PP
+.B IP_FW_MASQ_TIMEOUTS
+.RS
+Set the timeout values used for masquerading.
+The data passed with this command is a structure containing 3 fields of type
+.IR int ,
+representing the timeout values (in jiffies, 1/HZ second) for TCP sessions,
+TCP sessions after receiving a FIN packet, and UDP packets,
+repectively.
+A timeout value 0 means that the current timeout value of the
+corresponding entry is preserved.
+.RE
+.PP
+.B IP_FW_CHECK_IN
+.br
+.B IP_FW_CHECK_OUT
+.br
+.B IP_FW_CHECK_FWD
+.RS
+Check whether a packet would be accepted, denied, or rejected
+by the input firewall
+.RB ( IP_FW_CHECK_IN ),
+the output firewall
+.RB ( IP_FW_CHECK_OUT ),
+or the
+forwarding firewall
+.RB ( IP_FW_CHECK_FWD ).
+The data passed with this command is an
+.I ip_fwpkt
+structure, defining the packet headers and the interface address.
+.RE
+.SH STRUCTURES
+The
+.I ip_fw
+structure contains the following relevant fields to be filled
+in for adding or deleting a rule:
+.TP
+struct in_addr fw_src, fw_dst
+Source and destination IP addresses.
+.TP
+struct in_addr fw_smsk, fw_dmsk
+Masks for the source and destination IP addresses.
+Note that a mask of 0.0.0.0 will result in a match for all hosts.
+.TP
+struct in_addr fw_via
+IP address of the interface via which a packet is received by the system or is
+going to be sent by the system.
+The address 0.0.0.0 has a special meaning: it will match with all
+interface addresses.
+.TP
+char fw_vianame[IFNAMSIZ]
+Name of the interface via which a packet is received by the system or is
+going to be sent by the system.
+The empty string has a special meaning: it will match with all device names.
+.TP
+unsigned short fw_flg
+Flags for this rule.
+The flags for the different options can be bitwise or'ed with each other.
+.sp 0.75
+The protocol (mandatory).
+Possible values are
+.B IP_FW_F_TCP
+(TCP),
+.B IP_FW_F_UDP
+(UDP),
+.B IP_FW_F_ICMP
+(ICMP),
+or
+.B IP_FW_F_ALL
+(all protocols, which defines a universal firewall/accounting rule).
+.sp 0.75
+The policy to be used when a packet matches with this rule.
+This policy can be
+.B IP_FW_F_ACCEPT
+(accept the packet),
+.B IP_FW_F_ICMPRPL
+(reject the packet by sending an ICMP host unreachable message back to
+the sender).
+When none of these flags is specified, the packet is denied
+without any notification.
+Note that the policy is ignored in accounting rules.
+.sp 0.75
+Redirection and masquerading are also defined with 2 flags.
+.B IP_FW_F_REDIR
+redirects an accepted packet to a local socket (specified by a port
+number, see below).
+It is only valid in input firewall rules and can only be used
+when the kernel is compiled with
+.B CONFIG_IP_TRANSPARENT_PROXY
+defined.
+.B IP_FW_F_MASQ
+masquerades an accepted packet.
+It is only valid in forwarding firewall rules and can only be used
+when the kernel is compiled with
+.B CONFIG_IP_MASQUERADE
+defined.
+.sp 0.75
+The other options are:
+.B IP_FW_F_BIDIR
+(bidirectional rule, matching in both directions),
+.B IP_FW_F_TCPACK
+(only matches with TCP packets when the ACK bit is set
+in the TCP header, ignored with other protocols),
+.B IP_FW_F_TCPSYN
+(only matches with TCP packets when the SYN bit is set and the ACK bit
+is cleared in the TCP header, ignored with other protocols),
+.B IP_FW_F_ACCTIN
+and
+.B IP_FW_F_ACCTOUT
+(only match incoming or outgoing packets, respectively; these options
+only have effect in accounting rules),
+.BR IP_FW_F_SRNG ,
+and
+.BR IP_FW_F_DRNG
+(see below for a description of these flags).
+The option
+.B IP_FW_F_PRN
+can be used to list some information about a matching packet via
+.IR printk ().
+This option will only be effective when the kernel is compiled
+with
+.B CONFIG_IP_FIREWALL_VERBOSE
+defined.
+.TP
+unsigned short fw_nsp, fw_ndp, fw_pts[IP_FW_MAX_PORTS]
+These fields specify the number of source ports, the number of destination
+ports, and the array in which these ports are stored, respectively.
+The array starts with the source ports, directly followed by the
+destination ports.
+If the option
+.B IP_FW_F_REDIR
+is used, these ports are followed by the redirection port.
+If this redirection port is 0, the destination port of a packet will
+be used as the redirection port.
+The total number of ports is limited to
+.B IP_FW_MAX_PORTS
+(currently 10).
+Both the list of source and destination ports may contain at most one
+range.
+In that case, the first 2 port numbers of the list are taken as
+the minimum and maximum values of the range.
+For ICMP packets, source ports are interpreted as ICMP types and
+destination ports are ignored.
+Because the second and further fragments of a TCP or UDP packet
+do not contain port numbers, these IP packets are treated in
+accounting rules as if both port numbers are equal to 65535.
+For the same reason,
+all second and further fragments of an ICMP packet are treated
+in accounting rules as if the ICMP message type is 255.
+Furthermore, all second and further fragments of TCP, UDP, or ICMP packets
+will be accepted by any of the 3 firewalls.
+The flags
+.BR IP_FW_F_SRNG
+and
+.BR IP_FW_F_DRNG
+in the
+.I fw_flg
+field specify whether or not
+a source and/or destination range is specified.
+.TP
+unsigned char fw_tosand, fw_tosxor
+These 8-bit masks define how the TOS field in the IP header should be
+changed when a packet is accepted by the firewall rule.
+The TOS field is first bitwise and'ed with
+.I fw_tosand
+and the result of this will be bitwise xor'ed with
+.IR fw_tosxor .
+The fields are ignored in accounting rules or in firewall rules
+for rejecting or denying a packet.
+.PP
+The
+.I ip_fwpkt
+structure, used when checking a packet,
+contains the following fields:
+.TP
+struct iphdr fwp_iph
+The IP header. See
+.I <linux/ip.h>
+for a detailed description of the
+.I iphdr
+structure.
+.PP
+struct tcphdr fwp_protoh.fwp_tcph
+.br
+struct udphdr fwp_protoh.fwp_udph
+.br
+struct icmphdr fwp_protoh.fwp_icmph
+.RS
+The TCP, UDP, or ICMP header, combined in a union named
+.IR fwp_protoh .
+See
+.IR <linux/tcp.h> ,
+.IR <linux/udp.h> ,
+or
+.I <linux/icmp.h>
+for a detailed description of the respective structures.
+.RE
+.TP
+struct in_addr fwp_via
+The interface address via which the packet is pretended to be
+received or sent.
+.SH "RETURN VALUE"
+On success, zero is returned.
+On error, -1 is returned and
+.I errno
+is set appropriately.
+See
+.IR setsockopt (2)
+for a list of possible error values.
+When one of the 2 check packet commands is used, zero is returned
+when the packet would be accepted without redirection or masquerading.
+Otherwise, -1 is returned and
+.I errno
+is set to
+.B ECONNABORTED
+(packet would be accepted using redirection),
+.B ECONNRESET
+(packet would be accepted using masquerading),
+.B ETIMEDOUT
+(packet would be denied), or
+.B ECONNREFUSED
+(packet would be rejected).
+.SH "LISTING RULES"
+In the directory
+.I /proc/net
+there are 4 entries to list the currently defined rules for each of
+the categories:
+.I ip_acct
+(for IP accounting rules),
+.I ip_input
+(for IP input firewall rules),
+.I ip_output
+(for IP output firewall rules), and
+.I ip_forward
+(for IP forwarding firewall rules).
+Reading these files results in a header line and one line for each defined rule.
+For all 3 types of firewall, the header line includes at the end a
+decimal representation of the corresponding default policy
+(one of
+.BR IP_FW_F_ACCEPT ,
+.BR IP_FW_F_ICMPRPL ,
+and 0; the policy of the forwarding firewall may also be
+.B IP_FW_F_ACCEPT |
+.BR IP_FW_F_MASQ ).
+.PP
+Each following line lists the contents of a rule in the following order:
+source address and mask, destination address and mask, interface address,
+flags, number of source and destination ports, packet and byte counters,
+the list of ports, a TOS and-mask, and a TOS xor-mask.
+The IP addresses and masks are listed as 8 hexadecimal digits, the TOS masks
+are listed as 2 hexadecimal digits preceeded by the letter A and X,
+repectively,
+and the other values are represented in decimal format.
+Individual fields are seperated by white space, by a '/' (the address and
+the corresponding mask), or by "->" (the source and destination
+address/mask pairs).
+.PP
+The files may also be opened in read/write mode (only root is allowed
+to do this).
+In that case, the packet and byte counters in all the rules of that
+category will be reset to zero after listing their current values.
+.PP
+The file
+.I /proc/net/ip_masquerade
+contains the kernel administration related to masquerading.
+After a header line, each masqueraded session is described on a
+separate line with the following entries, separated by white space or by ':'
+(the address/port number pairs):
+protocol name ("TCP" or "UDP"), source IP address and port number,
+destination IP address and port number,
+the new port number, the initial sequence number
+for adding a delta value, the delta value, the previous delta value,
+and the expire time in jiffies (1/HZ second).
+All addresses and numeric values are in hexadecimal format, except the last
+3 entries, being represented in decimal format.
+.SH FILES
+.I /proc/net/ip_acct
+.br
+.I /proc/net/ip_input
+.br
+.I /proc/net/ip_output
+.br
+.I /proc/net/ip_forward
+.br
+.I /proc/net/ip_masquerade
+.\" .SH BUGS
+.SH SEE ALSO
+setsockopt(2), socket(2), ipfwadm(8)
+.\" .SH AUTHOR
+.\" Jos Vos <jos@xos.nl>
+.\" .br
+.\" X/OS Experts in Open Systems BV, Amsterdam, The Netherlands

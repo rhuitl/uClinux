@@ -1,0 +1,309 @@
+
+   @PRODUCT_LONG  @{r74}@{d}@{_}
+
+
+   This  product is an  implementation of ARJ v @COUNTERPARTS  for DOS on UNIX  and
+   UNIX-like  systems. It is  assumed that the  user is familiar  with ARJ
+   operation on DOS before using this package.
+
+   ***********************************************************************
+   ***                                                                 ***
+   ***  THIS PRODUCT IS DEVELOPED  SEPARATELY FROM THE MAINSTREAM ARJ  ***
+   ***  PACKAGE AND  THEREFORE IS NOT  UPDATED SYNCHRONOUSLY WITH ARJ  ***
+   ***  FOR DOS.                                                       ***
+   ***                                                                 ***
+   ***********************************************************************
+
+
+   INTRODUCTION
+
+      This file describes the features specific to the UNIX port. It is
+      suggested that you read the general README file prior to this one.
+
+
+   SYSTEM REQUIREMENTS
+
+   Linux:
+
+      *  Kernel version 2.0 or higher.
+      *  Intel 80386 or upwardly compatible machine.
+      *  GLIBC v 2.1 or higher.
+
+   FreeBSD:
+
+      *  FreeBSD v 3.0 or higher (ELF-based).
+      *  Intel 80386 or upwardly compatible machine.
+
+   QNX:
+
+      *  QNX v 6.2 NC/SE/PE or higher.
+      *  Intel 80386 or upwardly compatible machine.
+
+
+   IMPORTANT NOTE
+
+      The  implementation of  ARJ  on UNIX  platforms  requires a major
+      change in the  archive  format. To support UNIX-style timestamps,
+      we had to introduce a new timestamp format which is  incompatible
+      with the previous versions of ARJ.
+
+      If you plan to exchange  with ARJ and ARJ32 users, be sure to set
+      up the DOS compatibility mode in /etc/arj.cfg as follows:
+
+      + -2d
+
+      This  will  force  the  archiving  to be  done by  default in the
+      compatibility mode (time converted  to local, seconds  rounded to
+      even, date  range  from 1980 to  2107); to store  UNIX timestamps
+      normally, you will have to override "-2d" from the command line.
+
+
+   IMPLEMENTATION ISSUES
+
+      *  The usual place for ARJ within UNIX directory  structure is as
+         follows:
+
+         /usr/local/bin            for ARJ programs
+         /usr/local/lib            for ARJCRYPT
+         /usr/local/doc/arj        for accompanying documentation
+
+         Any other locations  are tolerated, provided that the programs
+         may  be found  by means  of  execution  environment (the  PATH
+         variable).
+
+         It is essential that ARJ is kept both readable and executable.
+
+         In this release, the most  up-to-date information regarding ARJ
+         commands and  options is  provided   by "arj -?".   In  certain
+         installations, ARJ  manual   pages may be  accessible  as well,
+         e.g. "man arj" should display the list of ARJ options.
+
+      *  The search order for ARJ configuration files is as follows:
+
+         arj.cfg:
+                1. ~/.arj.cfg
+                2. /etc/arj.cfg
+
+         arj.key:
+                1. arj.key in the directory of ARJ executable file
+                2. ~/.arj.key
+                3. /etc/arj.key
+
+         rearj.cfg:
+                1. ~/.rearj.cfg
+                2. /etc/rearj.cfg
+
+         The configuration files are  used on a  first-come  basis, and
+	 not "merged" together.
+
+      *  File creation  date/time is  not restored  but is saved  along
+	 with regular timestamp information.
+
+      *  The shortnames  for Windows 95  long filenames are  written as
+         w95lname.xxx (that is, in  lower case). The upper case is only
+         used for ARJ temporary files.
+
+      *  When operating on  standard streams, the file date/time is not
+         restored in  UNIX systems, i.e. "arj p archive myfile>newfile"
+         will result in newfile created with the current date/time.
+
+      *  External  garble  modules   are  provided  as  shared  dynamic
+	 libraries. The encryption algorithm  remains to  be compatible
+	 with ARJ versions on all other platforms.
+
+      *  "UNIX" is  stamped  as  the  host OS whenever  the  archive is
+	 updated, unless "-2d" is in effect.
+
+      *  The  archive "L"ist command  has been  remodelled  to  provide
+	 better  functionality on  UNIX platforms. The UNIX  attributes
+	 are  grouped  in  standard  "-rwxrwxrwx" pattern,  plus  three
+	 separate  fields,  G/U/A,  for  "set GID",  "set UID" and  the
+	 "append-only  directory" or "sticky bit"  flags, respectively.
+	 This is quite divergent from the UNIX listing conventions.
+
+         The "append-only directory" bit may be stated for normal files
+         on some  systems. This is not the  POSIX-defined behavior, and
+         should be treated accordingly with the platform specifics.
+
+         The CRC32 field has been removed  from list  command output on
+	 UNIX. The file  type has  been relocated  from grouped list at
+	 the rightmost  column to  the  letter prepending  "rwxrwxrwx".
+	 Additional  file  type  ID, "u" is  introduced, meaning  "UNIX
+	 special file".
+
+         The  "V"  and  "X"  flags ("continues   on   next volume"  and
+	 "continued  from  previous volume") have  been  grouped in "S"
+	 flag ("section"). It has the following meanings:
+
+         (blank) - file is kept on a single volume
+               < - continued from previous volume
+               > - continues on the next volume
+               * - intermediate section (other parts reside both on the
+		   previous and next volumes)
+
+      *  The low 12 bits  are stored  for the  file modes, allowing for
+	 POSIX-defined  attributes. When  converted  from  DOS mode and
+	 vice-versa, only  the  "read-only" flag  is  meaningful, which
+	 corresponds to the write permission for the current user under
+	 UNIX.
+
+      *  The  concept  of "UNIX special  files" is  introduced. In  the
+         technical implementation, it incorporates all structures which
+	 are  unavailable  under  DOS  into a  single  file type, whose
+	 extended header  bears the  UNIX-specific information. So  are
+	 the  links (both symbolic and  hard links), pipes  and devices
+	 (character or block).
+
+         The archiving of special files is  enabled either by "-hbu" or
+         "-a1".  Host-specific  special  files, such  as  devices,  are
+         checked to  suit the  current platform  type definitions  when
+         archive extraction is done.
+
+         If the special files are not enabled, then all of them are not
+         included in archive, except for symbolic links, whose contents
+         are added under the same name from the resolved link.
+
+         "-hbn" forbids any handling of UNIX special files. This can be
+         used in  cases  when  the system  files (devices, pipes, etc.)
+	 arrive from a different system or platform.
+
+      *  Hard  links are detected, unless  explicitly disabled by user.
+         This is  done  on  per-session  basis  (so, for  links  to  be
+	 resolved, the  archiving of  their pertinent  files  should be
+	 done in a single ARJ operation). The first file is used as the
+	 reference  point  for subsequent  linkages, so it  must  exist
+	 before all files linked to it are unpacked.
+
+         The "-2h" option disables the hard  link handling  both on the
+         compression  and  extraction  stages. In this  case, the  hard
+	 links will not be  resolved  during  archiving,  resulting  in
+	 duplicate  content. On extraction of  existing hard links with
+	 "-2h", the new files  will not be  linked  to their  reference
+	 entries.
+
+         There is also a  "-2h1" option  to convert  the hard  links to
+         symbolic links  during extraction. All  links  are directed to
+         their  reference file.  This feature is  advantageous when the
+         target file system does not support hard links (e.g. HPFS). 
+
+         No other  tracking is  done for  hard links. When  a reference
+	 entry is  deleted  from  the  archive, its links  have  to  be
+	 located and  deleted manually. No "reference count" is kept in
+	 archives!
+
+         On unarchiving, if a hard link  breaks into  cross-device link
+         due to different mount points, a warning message is generated.
+	 No attempt to establish a symbolic link is made.
+
+      *  The  links  and  special files  are honored  in  hollow  mode,
+         contrary to  the extended attributes. Password protection does
+	 not apply to them, so, to unpack such entry, the user does not
+	 need to have the password, as with any zero-sized file.
+
+      *  The symbolic links, being a sort  of special files, are stored
+	 with the target file attributes, and restored with the current
+	 system time  and default  attribute mask. To save  and restore
+	 their  specific  attributes, the "-2s" switch has to  be  used
+	 both  during  archiving  and   extraction.  When  used  during
+	 extraction, "-2s" implies that you  have write  permissions to
+	 the  place  where  the links do  point to, since  it  involves
+	 indirect modification of the target file attributes.
+
+      *  File ownership is preserved and restored when the "-2o" option
+	 is given. On  archiving,  there  are  two  options: "-2o"  and
+	 "-2o1".
+
+	 "-2o" resolves the user  name to  the character  form, i.e. no
+	 direct UID or GID is  stated. Be aware that, when  the file is
+         unarchived on  a setup  where a  user  with the  same name and
+         different  UID/GID exists, the file  gets the  UID/GID of that
+	 particular user. This may lead to problems when unarchiving to
+         partitions of one system from another system, but simplify the
+	 administrator's job of moving files across  several hosts with
+	 a common user base.
+
+	 "-2o1" stores the numeric UID/GID to the archive. It is mostly
+	 intended for backup/restore operations.
+
+         "-2o2" is similar to "-2o" but will resolve and save the group
+         name to which the user belongs. It is convenient when a single
+         user may belong to several GIDs.
+
+      *  It  is  possible to restrict  the  archiving to  a  particular
+	 filesystem, or exclude  some  volumes  from the set  of  files
+	 being archived.  The "-2b" parameter  enables filtering of the
+	 files by their relevant block devices.
+
+         A series  of  one or   more  "-2b+<filename>" parameters  will
+	 explicitly limit the    search to a  set  of  volumes. "+"  is
+	 optional, so "-2b<filename>" is  completely equivalent to  the
+	 above.  "-2b-<filename>", on the   contrary, will exclude  the
+	 volumes from search.
+ 
+         It  is most common to specify  the mount point in "<filename>"
+	 but any other filename or directory  will be accepted as well.
+	 "-2b."  restricts archiving to the current volume. Examples:
+
+	 arj a test / -r -2b/             (store the whole root volume)
+	 arj a main / -r -2b-/usr
+                     (store all volumes except the one containing /usr)
+
+         There   is no sense   if  both "-2b+"  and  "-2b-" options are
+         combined in a single command  line.  Also, it should be  noted
+         that giving a physical device  name, such as, "-2b/dev/wd0s3",
+         is incorrect and would mean the device containing "/dev/wd0s3"
+         entry (usually the root device or devfs) but not /dev/wd0s3.
+
+      *  The "-&" option  has  no effect  under  UNIX. In  fact, it  is
+         turned on permanently.
+
+      *  With  the  default  archiving  order, it's  assured  that  the
+	 ownership and permission data for a directory is restored only
+	 when there are no files  belonging to  this directory ahead in
+	 the archive. Besides, the directory  records as such  are only
+	 stored with the "-a", "-a1" or "-hbd" parameter.
+
+         If,  however, any  new  files  are appended  to  the  existing
+	 archive, or the archiving list has been specified to include a
+	 particular  directory  in  two  or  more  locations, then  the
+	 directory   information   will   be   finalized   before   the
+	 corresponding data files.
+
+      *  ARJSFXV is capable of  handling UNIX special files, hard links
+	 and  ownership  data. Other SFX  modules do  not process  this
+	 data. ARJSFXV is expected to be readable  on the system  where
+	 it is run, besides, it must  be referred  to with  a qualified
+	 filename (e.g. "./mysfx"), and not  searched for  through  the
+	 path. There is no  SFX extension, unless  explicitly stated by
+	 the user. There are native SFX stubs, about third the  size of
+	 ARJSFXJR (as of Linux ARJ v 3.10.06). Only the first volume of
+	 each SFX set is made executable.
+
+      *  The ANSI comments are displayed as raw text. No terminal setup
+         occurs for them.
+
+      *  "-2p<n>" can be used to set the  priority. The priority levels
+	 range from  1 (lowest) to  41 (highest), with  default  at 21.
+	 Priority  levels  above  21  can   only  be  assigned  by  the
+	 super user.
+
+      *  ARJSFXJR  does  not  handle  the  DOS  compatibility  formats.
+	 ARJSFXJR archives can only be created with "-2d" set off.
+
+      *  To take advantage of REARJ, a specific set of native archivers
+	 has to be  provided (RAR and  InfoZIP are known  to work). The 
+	 DOS counterparts can not be utilized. Besides, a new rearj.cfg
+	 file  has  to  be   created  (see  rearj.cfg.example   in  the
+	 documentation  directory,  and  consult  the   original  REARJ
+	 documentation  for  further  reference).  In  UNIX  version of
+	 REARJ, suffix length limit has been raised to 32 characters.
+
+
+   KNOWN PROBLEMS
+
+      *  Poor  performance  (long  startup  delays)  when  the  shell's
+	 wildcard  expansion  takes  effect  for  a  long list  of UNIX
+	 special files.
+
+
+      End of document

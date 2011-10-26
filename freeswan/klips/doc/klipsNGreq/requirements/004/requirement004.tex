@@ -1,0 +1,65 @@
+\subsection{004: connection up, down, wanted}
+
+\subsubsection{004: Definition of requirement }
+
+All internal SA entries should have a status of whether the connection is up
+(keying material is available), down (keying material has expired), or is
+wanted (keying material not yet available). This is part one.
+
+There is an additional situation in which the MAST device may need to be
+marked down. This is when it is known by the routing system that all routes
+to the outer destination will fail. This will typically only be true for
+systems without default routes (i.e. that are in a default-free zone). This
+second feature is part two.
+
+\subsubsection{004: Response}
+
+Part one is committed to. There is an issue that we currently do not 
+look for expired SAs unless we are attempting to use them. To fix this,
+we will need to walk the SA table periodically. 
+
+Part two raises some design questions. Specifically, how does one know if
+the outer destination is routable unless looks?
+
+\begin{itemize}
+\item each SA (and thus each conn) could maintain a pointer to
+   a struct dst\_entry. This has some savings in that one doesn't
+   have to lookup the route each time that the SA is used.
+   (One does the lookup if the entry is either invalid, or non-existant,
+   this is just a cache. The TCP PCB does this as well)
+
+   As these structures are reference counted, we can safely hang
+   on to this.
+
+   If asked about link status of a MAST device, then one just has to walk
+   all SAs associated with this device, looking for at least one with SA
+   which has not been obsoleted.
+
+\item alternatively, we do as we currently do, but upon failure to find
+   a route to the outer dst, we bash the link status of the device to
+   down. (We only change when all SAs say down, which makes this somewhat
+   difficult)
+
+   Once the device is down, then we should really discard any packets that
+   arrive at the MAST device. We do not want to waste time encrypting things
+   we would then through away. 
+
+   We could do something like let 1\% through to do the above test, but that
+   seems like a poor choice, since routing daemons may have found other ways
+   around in the meantime, so no traffic would ever reach us.
+
+\end{itemize}
+
+See also requirement 1.
+
+The first solution is preferred, but neither are committed to at this time.
+
+
+
+     
+
+
+
+
+
+

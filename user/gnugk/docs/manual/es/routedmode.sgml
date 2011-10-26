@@ -1,0 +1,410 @@
+<sect>Configuración de los Modos Enrutado y Proxy
+
+<sect1>Sección &lsqb;RoutedMode&rsqb;
+<label id="routed">
+<p>
+Los mensajes de señalización de llamada pueden ser manejados de dos maneras.
+El primer método es Señalización de llamada en Modo Directo, en el cual
+los mensajes de señalización de llamada son intercambiados directamente entre los endpoints.
+El segundo método es Señalización de llamada mediante Gatekeeper. En este método,
+los mensajes de señalización de llamada son enrutados a través del gatekeeper
+entre los endpoints. La selección de cual método utilizar es realizada por
+el gatekeeper.
+
+Cuando se utiliza la señalización de llamadas en Modo Gatekeeper, el gatekeeper puede seleccionar
+si enrutar o no el canal de control H.245 (H.245 control channel) y los canales lógicos (logical channels).
+
+<descrip>
+<tag/Caso I./
+El gatekeeper no rutea estos canales.
+El canal de control H.245 (H.245 control channel) y los canales lógicos (logical channels) se establecen directamente
+entre los endpoints.
+<tag/Caso II./
+El canal de control H.245 (H.245 control channel) se enruta entre
+los endpoints a través del gatekeeper, mientras que los canales lógicos (logical channels)
+se establecen directamente entre los endpoints.
+<tag/Caso III./
+El gatekeeper rutea el canal de control H.245 (H.245 control channel),
+asi como también los canales lógicos (logical channels), incluyendo el RTP/RTCP para audio y video,
+y el canal T.120 para datos. En este caso, ningún tipo de tráfico es intercambiado
+directamente entre los endpoints. Esto es usualmente llamado un Proxy H.323,
+el mismo que puede ser considerado también como un gateway H.323-H.323.
+</descrip>
+
+Esta sección define las opciones de ruteo del modo gatekeeper (Gatekeeper Routed) (Casos I &amp; II).
+La característica de proxy está definida en la <ref id="proxy" name="siguiente sección">.
+Todas las configuracones dentro de esta sección son afectadas por el comando reload desde el puerto de estado.
+
+<itemize>
+<item><tt/GKRouted=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Si se habilita o no el ruteo de la señalización en modo gatekeeper (gatekeeper routed signaling mode).
+
+<item><tt/H245Routed=1/<newline>
+Default: <tt/0/<newline>	
+<p>
+Si se enruta también el Canal de Control H.245 a través del gatekeeper. 
+Solamente tendrá efecto si el parámetro <tt/GKRouted=1/ y el tunneling H.245 está deshabilitado
+para una llamada. Incluso cuando esta opción está dehabilitada, si Proxy o ProxyForNAT
+tiene efecto, siempre será enrutado el canal H.245 a través del gatekeeper para las
+llamadas que están pasando por el proxy.
+
+<item><tt/CallSignalPort=0/<newline>
+Default: <tt/1721/<newline>
+<p>
+El puerto por donde el gatekeeper realizará la señalización de llamada.
+El puerto por defecto es <tt/1721/. Nosotros no usamos el puerto conocido <tt/1720/
+para que usted tenga la posibilidad de ejecutar un endpoint H.323 en la misma máquina del gatekeeper.
+Usted puede establecer este parámetro en <tt/0/ para permitirle al gatekeeper seleccionar un puerto arbitrario.
+
+<item><tt/CallSignalHandlerNumber=2/<newline>
+Default: <tt/1/<newline>
+<p>
+El numero de hilos dedicados al manejo de los canales de señalización/H.245.
+Usted puede incrementar este número en un gatekeeper fuertemente cargado. Cada hilo
+puede procesar un mensaje de señalización a la vez, de esta manera incrementar este número
+incrementará el rendimiento de la llamada. Bajo Windows, existe un límite por defecto
+de 64 sockets utilizados por un simple hilo de señalización, así cada hilo de señalización
+está en condiciones de manejar al menos 32 llamadas (con el tunneling H.245 habilitado).
+
+<item><tt/RtpHandlerNumber=2/<newline>
+Default: <tt/1/<newline>
+<p>
+El número de hilos que manejarán el RTP proxy. Incremente este valor solamente si usted
+experimenta problemas con el RTP delay o jitter en gatekeeper cargados fuertemente.
+Debe tener un cuidado especial bajo Windows, los hilos manejadores de RTP están sujetos
+al mismo límite de 64 sockets como hilos de señalización. Cada hilo RTP está
+en condiciones de manejar 32 llamadas proxiadas (2 sockets por llamada).
+
+<item><tt/AcceptNeighborsCalls=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Con esta característica habilitada, el hilo de señalización de llamada aceptará llamadas
+sin un CallRec preexistente dentro del CallTable, de tal manera que un endpoint
+correspondiente a una dirección de destino (destinationAddress) en un mensaje Setup pueda ser encontrado en la
+tabla de registro (RegistrationTable), y el emisor de la llamada es su vecino o su GK padre.
+El gatekeeper además utiliza su propia dirección de señalización de llamada (call signalling address) dentro de LCF
+en respuesta a un LRQ. Eso significa, la señalización de llamada será ruteada
+hacia el GK2 en llamadas GK-GK.
+Como resultado, los CDRs en el GK2 pueden mostrar correctamente el tiempo de conexión
+en lugar de 'unconnected'.
+
+<item><tt/AcceptUnregisteredCalls=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Con esta característica habilitada, el gatekeeper aceptará llamadas
+desde cualquier endpoint no registrado.
+Sin embargo, esto permite riesgos en la seguridad. Tenga cuidado con esto.
+
+<item><tt/RemoveH245AddressOnTunneling=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Algunos endpoints envían h245Address dentro del UUIE del Q.931 aún cuando h245Tunneling
+está establecida en TRUE. Esto podría causar problemas de interoperabilidad. Si la opción
+es TRUE, el gatekeeper removerá las h245Address cuando el indicador h245Tunneling
+esté en TRUE. Esto forzará a que la parte remota (remote party) permanezca en modo tunnelling.
+
+<item><tt/RemoveCallOnDRQ=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Con esta opción establecida en off, el gatekeeper no desconectará una llamada
+si éste recive un DRQ para la llamada. Esto evita que un DRQ
+alcance un Release Complete.
+Esto tiene sentido solamente en gatekeeper en Modo Enrutado puesto que en Modo Directo, el
+mecanismo de señal end-of-call es un DRQ.
+Cuando utilice la opción call failover, este parámetro debe ser establecido en 0.
+
+<item><tt/DropCallsByReleaseComplete=1/<newline>
+Default: <tt/0/<newline>
+<p>
+De acuerdo con la recomendación H.323, el gatekeeper podrá colgar una llamada
+enviando un mensaje RAS DisengageRequest hacia los endpoints.
+Sin embargo, algunos endpoints mal implementados ignoran este comando.
+Con esta opción establecida en "on", el gatekeeper enviará mensajes Q.931
+Release Complete en lugar de mensajes RAS DRQ hacia ambos endpoints para forzar a
+que ellos terminen la llamada.
+
+<item><tt/SendReleaseCompleteOnDRQ=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Cuando se cuelga la llamada, el endpoint envía tanto un Release Complete dentro de H.225/Q.931 y
+un DRQ dentro de los mensajes RAS. Podría ocurrir que el DRQ sea procesado primero, ocasionando que
+el gatekeeper cierre el canal de señalización de llamadas, previniendo así que el
+Release Complete sea enviado hacia el otro endpoint.
+Aunque el gatekeeper cierre el canal TCP hacia el destino,
+algunos endpoints (por ejemplo Cisco CallManager) no terminan la llamada aún si
+el canal de señalización de llamada está cerrado.
+Esto ocasiona que teléfonos se mantengan sonando si el que llama cuelga
+antes de que el receptor conteste.
+Establecer este parámetro en <tt/1/ produce que el gatekeeper siempre envíe
+un Release Complete hacia ambos endpoints antes de que cierren la llamada cuando 
+éste recibe un DRQ desde una de la partes.
+
+<item><tt/SupportNATedEndpoints=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Permite a un endpoint detrás de una NAT box registrarse con el gatekeeper.
+Si ésto se permite, el gatekeeper traducirá las direcciones IP dentro del canal Q.931 y H.245
+hacia la IP de la NAT box.
+
+Desde la versión 2.0.2, El GnuGk soporta salida de llamadas NAT (NAT outbound calls) (desde un endpoint detrás de la NAT
+hacia redes públicas) directamente sin ninguna modificación necesaria
+de endpoints o de NAT box. Solamente registre el endpoint con el GnuGk
+y usted puede hacer sus llamadas ahora.
+
+<item><tt/SupportCallingNATedEndpoints=0/<newline>
+Default: <tt/1/<newline>
+<p>
+Defina si permitir o no a un endpoint detrás de una NAT box que soporta la técnica GnuGK Nat Traversal
+recibir llamadas. Utilice esta opción para bloquear gateways erróneos que no soporten
+la técnica "GnuGK Nat Traversal" de manera apropiada ocasionando de alguna manera problemas de audio cuando
+tratan de llamar hacia el gateway. Las llamadas hacia los gateways devuelven caller inalcanzable (caller unreachable).
+Para ser efectivo el parámetro "SupportNATedEndpoints" debe estar establecido en 1.
+
+<item><tt/TreatUnregisteredNAT=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Utilizado conjuntamente con AcceptUnregisteredCalls y SupportNATedEndpoints tratará
+automáticamente a todas las llamadas no registradas las mismas que no pueden ser determinadas como
+propias de la NAT sean tratadas como propias de la NAT. 
+
+No todos los endpoints envían "sourceSignalAddress" en el mensaje setup, el cual puede
+ser utilizado para determinar si un emisor (caller) es NAT. Esto agrega soporte para aquellos
+que no son.
+
+<item><tt/ScreenDisplayIE=MyID/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Modifica el DisplayIE del Q.931 hacia un valor específico.
+
+<item><tt/ScreenCallingPartyNumberIE=0965123456/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Modifica el CallingPartyNumberIE del Q.931 hacia un valor específico.
+
+<item><tt/ScreenSourceAddress=MyID/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Modifica el campo sourceAddress del elemento UUIE del mensaje Q.931 Setup.
+
+<item><tt/ForwardOnFacility=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Si se habilita, en recibir Q.931 Facility con razón <bf/callForwarded/,
+el gatekeeper enviará el call Setup directamente hacia el endpoint remitido,
+en lugar de pasar el mensaje de regreso al caller.
+Si usted tiene endpoints con defectos de implementación que no pueden manejar Q.931 Facility con razón
+<bf/callForwarded/, active esta opción. Tenga en cuenta que esta característica
+no siempre podría trabajar correctamente, puesto que ésta no proporciona ningun recurso
+de renegociación de capacidades y media channel reopening.
+
+<item><tt/ShowForwarderNumber=0/<newline>
+Default: <tt/0/<newline>
+<p>
+Defina esta opción si desea reescribir el número de la parte que llama (calling party) al número del que reenvia (forwarder).
+Esta característica es utilizada para propósitos de billing.
+Solamente es válida si <tt/ForwardOnFacility=1/.
+
+<item><tt/Q931PortRange=20000-20999/<newline>
+Default: <tt>N/A (permitir que el SO asigne los puertos)</tt><newline>
+<p>
+Especifique el rango de números de puerto TCP para canales de señalización Q.931.
+Tenga presente que el tamaño del rango limita el número de llamadas concurrentes.
+Asegúrese que este rango sea suficiente para tomar en cuenta el descanso del socket TCP TIME_WAIT
+antes de que un socket pueda reutilizarse después de que ha sido cerrado.
+El valor TIME_WAIT puede variar desde 15 segundos hasta pocos minutos, dependiendo del Sistema operativo.
+Así, si su rango es 2000-2001 y usted hace dos llamadas, las siguientes dos pueden ser
+hechas después de que transcurra el TIME_WAIT y el sockets pueda ser reutilizado.
+Lo mismo se aplica a <tt/H245PortRange/ y <tt/T120PortRange/. Usualmente el TIME_WAIT
+puede ser deshabilitado en muchos Sistemas Operativos.
+
+<item><tt/H245PortRange=30000-30999/<newline>
+Default: <tt>N/A (permitir que el SO asigne los puertos)</tt><newline>
+<p>
+Especifique el rango de puertos TCP para los canales de control H.245.
+Tenga en cuenta que el tamaño del rango podría limitar el número de llamadas concurrentes.
+Revise los comentarios acerca del descanso de socket TIME_WAIT  en la descripción del 
+<tt/Q931PortRange/.
+
+<item><tt/SetupTimeout=4000/<newline>
+Default: <tt>8000</tt><newline>
+<p>
+Tiempo de espera en milisegundos para que un primer mensaje de Setup
+sea recibido después que el canal de señalización ha sido abierto.
+
+<item><tt/SignalTimeout=10000/<newline>
+Default: <tt>30000</tt><newline>
+<p>
+Tiempo de espera en milisegundos para que un canal de señalización
+sea abierto después de que se ha enviado un mensaje ACF o espera por un mensaje de alerta
+después de que el canal de señalización ha sido abierto. Esta opción
+puede ser imaginada como el máximo permitido del valor PDD (Post Dial Delay).
+
+<item><tt/AlertingTimeout=60000/<newline>
+Default: <tt>180000</tt><newline>
+<p>
+Tiempo de espera en milisegundos que espera por un mesaje de conexión (Connect)
+después de que una llamada entró en estado de alerta (Alerting state). Este valor puede ser imaginado 
+como el tiempo máximo del sonido del telefono "ringing time".
+
+<item><tt/TcpKeepAlive=0/<newline>
+Default: <tt/1/
+<p>
+Habilite/Deshabilite la característica keepalive en sockets de señalización (TCP signaling sockets). Esto puede
+ayudar a detectar canales de señalización inactivos y prevenir llamadas inactivas (dead calls) imposibles de colgar
+en la tabla de llamadas (call table). Para que esta opción funcione, usted necesita además modificar las
+configuraciones del sistema para ajustar el "keep alive timeout". Para más detalle vea docs/keepalive.txt.
+
+<item><tt/TranslateFacility=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Habilite esta opción si usted tiene problemas de interoperabilidad entre endpoints compatibles con H.323v4
+y endpoints no compatibles con H.323v4. Esto convierte los mensajes Facility (Facility messages) con razón = transportedInformation
+en mensajes Facility (Facility messages) con un cuerpo vacío debido a que algunos endpoints no
+procesan mensajes tunneled H.245 dentro de los mensajes Facility si el cuerpo no está vacío.
+Esta conversión solamente se realiza cuando sea necesaria. Si ambos endpoints son v4
+o ambos endpoints son previas a v4, no se realiza conversión alguna.
+
+<item><tt/SocketCleanupTimeout=1000/<newline>
+Default: <tt/5000/<newline>
+<p>
+Define el tiempo que se debe esperar antes de que un socket no utilizado sea cerrado (Si éste aún no ha sido cerrado)
+y eliminado (su memoria sea desocupada). Si usted utiliza rangos de puerto muy pequeños o
+pocos puertos (ejemplo: RTPPortRange=2000-2009), usted debe cambiar este valor
+para conseguir sockets más rápidamente reutilizables.
+
+<item><tt/ActivateFailover=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Activa el "call failover": Cuando se activa, el GnuGk tratará de buscar
+otras posibles rutas de destino si la llamada falla en su
+primera ruta. Actualmente solo pueden ser utilizadas como rutas alternas
+aquellas rutas disponibles mediante políticas de ruteo de tipo "internal".
+
+Para contabilizar las llamadas que utilizan failover, Revise el switch SingleFailoverCDR
+en la sección <ref id="calltable" name="[CallTable]">.
+
+<item><tt/FailoverCauses=1-15,21-127/<newline>
+Default: <tt/1-15,21-127/<newline>
+<p>
+Define qué código de causa en un ReleaseComplete lanzará el
+call failover.
+
+<item><tt/DiableRetryChecks=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Esto desactivará toda comprobación si una llamada fallida ya ha recibido
+mensajes FastStart o H.245. Advertencia: El uso de este switch permite 
+reintentar más llamadas, pero se corre el riesgo de que algunas de las llamadas reintentadas
+puedan fallar a causade que el el caller está aun en un estado donde no puede
+hacer una nueva llamada.
+
+<item><tt/CalledTypeOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Configura el tipo de números de Called-Party-Number en un valor específico
+para todas las llamadas
+(0 - UnknownType, 1 - InternationalType, 2 - NationalType,
+3 - NetworkSpecificType, 4 - SubscriberType, 6 - AbbreviatedType, 7 - ReservedType).
+
+<item><tt/CallingTypeOfNumber=1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Configura el tipo de números de Called-Party-Number en un valor específico
+para todas las llamadas
+(0 - UnknownType, 1 - InternationalType, 2 - NationalType,
+3 - NetworkSpecificType, 4 - SubscriberType, 6 - AbbreviatedType, 7 - ReservedType).
+
+</itemize>
+
+<p>
+<sect1>Sección &lsqb;Proxy&rsqb;
+<label id="proxy">
+<p>
+Esta sección define las características del proxy H.323. Esto quiere decir que el gatekeeper
+ruteará todo el tráfico entre el endpoint emisor y receptor, de esta manera
+no existe tráfico directamente entre dos endpoints. Por eso ésto es muy utilizado
+si usted tiene algunos endpoints utilizando IP privadas detrás de una NAT box y algunos
+endpoints utilizando IP publicas fuera de la NAT box.
+
+El gatekeeper puede hacer proxy para canales lógicos de RTP/RTCP (audio y video)
+y T.120 (datos). Canales abiertos por procedimientos de conexión rápida (fast-connect)
+o H.245 tunnelling también son soportados.
+
+Tenga en cuenta que para hacer que el proxy funcione, el gatekeeper debe tener <bf/conexión directa/
+hacia ambas redes: la de emisor (caller) y la del receptor (callee).
+
+<itemize>
+<item><tt/Enable=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Define si se habilita o no la función proxy. Usted debe de habilitar el ruteo en
+modo gatekeeper primero (ver la  <ref id="routed" name="sección previa">).
+Usted no tiene que especificar el ruteo H.245.
+Este será automáticamente utilizado si se requiere.
+
+<item><tt>InternalNetwork=10.0.1.0/24</tt><newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Define las redes detrás del proxy. Se permite el uso de múltiples redes internas.
+El proxy enruta canales solamente de las comunicaciones entre un endpoint
+en la red interna y una externa. Si usted no especifica esto, todas las llamadas serán
+llevadas a través del proxy. Si utiliza un GnuGk detrás de una NAT y el parámetro ExternalIP de la sección [Gatekeeper::Main] 
+está configurado, entonces no es obligatorio establecer éste, tal como es auto-detectado al inicio. 
+Utilizatr esta configuración simplemente sustituirá la configuración detectada por defecto.
+
+<descrip>
+<tag/Formato:/
+<tt>InternalNetwork=network address/netmask[,network address/netmask,...]</tt>
+<p>
+La máscara de red (netmask) puede ser expresada en notación decimal punteada o
+en notación CIDR (prefix length), como se muestra en el ejemplo.
+<tag/Ejemplo:/
+<tt>InternalNetwork=10.0.0.0/255.0.0.0,192.168.0.0/24</tt>
+</descrip>
+
+<item><tt/T120PortRange=40000-40999/<newline>
+Default: <tt>N/A (permitir que el SO asigne los puertos)</tt><newline>
+<p>
+Especifica el rango de números de puertos TCP para los canales de datos T.120.
+Tenga en cuenta que el tamaño del rango podría limitar el número de llamadas concurrentes.
+Revise los comentarios acerca del tiempo de espera del socket TIME_WAIT en la descripción de 
+<tt/Q931PortRange/.
+
+<item><tt/RTPPortRange=50000-59999/<newline>
+Default: <tt>1024-65535</tt><newline>
+<p>
+Especifica el rango de números de puertos UDP para los canales RTP/RTCP.
+Tenga en cuenta que el tamaño del rango podría limitar el número de llamadas concurrentes.
+
+<item><tt/ProxyForNAT=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Si se activa, el gatekeeper pasará por el proxy aquellas llamadas en las cuales uno de los endpoints
+participantes esta detrás de una NAT box. Esto asegura que el stream RTP/RTCP pueda
+penetrar dentro de la NAT box sin modificar éste.
+Sin embargo, el endpoint que se encuentra detrás de la NAT box debe utilizar el mismo puerto
+para enviar y recibir el stream RTP/RTCP.
+Si usted trabaja con endpoints con fallas o que no satisfacen la precondición,
+debe mejor deshabilitar esta característica y permitir que la NAT box remita el
+stream RTP/RTCP por usted.
+
+<item><tt/ProxyForSameNAT=0/<newline>
+Default: <tt/0/<newline>
+DE<p>
+Define si se habilita el proxy para llamadas entre endpoints desde la misma NAT box.
+Usted no necesita habilitar generalmente esta característica, ya que normalmente los endpoints
+de la misma NAT box pueden comunicarse entre si.
+
+<item><tt/EnableRTPMute=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Esta característica permite a la parte que llama (call party) en modo proxy silenciar 
+el audio/video enviando un * como string o como tone.userinput. El envío de
+* silencia el audio/video y enviar nuevamente un * desactiva el silencio
+del audio/video. Solamente la parte que silencia la llamada puede desactivar el silecio. Esto esta diseñado
+como una función "hold" para terminales que no soportan H450.4.
+
+</itemize>
+

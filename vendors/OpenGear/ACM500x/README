@@ -1,0 +1,71 @@
+OPENGEAR KSZ8692 FLASH
+----------------------
+
+These instructions document how to use the OCdemon debugger (with
+ARM 20pin JTAG header) to program the flash in-circuit on KZS8692
+based boards. This is specifically tailored to the OpenGear ACM500X,
+but would apply equally to other similar boards.
+
+
+0. SETTING UP DEBUGGER
+
+   Using OCdemon package, setup with appropriate .gdbinit script.
+   (Use new-wave/tools/misc/cm4002.gdb).
+
+   Firstly make sure you have the lp drivers loaded, and then load
+   the ocdemon driver:
+
+      modprobe ocdemompp
+      mknod /dev/ravenpp c 255 0
+
+   (Ignore the ocdemonpp load warnings).
+
+   Now startup the process demon, and start gdb:
+
+      OcdLibRemote -c ARM9 &
+      xscale-elf-gdb
+
+   Sometimes the debugger cannot access the CPU internals. Not sure why,
+   but it happens from time to time. Seems to be some sort of reset startup
+   issue. If it happens exit gdb and then remove power from the board
+   for a few seconds. Now try again. In some extreme cases this is not
+   enough, and when this happens I resort to shorting out flash chip
+   pins (with a screw driver of similar) to stop the cpu for booting at
+   power and into a bad state.
+
+
+1. FLASHING BOOT LOADER
+
+   Inside gdb run the following commands:
+
+      flash-load
+
+   Sometimes the cpu still enters an odd mode and will refuse to actually
+   run this code/script properly. Remove power and try again.
+
+   Now cat out the boot.bin file on the serial port attached to the console.
+   It is set for 115200 baud, 8 data bits, 1 stop bit, no parity.
+
+   When completed break into gdb with CTRL-C. To check if te transfer was
+   successful then do:
+
+      x/32x 0x20000
+
+   You should see the binary contents of boot.bin here.
+
+   Now program the boot loader into flash with:
+
+      flash-burn
+
+   This dosn't take long, but does not return to the prompt, you need to
+   break into it (with CTRL-C).
+
+   Sometimes (though not often) the serial load does not correctly down load
+   the image (hey there is no flow control implemented :-) so check that what
+   made it into flash is good:
+
+      x/32x 0x18000000
+
+   It should match a hexdump of boot.bin.
+
+

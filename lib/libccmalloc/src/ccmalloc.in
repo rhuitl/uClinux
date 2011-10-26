@@ -1,0 +1,114 @@
+#!/bin/sh
+# (C) 2001 Armin Biere ETH Zuerich
+#
+# This script may be used to link an executable with ccmalloc.  It
+# automatically tries to filter out requests which do not generate an
+# executable binary.  With this script the usage model of ccmalloc becomes
+# similar to purify.  Just use 'ccmalloc gcc' wherever you regularly would
+# use 'gcc' alone.
+#
+COMPILERS=@COMPILERS@
+PREFIX=@PREFIX@
+
+usage () {
+  echo \
+"ccmalloc [ <ccmalloc-option> ] <compiler> [ <compiler-option> ... ] <file> ..."
+  echo
+  echo "where <ccmalloc-option> is"
+  echo
+  echo "   --version     print version and exit"
+  echo "   --help | -h   print this command line option summary and exit\n"
+  echo
+  echo "and <compiler> is one of the following"
+  echo
+  echo "  $COMPILERS"
+  echo
+cat <<EOF
+and <file> is an object or source file.  If <compiler-option> contains '-S'
+or '-c' then linking is of course disabled and ccmalloc behaves just as if
+the compiler was called directly.
+EOF
+}
+
+if [ $# -lt 1 ]
+then
+  echo "*** ccmalloc: command line argument is missing" 1>&2
+  exit 1
+fi
+
+if [ "$1" = '--version' ]
+then
+  echo "@VERSION@"
+  exit 0
+fi
+
+if [ "$1" = '--help' -o "$1" = "-h" ]
+then
+  usage
+  exit 0
+fi
+
+args="$*"
+base="`basename $1`"
+
+shift
+
+foundfile=no
+link=yes
+last=""
+while [ $# -gt 0 ]
+do
+  case $1 in
+    *.o) 
+      [ "$last" = "-o" ] || foundfile=yes
+      ;;
+    *.s | *.c | *.cc | *.cpp ) 
+      foundfile=yes
+      ;;
+    -S | -c)
+      link=no
+      ;;
+    *) 
+      ;;
+  esac
+  last="$1"
+  shift
+done
+
+if [ "$link" = no ]
+then
+  exec $args
+fi
+
+if [ $foundfile = no ]
+then
+  echo "*** ccmalloc: missing source or object file" 1>&2
+  exit 1
+fi
+
+foundcompiler=no
+for CC in $COMPILERS
+do
+  if [ $CC = "$base" ]
+  then
+    foundcompiler=yes
+    break;
+  fi
+done
+
+echo "ccmalloc: installation prefix: $PREFIX"
+echo "ccmalloc: valid C++ wrappers: $COMPILERS "
+echo 'ccmalloc: $Id: ccmalloc.in,v 1.9 2002/01/30 14:23:55 biere Exp $'
+
+if [ $foundcompiler = yes ]
+then
+  wrapper="$PREFIX/lib/ccmalloc-$CC.o"
+  echo "ccmalloc: using '$wrapper' as C++ wrapper"
+  cmd="$args $wrapper -L$PREFIX/lib -lccmalloc -ldl"
+else
+  echo "ccmalloc: no C++ wrapper for '$base' installed"
+  cmd="$args -L$PREFIX/lib -lccmalloc -ldl"
+fi
+
+echo $cmd
+exec $cmd

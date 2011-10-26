@@ -1,0 +1,442 @@
+.\"     Title: udevadm
+.\"    Author: [see the "AUTHOR" section]
+.\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
+.\"      Date: November 2007
+.\"    Manual: udevadm
+.\"    Source: udev
+.\"  Language: English
+.\"
+.TH "UDEVADM" "8" "November 2007" "udev" "udevadm"
+.\" -----------------------------------------------------------------
+.\" * (re)Define some macros
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" toupper - uppercase a string (locale-aware)
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.de toupper
+.tr aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ
+\\$*
+.tr aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz
+..
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" SH-xref - format a cross-reference to an SH section
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.de SH-xref
+.ie n \{\
+.\}
+.toupper \\$*
+.el \{\
+\\$*
+.\}
+..
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" SH - level-one heading that works better for non-TTY output
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.de1 SH
+.\" put an extra blank line of space above the head in non-TTY output
+.if t \{\
+.sp 1
+.\}
+.sp \\n[PD]u
+.nr an-level 1
+.set-an-margin
+.nr an-prevailing-indent \\n[IN]
+.fi
+.in \\n[an-margin]u
+.ti 0
+.HTML-TAG ".NH \\n[an-level]"
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+\." make the size of the head bigger
+.ps +3
+.ft B
+.ne (2v + 1u)
+.ie n \{\
+.\" if n (TTY output), use uppercase
+.toupper \\$*
+.\}
+.el \{\
+.nr an-break-flag 0
+.\" if not n (not TTY), use normal case (not uppercase)
+\\$1
+.in \\n[an-margin]u
+.ti 0
+.\" if not n (not TTY), put a border/line under subheading
+.sp -.6
+\l'\n(.lu'
+.\}
+..
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" SS - level-two heading that works better for non-TTY output
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.de1 SS
+.sp \\n[PD]u
+.nr an-level 1
+.set-an-margin
+.nr an-prevailing-indent \\n[IN]
+.fi
+.in \\n[IN]u
+.ti \\n[SN]u
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.ps \\n[PS-SS]u
+\." make the size of the head bigger
+.ps +2
+.ft B
+.ne (2v + 1u)
+.if \\n[.$] \&\\$*
+..
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" BB/BE - put background/screen (filled box) around block of text
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.de BB
+.if t \{\
+.sp -.5
+.br
+.in +2n
+.ll -2n
+.gcolor red
+.di BX
+.\}
+..
+.de EB
+.if t \{\
+.if "\\$2"adjust-for-leading-newline" \{\
+.sp -1
+.\}
+.br
+.di
+.in
+.ll
+.gcolor
+.nr BW \\n(.lu-\\n(.i
+.nr BH \\n(dn+.5v
+.ne \\n(BHu+.5v
+.ie "\\$2"adjust-for-leading-newline" \{\
+\M[\\$1]\h'1n'\v'+.5v'\D'P \\n(BWu 0 0 \\n(BHu -\\n(BWu 0 0 -\\n(BHu'\M[]
+.\}
+.el \{\
+\M[\\$1]\h'1n'\v'-.5v'\D'P \\n(BWu 0 0 \\n(BHu -\\n(BWu 0 0 -\\n(BHu'\M[]
+.\}
+.in 0
+.sp -.5v
+.nf
+.BX
+.in
+.sp .5v
+.fi
+.\}
+..
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" BM/EM - put colored marker in margin next to block of text
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.de BM
+.if t \{\
+.br
+.ll -2n
+.gcolor red
+.di BX
+.\}
+..
+.de EM
+.if t \{\
+.br
+.di
+.ll
+.gcolor
+.nr BH \\n(dn
+.ne \\n(BHu
+\M[\\$1]\D'P -.75n 0 0 \\n(BHu -(\\n[.i]u - \\n(INu - .75n) 0 0 -\\n(BHu'\M[]
+.in 0
+.nf
+.BX
+.in
+.fi
+.\}
+..
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "Name"
+udevadm \- udev management tool
+.SH "Synopsis"
+.fam C
+.HP \w'\fBudevadm\fR\ 'u
+\fBudevadm\fR [\fB\-\-debug\fR] [\fB\-\-version\fR] [\fB\-\-help\fR]
+.fam
+.fam C
+.HP \w'\fBudevadm\ info\ \fR\fB\fIoptions\fR\fR\ 'u
+\fBudevadm info \fR\fB\fIoptions\fR\fR
+.fam
+.fam C
+.HP \w'\fBudevadm\ trigger\ \fR\fB[options]\fR\ 'u
+\fBudevadm trigger \fR\fB[options]\fR
+.fam
+.fam C
+.HP \w'\fBudevadm\ settle\ \fR\fB[options]\fR\ 'u
+\fBudevadm settle \fR\fB[options]\fR
+.fam
+.fam C
+.HP \w'\fBudevadm\ control\ \fR\fB\fIcommand\fR\fR\ 'u
+\fBudevadm control \fR\fB\fIcommand\fR\fR
+.fam
+.fam C
+.HP \w'\fBudevadm\ monitor\ \fR\fB[options]\fR\ 'u
+\fBudevadm monitor \fR\fB[options]\fR
+.fam
+.fam C
+.HP \w'\fBudevadm\ test\ \fR\fB[options]\fR\fB\ \fR\fB\fIdevpath\fR\fR\ 'u
+\fBudevadm test \fR\fB[options]\fR\fB \fR\fB\fIdevpath\fR\fR
+.fam
+.SH "DESCRIPTION"
+.PP
+udevadm expects a command and command specific options\&. It controls the runtime behavior of udev, requests kernel events, manages the event queue, and provides simple debugging mechanisms\&.
+.SH "OPTIONS"
+.PP
+\fB\-\-debug\fR
+.RS 4
+Print debug messages to stderr\&.
+.RE
+.PP
+\fB\-\-version\fR
+.RS 4
+Print version number\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Print help text\&.
+.RE
+.SS "udevadm info \fIoptions\fR"
+.PP
+Queries the udev database for device information stored in the udev database\&. It can also query the properties of a device from its sysfs representation to help creating udev rules that match this device\&.
+.PP
+\fB\-\-query=\fR\fB\fItype\fR\fR
+.RS 4
+Query the database for specified type of device data\&. It needs the
+\fB\-\-path\fR
+or
+\fB\-\-name\fR
+to identify the specified device\&. Valid queries are:
+\fBname\fR,
+\fBsymlink\fR,
+\fBpath\fR,
+\fBenv\fR,
+\fBall\fR\&.
+.RE
+.PP
+\fB\-\-path=\fR\fB\fIdevpath\fR\fR
+.RS 4
+The devpath of the device to query\&.
+.RE
+.PP
+\fB\-\-name=\fR\fB\fIfile\fR\fR
+.RS 4
+The name of the device node or a symlink to query
+.RE
+.PP
+\fB\-\-root\fR
+.RS 4
+The udev root directory:
+\FC/dev\F[]\&. If used in conjunction with a
+\fBname\fR
+or
+\fBsymlink\fR
+query, the query returns the absolute path including the root directory\&.
+.RE
+.PP
+\fB\-\-attribute\-walk\fR
+.RS 4
+Print all sysfs properties of the specified device that can be used in udev rules to match the specified device\&. It prints all devices along the chain, up to the root of sysfs that can be used in udev rules\&.
+.RE
+.PP
+\fB\-\-device\-id\-of\-file=\fR\fB\fIfile\fR\fR
+.RS 4
+Print major/minor numbers of the underlying device, where the file lives on\&.
+.RE
+.PP
+\fB\-\-export\-db\fR
+.RS 4
+Export the content of the udev database\&.
+.RE
+.PP
+\fB\-\-version\fR
+.RS 4
+Print version\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Print help text\&.
+.RE
+.SS "udevadm trigger [options]"
+.PP
+Request device events from the kernel\&. Usually used to replay events at system coldplug time\&.
+.PP
+\fB\-\-verbose\fR
+.RS 4
+Print the list of devices which will be triggered\&.
+.RE
+.PP
+\fB\-\-dry\-run\fR
+.RS 4
+Do not actually trigger the event\&.
+.RE
+.PP
+\fB\-\-type=\fR\fB\fItype\fR\fR
+.RS 4
+Trigger a specific type of devices\&. Valid types are:
+\fBdevices\fR,
+\fBsubsystems\fR,
+\fBfailed\fR\&. The default value is
+\fBdevices\fR\&.
+.RE
+.PP
+\fB\-\-action=\fR\fB\fIaction\fR\fR
+.RS 4
+Type of event to be triggered\&. The default value is
+\fBadd\fR\&.
+.RE
+.PP
+\fB\-\-subsystem\-match=\fR\fB\fIsubsystem\fR\fR
+.RS 4
+Trigger events for devices which belong to a matching subsystem\&. This option can be specified multiple times and supports shell style pattern matching\&.
+.RE
+.PP
+\fB\-\-subsystem\-nomatch=\fR\fB\fIsubsystem\fR\fR
+.RS 4
+Do not trigger events for devices which belong to a matching subsystem\&. This option can be specified multiple times and supports shell style pattern matching\&.
+.RE
+.PP
+\fB\-\-attr\-match=\fR\fB\fIattribute\fR\fR\fB=\fR\fB\fIvalue\fR\fR
+.RS 4
+Trigger events for devices with a matching sysfs attribute\&. If a value is specified along with the attribute name, the content of the attribute is matched against the given value using shell style pattern matching\&. If no value is specified, the existence of the sysfs attribute is checked\&. This option can be specified multiple times\&.
+.RE
+.PP
+\fB\-\-attr\-nomatch=\fR\fB\fIattribute\fR\fR\fB=\fR\fB\fIvalue\fR\fR
+.RS 4
+Do not trigger events for devices with a matching sysfs attribute\&. If a value is specified along with the attribute name, the content of the attribute is matched against the given value using shell style pattern matching\&. If no value is specified, the existence of the sysfs attribute is checked\&. This option can be specified multiple times\&.
+.RE
+.SS "udevadm settle [options]"
+.PP
+Watches the udev event queue, and exits if all current events are handled\&.
+.PP
+\fB\-\-timeout=\fR\fB\fIseconds\fR\fR
+.RS 4
+Maximum number of seconds to wait for the event queue to become empty\&. The default value is 180 seconds\&. A value of 0 will check if the queue is empty and always return immediately\&.
+.RE
+.PP
+\fB\-\-quiet\fR
+.RS 4
+Do not print any output, like the remaining queue entries when reachin the timeout\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Print help text\&.
+.RE
+.SS "udevadm control \fIcommand\fR"
+.PP
+Modify the internal state of the running udev daemon\&.
+.PP
+\fB\-\-log\-priority=\fR\fB\fIvalue\fR\fR
+.RS 4
+Set the internal log level of udevd\&. Valid values are the numerical syslog priorities or their textual representations:
+\fBerr\fR,
+\fBinfo\fR
+and
+\fBdebug\fR\&.
+.RE
+.PP
+\fB\-\-stop\-exec\-queue\fR
+.RS 4
+Signal udevd to stop executing new events\&. Incoming events will be queued\&.
+.RE
+.PP
+\fB\-\-start\-exec\-queue\fR
+.RS 4
+Signal udevd to enable the execution of events\&.
+.RE
+.PP
+\fB\-\-reload\-rules\fR
+.RS 4
+Signal udevd to reload the rules from the config\&.
+.RE
+.PP
+\fB\-\-env=\fR\fB\fIKEY\fR\fR\fB=\fR\fB\fIvalue\fR\fR
+.RS 4
+Set global variable\&.
+.RE
+.PP
+\fB\-\-max\-childs=\fR\fIvalue\fR
+.RS 4
+Set the maximum number of events, udevd will handle at the same time\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Print help text\&.
+.RE
+.SS "udevadm monitor [options]"
+.PP
+Listens to the kernel uevents and events sent out by a udev rule and prints the devpath of the event to the console\&. It can be used to analyze the event timing, by comparing the timestamps of the kernel uevent and the udev event\&.
+.PP
+\fB\-\-environment\fR
+.RS 4
+Print the complete environment for all events\&. Can be used to compare the kernel supplied and the udev added environment values\&.
+.RE
+.PP
+\fB\-\-kernel\fR
+.RS 4
+Print the kernel uevents\&.
+.RE
+.PP
+\fB\-\-udev\fR
+.RS 4
+Print the udev event after the rule processing\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Print help text\&.
+.RE
+.SS "udevadm test [options] \fIdevpath\fR"
+.PP
+Simulate a udev event run for the given device, and print out debug output\&. Unless forced to, no device node or symlink will be created\&.
+.PP
+\fB\-\-action=\fR\fB\fIstring\fR\fR
+.RS 4
+The action string\&.
+.RE
+.PP
+\fB\-\-subsystem=\fR\fB\fIstring\fR\fR
+.RS 4
+The subsystem string\&.
+.RE
+.PP
+\fB\-\-force\fR
+.RS 4
+Force the creation of a device node or symlink\&. Usually the test run prints only debug output\&.
+.RE
+.PP
+\fB\-\-help\fR
+.RS 4
+Print help text\&.
+.RE
+.SH "AUTHOR"
+.PP
+Written by Kay Sievers
+\FCkay\&.sievers@vrfy\&.org\F[]\&.
+.SH "SEE ALSO"
+.PP
+\fBudev\fR(7)
+\fBudevd\fR(8)

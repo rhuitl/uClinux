@@ -1,0 +1,15 @@
+
+# This tries to use Debian's network setup in /etc/network/interfaces
+# if no settings are given higher up in this file.  You can delete it
+# if that isn't desired.
+
+is_true $PUMP || is_true $BOOTP || is_true $DHCP || \
+if [ ! "$IPADDR" -a -f /etc/network/interfaces ] ; then
+    INFO="Debian network setup"
+    start_fn () {
+	log /sbin/ifup $1
+    }
+    stop_fn () {
+	log /sbin/ifdown $1
+    }
+fi

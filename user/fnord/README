@@ -1,0 +1,72 @@
+Usage:
+
+	tcpserver -v -RHl localhost -u 1234 -g 1234 0 80 ./httpd
+
+Will log to stderr in the form
+
+  127.0.0.1 200 23 localhost Links_(0.96;_Unix) none /index.html
+
+where 127.0.0.1 is the client IP, 200 is the HTTP exit code, 23 is the
+size of the content that was served (or 0 for unsuccessful exit codes),
+localhost is the Host: header (the virtual host), the next token is the
+user agent with spaces replaced by underscores, the next token (none) is
+the Referer HTTP header or "none" if none was given, and the rest of
+each line is the decoded requested URL.
+
+fnord-httpd does simple virtual hosting.  If the Host: HTTP header is
+there, fnord will try to chdir to a directory of that name, i.e. if the
+client asks for "/" on host "www.fefe.de:80", fnord will look for
+"www.fefe.de:80/index.html".  Fnord will also try the directory
+"default" if no specific directory for the virtual host was there.  If
+the directory is a dangling symlink and fnord was compiled with
+-DREDIRECT (default), fnord will redirect the whole site.  Examples:
+
+  lrwxrwxrwx    1 leitner  users          19 May  5 01:09 www.foo.de:80 -> http://www.baz.de/
+  lrwxrwxrwx    1 leitner  users          20 May  5 01:12 www.bar.de:80 -> =http://www.baz.de/
+
+http://www.foo.de/blub.html will be redirected to http://www.baz.de/blub.html.
+http://www.bar.de/blub.html will be redirected to http://www.baz.de/.
+
+fnord implements el-cheapo HTTP ranges (only byte ranges and only of the
+form x-y, not multiple ranges).
+
+fnord implements content type matching and Accepts: parsing, but the
+content type table is compiled in, i.e. to change it, you have to change
+the source code.  Shouldn't be a problem because you _have_ the source
+code ;)
+
+fnord implements HTTP redirection.  If a file is not found, but a
+dangling symlink is there under the same name, fnord will issue a
+redirection to the contents of that symlink.  To be RFC compliant, the
+symlink must point to a full URL, i.e.
+
+  ln -s ftp://foobar.math.fu-berlin.de/pub/dietlibc/dietlibc-0.11.tar.bz2 dietlibc-0.11.tar.bz2
+
+fnord implements in-place substitution of .gif to .png and of * to *.gz
+if the file is available and the client supports the mime-type and
+content-encoding.  That means you can save substantial bandwidth by
+having an index.html.gz for each index.html, as most clients can
+transparently decode gzipped files.
+
+fnord will change dots at the start of file or directory names to colons
+in the query before trying to answer them.
+
+fnord understands and implements keep-alive connections.
+
+fnord can use sendfile on Linux to enable zero-copy TCP.
+
+If fnord is compiled with CGI support enabled, it will regard files
+whose names end with ".cgi" as CGI programs and try to execute them.
+CGI programs starting with "nph-" will be handled as no-parse-header
+CGIs.  Please see http://hoohoo.ncsa.uiuc.edu/cgi/interface.html for the
+CGI specification.
+
+fnord 1.3 introduced a different method of whole-host redirection, which
+can still be enabled by compiling fnord with with -DOLD_STYLE_REDIRECT.
+Files that are not found locally will be redirected to $REDIRECT_HOST
+with the current URI stripped of leading slashes, i.e. if
+http://your.server/foo/bar.html is requested but not found, and
+$REDIRECT_HOST is set to http://www.yahoo.com/, a redirect to
+http://www.yahoo.com/foo/bar.html will be issued.  If $REDIRECT_HOST is
+unset but $REDIRECT_URI is set, the URI part will be discarded and all
+URLs will be redirected to $REDIRECT_URI.

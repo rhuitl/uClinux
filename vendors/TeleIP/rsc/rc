@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# system startup.
+
+# set time from RTC
+/bin/rtc -s
+
+# set up the hostname
+/bin/hostname rsc
+
+# expand the ramdisk
+/bin/expand /etc/ramfs.img /dev/ram0
+
+# mount ramdisk & proc
+/bin/mount -t proc proc /proc
+/bin/mount -t ext2 /dev/ram0 /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+
+# attach the interfaces
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+ifconfig eth0 192.168.5.34 netmask 255.255.255.0 broadcast 192.168.5.255
+route add 192.168.5.34 eth0
+route add default gw 192.168.5.17
+
+# /bin/mount -t nfs 192.168.5.54:/home/bruce /usr
+
+#portmap &
+
+# start up the internet superserver
+#/sbin/inetd & BMP see inittab
+
+cat /etc/motd
+
+# that's it... success
+/bin/sh
+exit 0 

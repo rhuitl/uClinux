@@ -1,0 +1,94 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2005 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+CFLAGS-utils := -DNOT_IN_libc $(SSP_ALL_CFLAGS) -B$(top_builddir)lib -Wl,-rpath-link,$(top_builddir)lib
+
+CFLAGS-utils-common := -I$(top_srcdir)ldso/include -DUCLIBC_RUNTIME_PREFIX=\"$(RUNTIME_PREFIX)\" -DUCLIBC_LDSO=$(UCLIBC_LDSO)
+CFLAGS-utils-shared := $(PIEFLAG) $(LDPIEFLAG)
+
+CFLAGS-ldconfig := $(CFLAGS-utils-common)
+
+ifeq ($(UCLIBC_STATIC_LDCONFIG),y)
+CFLAGS-ldconfig += -static
+else
+CFLAGS-ldconfig += $(CFLAGS-utils-shared)
+endif
+
+CFLAGS-ldd := $(CFLAGS-utils-common) $(CFLAGS-utils-shared)
+
+# needs CFLAGS-utils explicitely, because the source file is not located in utils
+CFLAGS-iconv := $(CFLAGS-utils) $(CFLAGS-utils-shared) -DL_iconv_main
+
+CFLAGS-readelf := $(CFLAGS-utils-shared)
+
+BUILD_CFLAGS-utils := -include $(top_srcdir)include/elf.h
+
+BUILD_CFLAGS-utils-common := $(CFLAGS-utils-common)
+
+ifeq ($(LDSO_CACHE_SUPPORT),y)
+BUILD_CFLAGS-utils-common += -D__LDSO_CACHE_SUPPORT__=1
+endif
+
+BUILD_CFLAGS-ldconfig.host := $(BUILD_CFLAGS-utils-common)
+
+BUILD_CFLAGS-ldd.host := $(BUILD_CFLAGS-utils-common)
+
+BUILD_LDFLAGS-utils := -Wl,-s
+
+utils_DIR := $(top_srcdir)utils
+utils_OUT := $(top_builddir)utils
+
+DEPS-ldconfig := $(utils_DIR)/chroot_realpath.c
+DEPS-ldconfig.host := $(DEPS-ldconfig)
+
+utils_OBJ := readelf
+ifeq ($(HAVE_SHARED),y)
+utils_OBJ += ldconfig ldd
+endif
+
+utils_ICONV_OBJ =
+ifeq ($(UCLIBC_HAS_LOCALE),y)
+utils_ICONV_OBJ := $(utils_OUT)/iconv
+endif
+
+utils_OBJ := $(patsubst %,$(utils_OUT)/%,$(utils_OBJ))
+
+hostutils_OBJ := $(patsubst %,%.host,$(utils_OBJ))
+
+utils: $(utils_OBJ) $(utils_ICONV_OBJ)
+
+# NOTE: We build the utils AFTER we have a uClibc-targeted toolchain.
+
+$(utils_OBJ): $(utils_OUT)/% : $(utils_DIR)/%.c | $(libc)
+	$(compile.u)
+
+$(utils_OUT)/iconv: $(top_srcdir)libc/misc/wchar/wchar.c | $(libc)
+	$(compile.u)
+
+hostutils: $(hostutils_OBJ)
+
+$(hostutils_OBJ): $(utils_OUT)/%.host : $(utils_DIR)/%.c
+	$(hcompile.u)
+
+install-y += utils_install
+
+utils_install: utils
+	$(INSTALL) -d $(PREFIX)$(RUNTIME_PREFIX)usr/bin
+	#$(INSTALL) -m 755 $(utils_OUT)/readelf $(PREFIX)$(RUNTIME_PREFIX)usr/bin/readelf
+ifeq ($(HAVE_SHARED),y)
+	$(INSTALL) -d $(PREFIX)$(RUNTIME_PREFIX)sbin
+	$(INSTALL) -m 755 $(utils_OUT)/ldd $(PREFIX)$(RUNTIME_PREFIX)usr/bin/ldd
+	$(INSTALL) -m 755 $(utils_OUT)/ldconfig $(PREFIX)$(RUNTIME_PREFIX)sbin/ldconfig
+endif
+ifeq ($(UCLIBC_HAS_LOCALE),y)
+	$(INSTALL) -m 755 $(utils_OUT)/iconv $(PREFIX)$(RUNTIME_PREFIX)usr/bin/iconv
+endif
+
+objclean-y += utils_clean
+
+utils_clean:
+	$(RM) $(utils_OUT)/{ldconfig,ldd,readelf,iconv,*.host}

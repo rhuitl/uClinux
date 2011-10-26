@@ -1,0 +1,133 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" pcinitrd.8 1.13 2000/07/25 18:31:33
+.\"
+.TH PCINITRD 8 "$Date" "pcmcia-cs"
+.SH NAME
+pcinitrd \- create a PCMCIA initrd ram disk image
+.SH SYNOPSIS
+.B pcinitrd
+.RB [ -v ]
+.RB [ -a ]
+.RB [ --all ]
+.RB [ "\-d\ "\c
+.I alternate-root\c
+]
+.RB [ \-\-dir=\c
+.I alternate-root\c
+]
+.RB [ "\-r\ "\c
+.I kernel-release\c
+]
+.RB [ \-\-release=\c
+.I kernel-release\c
+]
+.RB [ "\-s\ "\c
+.I image-size\c
+]
+.RB [ \-\-size=\c
+.I image-size\c
+]
+.RB [ -u ]
+.RB [ --update ]
+.I initrd-image
+.RI [ "modules\ ..." ]
+.SH DESCRIPTION
+The
+.B pcinitrd
+script creates an initrd ram disk image for booting with the root
+filesystem on a PCMCIA device.  If the target is a block special
+device (i.e.,
+.IR /dev/fd0 ),
+then the initrd image is created on that device.  If the target does
+not already exist or if it is an ordinary file, then
+.B pcinitrd
+will create the image file using the ``loopback'' device.
+.PP
+Modules are specified with paths relative to
+.IR /lib/modules/[kernel-release] .
+The core PCMCIA modules
+.RI ( pcmcia/pcmcia_core
+and
+.IR  pcmcia/ds )
+will automatically be installed in the target image.  All other
+device-specific modules need to be listed on the command line,
+along with the appropriate socket driver
+.RI ( pcmcia/i82365.o
+or
+.IR pcmcia/tcic.o ).
+Alternatively, if
+.B -a
+is specified, then all available PCMCIA socket drivers and block
+device drivers will be included in the image.  Additional files to be
+copied to the initrd image may also be listed on the command line.
+Executable programs will be installed in
+.IR /bin ,
+shared libraries will be installed in
+.IR /lib ,
+device files will be installed in
+.IR /dev ,
+and any other files will be placed in
+.IR /etc .
+.PP
+The startup script in the resulting image,
+.IR linuxrc ,
+may need to be customized for a particular system.  It contains the
+same variable definitions as the normal PCMCIA startup scripts (i.e.,
+.BR PCIC= ,
+.BR PCIC_OPTS= ,
+and
+.B CORE_OPTS=
+variables).  The
+.I /etc/config.opts
+file may also need to be edited.  Any changes to
+.I linuxrc
+or
+.I config.opts
+will be preserved if
+.B pcinitrd
+is executed in ``update'' mode.
+.PP
+Another feature of the generated
+.I linuxrc
+is that if the
+.B DEBUG
+variable is set to a non-blank string at the boot prompt, then cardmgr
+will echo all its status messages to the console, and after
+.I linuxrc
+executes, it will fire up a shell on the console.  This can be helpful
+for debugging initrd problems.  However, few commands are available in
+the normal initrd environment.
+.SH OPTIONS
+.TP
+.B \-v
+Verbose mode.  Identify files as they are copied.
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+Install all socket drivers and block-style PCMCIA device drivers,
+including memory card, SCSI card, and fixed-disk drivers.  This is
+mainly intended for use by package maintainers.
+.TP
+\fB\-d\fI alternate-root\fR, \fB\-\-dir=\fIalternate-root\fR
+Specifies an alternate directory tree to search for all the files used
+to put together the initrd image.  This may be helpful for running 
+.B pcinitrd
+after booting from an installation or rescue diskette.
+.TP
+\fB\-r\fI kernel-release\fR, \fB\-\-release=\fIkernel-release\fR
+Specifies the kernel release number (i.e., 2.0.28) to use when looking
+for modules in /lib/modules.  The default is the release of the
+running kernel.
+.TP
+\fB\-s\fI image-size\fR, \fB\-\-size=\fIimage-size\fR
+Specifies the filesystem size to create on the target file or device,
+in 1k blocks.  The default is 2400.
+.TP
+\fB\-u\fR, \fB\-\-update\fR
+Update mode: updates
+.B cardmgr
+and all the kernel modules in an existing initrd image, but does not
+modify other files.
+.SH AUTHOR
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+pcmcia(5), cardmgr(8), lilo(8).

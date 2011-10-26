@@ -1,0 +1,311 @@
+.\" 
+.\" Based on the original ipchains man page by Paul Russell
+.\" <Paul.Russell@rustcorp.com.au>
+.\"
+.\"	This program is free software; you can redistribute it and/or modify
+.\"	it under the terms of the GNU General Public License as published by
+.\"	the Free Software Foundation; either version 2 of the License, or
+.\"	(at your option) any later version.
+.\"
+.\"	This program is distributed in the hope that it will be useful,
+.\"	but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"	GNU General Public License for more details.
+.\"
+.\"	You should have received a copy of the GNU General Public License
+.\"	along with this program; if not, write to the Free Software
+.\"	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+.\"
+.\"
+.TH IPMASQADM 8 "December 1998" "" ""
+.SH NAME
+ipmasqadm \- IP Masquerading additional modules administration
+.SH SYNOPSIS
+.BR "ipmasqadm <module> " "[module-specific-options]"
+.br
+.BR "ipmasqadm <module> -h"
+.sp
+.BR "ipmasqadm autofw " "options"
+.br
+.BR "ipmasqadm portfw " "options"
+.br
+.BR "ipmasqadm mfw " "options"
+.br
+.SH DESCRIPTION
+.B Ipmasqadm
+is used to configure extra masquerading funcionality, usually
+provided by additional kernel modules.
+
+All in-firewall forwarding takes place by 
+.IR reverse-masquerading
+so you 
+.B must
+create firewall rules that must
+.IR match
+desired forwarding as-is the connection had been outgoing
+(instead of incoming).
+
+Kernel must have been compiled with 
+.br
+.B CONFIG_EXPERIMENTAL=y
+.br
+.B CONFIG_IP_MASQUERADE=y
+.br
+.B CONFIG_IP_MASQUERADE_MOD=y
+.br
+and 
+.br
+.B CONFIG_IP_MASQUERADE_IPAUTOFW=y/m
+.br
+.B CONFIG_IP_MASQUERADE_IPPORTFW=y/m
+.br
+.B CONFIG_IP_MASQUERADE_MFW=y/m
+.br
+for respective modules.
+
+If you need to forward one (or more) ports to internal hosts, consider
+using 
+.B mfw
+module.
+
+In short:
+.TS H
+c c c c
+c c c c
+l l l l.
+Short	ipmasqadm	kernel	kernel
+descr.	module    	module	option
+_
+Auto 	\fBautofw\fR.so	ip_masq_autofw.o	CONFIG_IP_MASQUERADE_IPAUTOFW
+Port	\fBportfw\fR.so	ip_masq_portfw.o	CONFIG_IP_MASQUERADE_IPPORTFW
+Fwmark	\fBmfw\fR.so	ip_masq_mfw.o     	CONFIG_IP_MASQUERADE_MFW
+.TE
+
+
+.SH MODULE autofw \- Auto-forwarding
+This module is, under some circustances, capable of handling 
+application protocolos that don't have support as specific masq modules.
+Kernel must have been compiled with 
+
+.SS autofw -h
+.TP
+Command help. By now please refer to it.
+.P
+For lot of useful info about using
+.I autofw
+please visit
+.B http://ipmasq.home.ml.org
+
+.SH MODULE portfw \- Port-forwarding
+This module is able to forward 
+.I to-firewall
+packets to
+.I internal
+hosts, based on address and port specification.
+
+.SS portfw -h
+.TP
+Command help. By now please refer to it.
+
+.SH MODULE mfw \- fwmark-forwarding
+This module allows forwarding
+.I to-firewall
+packets to
+.I internal
+hosts, based on 
+.I fwmark
+matching.
+See
+.BR ipchains (8)
+for setting up firewall rules with 
+.IR fwmark ing.
+Also please note that because this module acts 
+.B only
+in first packet connection, it makes sense to add
+.B -y
+ipchains switch to TCP fwmark rules.
+
+
+.SS COMMANDS
+
+.TP
+.BR "mfw -A -m " "fwmark " "-r " "address [port] " "[-p " "pref" "]"
+Append one rule to the end of 
+.I fwmark
+list of forwarding hosts. 
+.sp 0.5
+Packets 
+.IR fwmark ed
+will create a
+.I masq-tunnel
+for redirecting further connection traffic to
+.BR "address port" .
+This will happen at most
+.B pref
+times before 
+.I scheduling 
+another entry with 
+.BI "same " "fwmark "
+value.
+.sp 0.5
+If no
+.B port
+is specified, redirection will use  original packet destination port.
+
+.TP
+.BR "mfw -I -m " "fwmark " "-r " "address [port] " "[-p " "pref" "]"
+Same as 
+.B "-A"
+option, except that the rule is 
+.B inserted
+at the head.
+
+.TP
+.BR "mfw -D -m " "fwmark " "[-r " "address [port] " "]"
+Delete specified rule(s).
+
+.TP
+.BR "mfw -E -m " "fwmark " "[-r " "address [port] " "] -p " "pref"
+Edit specified rule(s), currently 
+.B -p
+value can be changed.
+
+.TP
+.BR "mfw -S -m " "fwmark"
+Force scheduling in 
+.I fwmark
+redirect entries.
+
+.TP
+.BR "mfw -F "
+Flush 
+.B all
+rules.
+
+.TP
+.BR "mfw -L [-n]"
+List rules, optionally showing only addresses (no names).
+
+.SS EXAMPLES
+
+\".TP
+Redirect all web traffic to internals hostA and hostB, where hostB will
+serve 2 times hostA connections. Forward rules
+.B already
+masq internal hosts to outside (typical).
+.RS
+
+ipchains -I input -p tcp -y -d yours.com/32 80
+.B -m 1
+.br
+ipmasqadm mfw -I
+.B -m 1 
+-r hostA 80 -p 10
+.br
+ipmasqadm mfw -I
+.B -m 1 
+-r hostB 80 -p 20
+.RE
+
+Redirect ssh traffic from external clientA to internal hostB, also
+show forward masq rule to allow
+.B only
+hostB incoming connections to ssh port.
+.RS
+
+ipchains -I forward -p tcp -d clientA/32 -s hostB/32 22
+.br
+ipchains -I input -p tcp -y -s clientA/32 -d 0/0 22 
+.B -m 2
+.br
+ipmasqadm mfw -I
+.B -m 2
+-r hostB 22
+
+.RE
+
+Redirect all traffic from external clientA to internal hostB, also
+show forward masq rule to allow this for hostB 
+.B only
+(clean, simple ... just *grin*)
+.RS
+
+ipchains -I forward -d clientA/32 -s hostB/32
+.br
+ipchains -I input -s clientA/32
+.B -m 3
+.br
+ipmasqadm mfw -I
+.B -m 3
+-r hostB
+
+.RE
+
+
+.SH FILES
+.TP 20
+.B /usr/lib/ipmasqadm/*.so
+Modules used for ipmasqadm kernel interfacing.
+.TP 20
+.B /proc/net/ipmasq/*
+Masquerading modules internal state files.
+
+.SH BUGS
+By 2.2, there is no way to 
+.I share
+port numbers with 
+.I normal
+sockets. Currently masq modules 
+.B take precedence
+before sockets.
+
+Also because redirections are actually masq tunnels they have same
+propierties: idle timeouts, max. number of entries, etc.
+
+Kernel module autoloading will work for 
+.BR "-A " "and " "-I "
+switches, and not for 
+.BR -L ,
+so you will see warnings about missing
+.I /proc/net/ip_masq/... 
+if you list entries when module is not (auto)loaded. This will change 
+in futur releases.
+
+.SH CAVEATS
+Protocols that use control and data connections are always a headache when
+crossing firewalls. Examples of these are 
+.BR ftp ,
+.BR irc ,
+.BR "real audio" ,
+etc.
+Because we are
+.I reverse-masq forwarding
+problems get 
+.IR reversed ;
+for example: 
+.B ftp
+from outside to an internal 
+.I forwarded 
+server will 
+.B not work in 
+.I PASV
+mode because server will send its internal 
+.I address
+to outside client, in contrast, traditional 
+.IR non- passive
+connections will success (think about this a little, please).
+Support for 
+.I bidirectional
+helper modules is in the works.
+
+
+.SH NOTES
+This is my first man page, just in case you didn't notice ... ;)
+
+Consider it pre-alpha quality.
+
+.SH SEE ALSO
+ipchains(8)
+
+.SH AUTHOR
+Juan Jose Ciarlante <jjciarla@raiz.uncu.edu.ar>

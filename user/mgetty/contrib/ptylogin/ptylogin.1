@@ -1,0 +1,93 @@
+.TH ptylogin 1 "10 january 1999"
+.IX ptylogin
+.SH NAME
+ptylogin \-\ replacement for mgetty's login.config rlogin hack fixing
+security and denial of service problems with ownership of tty.
+.SH SYNOPSIS
+.B ptylogin
+login-name
+.SH DESCRIPTION
+This manual page documents
+.BR ptylogin .
+.B ptylogin
+is launched from mgetty's login.config configuration file with root
+priviledges. It opens a pty slave/master pair, and forks /bin/login.
+It ensures data stream is 8 bit. This means that the user which
+logs in will not be connected to the tty of the modem, but to
+a pty. The pty slave will be owned (because of /bin/login) by the
+logged-on user. The modem tty will be owned by root, and permissions
+will be rw access for root only. That tty doesn't need, by the way, to
+be logged-in. When the modem disconnects, the master pty is closed
+and a SIGHUP is transmitted to the other side. The worse that the
+user can then do is leave their process on if they disabled the
+SIGHUP. However they can't access the modem device nor reopen it.
+
+For enhanced security we assume the escape sequence of the modem is
+disabled, and that a modem hangup from the user calling our local
+modem causes a SIGHUP to the ptylogin process.
+
+Please look at the
+.B Paranoid Secure Port Implementation
+RCS revision SPEC,v 1.6 1999/01/05 08:41:46 or
+later for all details of the problem ptylogin fixes (it's
+quite tricky).
+
+.SS OPTIONS
+
+.I "\login-name"
+This must be a 8 char maximum login name to launch login into,
+must exist, and may not contain \- or spaces. As
+.B /bin/login
+is not launched through system() but instead with exec(), common
+attacks like semicolons or other separators cannot happen.
+
+.SH EXAMPLES
+
+The login.config could be configured like this:
+
+.I "*       root  dialin  /usr/bin/ptylogin @"
+
+Note that if you specify users which bypass this default, for
+example for PPP, FTN or UUCP, you would enter something like
+
+.I "uu*     \-       \-       /bin/login.one @"
+
+.B WARNING:
+You must use a login program which doesn't allow more than one retry. Else
+interactive users can bypass the default ptylogin restricted login.
+
+.SH AUTHOR
+Marc SCHAEFER <schaefer@alphanet.ch>
+
+.SH VERSION
+Manual version 1.0 PV001 documents ptylogin version 1.0
+
+.SH NOTES
+
+.SH BUGS
+Please look at the source.
+
+.SH TODO
+
+.SH BASED\-ON
+\- An idea to simplify rlogin and still fix the problems from
+     Theodore Y. Ts'o <tytso@MIT.EDU>
+
+\- rlogind and rlogin code from Linux NetKit-0.09
+
+\- virtual_connection from Marc SCHAEFER <schaefer@alphanet.ch>
+
+.SH HISTORY
+
+.SH COPYRIGHT
+This work is (C) Marc SCHAEFER 1999 and has been done in my free
+time. However, it is placed under the GPL and thus any use is
+authorized as long as you do not prevent others from using it and
+accessing the original source code or your extensions.
+
+.SH DISCLAIMER
+The author hereby disclaims any warranty, either expressed or
+implied, regarding this software and documentation. The fact that
+this software attempts to fix a security vulnerability doesn't mean
+that it doesn't have any vulnerability, some which could be more
+serious than the one it tries to fix.

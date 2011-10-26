@@ -1,0 +1,188 @@
+#
+#	make.os -- Makefile settings for Windows
+#
+#	This file expects that the per-directory Makefiles will have included
+#	their make.dep files which will in-turn include config.make and this
+#	file.
+#
+################################################################################
+#
+#	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+#	The latest version of this code is available at http://www.mbedthis.com
+#
+#	This software is open source; you can redistribute it and/or modify it 
+#	under the terms of the GNU General Public License as published by the 
+#	Free Software Foundation; either version 2 of the License, or (at your 
+#	option) any later version.
+#
+#	This program is distributed WITHOUT ANY WARRANTY; without even the 
+#	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#	See the GNU General Public License for more details at:
+#	http://www.mbedthis.com/downloads/gplLicense.html
+#	
+#	This General Public License does NOT permit incorporating this software 
+#	into proprietary programs. If you are unable to comply with the GPL, a 
+#	commercial license for this software and support services are available
+#	from Mbedthis Software at http://www.mbedthis.com
+#
+################################################################################
+#
+#	Variables used in this script come from several sources:
+#
+#		- config.make
+#		- user makefiles
+#		- make.rules
+#
+#	User makefiles may define:
+#
+#		$(DEBUG)
+#		$(MAKE_CFLAGS)
+#		$(MAKE_IFLAGS)
+#		$(MAKE_LDFLAGS)
+#		
+#	config.make will define:
+#
+#		$(BLD_CC)
+#		$(BLD_CFLAGS)
+#		$(BLD_IFLAGS)
+#		$(BLD_OBJ_DIR)
+#		$(BLD_PIOBJ)
+#
+#	make.rules will define the build output formatter 
+#
+#		$(BLDOUT)
+#
+################################################################################
+
+ifeq		($(BLD_FEATURE_MULTITHREAD),1)
+	MT  	:= -D_REENTRANT
+else
+	MT  	:=
+endif
+
+ifeq		($(BLD_FEATURE_MULTITHREAD),1)
+	THREAD_LIB	:= 
+else
+	THREAD_LIB	:= 
+endif
+
+_IFLAGS		:= -I$(BLD_TOP) 
+
+#
+#	-GX- (disable exceptions), MDd (multit-hreaded DLL), FD (file dependencies)
+#
+_CFLAGS  	:= -nologo -MDd -FD \
+			   -DWIN -D_DLL -D_MT -D_WINDOWS -DWIN32 -D_WIN32_WINNT=0x500 \
+			   -D_X86_=1 -GX-
+
+#
+#	DEBUG or RELEASE build settings. -Zi (debugging info), 
+#	-Od (disable optimization), -GZ (catch release build issues), 
+#	-O1 (small size)
+#
+_LD_OPT_DEBUG	:= -debug
+_CC_OPT_DEBUG 	:= -Zi -Od -GZ -D_DEBUG
+_LD_OPT_RELEASE	:= 
+_CC_OPT_RELEASE	:= -O1 -D_NDEBUG
+_LD_DLL			:= -dll
+
+ifeq		($(BLD_TYPE),DEBUG)
+	_LD_OPT:= $(_LD_OPT_DEBUG)
+	_CC_OPT:= $(_CC_OPT_DEBUG)
+else
+	_LD_OPT:= $(_LD_OPT_RELEASE)
+	_CC_OPT:= $(_CC_OPT_RELEASE)
+endif
+
+ifeq		($(BLD_FEATURE_DLL),1)
+	DLL_LIB	:=
+	_CFLAGS	+= -D_USRDLL
+else
+	DLL_LIB	:= 
+endif
+
+_LDPATH		:= $(BLD_BIN_DIR)
+_LDFLAGS	:= -machine:ix86 -nodefaultlib -incremental:no -nologo
+_SHARED_LIBS = ws2_32.lib advapi32.lib user32.lib kernel32.lib oldnames.lib
+_STATIC_LIBS = ws2_32.lib advapi32.lib user32.lib kernel32.lib oldnames.lib
+_NATIVE_LIBS = ws2_32.lib advapi32.lib user32.lib kernel32.lib oldnames.lib
+
+ifeq		($(BLD_FEATURE_DEBUG),1)
+_SHARED_LIBS += msvcrtd.lib
+_STATIC_LIBS += msvcrtd.lib
+_NATIVE_LIBS += msvcrtd.lib
+else
+_SHARED_LIBS += msvcrt.lib
+_STATIC_LIBS += msvcrt.lib
+_NATIVE_LIBS += msvcrt.lib
+endif
+
+_WARNING	:= -W3
+
+CLEANIT		= $(FILES) *.a *.tmp *.bak core *.out *.obj *.map *.res *.sym \
+			  *.lst *.mdp *.pbi *.pbo *.pbt *.pdb *.pch *.plg *.exp *.ilk *.idb
+
+.PRECIOUS: 	$(_SHARED_LIBS)
+
+#
+#	These exports defined in this file are used by the bld program
+#
+export 	_LD_OPT _LD_OPT_DEBUG _LD_OPT_RELEASE _LD_DLL _LDFLAGS _WARNING \
+		_NATIVE_LIBS _SHARED_LIBS _STATIC_LIBS _LDPATH BLD_TOP 
+
+#
+#	These exports are used by the makeProj program
+#
+export	MAKE_CFLAGS MAKE_IFLAGS MAKE_LDFLAGS _CFLAGS _IFLAGS \
+		_CC_OPT_DEBUG _CC_OPT_RELEASE
+
+#
+#	Transitition rules
+#
+.SUFFIXES: .cpp .rc .res .lib .a
+
+$(BLD_OBJ_DIR)/%${BLD_OBJ}: %.c
+	@echo
+	@echo -e "    $(BLD_CC) -c $(DEBUG) $(_CC_OPT) $(_WARNING) $(MAKE_CFLAGS) $(_CFLAGS) $(BLD_CFLAGS) $(MAKE_IFLAGS) $(BLD_IFLAGS) $(_IFLAGS) $< -Fo$@" | $(BLDOUT)
+	@$(BLD_CC) -c $(DEBUG) $(_CC_OPT) $(_WARNING) $(MAKE_CFLAGS) $(_CFLAGS) $(BLD_CFLAGS) $(MAKE_IFLAGS) $(BLD_IFLAGS) $(_IFLAGS) $< -Fo$@ >.bld.out ; \
+	STATUS=$$? ; \
+	if [ $$STATUS -ne 0 ] ; \
+	then \
+		cat .bld.out ; \
+		rm -f .bld.out ; \
+		exit 255 ; \
+	else \
+		$(BLDOUT) < .bld.out ; \
+		rm -f .bld.out ; \
+	fi
+
+$(BLD_OBJ_DIR)/%${BLD_OBJ}: %.cpp
+	@echo
+	@echo "    $(BLD_CC) -c $(DEBUG) $(_CC_OPT) $(_WARNING) $(MAKE_CFLAGS) $(_CFLAGS) $(BLD_CFLAGS) $(MAKE_IFLAGS) $(BLD_IFLAGS) $(_IFLAGS) $< -Fo$@" | $(BLDOUT)
+	@$(BLD_CC) -c $(DEBUG) $(_CC_OPT) $(_WARNING) $(MAKE_CFLAGS) $(_CFLAGS) $(BLD_CFLAGS) $(MAKE_IFLAGS) $(BLD_IFLAGS) $(_IFLAGS) $< -Fo$@ >.bld.out ; \
+	STATUS=$$? ; \
+	if [ $$STATUS -ne 0 ] ; \
+	then \
+		cat .bld.out ; \
+		rm -f .bld.out ; \
+		exit 255 ; \
+	else \
+		$(BLDOUT) < .bld.out ; \
+		rm -f .bld.out ; \
+	fi
+
+%.lib:
+	@true
+
+%.dll:
+	@true
+
+##
+##  Local variables:
+##  tab-width: 4
+##  c-basic-offset: 4
+##  End:
+##  vim:tw=78
+##  vim600: sw=4 ts=4 fdm=marker
+##  vim<600: sw=4 ts=4
+##

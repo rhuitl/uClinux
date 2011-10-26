@@ -1,0 +1,637 @@
+Dates are in french format dd/mm/yyyy
+
+*------------------------------------------------------------------------------
+* 03/06/2004
+-> src/modem_run.c src/mutex.h src/mutex.c : Benoit PAPILLAULT
+   modem_run is now controlled by a mutex and a shared value.
+   Usefull to handle the case where modem_run is run multiple times.
+
+*------------------------------------------------------------------------------
+* 18/05/2004
+-> Makefile.in hotplug/Makefile.in src/Makefile.in doc-linux/Makefile.in
+   doc-bsd/Makefile.in : Benoit PAPILLAULT
+   Modification to handle directory with space.
+
+*------------------------------------------------------------------------------
+* 17/05/2004
+-> src/speedtouch-start.in src/speedtouch-stop.in
+   src/speedtouch-setup.in : Benoit PAPILLAULT
+   Added start/stop/setup scripts + man pages.
+
+*------------------------------------------------------------------------------
+* 11/05/2004
+-> src/pppoa2.c src/pppoa3.c src/modem_run.c: Benoit PAPILLAULT
+   Updated the usage() information.
+   Use the "-e 1" by default.
+
+-> src/doc-linux/man/*.1: Benoit PAPILLAULT
+   Updated man pages according to usage() information.
+
+	
+*------------------------------------------------------------------------------
+* 05/05/2004
+-> src/pppoa2.c : Benoit PAPILLAULT
+   Corrected a bug where cells with wrong vpi/vci were generated
+   Corrected a bug where AAL5 frame with wrong CRC were generated
+   Added uninstall target in hotplug directory.
+
+*------------------------------------------------------------------------------
+* 03/05/2004
+-> hotplug: Benoit PAPILLAULT
+   Added hotplug support. Tested on linux 2.6.5
+   Updated documentation on the --sysconfdir option 
+
+*------------------------------------------------------------------------------
+* 22/04/2004
+-> src/modem_run.c src/pppoa2.c src/pppoa3.c: Benoit PAPILLAULT
+   Removed call to pusb_set_configuration() since it's useless.
+   Tested on linux 2.4.22 & 2.6.5. OpenBSD 3.5.
+
+*------------------------------------------------------------------------------
+* 24/03/2004
+-> Makefile.in: Benoit PAPILLAULT
+   Removed -v option to install since it is not supported under OpenBSD
+
+*------------------------------------------------------------------------------
+* 16/03/2004
+-> Updated man pages.
+-> Updated debian package.
+-> Release 1.2: Benoit PAPILLAULT
+
+*------------------------------------------------------------------------------
+* 03/03/2004
+-> src/pppoa3.c: Nick Hudson
+   NetBSD lacks thread scheduling policy support. If this feature
+   is supported, then _POSIX_THREAD_PRIORITY_SCHEDULING is defined.
+-> src/pusb-bsd.c: Nick Hudson
+   Added pusb_get_revision for *BSD systems.
+
+*------------------------------------------------------------------------------
+* 16/02/2004
+-> src/firmware.c: Benoit PAPILLAULT
+   Added check_firmware() function.
+
+*------------------------------------------------------------------------------
+* 14/02/2004
+-> Renamed src/extract.c to src/firmware.c: GomGom
+-> Renamed src/extract.h to src/firmware.h: GomGom
+-> src/firmware.[ch]: GomGom
+   Reworked the complete extracter module. It now checks for both boot code and
+   main firmware code. It is also now possible to specify a boot file code.
+-> src/modem_run.c: GomGom
+   Updated to new firmware extracter API. No 330 rev4 support yet.
+-> src/Makefile.in: GomGom
+   Modified in order to reflect extract.[ch] -> firmware.[ch]
+   Added firmware_extract rule to build a standalone firmware extracter to test
+   the firmware extraction utility functions.
+-> src/boot.v123.S, src/boot.v123.bin: GomGom
+   Added boot code source + precompiled/encapsulated binary.
+-> doc-linux/man/modem_run.1
+   Updated. Added undocumented/new options (-b and -a). Overall modifications.
+
+*------------------------------------------------------------------------------
+* 04/01/2004
+-> src/modem_run.c: GomGom
+   Changed default timeout value to 60s
+-> src/pusb-linux.c: GomGom
+   Doesn't use PAGE_SIZE from asm/asm-page.h, use sysconf(_SC_PAGE) instead
+   in make_device() so the lib initializes the pagesize before using it (if
+   lib usage is respected of course ...)
+   Make sure __u8|16|32 are undefined before defining them using iso c99 types
+
+*------------------------------------------------------------------------------
+* 17/11/2003
+-> src/pppoa3.c, src/pppoa2.c: GomGom
+   Added SIGHUP and SIGPIPE trapping for GNU/Linux. It seemed SIGTERM
+   wasn't enough.
+-> src/pppoa3.c: Leonard den Ottolander
+   Minor code cleanups.
+   Fixes CRC errors in read_from_usb_thread().
+   Checks for frames that are too long.
+-> src/pusb-linux.c, added src/pusb-linux.h: GomGom
+   Removed linux kernel includes. That solves the problem of driver
+   building on distros using 2.6 headers.
+-> VERSION, configure: GomGom
+   Bump up the version numbers.
+-> src/modem_run.c, doc-linux/man/mode_run.1: Howard Wilkinson <howard@cohtech.com>
+   Added a timer so modem_run gives up after a specified amount of time
+   (default is 30s). This duration can be specified using the new option -t.
+
+*------------------------------------------------------------------------------
+* 12/10/2003
+-> src/pppoa2.c, src/pppoa3.c, src/modem_run.c: GomGom
+   REPORT_DUMP only for verbose > 2
+-> doc-linux/man/modem_run.1: GomGom
+   Documented the -d option.
+-> src/modem_run.c: GomGom
+   Doesn't release interface 0 on parent modem_run exit as the interface
+   is still in use by the monitoring child.
+
+*------------------------------------------------------------------------------
+* 29/09/2003
+-> doc-linux/man/modem_run.1: GomGom
+   Added link to pppoa3
+-> doc-linux/man/pppoa2.1, doc-linux/man/pppoa3.1: GomGom
+   Fixed the verboseity level help for verbose==[23]
+-> src/pppoa2.c, src/pppoa3.c: GomGom
+   Added a 3rd verbosity level to allow debug level info w/o packet dumping
+   Added usage output when euid != 0
+-> src/modem_run.c
+   Added usage output when euid != 0
+
+*------------------------------------------------------------------------------
+* 23/07/2003
+-> doc-bsd/INSTALL: Francois
+   Updated the install notes for FreeBSD 5.
+-> doc-linux/howto: Francois
+   Added the dtuch translation from Timothy Demulder <syphon@wanadoo.be>
+   Updated all the howto to change from Alcatel to Thomson, also he change for
+   the IRC server from openprojects to freenode.
+
+*------------------------------------------------------------------------------
+* 18/07/2003
+-> src/pppoa2.c: Francois
+   Backporting PPPoE code from pppoa3 and most code from the loops.
+
+*------------------------------------------------------------------------------
+* 15/07/2003
+-> src/pppoa3.c: Francois
+   Added PPPoE support for FreeBSD using a TAP interface.
+-> configure.in: Francois
+   Now use the new thread library from FreeBSD 5 : libKSE
+
+*------------------------------------------------------------------------------
+* 27/06/2003
+-> src/modem_run.c src/extract.c: GomGom
+   Added Firmware checking and information printing
+-> src/modem_run.c: GomGom
+   Renamed the log file pointer to flog because of a gcc 3.3 intrinsic
+   function which has this exact name.
+-> src/Makefile.in: GomGom
+   Added crc.o to the modem_run build
+-> VERSION configure.in configure.in: GomGom
+   1.2 Beta2
+
+*------------------------------------------------------------------------------
+* 31/01/2003
+-> src/modem_run.c src/pusb.h src/pusb-linux.c src/pusb-bsd.c: GomGom
+   Added kernel module support into modem_run as an option -k
+-> debian/changelog: GomGom
+   I am now the debian packager
+-> Makefile.in (all): GomGom
+   Updated dist rules.
+
+*------------------------------------------------------------------------------
+* 26/01/2003
+-> src/modem_run.c: GomGom
+   Disabled SW buffering by default, it was causing troubles to lot of
+   stusb 330 users.
+
+*------------------------------------------------------------------------------
+* 13/12/2002
+-> src/modem_run.c: GomGom
+   Reworked patch for 330 modem. Included sw buffer activation (courtesy of
+   Thomson)
+
+*------------------------------------------------------------------------------
+* 05/12/2002
+-> src/pppoa3.c src/pppoa2.c src/modem_run.c: GomGom
+   Added support for SpeedTouch USB 330. Next step would be to auto detect the
+   right alternate interface according to its transfer mode (must be bulk).
+-> doc-linux/man/*.1: GomGom
+   Updated, added bridged mode doc and alternate endpoint interface.
+	
+*------------------------------------------------------------------------------
+* 18/11/2002
+-> src/pusb-bsd.c : francois
+   Change in usb.h structures got sync with FreeBSD and NetBSD since
+   OpenBSD3.2. Hope that i found the right version number.
+
+*------------------------------------------------------------------------------
+* 20/10/2002
+-> src/pppoa3.c : GomGom
+   Added bridged PPPoE mode (RFC1483). This patch needs to be proted to BSD
+   systems and then be backported to pppoa2 where it could be used by BSD
+   people.
+
+   Thanks to <fly8 at prout dot be> for the original patch.
+
+   NB : pppoa3 bridged mode depends on a pppoe ppp slave (OS dependant,
+   could be rp-pppoe with GNU/Linux)
+   
+
+*------------------------------------------------------------------------------
+* 22/08/2002
+-> doc-bsd/patch-usb : francois
+   Added a patch of the usb for FreeBSD. Should Also work with open and net.
+   This patch enable the USB to be reloaded by the kernel when it crashes.
+   Patch provided by Dr David Hedley
+   ref : http://www.mail-archive.com/speedtouch@ml.free.fr/msg03136.html
+
+*------------------------------------------------------------------------------
+* 22/08/2002
+-> doc-bsd/INSTALL-nl : francois
+   Added dutch translation of the howto thanks to Douwe Kiela <tadhp@wanadoo.nl>
+
+*------------------------------------------------------------------------------
+* 1/06/2002
+-> doc-bsd/INSTALL : francois
+   Added static English version of the howto. (doesn't use configure anymore)
+-> doc-bsd/INSTALL-it : francois
+   Added german translation of the INSTALL howto thanks to Michael Kohl.
+
+*------------------------------------------------------------------------------
+* 18/05/2002
+-> doc-linux/adsl-conf-pppd : GomGom
+   Updated for debian distros, it creates a /etc/modutils/hdlc file, adds an
+   entry for the tty-ldisc-13 n_hdlc and then runs update-modules
+-> doc-linux/FAQ : GomGom
+   Added a question concerning the DNS entries that should handled by pppd
+   Added a reference to speedtouch-doctor in the last question
+-> src/pppoa3.c : GomGom
+   Applied a fix from Tim Woodall for the async mode. 
+-> VERSION, debian/changelog : GomGom
+   Updated for the rc2
+-> doc-bsd/ : francois (but this is GomGom who updates the ChangeLog :(
+   Added french translation of the FAQ and INSTALL
+   Renamed INSTALL-it.txt to INSTALL-it
+
+*------------------------------------------------------------------------------
+* 10/05/2002
+-> doc-linux/adsl-conf-pppd : GomGom
+   Fixed a bug for debug options
+   Updated the generated peer file to match the new adsl.ppp-peersample one
+   Added a ToDo concerning Debian specificity for modules.conf
+-> doc-linux/adsl.ppp-peersample : GomGom
+   Updated the path for binaries and added a comment about package installed
+   binaries that resides in /usr/sbin instead of /usr/local/sbin
+-> doc-bsd/INSTALL : francois
+   Updated
+-> doc-bsd/INSTALL : GomGom
+   Fixed an english mistake (francois, avaible does not exist :-)
+
+*------------------------------------------------------------------------------
+* 07/05/2002
+-> doc-linux/howto/* : GomGom
+   Updated path for modem_run and pppoa3/2. Now they're in /usr/local/sbin
+-> doc-linux/FAQ : GomGom
+   Updated question about the SysV script.
+   Added to questions (LCP config request timeouts and startup usbfs error)
+-> src/modem_run.c : GomGom
+   Reordered 3 function calls like previous version (before my state detection
+   changes)
+
+*------------------------------------------------------------------------------
+* 02/05/2002
+-> debian/changelog : Robot101
+   Changed .deb version to 1.0-1.1rc1-1 to reflect imminent 1.1rc1 release.
+
+*------------------------------------------------------------------------------
+* 15/04/2002
+-> All Makefiles : GomGom
+   Removed and replaced by Makefile.in files
+-> doc-linux/adsl : GomGom
+   Renamed to adsl.ppp-peersample and the file has been commented
+   with lot of informations to help them make choices, enable/disable
+   stuff in it
+-> doc-linux/adsl.sh : GomGom
+   Renamed to speedtouch.sh, this close defintively the problems
+   with other identical script names for other drivers (rp-pppoe)
+-> dist target in Makefiles : GomGom
+   dist builds only the tarballs (bz2 abd gz). It doesn't tag
+   the cvs anymore.
+   Changed the old "copy all and then remove some files" way by a
+   "create the subdir and copy all the apprpriate files in it" way
+   Look at the DIST_FILES in Makefile.in   
+
+*------------------------------------------------------------------------------
+* 12/04/2002
+-> Makefile src/pusb-bsd.c : Francois
+   Fixes the makefile in the RPM part as it was designed for gmake and not
+   make.
+   For the pusb, fixes the USB structures which were changed in FreeBSD.
+   NetBSD also changed that but it's not already handeled.
+-> src/pppoa3.c : GomGom
+   Added Tim Woodall Async stuff so pppoa3 can do async communication  with
+   pppd now (new option -a/--async). Manual pages need to be updated
+
+*------------------------------------------------------------------------------
+* 07/04/2002
+->doc-linux/howto/SpeedTouch-HOWTO-it.html : GomGom
+  Updated with the missing module section.
+
+*------------------------------------------------------------------------------
+* 02/04/2002
+-> speedtouch.spec.in and others (Alex)
+   Fixes for RPM creation. RPM's now chkconfig the SysV script (now called speedtouch)
+   The SysV script now uses /etc/speedtouch.conf for config details
+   The RPM creates a pointer to the example speedtouch.conf file
+	
+*------------------------------------------------------------------------------
+* 23/03/2002
+-> src/extract.c
+   Changed the pattern search so we obtain 100% all the time with all tested
+   firmwares.
+   Changed the way the firmware buffer is returned, now we can easily free
+   it.
+-> src/modem_run.c
+   Added free(firmware buf) so we do not waste ~520ko of memory
+   Fixed a mistake where the word "downloaded" was used instead of "uploaded"
+-> src/atm.c
+   Fixed a little problem when the aal5 frame was not valid (a better patch
+   will be commited soon)
+
+*------------------------------------------------------------------------------
+* 08/03/2002
+-> doc-bsd/INSTALL-it.txt
+   Added Italian translation of the BSD INSTALL file
+
+*------------------------------------------------------------------------------
+* 06/03/2002
+-> ./doc-linux : GomGom
+   Moved manual pages to the ./man directory
+   Moved howtos to the ./howto directory
+   Updated the install target (Italian and German howtos were missing)
+   Updated the BUG file to officially close the "Wrong speed bug in UK"
+
+*------------------------------------------------------------------------------
+* 03/03/2002
+-> Build: Alex (stsquad)
+   binaries now install in $prefix/sbin instead of bin (LSB complient)
+   make archive and make rpm to make tarballs and rpm's
+   spelling fix in speedtouch.tmpl (CONFIGURE_ARGS)
+   doc-linux now in $prefix/doc/speedtouch (LSB complient)
+   doc-linux make uninstall fixed
+   src/Makefile now quotes VERSION
+
+*------------------------------------------------------------------------------
+* 04/02/2002
+-> FAQ : GomGom
+   Added adsl.sh configuration and updated some litle things in it
+   pusb-linux.c : GomGom (patch provided by Duncan Sands <duncan.sands@math.u-psud.fr>)
+   Linux 2.5.x compatibility (usbdevfs changes)
+
+*------------------------------------------------------------------------------
+* 03/02/2002
+-> Documentation : GomGom
+   Added German translation by Christoph Tapler <christoph@tapler.info>.
+   Updated English and French "Latest Modifications" dates.
+
+*------------------------------------------------------------------------------
+* 28/01/2002
+-> Documentaion : Alex (stsquad)
+   Added Italian translation by Nicolò Chieffo <chievo@freemail.it>
+	
+*------------------------------------------------------------------------------
+* 24/01/2002
+-> modem_run.c extract.c src/Makefile : GomGom
+   Added Syslog support. Now your system log files keep track of your
+   connection speed automatically and if you increase verbosity all
+   debug stuff is printed to your syslog files too.
+
+*------------------------------------------------------------------------------
+* 18/01/2002
+-> pusb-bsd : Francois
+   I put a final correction on endpoint timeout. I separated endpoint timeout 
+   in 2 :
+     * timeout_read
+     * timeout_write
+   So that we ignore timeout_write as ugen.c don't let us change it.
+
+*------------------------------------------------------------------------------
+* 25/12/2001
+-> Release Work: Alex (stsquad)
+   Release 1.0 (no changes from 1.0rc1)
+
+*------------------------------------------------------------------------------
+* 15/12/2001
+-> Release Work: Alex (stsquad)
+   Release Candiate 1 of 1.0
+	
+*------------------------------------------------------------------------------
+* 12/12/2001
+-> Makefile files : Francois
+   Corrected a bug in make install : we check first if directories exists
+   if not we create them, then install files
+   The problem came with the separate install of modem_run and pppoax, they got
+   install before we check the directory.
+
+*------------------------------------------------------------------------------
+* 11/11/2001
+-> configure and Makefile files : GomGom
+   Changed pusb compilation handling (now through configure)
+   Now beta target are "builded" in current dir better than in /tmp
+
+*------------------------------------------------------------------------------
+* 01/11/2001-11/11/2001
+-> All C files : GomGom (and francoiss :-)
+   Cleaning up the sources
+
+*------------------------------------------------------------------------------
+* 26/10/2001
+-> pppoa3.c : stsquad
+   Modified the kill routine to use pid instead of -pid so it actually kills
+   rouge pppoa3's!
+	
+*------------------------------------------------------------------------------
+* 07/10/2001
+-> pppoa3.c : GomGom
+   Added a "real" pipe control
+   Reworked thread system (now they are joinable and asynchronous)
+   Update the command line parser so it accepts both long options
+   and short options (eg : --help or -h)
+   Threads cleanup has been implemented with pthread_cleanup_push/pop
+   functions
+   Pipe thread startable with a SIGUSR2 signal
+   Added multiple modem support.
+   Now you can launch 2 instances for differents modem
+   eg : pppoa3 -m 1 -d /proc/bus/usb/0/1 -vpi 0 -vci 38
+        then pppoa3 -m 2 -d /proc/bus/usb/0/2 -vpi 0 -vci 38
+   You can even change vpi vci values as pppoa3 instances are totally
+   independant
+-> pppoa2/2m.c modem_run.c : francoiss
+   Added multiple modem support
+
+*------------------------------------------------------------------------------
+* 16/09/2001 
+-> pppoa3.c : GomGom
+   Added named pipe stuff as a thread function, now, you can change verbose
+   level without restarting the pppoa3 tty slave. You have just to start
+   pppoa3 with -p option and then echo 0/1/2 > /tmp/pppoa3.vlevel to set
+   the new verbose level or you can dinamically turn off this option doing
+   echo k > /tmp/pppoa3.vlevel (k stands for kill)
+-> doc-linux/pppoa3.1 : GomGom
+   Added to cvs (adapted from pppoa2 man page :)
+
+*------------------------------------------------------------------------------
+* 05/08/2001 
+-> configure configure.in speedtouch.tmpl.in src/Makefile : francoiss
+   Added pthread test to know if pppoa3 can or cannot be compiled
+
+*------------------------------------------------------------------------------
+* 05/09/2001 
+-> pppoa3.c pppoa3.h atm.c : GomGom
+   Cleanup in signal_handler
+   Added "style" messages to report flags,so now report is able to differenciate
+   messages when sending them to syslog (3 styles are used, error, info, debug 
+   their syslog equivalents are LOG_ERR, LOG_INFO, LOG_DEBUG)
+   PS : REPORT_JUST_MESSAGES disapeared
+-> pppoa2m.c : GomGom
+   syslog support backported from pppoa3 to pppoa2m
+
+*------------------------------------------------------------------------------
+* 04/09/2001 
+-> configure Makefile src/Makefile : francoiss
+   adding option for syslog in the configure
+
+*------------------------------------------------------------------------------
+* 03/09/2001
+-> pppoa3.c pppoa3.h : GomGom
+   I've added the possibilitie to use either "old" log system or syslog
+   You have just to define USE_SYSLOG when compiling pppoa3.c
+
+*------------------------------------------------------------------------------
+* 02/09/2001 
+-> configure : francoiss
+   added --enable-install=user
+
+*------------------------------------------------------------------------------
+* 27/08/2001 
+-> pppoa3.c pppoa3.h pppoa2m.c atm.c atm.h crc.c crc.h : GomGom
+   Added to the source tree
+
+-> pppoa2.c pppoa2m.c : Francois Rogler
+   It's a patch that comes from the speedtouch-BSD-030601.tar.gz. Thanks to 
+   Richard and foob that located the mistake.
+   Adding a do while loop to remove the timeout problem under BSD as sometimes 
+   the function pusb_endpoint_read raise a timeout when we set the timeout at 0.
+   Need to add that to the pppoa3.c. Will be done later to see if it makes a
+   problem with linux.
+
+*------------------------------------------------------------------------------
+* 05/08/2001 
+-> pppoa2.c : Francois Rogler
+   Adding the setting the termios tty line discipline for BSD (Tested with
+   Freebsd only at the moment)
+
+*------------------------------------------------------------------------------
+* 24/07/2001
+
+-> pppoa2.c : GomGom
+   Under Linux pppd doesn't kill its pty slaves with SIGUP (like BSD does)
+   It sends a SIGTERM signal... so i added the SIGTERM to the sighandler al-
+   ready coded (doesn't matter, cause it doesn't care what signal is received)
+   
+*------------------------------------------------------------------------------
+* 23/07/2001
+
+->Pasted modem_run internal ChangeLog
+
+  25/03/2001: added GPL license.
+
+  13/04/2001: removed timeout messages.
+  
+  23/06/2001: Modifications GomGom (ed.gomez@free.fr)
+  * added verbsosity levels
+  *    - level 0     errors
+  *    - level 1     errors + state messages
+  *    - level 2     errors + state messages + dumps
+
+->Pasted pppoa2 Internal ChangeLog to this file
+
+  Paste beggining
+
+  21/03/2001: you MUST run 'modem_init' and 'modem_link' before trying to
+  run this one.
+
+  25/03/2001: 'modem_link' has been replaced by 'modem_diag'.
+
+  28/03/2001 : removed 'test_main'. replace libusb by usbfs. 
+
+  01/04/2001 : removed reading cells in signal handler.
+
+  12/04/2001 : added handling of HDLC line discipline. In fact, pppd
+  * sends us HDLC packet in stdin (stdin is normally the master side of
+  * a master/slave tty). However, with no special care, HDLC packets can
+  * be concatenated and since HDLC header does not include any length
+  * indicator, HDLC is not handled the way it should be.
+  *
+  * After reading the source code from rp-pppoe, it tried to do :
+  *   ioctl(0,TIOCSETD,&N_HDLC).
+  * It works if your kernel has been compiled with HDLC support
+  * (maybe insmod n_hdlc).
+
+  12/06/2001 : Modifs by GomGom (ed.gomez@free.fr)
+  * removed debug mode
+  * added verbosity levels instead of debug and state messages
+  *              -v 0 -> no messages at all, no logging
+  *              -v 1 -> only the old state messages  
+  *              -v 2 -> equivalent to the old debug mode ie state+packet dropping
+  * restricted log file access to 0600 as the inet login is visible from
+  * this file in -v 2 mode.
+
+  13/06/2001 : Modifs by GomGom (ed.gomez@free.fr)
+  * replaced pid_t other_process by handler87_process
+  * added pid_t parent_process, this_process
+  * I chose to add these pid_t to simplify program comprehension
+  * So now,wherever you are in child or parent process
+  *      - this_process is always pointing to the current process
+  *         (this_process==handler87_process when you are in child process)
+  *         (this_process==parent_process when you are in the parent process)
+  *      - parent_process is always pointing to the parent process
+  *      - handler87_process is always pointing to the child process  
+
+  Unknown date : Added sched_setscheduler (thanks to dgautheron@magic.fr)
+
+  22/06/2001 : Modifs by Eagle (Eagle@ifrance.com)
+  * removed pools. pool.c is no more needed to compile this file.
+  * moved buffer from local variables on the stack to global one
+  * removed all buffer copies except one, during generation of atm cells
+  * modified signatures of ppp_read, ppp_write and aal5_write to remove pointers parameters since
+  * not needed anymore.
+
+     -> further integration is possible : merge ppp_read and aal5_write, and merge ppp_write and aal5_read
+    but is it wanted ?
+
+  22/06/2001 : Modifs by GomGom (ed.gomez@free.fr)
+  * Coding Style problems
+  * Some verbose message level changes,  parent & child pid dump is now level 1
+  * verbose level set to 1 by default
+
+  25/06/2001 : Modifs by GomGom (edgomez@libertysurf.fr)
+  * Changed verbosity levels, log is now mandatory
+  *     - level 0 : Errors
+  *     - level 1 : Errors + Warnings/States
+  *     - level 2 : Errors + Warnings/States + packet dumping
+  * Default verbose level is now 0 ( but looks like the old 1)
+  * Changed redirection code for the log, now uses dup2 instead of close/dup
+  * Use the STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO constants to avoid
+  * OS incompatibilities
+  * Added some checkings when dup2'ing and closing file descriptors
+  * (cause 'man close' says it is "serious programming  error" not to
+  *  check return values)
+
+  23/07/2001 : Modifs by GomGom (ed.gomez@free.fr)
+  * Added report function to simplify verbose stuff
+  * void report( int minlevel, char *fmt, ...);
+  *
+  * Discovered a colision problem in logs (thanks to Benoit- #speedtouch)
+  * Semaphores will be used to solve this problem
+
+  23/07/2001 : Benoit LOCHER (benoit.locher@skf.com)
+  * Added semaphores via smallsem utility lib
+  * All critical sections are now protected
+  * (next GomGom) updated report to includes perror report
+  * void report( int minlevel, int perror_needed, char *fmt, ...);
+  * Changed log location, now it is in /var/log/pppoa2.log by default
+
+  Paste End
+
+*------------------------------------------------------------------------------
+* 22/07/2001 ChangeLog Creation
+
+->Added GPL header to all files
+->Added COPYING file !
+->Created and added AUTHOR file
+->Added Linux html HOWTOs (french and english)
+->Updated linux FAQ & linux results.txt

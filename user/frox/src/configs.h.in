@@ -1,0 +1,79 @@
+/***************************************
+    This is part of frox: A simple transparent FTP proxy
+    Copyright (C) 2000 James Hollingshead
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+    configs.h -- miscellaneous definitions.
+
+	%_REPLACE_COMMENT_%
+					
+***************************************/
+
+
+#ifndef CONFIGS_H
+#define CONFIGS_H		/*+ To stop multiple inclusions. + */
+
+int process_cmdline(int argc, char *argv[]);
+int read_config(void);
+int reread_config(void);
+void strip_filenames(void);
+int config_connectionok(struct sockaddr_in *src, struct sockaddr_in *dst,
+		        const char *user);
+void config_change(struct sockaddr_in *src, struct sockaddr_in *dst,
+		   const char *user);
+int config_portok(struct sockaddr_in *addr);
+int config_pasvok(struct sockaddr_in *addr);
+
+struct acl_item {
+	enum { ALLOW, DENY } action;
+	/*struct in_addr src, smsk;*/
+	/*struct in_addr dst, dmsk;*/
+	char *src, *dst, *user;
+	u_int16_t *ntp_ports;
+};
+
+
+struct acl_list {
+	struct acl_item *list;
+	int num;
+};
+
+
+struct subsect;
+
+struct subsect_list {
+	struct subsect *list;
+	int num;
+};
+
+struct options {
+
+	/* %_REPLACE_OPTIONS_DEFINITION_% */
+
+	struct sockaddr_in listen_address;
+	uid_t uid;
+	gid_t gid;
+	int fakentp;
+};
+
+struct subsect {
+	struct options config;
+	struct acl_item match;
+};	
+
+extern struct options config;
+
+#endif				/* COMMON_H */

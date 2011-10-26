@@ -1,0 +1,249 @@
+From rickert@cco.caltech.edu Sat Jul 30 11:17:32 1994
+Received: from optima.CS.Arizona.EDU by quercus.cs.arizona.edu; Sat, 30 Jul 1994 11:17:31 MST
+Received: from piccolo.cco.caltech.edu by optima.cs.arizona.edu (5.65c/15) via SMTP
+	id AA00375; Sat, 30 Jul 1994 11:17:29 MST
+Received: from accord.cco.caltech.edu by piccolo.cco.caltech.edu with ESMTP 
+	(8.6.7/DEI:4.41) id LAA28348; Sat, 30 Jul 1994 11:17:24 -0700
+From: rickert@cco.caltech.edu (Keith Warren Rickert)
+Received: by accord.cco.caltech.edu 
+	(8.6.7/UGCS:4.41) id LAA04047; Sat, 30 Jul 1994 11:17:23 -0700
+Date: Sat, 30 Jul 1994 11:17:23 -0700
+Message-Id: <199407301817.LAA04047@accord.cco.caltech.edu>
+To: gkim@cs.arizona.edu
+Subject: Re:  Status report #2: Tripwire v1.2
+Status: OR
+
+I've checked out the Beta2 version of Tripwire 1.2, and had no problems
+at all under Irix 4.0.5, in both the tests and real use,
+including interactive database update.
+The following file is a tw.config which I think includes most of
+the important files for an Irix 4.0.x installation, although
+no guarantees for people with different software packages installed
+than I have. 
+--------------------------------------------------------------------
+# $Id: tw.conf.irix,v 1.1 1994/08/04 03:44:17 gkim Exp $
+#
+# tripwire.config
+# Generic version for IRIX 4.x
+#  Will need editing...see comments below
+#
+# This file contains a list of files and directories that System 
+# Preener will scan.  Information collected from these files will be 
+# stored in the tripwire.database file.
+#
+# Format: 			[!|=] entry [ignore-flags]
+#
+# where:	 '!' signifies the entry is to be pruned (inclusive) from
+#				the list of files to be scanned.
+#		 '=' signifies the entry is to be added, but if it is
+#				a directory, then all its contents are pruned
+#				(useful for /tmp).
+#
+# where:	entry is the absolute pathname of a file or a directory
+#
+# where ignore-flags are in the format:
+#		[template][ [+|-][pinugsam12] ... ]
+#
+# 	- :  ignore the following atributes
+#	+ :  do not ignore the following attributes
+#
+#	p :  permission and file mode bits 	a: access timestamp
+#	i :  inode number			m: modification timestamp
+#	n :  number of links (ref count)	c: inode creation timestamp
+#	u :  user id of owner			1: signature 1
+#	g :  group id of owner			2: signature 2
+#	s :  size of file
+#
+#
+# Ex:   The following entry will scan all the files in /etc, and report
+#	any changes in mode bits, inode number, reference count, uid,
+#	gid, modification and creation timestamp, and the signatures.
+#	However, it will ignore any changes in the access timestamp.
+#
+#	/etc	+pinugsm12-a
+#
+# The following templates have been pre-defined to make these long ignore
+# mask descriptions unecessary.
+#
+# Templates: 	(default)	R :  [R]ead-only (+pinugsm12-a)
+#				L :  [L]og file (+pinug-sam12)
+#				N :  ignore [N]othing (+pinusgsamc12)
+#				E :  ignore [E]verything (-pinusgsamc12)
+#
+# By default, Tripwire uses the R template -- it ignores
+# only the access timestamp.
+#
+# You can use templates with modifiers, like:
+#	Ex:  /etc/lp	E+ug
+#
+#	Example configuration file:
+#		/etc		R	# all system files
+#		!/etc/lp	R	# ...but not those logs
+#		=/tmp		N	# just the directory, not its files
+#
+# Note the difference between pruning (via "!") and ignoring everything
+# (via "E" template):  Ignoring everything in a directory still monitors
+# for added and deleted files.  Pruning a directory will prevent Tripwire
+# from even looking in the specified directory.
+#
+#
+# Tripwire running slowly?  Modify your tripwire.config entries to
+# ignore the (signature 2) attribute when this computationally-exorbitant 
+# protection is not needed.  (See README and design document for further
+# details.)
+#
+
+#  First, root's "home"
+=/		L
+/.rhosts	R	# may not exist
+/.profile	R	# may not exist
+/.cshrc		R	# may not exist
+/.login		R	# may not exist
+/.exrc		R	# may not exist
+/.logout	R	# may not exist
+/.forward	R	# may not exist
+/.netrc		R	# may not exist
+
+# Unix itself
+/unix		R
+
+# Now, some critical directories and files
+#  Some exceptions are noted further down
+/etc		R
+/etc/rc0.d	R
+/etc/rc2.d	R
+/etc/rc3.d	R
+/etc/init.d	R
+/etc/config	R
+/etc/mtab	L
+/etc/motd	L
+/etc/rmtab	L
+/etc/utmp	L
+/etc/wtmp	L
+/etc/OLDwtmp	L
+/etc/xutmp	L
+/etc/group	R	# changes should be infrequent
+#  The next line may need to be replaced with /etc/security
+#   if C2 is enabled
+/etc/passwd	L
+
+/dev		L
+
+/usr/etc	R
+
+# Checksumming the following is not so critical.  However,
+#  setuid/setgid files are special-cased further down.
+
+/lib		R-2
+
+/bin		R-2
+
+/usr/bin	R-2
+/usr/sbin	R-2
+
+/usr/bsd	R-2
+
+/usr/lib	R-2
+
+/usr/adm	L
+/usr/admin	R
+/usr/bin/X11	R-2
+
+=/usr		L
+=/usr/spool	L
+/usr/spool/cron		L
+/usr/spool/mqueue	L
+/usr/mail		L
+
+# You may or may not have the following
+/usr/people/ftp		L
+/usr/people/ftp/bin	R
+/usr/people/ftp/etc	R
+
+# put entries for uucp if you need them
+
+=/tmp
+=/usr/tmp
+
+
+#  Here are entries for setuid/setgid files.  On these, we use
+#  both signatures just to be sure.
+#
+#  You may want/need to edit this list.  Batteries not inc.
+
+/usr/lib/sendmail	R
+/usr/lib/acct/accton	R
+/usr/lib/envm/longinfo	R
+/usr/lib/sendmail.old	R
+/usr/adm/mkpts	R
+/usr/bin/at	R
+/usr/bin/crontab	R
+/usr/bin/X11/cdplayer	R
+/usr/bin/X11/xterm	R
+/usr/bin/X11/Xsgi	R
+/usr/bin/cancel	R
+/usr/bin/lp	R
+/usr/bin/lpstat	R
+/usr/bin/under	R
+/usr/bsd/lpq	R
+/usr/bsd/lpr	R
+/usr/bsd/lprm	R
+/usr/bsd/rcp	R
+/usr/bsd/rdist	R
+/usr/bsd/rlogin	R
+/usr/bsd/rsh	R
+/usr/etc/lpd	R
+/usr/etc/ping	R
+/usr/etc/route	R
+/usr/etc/timedc	R
+/usr/etc/traceroute	R
+/usr/sbin/cdinstmgr	R
+/usr/sbin/eject	R
+/usr/sbin/gr_osview	R
+/usr/sbin/gr_top	R
+/usr/sbin/pandora	R
+/usr/sbin/xwsh	R
+/usr/sbin/systemdown	R
+/usr/sbin/top	R
+/usr/sbin/vadmin	R
+/usr/demos/bin/setup_dgl	R
+/bin/df	R
+/bin/login	R
+/bin/mail	R
+/bin/newgrp	R
+/bin/passwd	R
+/bin/su	R
+/etc/lvinfo	R
+/etc/suid_exec	R
+/usr/lib/expreserve	R
+/usr/lib/sendmail	R
+/usr/lib/sa/sadc	R
+/usr/bin/X11/xload	R
+/usr/bin/X11/xterm	R
+/usr/bsd/lpq	R
+/usr/bsd/lpr	R
+/usr/bsd/lprm	R
+/usr/bsd/w	R
+/usr/etc/arp	R
+/usr/etc/fam	R
+/usr/etc/lpc	R
+/usr/etc/lpd	R
+/usr/etc/netstat	R
+/usr/etc/nfsstat	R
+/usr/etc/traceroute	R
+/usr/sbin/Mail	R
+/usr/sbin/osview	R
+/usr/demos/bin/setup_dgl	R
+/bin/ipcs	R
+/bin/mail	R
+/bin/ps	R
+/bin/rmail	R
+/etc/fuser	R
+/etc/killall	R
+/etc/savecore	R
+/etc/whodo	R
+
+--------------------------------------------------------------------
+Regards,
+Keith
+

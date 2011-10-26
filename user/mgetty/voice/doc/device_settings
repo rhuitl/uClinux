@@ -1,0 +1,88 @@
+% Juergen Kosel <Juergen.Kosel@gmx.de>
+% $Id: device_settings,v 1.1 2001/02/24 10:22:01 marcs Exp $
+%
+% This file should become part of vgetty.info someday ...
+% Otherwise SUSE/Red-Hat binary users wouldn't have any vgetty manual
+%
+voice-device-setting
+
+This settings selects the device which should be used inside the modem
+for voice-IO (phone-line, speaker, microphone,... )
+
+This setting is done for vm with the commandline option -d,
+and inside vgetty with the function 
+int voice_set_device(int device)
+
+The following devices are defined for vm/vgetty:
+
+NO_DEVICE/1:		The modem goes on-hook.
+			IS101/V253: "AT+VLS=0"
+			Rockwell: Not available, but mapped for many modem to
+			DIALUP_LINE
+
+DIALUP_LINE/2:		The modem selects the phone-line as IO-path
+			IS101/V253: "AT+VLS=1" the modem goes off-hook!
+			Rockwell: "AT'VLS=0" the modem needs an additionally
+			"ATA" for going off-hook!
+
+EXTERNAL_MICROPHONE/3:	The modem selects the external microphone for input.
+			IS101/V253: "AT+VLS=11"
+
+INTERNAL_MICROPHONE/4:	The modem selects the internal microphone for input.
+			IS101/V253: "AT+VLS=6"
+			Rockwell: "AT#VLS=3"
+
+EXTERNAL_SPEAKER/5:	The external modem speaker is selected for output.
+			IS101/V253modem: "AT+VLS=8"
+
+INTERNAL_SPEAKER/6:	The internal modem speaker is selected for output.
+			For many modems the speaker is only avaiable in
+			connection with the phone-line.
+			IS101/V253: "AT+VLS=4"
+			Rockwell: "AT#VLS=2"
+
+
+LOCAL_HANDSET/7:	The modem selects the local phone as IO-path
+			IS101/V253: "AT+VLS=2"
+			Rockwell: "AT'VLS=1"
+
+DIALUP_WITH_EXT_SPEAKER/8:
+			IS101/V253: "AT+VLS=9"
+
+DIALUP_WITH_INT_SPEAKER/9:
+			The modem selects the speaker and the phone-line
+			for IO.
+			IS101/V253: "AT+VLS=5"
+			Rockwell: "AT#VLS=4
+
+
+DIALUP_WITH_LOCAL_HANDSET/10:
+			The modem can listen to connections between the
+			local phone and a far station.
+			%Hochohmigmithoeren
+			When the modem detects a data/faxcalling-tone
+			vgetty/vm can switch (someday) to data/fax ->
+			mgetty sends ATA to the modem -> the modem goes
+			off-hook which disconnects the local-phone from
+			the phone-line, and a connection could be established
+			between the local modem and the far station.
+			IS101/V253: "AT+VLS=3"
+			Rockwell: (ugly) "AT#VLS=5" then "AT#VLS=8"
+			Notes:
+			1. Playing voice wouldn't work in this state.
+			2. Some modems may return "ERROR" if the local-phone
+			is on-hook. (No problem since the ERROR is catched
+			by vgetty).
+			3. Implementation of the above could also requiere
+			changes to the <DLE><H>/<h> handling!
+
+DIALUP_WITH_EXTERNAL_MIC_AND_SPEAKER/11:
+			IS101/V253: "AT+VLS=13"
+
+DIALUP_WITH_INTERNAL_MIC_AND_SPEAKER/12:
+			Phone-line, internal microphne and internal speaker
+			for IO.
+			IS101/V253: "AT+VLS=7"
+			Rockwell: "AT#VLS=5"
+
+

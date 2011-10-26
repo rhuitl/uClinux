@@ -1,0 +1,16 @@
+#!/bin/sh -xv
+
+#  This shows how we can use the input file descriptors
+#  To compress and encrypt inputs....
+
+#  Note that your PATH should be set correctly for this...
+
+TEMP_P=./pipe
+
+rm -f $TEMP_P
+mknod $TEMP_P p
+zcat <tw.config.Z > $TEMP_P &
+
+crypt < tw.db_myhost | tripwire -v -d - -cfd 5  5<$TEMP_P
+
+rm $TEMP_P

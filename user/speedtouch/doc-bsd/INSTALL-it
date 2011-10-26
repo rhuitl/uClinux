@@ -1,0 +1,124 @@
+$Id: INSTALL-it,v 1.3 2002/12/31 13:00:12 rogler Exp $
+Francois ROGLER, francois@rogler.org, 29/05/2001
+Luca Risolia, luca_ing@libero.it 2002/03/22 (Italian translation)
+
+
+                     Driver Speedtoch USB per sistemi *BSD
+                             File di installazione
+
+--------------------------------------------------------------------------------
+
+1. Scaricare il driver 
+2. Requisiti di sistema
+3. Compilazione ed Installazione
+4. Configurazione
+5. Connessione
+
+--------------------------------------------------------------------------------
+
+
+1. Scaricare il driver.
+
+Questi sono i file necessari:
+
+* speedtouch-1.1.tar.gz
+    scaricabile dal sito:
+    	 http://prdownloads.sourceforge.net/speedtouch/speedtouch-1.1.tar.gz
+    oppure dal sito:
+         http://www.xsproject.org/speedtouch/files/speedtouch-1.1.tar.gz
+* speedmgmt.tar.gz 
+    scaricabile dal sito dell'Thomson:
+	 http://www.speedtouchdsl.com/dvrdownload_lx.htm
+
+Utilizzo di CVS: 
+Si può ottenere il sorgente anche dal CVS (c'e' bisogno di una connessione)
+che si trova sul sito sourceforge.net. Scrivere la seguente linea: 
+cvs -z3 -r -d:pserver:anonymous@cvs.speedtch.sourceforge.net:/cvsroot/speedtch
+co speedtouch
+Ciò creerà una directory speedtouch con il sorgente all'interno. In futuro il 
+sorgente può essere aggiornato scrivendo solamente 'cvs update`.
+
+
+2. Requisiti di sistema.
+
+Questa versione è stata testata su sistemi operativi FreeBSD, dalla versione
+4.2 alla 4.4, OpenBSD 2.9 e NetBSD 1.5.
+
+E' necessario dell'USB, e del supporto ugen e ppp nel tuo kernel.
+
+Per NetBSD, è necessaria la versione user-ppp che ho fatto e che dovrebbe 
+essere presto trovata sul sito: http://www.xsproject.org/speedtouch .
+Chiederò altresì al team di NetBSD di includerlo nel port di NetBSD.
+
+
+3. Compilazione e Installazione.
+
+Questo driver è software GPL, meglio distribuito in formato sorgente. Ciò 
+significa che devi compilarlo prima di usarlo.
+
+* Estrarre il file dell'Alcatel:
+
+tar -zxvf speedmgmt.tar.gz 
+
+Copiare poi il file  'mgmt.o' in /usr/local/libdata
+(si può anche usare il file 'alcaudsl.sys' dalla versione per windows)
+
+* Estrarre, compilare ed installare il driver:
+
+tar -zxvf speedtouch-1.1.tar.gz
+cd speedtouch-1.1
+./configure
+make
+make install (è necessario essere root)
+
+Copiare il file (salvando il vecchio ppp.conf prima) :
+cp /usr/local/share/doc/ppp.conf.sample /etc/ppp/ppp.conf
+chmod 600 /etc/ppp/ppp.conf
+
+
+4. Configurazione.
+
+Editare il file /etc/ppp/ppp.conf e modificarlo: 
+    * <login>
+    * <password>
+    * <VPI> and <VCI>: vedere i seguenti valori.
+
+Coppie vpi.vci conosciute:
+     * 8.35 per la Francia (o 8.67 per una installazione prima del gennaio 2001)
+     * 0.38 per l' UK 
+     * 8.48 per Netherlands
+     * 8.35 per gli USA
+     * 8.35 per l'Italia
+     * 8.35 per il Kuwait
+     * 0.35 per il Portugal
+     (verificare i valori richiesti da Windows)
+
+
+5. Connessione.
+
+Si può usare lo script adsl.sh.sample fornito.
+Di solito si trova nella directory /usr/local/etc/rc.d .
+Per lanciare la connessione al boot del sistema, si deve rinominarlo 'adsl.sh'.
+
+Per lanciare la connessione manualmente, questi sono i due passi da seguire:
+
+* Inizializzazione:
+
+Inizializzare il modem (c'e' bisogno di farlo ogni volta che si attacca il modem
+o quando si fa ripartite il computer): 
+    modem_run -f /usr/local/libdata/mgmt.o -m
+
+
+* Lanciare la connessione PPP:
+    ppp -background adsl
+(vedere `man ppp` per altre opzioni, come auto, natd, ddial)
+ 
+
+A questo putno si dovrebbe essere connessi. 
+Per chiudere la connessione, bisogna scrivere:
+killall ppp (per FreeBSD)
+
+
+Se qualcosa fosse andato storto, si prega di segnalarcelo (ma consulta le FAQ prima).
+Si prega inoltre di usare IRC o la mailing list per segnalarci il problema.
+

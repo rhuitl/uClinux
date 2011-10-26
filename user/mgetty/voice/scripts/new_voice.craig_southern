@@ -1,0 +1,61 @@
+#!/bin/bash
+
+#
+#  new_fax script for use with mgetty+sendfax/voice
+#  Copyright (C) Equivalence Pty Ltd 1999
+#  Original at: http://www.southeren.com/craig/vgetty/
+#  $Id: new_voice.craig_southern,v 1.1 1999/10/09 15:56:06 marcs Exp $
+#
+#  Permission is given to freely copy, redistribute or change this
+#  program, provided this notice is retained intact.
+#
+#  The information and code herein is provided "as is"
+#  without warranty of any kind, either expressed or implied.
+#  In no event shall EQUIVALENCE be liable for any damages
+#  whatsoever including direct, indirect, incidental,
+#  consequential, loss of business profits or special damages,
+#  even if EQUIVALENCE has been advised of the possibility of such damages.
+#
+
+extension="wav"
+contenttype="audio/x-wav"
+
+fn=$1
+#tempfn=${fn}.tmp
+tempfn=/tmp/voice.temp
+
+email=voiceadmin
+
+seperator="========== $$fn =========="
+
+echo Date: `date` > $tempfn
+echo To: $email >> $tempfn
+echo From: ${email}@`hostname` >> $tempfn
+echo Subject: Voice mail received by `hostname -s` >> $tempfn
+echo Mime-Version: 1.0 >> $tempfn
+echo Content-Type: multipart/mixed\; boundary=\"$seperator\" >> $tempfn
+echo "">> $tempfn
+
+# name of attachment
+pagefn=voice.$$.$extension
+
+# name of temporary file
+outputfn=$fn.$extension
+
+# convert file into correct format
+/usr/local/bin/rmdtopvf $fn | /usr/local/bin/pvftowav 2>/dev/null > $outputfn
+
+echo --$seperator >> $tempfn
+echo Content-Type: $contenttype\; name=\"$pagefn\" >> $tempfn
+echo Content-Transfer-Encoding: base64 >> $tempfn
+echo Content-Disposition: attachment\; filename=\"$pagefn\" >> $tempfn
+echo "">> $tempfn
+/usr/bin/mimencode $outputfn >> $tempfn
+
+#rm -f $fn
+rm -f $outputfn
+
+echo --$seperator >> $tempfn
+
+/usr/sbin/sendmail < $tempfn $email 
+rm -f $tempfn 

@@ -1,0 +1,130 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 0.9.21">
+ <TITLE>Frox FAQ: Caching</TITLE>
+ <LINK HREF="FAQ-5.html" REL=next>
+ <LINK HREF="FAQ-3.html" REL=previous>
+ <LINK HREF="FAQ.html#toc4" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="FAQ-5.html">Next</A>
+<A HREF="FAQ-3.html">Previous</A>
+<A HREF="FAQ.html#toc4">Contents</A>
+<HR>
+<H2><A NAME="s4">4.</A> <A HREF="FAQ.html#toc4">Caching</A></H2>
+
+<H2><A NAME="ss4.1">4.1</A> <A HREF="FAQ.html#toc4.1">HTTP caching vs local caching</A>
+</H2>
+
+<P>With HTTP caching frox rewrites ftp retrieve requests in
+HTTP and sends them to a proxy server like squid which
+actually retrieves the file and does the caching. With local
+caching frox maintains its own cache of recently downloaded
+files on the hard disk.</P>
+<P>The main advantage of the HTTP method is that the cache can
+be shared with any web browsers which use the same proxy
+directly for their ftp requests. Local caching is much faster
+(especially for small files) and lighter on network
+resources.</P>
+<P>Caching needs to be compiled in by running
+<CODE>./configure</CODE> with <CODE>--enable-http-cache</CODE> or
+<CODE>--enable-local-cache</CODE>. You can have both compiled in if
+you want - the cache method actually used (if any) is chosen
+in the config file.</P>
+<P>For HTTP caching your config file needs to say:
+<BLOCKQUOTE><CODE>
+<PRE>
+        CacheModule HTTP
+        HTTPProxy 192.168.2.1:3128 # proxy address
+        # and optionally...
+        MinCacheSize 64000 # in bytes
+        
+</PRE>
+</CODE></BLOCKQUOTE>
+</P>
+<P>Files smaller than MinCacheSize will not be cached. Latency
+on small files can be really bad with this method since the
+HTTP proxy has to make a separate connection to the ftp server
+- setting MinCacheSize fairly high will help with this.</P>
+<P>For Local caching your config file should say:
+<BLOCKQUOTE><CODE>
+<PRE>
+        CacheModule Local
+        # and optionally...
+        CacheSize 100 # in MB
+        
+</PRE>
+</CODE></BLOCKQUOTE>
+</P>
+<P>The cached copies will be created within frox's working directory
+as specified in the config file. If CacheSize is unspecified the
+cache will grow indefinitely.</P>
+<P>Finally you can turn off caching with the line <CODE>CacheModule
+None</CODE>. This is necessary if you wish a config file subsection to
+not do caching when the parent section has it turned on.</P>
+<H2><A NAME="ss4.2">4.2</A> <A HREF="FAQ.html#toc4.2">StrictCaching</A>
+</H2>
+
+<P>With strict caching off frox works out the URI for the file
+it is retrieving by sending a PWD to ask the server what
+the current working directory is. On a small minority of
+servers this may be broken, and a server may return the same
+answer to PWD for more than one directory. If additionally two
+such directories contain files with the same names, sizes, and
+times of modification then frox could cache the wrong file by
+mistake.</P>
+<P>StrictCaching tries to get around this by keeping track of
+all directory changes and making up its own path instead of
+asking the server for it. This has the disadvantage that ``cd
+pub; get readme'' will not cache to the same file as ``get
+pub/readme'' or ``get /pub/readme'' or ``cd /pub; get
+readme''. As a result your cache hit rate will probably drop
+considerably, but you will have the extra security. Note that
+you can set this on a per server basis if there is a
+particular server about which you are worried.</P>
+<P>Thanks to Henrik Nordstrom for pointing this problem out
+and suggesting a solution.</P>
+<H2><A NAME="ss4.3">4.3</A> <A HREF="FAQ.html#toc4.3">CacheOnFQDN</A>
+</H2>
+
+<P>This option involves using FQDNs instead of IP addresses
+for the cache requests (either to squid or the local cache),
+and allowing squid to guess whether to
+use binary or ascii file transfer rather than using the value
+supplied by the ftp client. For transparently proxied
+connections this requires a reverse DNS lookup to get the
+FQDN, and may cause problems with un-synced mirrored ftp hosts
+all running off the same FQDN, although most of the time there
+will be no problems. The advantage is that you should increase
+the hit rate, in particular with squid based caching for files
+which have been previously downloaded through squid with a web
+browser.</P>
+<P>If all your clients are being non transparently proxied
+then this option should cause no problems. Otherwise use with some care,
+although it may be worth the extra hit rate.</P>
+<H2><A NAME="ss4.4">4.4</A> <A HREF="FAQ.html#toc4.4">I get an ``Unable to initialise cache'' error.</A>
+</H2>
+
+<P>Check that frox was compiled with support for the cache
+module you are attempting to use, and that you have given the
+correct Cache options for that module. If doing http caching check
+that the http proxy name resolves.</P>
+<H2><A NAME="ss4.5">4.5</A> <A HREF="FAQ.html#toc4.5">I retrieved a file I had retrieved before and it doesn't seem to have been cached?</A>
+</H2>
+
+<P>Files are not cached if the ftp server doesn't support the
+MDTM and SIZE extensions. Non-Anonymous ftp sessions are only
+cached if you have set the <CODE>CacheAll</CODE> config file
+option. Additionally if the host's DNS name resolves to more
+than one IP address then the file will be cached, but frox has
+no way of knowing that the different IP addresses refer to the
+same host - unless your ftp client happens to pick the same IP
+both times you will not get the cached file back. Using
+CacheOnFQDN may impove this behaviour.</P>
+<HR>
+<A HREF="FAQ-5.html">Next</A>
+<A HREF="FAQ-3.html">Previous</A>
+<A HREF="FAQ.html#toc4">Contents</A>
+</BODY>
+</HTML>

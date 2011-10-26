@@ -1,0 +1,200 @@
+This is the README for pam_smb v1.1.7
+--------------------------------------------------
+
+pam_smb is a PAM module which allows authentication of UNIX users using an NT
+server.
+
+***********************************
+What's New in this version -- 1.1.7
+***********************************
+
+This is a newer issue than the 1.1.6 one. There is another potential
+security hole.
+
+REMOTE ROOT EXPLOIT FIX: PLEASE UPGRADE ASAP.
+
+SECURITY UPGRADE: stops guest logins problems with Windows NT
+thanks to mirko.dziadzka@systor.com for tracking this down.
+
+This version contains a bug-fix that stops pam_smb from authenticating 
+against servers in share mode i.e. Win 95 or samba in share mode.
+If you had a share mode server by mistake in your pam_smb.conf
+anyone could log in to any a/c on your machine with no password !!!
+
+**************
+Features
+**************
+	o GNU configure support
+	o Linux Redhat PAM support
+	o GLIBC 2 support ( RH 5.0 )
+	o Solaris 2.6 support
+	o NT Domain support
+	o Encrypted LANMAN password support.
+	o Ability to use backup server in case of failure of primary.
+	
+****************
+Getting pam_smb:
+****************
+
+ftp://ftp.samba.org/pub/samba/pam_smb/
+or Samba Mirror.
+
+**********
+Installing
+**********
+1)Untar the distribution and cd into the pam_smb directory.
+
+2) Run configure
+./configure
+If you want to disable encrypted passwords you can run 
+./configure --disable-encrypt-pass
+
+3) run make (must be GNU make)
+make 
+or maybe on Solaris
+gmake
+
+4) This will produce pam_smb_auth.so. 
+   Copy this file into the pam modules directory which for Redhat-4.2 is
+   /lib/security and for Solaris 2.6 is /usr/lib/security.
+
+5) Configure pam_smb.conf file with the domain and two servers for authentication purposes.
+
+6) Install the module into the PAM system:
+For Linux:
+	You then need to change the configuration files in /etc/pam.d for the applications you wish to use NT authentication with.
+
+My /etc/pam.d/login is as follows for NT authenticated logins.
+Note the pam_smb_auth.so line.
+
+#%PAM-1.0
+auth       required	/lib/security/pam_securetty.so
+auth	   required	/lib/security/pam_smb_auth.so
+auth       required	/lib/security/pam_nologin.so
+account    required	/lib/security/pam_pwdb.so
+password   required	/lib/security/pam_cracklib.so
+password   required	/lib/security/pam_pwdb.so shadow nullok use_authtok
+session    required	/lib/security/pam_pwdb.so
+
+For Solaris:
+	You need to change the /etc/pam.conf other line to
+
+other   auth required   /usr/lib/security/pam_smb_auth.so.1
+
+
+*********************
+Further Configuration
+*********************
+
+The pam_smb modules has two configuration steps,
+	a) Command line options
+	b) Configuration file.
+
+A) Command line options
+	Most installations can skip this step as the module will 
+	work grand without any command line arguments.
+	These arguments go in the /etc/pam.d or /etc/pam.conf 
+	file on the auth line containing the pam_smb_auth.so module.
+
+	The pam_smb module accepts 3 command line options.
+	1. debug - This switches on syslog debugging of the module.
+	2. use_first_pass - This is a standard PAM Module command line option.
+	*********** N.B. Danger lurks here somewhere *****************
+	3. nolocal - This allows authentication of a username/password
+			pair which are not in the local password file.
+		 Do not switch this on unless you know what you are at.
+	**************************************************************
+
+B) Configuration File
+
+The configuration file is stored in /etc/pam_smb.conf and it consists of three
+ lines the first containing the NT DOMAIN to be logged on at and the second 
+and third are the primary and secondary servers to use. Note these do not have 
+to be NT server machines simply machines which can authenticate in the domain.
+
+e.g.
+Here is my local copy: where I have server INTEL41 and INTEL42 and the domain is the UNDERGRADUATE domain :
+UNDERGRADUATE
+INTEL41
+INTEL42
+----- end ------
+
+*******************
+General Information.
+*******************
+
+The module is a hacked together version of smblib-0.50, smb-NT-verify, the pam_unix_auth module, and changes made by myself to allow Domain logons and 
+other stuff.
+
+Notes:
+	The user must be in the password file to allow the user to login.
+	If the user hasn't a starred password the password in the file
+	will work,
+	If the user has a starred password it will go to the NT server
+	and validate the user in the domain specified in the conf file
+
+Thanks and a lot of the credit for this go to :
+
+Andrew Morgan <morgan@parc.power.net> -- the Linux PAM project person, and 
+writer of the pam_unix_auth.c module.
+
+Richard Sharpe <sharpe@nmesis.enet.dec.com> -- the author of smblib which I
+have used a lot of directly.
+
+Christopher Burke <c.burke@mindware.com.au> -- the author of smb-NT-valid
+from which I took the validation routine.
+
+The encryption routine is taken straight from samba and is copyright
+Andrew Tridgell (author of samba).
+
+All work is my own fault so don't bother any of the above about any bugs
+you find in it because I probably introduced them anyways ... 
+
+BUGS: 
+This bug is now a bug in login.c a patch to login.c from util-linux
+is available on the primary site for pam_smb.
+When runnning on a system designed for 2.1.x kernels telnetting to the machine from a box in the hosts file causes login to get SIGSEGV outside my code not sure why ..
+
+*********************************
+Old What's new 0.7, 0.8, 0.9, 1.0
+*********************************
+
+1.0--
+Autoconf support added.
+
+0.9--
+PAM_SMB now has syslog debugging support and supports some PAM command
+line options, fixed RH5.0 imap/pop support.
+
+There is also a command line option to disable local password file checking.
+This means no local passwd file or shadow checking is done. This means
+a username not in the password file can be checked, this feature is for
+people who supply UID's and other information from another module
+i.e. Radius or something similar. I advise leaving if off as it stops root
+from logging in if switched off.              
+
+0.8--
+Pam_smb now has Solaris 2.6 PAM support. It can be compiled using either the 
+SunPro cc compiler or gcc-2.7.2.3 for Solaris 2.6. 
+
+pam_smb now has support for encrypted passwords turned on. It will now use
+encrypted LANMAN/NT passwords ala the encrypt password option on samba. This 
+allows a SAMBA server using encrypted passwords to authenticate users now, so
+you can now authenticate from the smbpasswd file by setting up samba with 
+encrypted passwords switched on, and pointing the pam_smb.conf at the
+localhost server. 
+
+0.7--
+Encryption can be disabled by editing the Makefile.
+
+
+******************
+Contating Me
+******************
+This software is released under the GPL as found in the COPYING file
+enclosed.
+
+Any Questions etc to airlied@samba.org
+	
+Dave Airlie 15/08/2003
+http://www.csn.ul.ie/~airlied

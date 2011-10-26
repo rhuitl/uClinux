@@ -1,0 +1,1330 @@
+Date: 2006/11/11 02:55:24
+#11908
+
+Make a lot of the functions we won't immediately use optional and don't
+compile them into the binary.  This includes the inbuilt DHCP server
+and TFPT server.
+
+Index: dnsmasq2/src/cache.c
+===================================================================
+--- dnsmasq2.orig/src/cache.c	2009-03-13 15:11:38.000000000 +1000
++++ dnsmasq2/src/cache.c	2009-03-13 15:11:38.000000000 +1000
+@@ -17,7 +17,11 @@
+ #include "dnsmasq.h"
+ 
+ static struct crec *cache_head = NULL, *cache_tail = NULL, **hash_table = NULL;
++#if defined(DO_DHCP) || defined(HAVE_ISC_READER)
+ static struct crec *dhcp_spare = NULL, *new_chain = NULL;
++#else
++static struct crec *new_chain = NULL;
++#endif
+ static int cache_inserted = 0, cache_live_freed = 0, insert_error;
+ #ifdef USE_BIGNAMES
+ static union bigname *big_free = NULL;
+@@ -238,8 +242,10 @@ char *cache_get_name(struct crec *crecp)
+ #else
+     return crecp->name.dyn_namep;
+ #endif
++#if defined(DO_DHCP) || defined(HAVE_ISC_READER)
+   else if (crecp->flags & F_DHCP) 
+     return crecp->name.namep;
++#endif
+   
+   return crecp->name.sname;
+ }
+@@ -872,6 +878,7 @@ void cache_reload(int opts, char *buff, 
+     }  
+ } 
+ 
++#if defined(DO_DHCP) || defined(HAVE_ISC_READER)
+ void cache_unhash_dhcp(void)
+ {
+   struct crec *cache, **up;
+@@ -955,6 +962,7 @@ void cache_add_dhcp_entry(char *host_nam
+       cache_hash(crec);
+     }
+ }
++#endif
+ 
+ void dump_cache(time_t now)
+ {
+Index: dnsmasq2/src/dhcp.c
+===================================================================
+--- dnsmasq2.orig/src/dhcp.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/dhcp.c	2009-03-13 15:11:38.000000000 +1000
+@@ -16,6 +16,8 @@
+ 
+ #include "dnsmasq.h"
+ 
++#ifdef DO_DHCP
++
+ struct iface_param {
+   struct in_addr relay, primary;
+   struct dhcp_context *current;
+@@ -950,3 +952,5 @@ char *strip_hostname(char *hostname)
+   
+   return NULL;
+ }
++
++#endif
+Index: dnsmasq2/src/dnsmasq.c
+===================================================================
+--- dnsmasq2.orig/src/dnsmasq.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/dnsmasq.c	2009-03-13 15:11:56.000000000 +1000
+@@ -40,6 +40,15 @@ static char *compile_opts = 
+ "no-"
+ #endif
+ "ISC-leasefile "
++#ifndef DO_DHCP
++"no-DHCP "
++#endif
++#ifndef DO_DOCTOR
++"no-DOCTOR "
++#endif
++#ifndef DO_NOWILD
++"no-NOWILD "
++#endif
+ #ifndef HAVE_DBUS
+ "no-"
+ #endif
+@@ -65,14 +74,18 @@ static void poll_resolv(void);
+ 
+ int main (int argc, char **argv)
+ {
++#ifndef HAVE_LINUX_NETWORK
+   int bind_fallback = 0;
++#endif
+   time_t now, last = 0;
+   struct sigaction sigact;
+   struct iname *if_tmp;
+   int piperead, pipefd[2], err_pipe[2];
+   struct passwd *ent_pw = NULL;
++#ifdef DO_DHCP
+   uid_t script_uid = 0;
+   gid_t script_gid = 0;
++#endif
+   struct group *gp= NULL;
+   long i, max_fd = sysconf(_SC_OPEN_MAX);
+   char *baduser = NULL;
+@@ -112,6 +125,7 @@ int main (int argc, char **argv)
+     daemon->edns_pktsz : DNSMASQ_PACKETSZ;
+   daemon->packet = safe_malloc(daemon->packet_buff_sz);
+ 
++#if defined(DO_DHCP)
+   if (!daemon->lease_file)
+     {
+       if (daemon->dhcp)
+@@ -121,6 +135,7 @@ int main (int argc, char **argv)
+   else if (!daemon->dhcp)
+     die(_("ISC dhcpd integration not available: set HAVE_ISC_READER in src/config.h"), NULL, EC_BADCONF);
+ #endif
++#endif
+   
+   /* Close any file descriptors we inherited apart from std{in|out|err} */
+   for (i = 0; i < max_fd; i++)
+@@ -132,6 +147,9 @@ int main (int argc, char **argv)
+ #elif !(defined(IP_RECVDSTADDR) && \
+ 	defined(IP_RECVIF) && \
+ 	defined(IP_SENDSRCADDR))
++#ifndef DO_NOWILD
++#warning Build without DO_NOWILD is probably non-functional on this OS
++#endif
+   if (!(daemon->options & OPT_NOWILD))
+     {
+       bind_fallback = 1;
+@@ -153,6 +171,7 @@ int main (int argc, char **argv)
+   
+   now = dnsmasq_time();
+   
++#ifdef DO_DHCP
+   if (daemon->dhcp)
+     {
+ #if !defined(HAVE_LINUX_NETWORK) && !defined(IP_RECVIF)
+@@ -170,10 +189,12 @@ int main (int argc, char **argv)
+       lease_init(now);
+       dhcp_init();
+     }
++#endif
+ 
+   if (!enumerate_interfaces())
+     die(_("failed to find list of interfaces: %s"), NULL, EC_MISC);
+     
++#ifdef DO_NOWILD
+   if (daemon->options & OPT_NOWILD) 
+     {
+       daemon->listeners = create_bound_listeners();
+@@ -189,6 +210,9 @@ int main (int argc, char **argv)
+ 	    die(_("no interface with address %s"), daemon->namebuff, EC_BADNET);
+ 	  }
+     }
++#else
++  if (0) { }
++#endif
+   else if ((daemon->port != 0 || (daemon->options & OPT_TFTP)) &&
+ 	   !(daemon->listeners = create_wildcard_listeners()))
+     die(_("failed to create listening socket: %s"), NULL, EC_BADNET);
+@@ -212,6 +236,7 @@ int main (int argc, char **argv)
+   if (daemon->port != 0)
+     pre_allocate_sfds();
+ 
++#ifdef DO_DHCP
+   /* Note getpwnam returns static storage */
+   if (daemon->dhcp && daemon->lease_change_command && daemon->scriptuser)
+     {
+@@ -223,6 +248,7 @@ int main (int argc, char **argv)
+       else
+ 	baduser = daemon->scriptuser;
+     }
++#endif
+   
+   if (daemon->username && !(ent_pw = getpwnam(daemon->username)))
+     baduser = daemon->username;
+@@ -355,12 +381,14 @@ int main (int argc, char **argv)
+   
+    log_err = log_start(ent_pw, err_pipe[1]); 
+    
++#ifdef DO_DHCP
+    /* if we are to run scripts, we need to fork a helper before dropping root. */
+   daemon->helperfd = -1;
+ #ifndef NO_FORK
+   if (daemon->dhcp && daemon->lease_change_command)
+     daemon->helperfd = create_helper(pipewrite, err_pipe[1], script_uid, script_gid, max_fd);
+ #endif
++#endif
+ 
+   if (!(daemon->options & OPT_DEBUG) && getuid() == 0)   
+     {
+@@ -470,8 +498,10 @@ int main (int argc, char **argv)
+     my_syslog(LOG_WARNING, _("warning: failed to change owner of %s: %s"), 
+ 	      daemon->log_file, strerror(log_err));
+ 
++#ifndef HAVE_LINUX_NETWORK
+   if (bind_fallback)
+     my_syslog(LOG_WARNING, _("setting --bind-interfaces option because of OS limitations"));
++#endif
+   
+   if (!(daemon->options & OPT_NOWILD)) 
+     for (if_tmp = daemon->if_names; if_tmp; if_tmp = if_tmp->next)
+@@ -490,6 +520,7 @@ int main (int argc, char **argv)
+   if (daemon->max_logs != 0)
+     my_syslog(LOG_INFO, _("asynchronous logging enabled, queue limit is %d messages"), daemon->max_logs);
+ 
++#ifdef DO_DHCP
+   if (daemon->dhcp)
+     {
+       struct dhcp_context *dhcp_tmp;
+@@ -505,6 +536,7 @@ int main (int argc, char **argv)
+ 		    daemon->dhcp_buff, inet_ntoa(dhcp_tmp->end), daemon->dhcp_buff2);
+ 	}
+     }
++#endif
+ 
+ #ifdef HAVE_TFTP
+   if (daemon->options & OPT_TFTP)
+@@ -578,8 +610,14 @@ int main (int argc, char **argv)
+ 	}
+ 
+       /* Whilst polling for the dbus, or doing a tftp transfer, wake every quarter second */
+-      if (daemon->tftp_trans ||
+-	  ((daemon->options & OPT_DBUS) && !daemon->dbus))
++      if (0
++#ifdef HAVE_TFTP
++	  || daemon->tftp_trans
++#endif
++#ifdef HAVE_DBUS
++	  || ((daemon->options & OPT_DBUS) && !daemon->dbus)
++#endif
++	  )
+ 	{
+ 	  t.tv_sec = 0;
+ 	  t.tv_usec = 250000;
+@@ -590,11 +628,13 @@ int main (int argc, char **argv)
+       set_dbus_listeners(&maxfd, &rset, &wset, &eset);
+ #endif	
+   
++#ifdef DO_DHCP
+       if (daemon->dhcp)
+ 	{
+ 	  FD_SET(daemon->dhcpfd, &rset);
+ 	  bump_maxfd(daemon->dhcpfd, &maxfd);
+ 	}
++#endif
+ 
+ #ifdef HAVE_LINUX_NETWORK
+       FD_SET(daemon->netlinkfd, &rset);
+@@ -604,6 +644,7 @@ int main (int argc, char **argv)
+       FD_SET(piperead, &rset);
+       bump_maxfd(piperead, &maxfd);
+ 
++#ifdef DO_DHCP
+ #ifndef NO_FORK
+       while (helper_buf_empty() && do_script_run(now));
+ 
+@@ -616,6 +657,7 @@ int main (int argc, char **argv)
+       /* need this for other side-effects */
+       while (do_script_run(now));
+ #endif
++#endif
+       
+       /* must do this just before select(), when we know no
+ 	 more calls to my_syslog() can occur */
+@@ -638,7 +680,11 @@ int main (int argc, char **argv)
+ 	  last = now;
+ 
+ #ifdef HAVE_ISC_READER
+-	  if (daemon->lease_file && !daemon->dhcp)
++	  if (daemon->lease_file
++#ifdef DO_DHCP
++	      && !daemon->dhcp
++#endif
++	      )
+ 	    load_dhcp(now);
+ #endif
+ 
+@@ -673,6 +719,7 @@ int main (int argc, char **argv)
+       check_tftp_listeners(&rset, now);
+ #endif      
+ 
++#ifdef DO_DHCP
+       if (daemon->dhcp && FD_ISSET(daemon->dhcpfd, &rset))
+ 	dhcp_packet(now);
+ 
+@@ -680,6 +727,7 @@ int main (int argc, char **argv)
+       if (daemon->helperfd != -1 && FD_ISSET(daemon->helperfd, &wset))
+ 	helper_write();
+ #endif
++#endif
+ 
+     }
+ }
+@@ -756,10 +804,12 @@ static void fatal_event(struct event_des
+       die(_("setting capabilities failed: %s"), NULL, EC_MISC);
+ 
+     case EVENT_USER_ERR:
++      die(_("failed to change user-id to %s: %s"), daemon->username, EC_MISC);
++
++#ifdef DO_DHCP
+     case EVENT_HUSER_ERR:
+-      die(_("failed to change user-id to %s: %s"), 
+-	  ev->event == EVENT_USER_ERR ? daemon->username : daemon->scriptuser,
+-	  EC_MISC);
++      die(_("failed to change user-id to %s: %s"), daemon->scriptuser, EC_MISC);
++#endif
+ 
+     case EVENT_GROUP_ERR:
+       die(_("failed to change group-id to %s: %s"), daemon->groupname, EC_MISC);
+@@ -788,7 +838,9 @@ static void async_event(int pipe, time_t
+ 	    reload_servers(daemon->resolv_files->name);
+ 	    check_servers();
+ 	  }
++#ifdef DO_DHCP
+ 	rerun_scripts();
++#endif
+ 	break;
+ 	
+       case EVENT_DUMP:
+@@ -797,11 +849,13 @@ static void async_event(int pipe, time_t
+ 	break;
+ 	
+       case EVENT_ALARM:
++#ifdef DO_DHCP
+ 	if (daemon->dhcp)
+ 	  {
+ 	    lease_prune(NULL, now);
+ 	    lease_update_file(now);
+ 	  }
++#endif
+ 	break;
+ 		
+       case EVENT_CHILD:
+@@ -827,8 +881,10 @@ static void async_event(int pipe, time_t
+ 	break;
+ 
+       case EVENT_EXEC_ERR:
++#ifdef DO_DHCP
+ 	my_syslog(LOG_ERR, _("failed to execute %s: %s"), 
+ 		  daemon->lease_change_command, strerror(ev.data));
++#endif
+ 	break;
+ 
+ 	/* necessary for fatal errors in helper */
+@@ -851,6 +907,7 @@ static void async_event(int pipe, time_t
+ 	  if (daemon->tcp_pids[i] != 0)
+ 	    kill(daemon->tcp_pids[i], SIGALRM);
+ 	
++#ifdef DO_DHCP
+ #ifndef NO_FORK
+ 	/* handle pending lease transitions */
+ 	if (daemon->helperfd != -1)
+@@ -864,9 +921,12 @@ static void async_event(int pipe, time_t
+ 	    close(daemon->helperfd);
+ 	  }
+ #endif
++#endif
+ 	
++#ifdef DO_DHCP
+ 	if (daemon->lease_stream)
+ 	  fclose(daemon->lease_stream);
++#endif
+ 	
+ 	my_syslog(LOG_INFO, _("exiting on receipt of SIGTERM"));
+ 	flush_log();
+@@ -931,6 +991,7 @@ void clear_cache_and_reload(time_t now)
+   if (daemon->port != 0)
+     cache_reload(daemon->options, daemon->namebuff, daemon->domain_suffix, daemon->addn_hosts);
+   
++#ifdef DO_DHCP
+   if (daemon->dhcp)
+     {
+       if (daemon->options & OPT_ETHERS)
+@@ -942,6 +1003,9 @@ void clear_cache_and_reload(time_t now)
+       lease_update_file(now); 
+       lease_update_dns();
+     }
++#else
++  (void)now;
++#endif
+ }
+ 
+ static int set_dns_listeners(time_t now, fd_set *set, int *maxfdp)
+@@ -1144,6 +1208,7 @@ static void check_dns_listeners(fd_set *
+ }
+ 
+ 
++#ifdef DO_DHCP
+ int make_icmp_sock(void)
+ {
+   int fd;
+@@ -1268,3 +1333,4 @@ int icmp_ping(struct in_addr addr)
+ }
+ 
+  
++#endif
+Index: dnsmasq2/src/dnsmasq.h
+===================================================================
+--- dnsmasq2.orig/src/dnsmasq.h	2009-03-13 15:11:38.000000000 +1000
++++ dnsmasq2/src/dnsmasq.h	2009-03-13 15:11:56.000000000 +1000
+@@ -165,7 +165,11 @@ struct event_desc {
+ #define OPT_LOCALMX        (1u<<10)
+ #define OPT_NO_NEG         (1u<<11)
+ #define OPT_NODOTS_LOCAL   (1u<<12)
++#ifdef DO_NOWILD
+ #define OPT_NOWILD         (1u<<13)
++#else
++#define OPT_NOWILD         (0)
++#endif
+ #define OPT_ETHERS         (1u<<14)
+ #define OPT_RESOLV_DOMAIN  (1u<<15)
+ #define OPT_NO_FORK        (1u<<16)
+@@ -174,7 +178,9 @@ struct event_desc {
+ #define OPT_DBUS           (1u<<19)
+ #define OPT_BOOTP_DYNAMIC  (1u<<20)
+ #define OPT_NO_PING        (1u<<21)
++#ifdef DO_DHCP
+ #define OPT_LEASE_RO       (1u<<22)
++#endif
+ #define OPT_ALL_SERVERS    (1u<<23)
+ #define OPT_RELOAD         (1u<<24)
+ #define OPT_TFTP           (1u<<25)
+@@ -199,11 +205,15 @@ struct bogus_addr {
+   struct bogus_addr *next;
+ };
+ 
++#ifdef DO_DOCTOR
+ /* dns doctor param */
+ struct doctor {
+   struct in_addr in, out, mask;
+   struct doctor *next;
+ };
++#else
++struct doctor;
++#endif
+ 
+ struct mx_srv_record {
+   char *name, *target;
+@@ -261,7 +271,9 @@ struct crec { 
+ #else
+     char *dyn_namep;
+ #endif
++#if defined(DO_DHCP) || defined(HAVE_ISC_READER)
+     char *namep;
++#endif
+   } name;
+ };
+ 
+@@ -577,13 +589,23 @@ extern struct daemon {
+   struct ptr_record *ptr;
+   struct interface_name *int_names;
+   char *mxtarget;
++#if defined(DO_DHCP) || defined(HAVE_ISC_READER)
+   char *lease_file; 
+-  char *username, *groupname, *scriptuser;
++#endif
++  char *username, *groupname;
++#ifdef DO_DHCP
++  char *scriptuser;
++#endif
+   int group_set, osport;
+   char *domain_suffix;
+   char *runfile; 
++#ifdef DO_DHCP
+   char *lease_change_command;
+-  struct iname *if_names, *if_addrs, *if_except, *dhcp_except;
++#endif
++  struct iname *if_names, *if_addrs, *if_except;
++#ifdef DO_DHCP
++  struct iname *dhcp_except;
++#endif
+   struct bogus_addr *bogus_addr;
+   struct server *servers;
+   int log_fac; /* log facility */
+@@ -593,6 +615,7 @@ extern struct daemon {
+   int port, query_port, min_port;
+   unsigned long local_ttl, neg_ttl;
+   struct hostsfile *addn_hosts;
++#ifdef DO_DHCP
+   struct dhcp_context *dhcp;
+   struct dhcp_config *dhcp_conf;
+   struct dhcp_opt *dhcp_opts;
+@@ -601,13 +624,23 @@ extern struct daemon {
+   struct dhcp_boot *boot_config;
+   struct dhcp_netid_list *dhcp_ignore, *dhcp_ignore_names, *force_broadcast;
+   char *dhcp_hosts_file, *dhcp_opts_file;
+-  int dhcp_max, tftp_max;
++  int dhcp_max;
+   int dhcp_server_port, dhcp_client_port;
++#endif
++#ifdef HAVE_TFTP
++  int tftp_max;
+   int start_tftp_port, end_tftp_port; 
++#endif
++#ifdef DO_DHCP
+   unsigned int min_leasetime;
++#endif
++#ifdef DO_DOCTOR
+   struct doctor *doctors;
++#endif
+   unsigned short edns_pktsz;
++#ifdef HAVE_TFTP
+   char *tftp_prefix; 
++#endif
+ 
+   /* globally used stuff for DNS */
+   char *packet; /* packet buffer */
+@@ -625,30 +658,38 @@ extern struct daemon {
+ pid_t tcp_pids[MAX_PROCS];
+   struct randfd randomsocks[RANDOM_SOCKS];
+ 
++#ifdef DO_DHCP 
+   /* DHCP state */
+   int dhcpfd, helperfd; 
++#endif
+ #ifdef HAVE_LINUX_NETWORK
+   int netlinkfd;
+ #else
++#ifdef DO_DHCP
+   int dhcp_raw_fd, dhcp_icmp_fd;
+ #endif
++#endif
++#ifdef DO_DHCP
+   struct iovec dhcp_packet;
+   char *dhcp_buff, *dhcp_buff2;
+   struct ping_result *ping_results;
+   FILE *lease_stream;
++#endif
+ #ifdef HAVE_BSD_BRIDGE
+   struct dhcp_bridge *bridges;
+ #endif
+ 
+   /* DBus stuff */
++#ifdef HAVE_DBUS
+   /* void * here to avoid depending on dbus headers outside dbus.c */
+   void *dbus;
+-#ifdef HAVE_DBUS
+   struct watch *watches;
+ #endif
+ 
+   /* TFTP stuff */
++#ifdef HAVE_TFTP
+   struct tftp_transfer *tftp_trans;
++#endif
+ 
+ } *daemon;
+ 
+@@ -753,6 +794,7 @@ int fix_fd(int fd);
+ struct in_addr get_ifaddr(char *intr);
+ 
+ /* dhcp.c */
++#ifdef DO_DHCP
+ void dhcp_init(void);
+ void dhcp_packet(time_t now);
+ 
+@@ -777,6 +819,7 @@ void check_dhcp_hosts(int fatal);
+ struct dhcp_config *config_find_by_address(struct dhcp_config *configs, struct in_addr addr);
+ char *strip_hostname(char *hostname);
+ char *host_from_dns(struct in_addr addr);
++#endif
+ 
+ /* lease.c */
+ void lease_update_file(time_t now);
+Index: dnsmasq2/src/helper.c
+===================================================================
+--- dnsmasq2.orig/src/helper.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/helper.c	2009-03-13 15:11:38.000000000 +1000
+@@ -16,6 +16,8 @@
+ 
+ #include "dnsmasq.h"
+ 
++#ifdef DO_DHCP
++
+ /* This file has code to fork a helper process which recieves data via a pipe 
+    shared with the main process and which is responsible for calling a script when
+    DHCP leases change.
+@@ -417,3 +419,4 @@ void helper_write(void)
+ #endif
+ 
+ 
++#endif
+Index: dnsmasq2/src/lease.c
+===================================================================
+--- dnsmasq2.orig/src/lease.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/lease.c	2009-03-13 15:11:38.000000000 +1000
+@@ -16,6 +16,8 @@
+ 
+ #include "dnsmasq.h"
+ 
++#ifdef DO_DHCP
++
+ static struct dhcp_lease *leases = NULL, *old_leases = NULL;
+ static int dns_dirty, file_dirty, leases_left;
+ 
+@@ -573,5 +575,6 @@ int do_script_run(time_t now)
+ }
+ 	  
+ 
++#endif
+       
+ 
+Index: dnsmasq2/src/network.c
+===================================================================
+--- dnsmasq2.orig/src/network.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/network.c	2009-03-13 15:11:38.000000000 +1000
+@@ -95,7 +95,9 @@ static int iface_allowed(struct irec **i
+   int fd;
+   struct ifreq ifr;
+   int dhcp_ok = 1;
++#ifdef DO_DHCP
+   struct iname *tmp;
++#endif
+   
+   /* check whether the interface IP has been added already 
+      we call this routine multiple times. */
+@@ -153,9 +155,11 @@ static int iface_allowed(struct irec **i
+       !iface_check(AF_INET, (struct all_addr *)&addr->in.sin_addr, &ifr, NULL))
+     return 1;
+   
++#ifdef DO_DHCP
+   for (tmp = daemon->dhcp_except; tmp; tmp = tmp->next)
+     if (tmp->name && (strcmp(tmp->name, ifr.ifr_name) == 0))
+       dhcp_ok = 0;
++#endif
+   
+ #ifdef HAVE_IPV6
+   if (addr->sa.sa_family == AF_INET6 &&
+@@ -362,6 +366,7 @@ struct listener *create_wildcard_listene
+   return l;
+ }
+ 
++#ifdef DO_NOWILD
+ struct listener *create_bound_listeners(void)
+ {
+   struct listener *listeners = NULL;
+@@ -440,6 +445,7 @@ struct listener *create_bound_listeners(
+ 
+   return listeners;
+ }
++#endif
+ 
+ 
+ /* return a UDP socket bound to a random port, have to coper with straying into
+Index: dnsmasq2/src/option.c
+===================================================================
+--- dnsmasq2.orig/src/option.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/option.c	2009-03-13 15:11:38.000000000 +1000
+@@ -116,12 +116,16 @@ static const struct myoption opts[] = 
+     {"mx-target", 1, 0, 't'},
+     {"cache-size", 2, 0, 'c'},
+     {"port", 1, 0, 'p'},
++#if defined(HAVE_ISC_READER) || defined(DO_DHCP)
+     {"dhcp-leasefile", 2, 0, 'l'},
++#endif
++#ifdef DO_DHCP
+     {"dhcp-lease", 1, 0, 'l' },
+     {"dhcp-host", 1, 0, 'G'},
+     {"dhcp-range", 1, 0, 'F'},
+     {"dhcp-option", 1, 0, 'O'},
+     {"dhcp-boot", 1, 0, 'M'},
++#endif
+     {"domain", 1, 0, 's'},
+     {"domain-suffix", 1, 0, 's'},
+     {"interface", 1, 0, 'i'},
+@@ -144,61 +148,101 @@ static const struct myoption opts[] = 
+     {"addn-hosts", 1, 0, 'H'},
+     {"query-port", 1, 0, 'Q'},
+     {"except-interface", 1, 0, 'I'},
++#ifdef DO_DHCP
+     {"no-dhcp-interface", 1, 0, '2'},
++#endif
+     {"domain-needed", 0, 0, 'D'},
++#ifdef DO_DHCP
+     {"dhcp-lease-max", 1, 0, 'X' },
++#endif
++#ifdef DO_NOWILD
+     {"bind-interfaces", 0, 0, 'z'},
++#endif
++#ifdef DO_DHCP
+     {"read-ethers", 0, 0, 'Z' },
++#endif
++#ifdef DO_DOCTOR
+     {"alias", 1, 0, 'V' },
++#endif
++#ifdef DO_DHCP
+     {"dhcp-vendorclass", 1, 0, 'U'},
+     {"dhcp-userclass", 1, 0, 'j'},
+     {"dhcp-ignore", 1, 0, 'J'},
++#endif
+     {"edns-packet-max", 1, 0, 'P'},
+     {"keep-in-foreground", 0, 0, 'k'},
++#ifdef DO_DHCP
+     {"dhcp-authoritative", 0, 0, 'K'},
++#endif
+     {"srv-host", 1, 0, 'W'},
+     {"localise-queries", 0, 0, 'y'},
+     {"txt-record", 1, 0, 'Y'},
++#ifdef HAVE_DBUS
+     {"enable-dbus", 0, 0, '1'},
++#endif
++#ifdef DO_DHCP
+     {"bootp-dynamic", 0, 0, '3'},
+     {"dhcp-mac", 1, 0, '4'},
+     {"no-ping", 0, 0, '5'},
+     {"dhcp-script", 1, 0, '6'},
++#endif
+     {"conf-dir", 1, 0, '7'},
+     {"log-facility", 1, 0 ,'8'},
++#ifdef DO_DHCP
+     {"leasefile-ro", 0, 0, '9'},
++#endif
+     {"dns-forward-max", 1, 0, '0'},
+     {"clear-on-reload", 0, 0, LOPT_RELOAD },
++#ifdef DO_DHCP
+     {"dhcp-ignore-names", 2, 0, LOPT_NO_NAMES },
++#endif
++#ifdef HAVE_TFTP
+     {"enable-tftp", 0, 0, LOPT_TFTP },
+     {"tftp-secure", 0, 0, LOPT_SECURE },
+     {"tftp-unique-root", 0, 0, LOPT_APREF },
+     {"tftp-root", 1, 0, LOPT_PREFIX },
+     {"tftp-max", 1, 0, LOPT_TFTP_MAX },
++#endif
+     {"ptr-record", 1, 0, LOPT_PTR },
+     {"naptr-record", 1, 0, LOPT_NAPTR },
+ #ifdef HAVE_BSD_BRIDGE
+     {"bridge-interface", 1, 0 , LOPT_BRIDGE },
+ #endif
++#ifdef DO_DHCP
+     {"dhcp-option-force", 1, 0, LOPT_FORCE },
++#endif
++#ifdef HAVE_TFTP
+     {"tftp-no-blocksize", 0, 0, LOPT_NOBLOCK },
++#endif
++#ifdef DO_DHCP
+     {"log-dhcp", 0, 0, LOPT_LOG_OPTS },
++#endif
+     {"log-async", 2, 0, LOPT_MAX_LOGS },
++#ifdef DO_DHCP
+     {"dhcp-circuitid", 1, 0, LOPT_CIRCUIT },
+     {"dhcp-remoteid", 1, 0, LOPT_REMOTE },
+     {"dhcp-subscrid", 1, 0, LOPT_SUBSCR },
++#endif
+     {"interface-name", 1, 0, LOPT_INTNAME },
++#ifdef DO_DHCP
+     {"dhcp-hostsfile", 1, 0, LOPT_DHCP_HOST },
+     {"dhcp-optsfile", 1, 0, LOPT_DHCP_OPTS },
+     {"dhcp-no-override", 0, 0, LOPT_OVERRIDE },
++#endif
++#ifdef HAVE_TFTP
+     {"tftp-port-range", 1, 0, LOPT_TFTPPORTS },
++#endif
+     {"stop-dns-rebind", 0, 0, LOPT_REBIND },
+     {"all-servers", 0, 0, LOPT_NOLAST}, 
++#ifdef DO_DHCP
+     {"dhcp-match", 1, 0, LOPT_MATCH }, 
+     {"dhcp-broadcast", 1, 0, LOPT_BROADCAST },
++#endif
+     {"neg-ttl", 1, 0, LOPT_NEGTTL },
++#ifdef DO_DHCP
+     {"dhcp-alternate-port", 2, 0, LOPT_ALTPORT },
+     {"dhcp-scriptuser", 1, 0, LOPT_SCRIPTUSR },
++#endif
+     {"min-port", 1, 0, LOPT_MINPORT },
+     { NULL, 0, 0, 0 }
+   };
+@@ -227,32 +271,48 @@ static struct {
+   { 'e', OPT_SELFMX, NULL, gettext_noop("Return self-pointing MX records for local hosts."), NULL },
+   { 'E', OPT_EXPAND, NULL, gettext_noop("Expand simple names in /etc/hosts with domain-suffix."), NULL },
+   { 'f', OPT_FILTER, NULL, gettext_noop("Don't forward spurious DNS requests from Windows hosts."), NULL },
++#ifdef DO_DHCP
+   { 'F', ARG_DUP, "ipaddr,ipaddr,time", gettext_noop("Enable DHCP in the range given with lease duration."), NULL },
++#endif
+   { 'g', ARG_ONE, "groupname", gettext_noop("Change to this group after startup (defaults to %s)."), CHGRP },
++#ifdef DO_DHCP
+   { 'G', ARG_DUP, "<hostspec>", gettext_noop("Set address or hostname for a specified machine."), NULL },
+   { LOPT_DHCP_HOST, ARG_ONE, "<filename>", gettext_noop("Read DHCP host specs from file"), NULL },
+   { LOPT_DHCP_OPTS, ARG_ONE, "<filename>", gettext_noop("Read DHCP option specs from file"), NULL },
++#endif
+   { 'h', OPT_NO_HOSTS, NULL, gettext_noop("Do NOT load %s file."), HOSTSFILE },
+   { 'H', ARG_DUP, "path", gettext_noop("Specify a hosts file to be read in addition to %s."), HOSTSFILE },
+   { 'i', ARG_DUP, "interface", gettext_noop("Specify interface(s) to listen on."), NULL },
+   { 'I', ARG_DUP, "int", gettext_noop("Specify interface(s) NOT to listen on.") , NULL },
++#ifdef DO_DHCP
+   { 'j', ARG_DUP, "<tag>,<class>", gettext_noop("Map DHCP user class to tag."), NULL },
+   { LOPT_CIRCUIT, ARG_DUP, "<tag>,<circuit>", gettext_noop("Map RFC3046 circuit-id to tag."), NULL },
+   { LOPT_REMOTE, ARG_DUP, "<tag>,<remote>", gettext_noop("Map RFC3046 remote-id to tag."), NULL },
+   { LOPT_SUBSCR, ARG_DUP, "<tag>,<remote>", gettext_noop("Map RFC3993 subscriber-id to tag."), NULL },
+   { 'J', ARG_DUP, "<tag>", gettext_noop("Don't do DHCP for hosts with tag set."), NULL },
+   { LOPT_BROADCAST, ARG_DUP, "<tag>", gettext_noop("Force broadcast replies for hosts with tag set."), NULL }, 
++#endif
+   { 'k', OPT_NO_FORK, NULL, gettext_noop("Do NOT fork into the background, do NOT run in debug mode."), NULL },
++#ifdef DO_DHCP
+   { 'K', OPT_AUTHORITATIVE, NULL, gettext_noop("Assume we are the only DHCP server on the local network."), NULL },
++#endif
++#ifdef HAVE_ISC_READER
++  { 'l', ARG_ONE, "path", gettext_noop("Specify where to read DHCP leases from (defaults to %s)."), LEASEFILE },
++#elif defined(DO_DHCP)
+   { 'l', ARG_ONE, "path", gettext_noop("Specify where to store DHCP leases (defaults to %s)."), LEASEFILE },
++#endif
+   { 'L', OPT_LOCALMX, NULL, gettext_noop("Return MX records for local hosts."), NULL },
+   { 'm', ARG_DUP, "host_name,target,pref", gettext_noop("Specify an MX record."), NULL },
++#ifdef DO_DHCP
+   { 'M', ARG_DUP, "<bootp opts>", gettext_noop("Specify BOOTP options to DHCP server."), NULL },
++#endif
+   { 'n', OPT_NO_POLL, NULL, gettext_noop("Do NOT poll %s file, reload only on SIGHUP."), RESOLVFILE }, 
+   { 'N', OPT_NO_NEG, NULL, gettext_noop("Do NOT cache failed search results."), NULL },
+   { 'o', OPT_ORDER, NULL, gettext_noop("Use nameservers strictly in the order given in %s."), RESOLVFILE },
++#ifdef DO_DHCP
+   { 'O', ARG_DUP, "<optspec>", gettext_noop("Specify options to be sent to DHCP clients."), NULL },
+   { LOPT_FORCE, ARG_DUP, "<optspec>", gettext_noop("DHCP option sent even if the client does not request it."), NULL},
++#endif
+   { 'p', ARG_ONE, "number", gettext_noop("Specify port to listen for DNS requests on (defaults to 53)."), NULL },
+   { 'P', ARG_ONE, "<size>", gettext_noop("Maximum supported UDP packet size for EDNS.0 (defaults to %s)."), "*" },
+   { 'q', OPT_LOG, NULL, gettext_noop("Log DNS queries."), NULL },
+@@ -261,25 +321,40 @@ static struct {
+   { 'r', ARG_DUP, "path", gettext_noop("Specify path to resolv.conf (defaults to %s)."), RESOLVFILE }, 
+   { 'S', ARG_DUP, "/domain/ipaddr", gettext_noop("Specify address(es) of upstream servers with optional domains."), NULL },
+   { LOPT_LOCAL, ARG_DUP, "/domain/", gettext_noop("Never forward queries to specified domains."), NULL },
++#ifdef DO_DHCP
+   { 's', ARG_ONE, "<domain>", gettext_noop("Specify the domain to be assigned in DHCP leases."), NULL },
++#endif
+   { 't', ARG_ONE, "host_name", gettext_noop("Specify default target in an MX record."), NULL },
+   { 'T', ARG_ONE, "time", gettext_noop("Specify time-to-live in seconds for replies from /etc/hosts."), NULL },
+   { LOPT_NEGTTL, ARG_ONE, "time", gettext_noop("Specify time-to-live in seconds for negative caching."), NULL },
+   { 'u', ARG_ONE, "username", gettext_noop("Change to this user after startup. (defaults to %s)."), CHUSER }, 
++#ifdef DO_DHCP
+   { 'U', ARG_DUP, "<id>,<class>", gettext_noop("Map DHCP vendor class to tag."), NULL },
++#endif
+   { 'v', 0, NULL, gettext_noop("Display dnsmasq version and copyright information."), NULL },
++#ifdef DO_DOCTOR
+   { 'V', ARG_DUP, "addr,addr,mask", gettext_noop("Translate IPv4 addresses from upstream servers."), NULL },
++#endif
+   { 'W', ARG_DUP, "name,target,...", gettext_noop("Specify a SRV record."), NULL },
+   { 'w', 0, NULL, gettext_noop("Display this message. Use --help dhcp for known DHCP options."), NULL },
+   { 'x', ARG_ONE, "path", gettext_noop("Specify path of PID file (defaults to %s)."), RUNFILE },
++#ifdef DO_DHCP
+   { 'X', ARG_ONE, "number", gettext_noop("Specify maximum number of DHCP leases (defaults to %s)."), "&" },
++#endif
+   { 'y', OPT_LOCALISE, NULL, gettext_noop("Answer DNS queries based on the interface a query was sent to."), NULL },
+   { 'Y', ARG_DUP, "name,txt....", gettext_noop("Specify TXT DNS record."), NULL },
+   { LOPT_PTR, ARG_DUP, "name,target", gettext_noop("Specify PTR DNS record."), NULL },
+   { LOPT_INTNAME, ARG_DUP, "name,interface", gettext_noop("Give DNS name to IPv4 address of interface."), NULL },
++#ifdef DO_NOWILD
+   { 'z', OPT_NOWILD, NULL, gettext_noop("Bind only to interfaces in use."), NULL },
++#endif
++#ifdef DO_DHCP
+   { 'Z', OPT_ETHERS, NULL, gettext_noop("Read DHCP static host information from %s."), ETHERSFILE },
++#endif
++#ifdef HAVE_DBUS
+   { '1', OPT_DBUS, NULL, gettext_noop("Enable the DBus interface for setting upstream servers, etc."), NULL },
++#endif
++#ifdef DO_DHCP
+   { '2', ARG_DUP, "interface", gettext_noop("Do not provide DHCP on this interface, only provide DNS."), NULL },
+   { '3', OPT_BOOTP_DYNAMIC, NULL, gettext_noop("Enable dynamic address allocation for bootp."), NULL },
+   { '4', ARG_DUP, "<id>,<mac address>", gettext_noop("Map MAC address (with wildcards) to option set."), NULL },
+@@ -288,13 +363,19 @@ static struct {
+ #endif
+   { '5', OPT_NO_PING, NULL, gettext_noop("Disable ICMP echo address checking in the DHCP server."), NULL },
+   { '6', ARG_ONE, "path", gettext_noop("Script to run on DHCP lease creation and destruction."), NULL },
++#endif /* DO_DHCP */
+   { '7', ARG_DUP, "path", gettext_noop("Read configuration from all the files in this directory."), NULL },
+   { '8', ARG_ONE, "<facilty>|<file>", gettext_noop("Log to this syslog facility or file. (defaults to DAEMON)"), NULL },
++#ifdef DO_DHCP
+   { '9', OPT_LEASE_RO, NULL, gettext_noop("Do not use leasefile."), NULL },
++#endif
+   { '0', ARG_ONE, "<queries>", gettext_noop("Maximum number of concurrent DNS queries. (defaults to %s)"), "!" }, 
+   { LOPT_RELOAD, OPT_RELOAD, NULL, gettext_noop("Clear DNS cache when reloading %s."), RESOLVFILE },
++#ifdef DO_DHCP
+   { LOPT_NO_NAMES, ARG_DUP, "[=<id>]", gettext_noop("Ignore hostnames provided by DHCP clients."), NULL },
+   { LOPT_OVERRIDE, OPT_NO_OVERRIDE, NULL, gettext_noop("Do NOT reuse filename and server fields for extra DHCP options."), NULL },
++#endif
++#ifdef HAVE_TFTP
+   { LOPT_TFTP, OPT_TFTP, NULL, gettext_noop("Enable integrated read-only TFTP server."), NULL },
+   { LOPT_PREFIX, ARG_ONE, "<directory>", gettext_noop("Export files by TFTP only from the specified subtree."), NULL },
+   { LOPT_APREF, OPT_TFTP_APREF, NULL, gettext_noop("Add client IP address to tftp-root."), NULL },
+@@ -302,18 +383,24 @@ static struct {
+   { LOPT_TFTP_MAX, ARG_ONE, "<connections>", gettext_noop("Maximum number of conncurrent TFTP transfers (defaults to %s)."), "#" },
+   { LOPT_NOBLOCK, OPT_TFTP_NOBLOCK, NULL, gettext_noop("Disable the TFTP blocksize extension."), NULL },
+   { LOPT_TFTPPORTS, ARG_ONE, "<start>,<end>", gettext_noop("Ephemeral port range for use by TFTP transfers."), NULL },
++#endif
++#ifdef DO_DHCP
+   { LOPT_LOG_OPTS, OPT_LOG_OPTS, NULL, gettext_noop("Extra logging for DHCP."), NULL },
++#endif
+   { LOPT_MAX_LOGS, ARG_ONE, "[=<log lines>]", gettext_noop("Enable async. logging; optionally set queue length."), NULL },
+   { LOPT_REBIND, OPT_NO_REBIND, NULL, gettext_noop("Stop DNS rebinding. Filter private IP ranges when resolving."), NULL },
+   { LOPT_NOLAST, OPT_ALL_SERVERS, NULL, gettext_noop("Always perform DNS queries to all servers."), NULL },
++#ifdef DO_DHCP
+   { LOPT_MATCH, ARG_DUP, "<netid>,<opt-no>", gettext_noop("Set tag if client includes option in request."), NULL },
+   { LOPT_ALTPORT, ARG_ONE, "[=<ports>]", gettext_noop("Use alternative ports for DHCP."), NULL },
+   { LOPT_SCRIPTUSR, ARG_ONE, "<username>", gettext_noop("Run lease-change script as this user."), NULL },
++#endif
+   { LOPT_NAPTR, ARG_DUP, "<name>,<naptr>", gettext_noop("Specify NAPTR DNS record."), NULL },
+   { LOPT_MINPORT, ARG_ONE, "<port>", gettext_noop("Specify lowest port available for DNS query transmission."), NULL },
+   { 0, 0, NULL, NULL, NULL }
+ }; 
+ 
++#ifdef DO_DHCP
+ /* makes options which take a list of addresses */
+ #define OT_ADDR_LIST 255
+ /* DHCP-internal options, for logging. not valid in config file */
+@@ -391,11 +478,13 @@ static const struct {
+   { "classless-static-route", 121, 0 },
+   { NULL, 0, 0 }
+ };
++#endif
+ 
+ static volatile int mem_recover = 0;
+ static jmp_buf mem_jmp;
+ static void one_file(char *file, int nest, int hard_opt);
+ 
++#ifdef DO_DHCP
+ char *option_string(unsigned char opt)
+ {
+   int i;
+@@ -406,6 +495,7 @@ char *option_string(unsigned char opt)
+ 
+   return NULL;
+ }
++#endif
+ 
+ /* We hide metacharaters in quoted strings by mapping them into the ASCII control
+    character space. Note that the \0, \t \b \r \033 and \n characters are carefully placed in the
+@@ -539,6 +629,7 @@ static int atoi_check16(char *a, int *re
+   return 1;
+ }
+ 	
++#ifdef DO_VERSION
+ static void add_txt(char *name, char *txt)
+ {
+   size_t len = strlen(txt);
+@@ -553,6 +644,7 @@ static void add_txt(char *name, char *tx
+   *(r->txt) = len;
+   memcpy((r->txt)+1, txt, len);
+ }
++#endif
+ 
+ static void do_usage(void)
+ {
+@@ -611,6 +703,7 @@ static void do_usage(void)
+     }
+ }
+ 
++#ifdef DO_DHCP
+ static void display_opts(void)
+ {
+   int i;
+@@ -910,6 +1003,7 @@ static char *parse_dhcp_opt(char *arg, i
+ 
+   return problem;
+ }
++#endif /* DO_DHCP */
+ 
+ 
+ static char *one_opt(int option, char *arg, char *gen_prob, int nest)
+@@ -1025,6 +1119,7 @@ static char *one_opt(int option, char *a
+       daemon->runfile = opt_string_alloc(arg);
+       break;
+ 
++#ifdef DO_DHCP 
+     case LOPT_DHCP_HOST: /* --dhcp-hostfile */
+       if (daemon->dhcp_hosts_file)
+ 	problem = _("only one dhcp-hostsfile allowed");
+@@ -1038,6 +1133,7 @@ static char *one_opt(int option, char *a
+       else
+ 	daemon->dhcp_opts_file = opt_string_alloc(arg);
+       break; 
++#endif
+       
+     case 'r': /* --resolv-file */
+       {
+@@ -1101,10 +1197,13 @@ static char *one_opt(int option, char *a
+ 	daemon->mxtarget = opt_string_alloc(arg);
+       break;
+       
++#if defined(HAVE_ISC_READER) || defined(DO_DHCP) 
+     case 'l':  /* --dhcp-leasefile */
+       daemon->lease_file = opt_string_alloc(arg);
+       break;
++#endif
+       
++#ifdef DO_DHCP 
+     case '6': /* --dhcp-script */
+ #ifdef NO_FORK
+       problem = _("cannot run scripts under uClinux");
+@@ -1112,6 +1211,7 @@ static char *one_opt(int option, char *a
+       daemon->lease_change_command = opt_string_alloc(arg);
+ #endif
+       break;
++#endif
+       
+     case 'H': /* --addn-hosts */
+       {
+@@ -1142,9 +1242,11 @@ static char *one_opt(int option, char *a
+       daemon->group_set = 1;
+       break;
+ 
++#ifdef DO_DHCP
+     case LOPT_SCRIPTUSR: /* --scriptuser */
+       daemon->scriptuser = opt_string_alloc(arg);
+       break;
++#endif
+       
+     case 'i':  /* --interface */
+       do {
+@@ -1161,7 +1263,9 @@ static char *one_opt(int option, char *a
+       break;
+       
+     case 'I':  /* --except-interface */
++#ifdef DO_DHCP
+     case '2':  /* --no-dhcp-interface */
++#endif
+       do {
+ 	struct iname *new = opt_malloc(sizeof(struct iname));
+ 	comma = split(arg);
+@@ -1171,11 +1275,13 @@ static char *one_opt(int option, char *a
+ 	    new->next = daemon->if_except;
+ 	    daemon->if_except = new;
+ 	  }
++#ifdef DO_DHCP
+ 	else
+ 	  {
+ 	    new->next = daemon->dhcp_except;
+ 	    daemon->dhcp_except = new;
+ 	  }
++#endif
+ 	arg = comma;
+       } while (arg);
+       break;
+@@ -1453,20 +1559,27 @@ static char *one_opt(int option, char *a
+ 	break;
+       }
+       
++#ifdef DO_DHCP
+     case 'X': /* --dhcp-lease-max */
+       if (!atoi_check(arg, &daemon->dhcp_max))
+ 	option = '?';
+       break;
++#endif
+       
++#ifdef HAVE_TFTP
+     case LOPT_TFTP_MAX:  /*  --tftp-max */
+       if (!atoi_check(arg, &daemon->tftp_max))
+ 	option = '?';
+       break;  
++#endif
+ 
++#ifdef HAVE_TFTP
+     case LOPT_PREFIX: /* --tftp-prefix */
+       daemon->tftp_prefix = opt_string_alloc(arg);
+       break;
++#endif
+ 
++#ifdef HAVE_TFTP
+     case LOPT_TFTPPORTS: /* --tftp-port-range */
+       if (!(comma = split(arg)) || 
+ 	  !atoi_check16(arg, &daemon->start_tftp_port) ||
+@@ -1481,6 +1594,7 @@ static char *one_opt(int option, char *a
+ 	} 
+       
+       break;
++#endif
+ 	      
+ #ifdef HAVE_BSD_BRIDGE
+     case LOPT_BRIDGE:   /* --bridge-interface */
+@@ -1513,6 +1627,7 @@ static char *one_opt(int option, char *a
+       }
+ #endif
+ 
++#ifdef DO_DHCP
+     case 'F':  /* --dhcp-range */
+       {
+ 	int k, leasepos = 2;
+@@ -1644,7 +1759,9 @@ static char *one_opt(int option, char *a
+ 	  }
+ 	break;
+       }
++#endif
+ 
++#ifdef DO_DHCP
+     case LOPT_BANK:
+     case 'G':  /* --dhcp-host */
+       {
+@@ -1785,7 +1902,9 @@ static char *one_opt(int option, char *a
+ 	daemon->dhcp_conf = new;
+ 	break;
+       }
++#endif
+       
++#ifdef DO_DHCP
+     case 'O':
+     case LOPT_FORCE:
+     case LOPT_OPTS:
+@@ -1793,7 +1912,9 @@ static char *one_opt(int option, char *a
+ 			       option == LOPT_FORCE ? DHOPT_FORCE : 
+ 			       (option == LOPT_OPTS ? DHOPT_BANK : 0));
+       break;
++#endif
+       
++#ifdef DO_DHCP
+     case 'M': /* --dhcp-boot */
+       {
+ 	struct dhcp_netid *id = NULL;
+@@ -1842,7 +1963,9 @@ static char *one_opt(int option, char *a
+ 	
+ 	break;
+       }
++#endif
+       
++#ifdef DO_DHCP 
+     case '4':  /* --dhcp-mac */
+       {
+ 	if (!(comma = split(arg)))
+@@ -1858,7 +1981,9 @@ static char *one_opt(int option, char *a
+ 	  }
+       }
+       break;
++#endif
+       
++#ifdef DO_DHCP 
+     case 'U':           /* --dhcp-vendorclass */
+     case 'j':           /* --dhcp-userclass */
+     case LOPT_CIRCUIT:  /* --dhcp-circuitid */
+@@ -1923,7 +2048,9 @@ static char *one_opt(int option, char *a
+ 	  }
+ 	break;
+       }
++#endif
+       
++#ifdef DO_DHCP 
+     case LOPT_ALTPORT:   /* --dhcp-alternate-port */
+       if (!arg)
+ 	{
+@@ -1940,7 +2067,9 @@ static char *one_opt(int option, char *a
+ 	    daemon->dhcp_client_port = daemon->dhcp_server_port+1; 
+ 	}
+       break;
++#endif
+ 
++#ifdef DO_DHCP 
+     case 'J':            /* --dhcp-ignore */
+     case LOPT_NO_NAMES:  /* --dhcp-ignore-names */
+     case LOPT_BROADCAST: /* --dhcp-broadcast */
+@@ -1975,7 +2104,9 @@ static char *one_opt(int option, char *a
+ 	new->list = list;
+ 	break;
+       }
++#endif
+       
++#ifdef DO_DOCTOR 
+     case 'V':  /* --alias */
+       {
+ 	char *a[3] = { NULL, NULL, NULL };
+@@ -2013,6 +2144,7 @@ static char *one_opt(int option, char *a
+ 	
+ 	break;
+       }
++#endif
+       
+     case LOPT_INTNAME:  /* --interface-name */
+       {
+@@ -2374,6 +2506,7 @@ static void one_file(char *file, int nes
+   fclose(f);
+ }
+ 
++#ifdef DO_DHCP
+ void reread_dhcp(void)
+ {
+   if (daemon->dhcp_hosts_file)
+@@ -2435,6 +2568,7 @@ void reread_dhcp(void)
+       my_syslog(LOG_INFO, _("read %s"), daemon->dhcp_opts_file);
+     }
+ }
++#endif /* DO_DHCP */
+     
+ void read_opts(int argc, char **argv, char *compile_opts)
+ {
+@@ -2452,20 +2586,28 @@ void read_opts(int argc, char **argv, ch
+   daemon->cachesize = CACHESIZ;
+   daemon->ftabsize = FTABSIZ;
+   daemon->port = NAMESERVER_PORT;
++#ifdef DO_DHCP
+   daemon->dhcp_client_port = DHCP_CLIENT_PORT;
+   daemon->dhcp_server_port = DHCP_SERVER_PORT;
++#endif
+   daemon->default_resolv.is_default = 1;
+   daemon->default_resolv.name = RESOLVFILE;
+   daemon->resolv_files = &daemon->default_resolv;
+   daemon->username = CHUSER;
+   daemon->runfile =  RUNFILE;
++#ifdef DO_DHCP
+   daemon->dhcp_max = MAXLEASES;
++#endif
++#ifdef HAVE_TFTP
+   daemon->tftp_max = TFTP_MAX_CONNECTIONS;
++#endif
+   daemon->edns_pktsz = EDNS_PKTSZ;
+   daemon->log_fac = -1;
++#ifdef DO_VERSION
+   add_txt("version.bind", "dnsmasq-" VERSION );
+   add_txt("authors.bind", "Simon Kelley");
+   add_txt("copyright.bind", COPYRIGHT);
++#endif
+ 
+   while (1) 
+     {
+@@ -2491,9 +2633,11 @@ void read_opts(int argc, char **argv, ch
+       /* command-line only stuff */
+       if (option == 'w')
+ 	{
++#ifdef DO_DHCP
+ 	  if (argc == 3 && strcmp(argv[2], "dhcp") == 0)
+ 	    display_opts();
+ 	  else
++#endif
+ 	    do_usage();
+ 	  exit(0);
+ 	}
+Index: dnsmasq2/src/rfc1035.c
+===================================================================
+--- dnsmasq2.orig/src/rfc1035.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/rfc1035.c	2009-03-13 15:11:38.000000000 +1000
+@@ -501,6 +501,7 @@ static int private_net(struct in_addr ad
+     ((ip_addr & 0xFFFF0000) == 0xA9FE0000)  /* 169.254.0.0/16 (zeroconf) */ ;
+ }
+ 
++#ifdef DO_DOCTOR
+ static unsigned char *do_doctor(unsigned char *p, int count, HEADER *header, size_t qlen)
+ {
+   int i, qtype, qclass, rdlen;
+@@ -544,6 +545,7 @@ static unsigned char *do_doctor(unsigned
+   
+   return p; 
+ }
++#endif
+ 
+ static int find_soa(HEADER *header, size_t qlen)
+ {
+@@ -554,7 +556,12 @@ static int find_soa(HEADER *header, size
+   
+   /* first move to NS section and find TTL from any SOA section */
+   if (!(p = skip_questions(header, qlen)) ||
+-      !(p = do_doctor(p, ntohs(header->ancount), header, qlen)))
++#ifdef DO_DOCTOR 
++      !(p = do_doctor(p, ntohs(header->ancount), header, qlen))
++#else
++      0
++#endif
++      )
+     return 0;  /* bad packet */
+   
+   for (i = ntohs(header->nscount); i != 0; i--)
+@@ -592,9 +599,11 @@ static int find_soa(HEADER *header, size
+ 	return 0; /* bad packet */
+     }
+  
++#ifdef DO_DOCTOR 
+   /* rewrite addresses in additioal section too */
+   if (!do_doctor(p, ntohs(header->arcount), header, qlen))
+     return 0;
++#endif
+   
+   if (!found_soa)
+     minttl = daemon->neg_ttl;
+@@ -615,12 +624,14 @@ int extract_addresses(HEADER *header, si
+ 
+   cache_start_insert();
+ 
++#ifdef DO_DOCTOR
+   /* find_soa is needed for dns_doctor side-effects, so don't call it lazily if there are any. */
+   if (daemon->doctors)
+     {
+       searched_soa = 1;
+       ttl = find_soa(header, qlen);
+     }
++#endif
+   
+   /* go through the questions. */
+   p = (unsigned char *)(header+1);
+Index: dnsmasq2/src/rfc2131.c
+===================================================================
+--- dnsmasq2.orig/src/rfc2131.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/rfc2131.c	2009-03-13 15:11:38.000000000 +1000
+@@ -16,6 +16,8 @@
+ 
+ #include "dnsmasq.h"
+ 
++#ifdef DO_DHCP
++
+ #define BOOTREQUEST              1
+ #define BOOTREPLY                2
+ #define DHCP_COOKIE              0x63825363
+@@ -1851,3 +1853,4 @@ static void do_options(struct dhcp_conte
+     }
+ }
+ 
++#endif
+Index: dnsmasq2/src/tftp.c
+===================================================================
+--- dnsmasq2.orig/src/tftp.c	2009-03-13 15:10:15.000000000 +1000
++++ dnsmasq2/src/tftp.c	2009-03-13 15:11:38.000000000 +1000
+@@ -49,7 +49,9 @@ void tftp_request(struct listener *liste
+   struct iovec iov;
+   struct ifreq ifr;
+   int is_err = 1, if_index = 0;
++#ifdef DO_DHCP
+   struct iname *tmp;
++#endif
+   struct tftp_transfer *transfer;
+   int port = daemon->start_tftp_port; /* may be zero to use ephemeral port */
+ #if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DONT)
+@@ -124,10 +126,12 @@ void tftp_request(struct listener *liste
+ 		       &ifr, &if_index))
+ 	return;
+       
++#ifdef DO_DHCP
+       /* allowed interfaces are the same as for DHCP */
+       for (tmp = daemon->dhcp_except; tmp; tmp = tmp->next)
+ 	if (tmp->name && (strcmp(tmp->name, ifr.ifr_name) == 0))
+ 	  return;
++#endif
+       
+     }
+   

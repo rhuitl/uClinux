@@ -1,0 +1,15 @@
+# (C) Copyright 2001,2002, Martin Roesch, Brian Caswell, et al.
+#    All rights reserved.
+# $Id: multimedia.rules,v 1.4 2002/08/18 20:28:43 cazz Exp $
+#-------------
+# MULTIMEDIA RULES
+#-------------
+# These signatures look for people using streaming multimedia technologies.
+# Using streaming media may be a violation of corporate policies.
+
+drop tcp $EXTERNAL_NET any -> $HONEYNET 80 (msg:"MULTIMEDIA Quicktime User Agent access"; flow:to_server,established; content:"User-Agent\: Quicktime"; classtype:policy-violation; sid:1436;  rev:2;)
+drop tcp $HONEYNET 80 -> $EXTERNAL_NET any (msg:"MULTIMEDIA Windows Media audio download"; flow:from_server,established; content:"Content-type\: audio/x-ms-wma$"; classtype:policy-violation; sid:1437;  rev:2;)
+drop tcp $HONEYNET 80 -> $EXTERNAL_NET any (msg:"MULTIMEDIA Windows Media Video download"; flow:from_server,established; content:"Content-type\: video/x-ms-asf$"; classtype:policy-violation; sid:1438;  rev:2;)
+drop tcp $HONEYNET 80 -> $EXTERNAL_NET any (msg:"MULTIMEDIA Shoutcast playlist redirection"; flow:from_server,established; content:"Content-type\: audio/x-scpls$"; classtype:policy-violation; sid:1439;  rev:2;)
+drop tcp $HONEYNET 80 -> $EXTERNAL_NET any (msg:"MULTIMEDIA Icecast playlist redirection"; flow:from_server,established; content:"Content-type\: audio/x-mpegurl$"; classtype:policy-violation; sid:1440;  rev:2;)
+drop tcp $EXTERNAL_NET any -> 64.245.58.0/23 any (msg:"MULTIMEDIA audio galaxy keepalive"; flow:established; content:"|45 5F 00 03 05|"; offset:0; depth:5; classtype:misc-activity; sid:1428; rev:3;)

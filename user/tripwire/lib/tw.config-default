@@ -1,0 +1,102 @@
+# $Id: tw.config-default,v 1.1 2001-02-14 00:39:14 pauli Exp $
+#
+# tw.config
+#
+# This file contains a list of files and directories that System 
+# Preener will scan.  Information collected from these files will be 
+# stored in the tw.database file.
+#
+# Format: 			[!|=] entry [ignore-flags]
+#
+# where:	 '!' signifies the entry is to be pruned (inclusive) from
+#				the list of files to be scanned.
+#		 '=' signifies the entry is to be added, but if it is
+#				a directory, then all its contents are pruned
+#				(useful for /tmp).
+#
+# where:	entry is the absolute pathname of a file or a directory
+#
+# where ignore-flags are in the format:
+#		[template][ [+|-][pinugsam12] ... ]
+#
+# 	- :  ignore the following atributes
+#	+ :  do not ignore the following attributes
+#
+#	p :  permission and file mode bits 	a: access timestamp
+#	i :  inode number			m: modification timestamp
+#	n :  number of links (ref count)	c: inode creation timestamp
+#	u :  user id of owner			1: signature 1
+#	g :  group id of owner			2: signature 2
+#	s :  size of file
+#
+#
+# Ex:   The following entry will scan all the files in /etc, and report
+#	any changes in mode bits, inode number, reference count, uid,
+#	gid, modification and creation timestamp, and the signatures.
+#	However, it will ignore any changes in the access timestamp.
+#
+#	/etc	+pinugsm12-a
+#
+# The following templates have been pre-defined to make these long ignore
+# mask descriptions unecessary.
+#
+# Templates: 	(default)	R :  [R]ead-only (+pinugsm12-a)
+#				L :  [L]og file (+pinug-sam12)
+#				N :  ignore [N]othing (+pinusgsamc12)
+#				E :  ignore [E]verything (-pinusgsamc12)
+#				> :  like [L], but ignore growing files
+#
+# By default, Tripwire uses the R template -- it ignores
+# only the access timestamp.
+#
+# You can use templates with modifiers, like:
+#	Ex:  /etc/lp	E+ug
+#
+#	Example configuration file:
+#		/etc		R	# all system files
+#		!/etc/lp	R	# ...but not those logs
+#		=/tmp		N	# just the directory, not its files
+#
+# ====
+#
+# Preprocessor directives:
+#
+#	The following directives provide C-preprocessor and m4-like
+#	functionality:
+#
+#		@@ifhost hostname	:	included if (hostname) matches
+#		@@ifhost hostname	:	included if (hostname) doesn't
+#						match.
+#						(both need matching @@endif)
+#
+#		@@define x		: 	defines (x)
+#		@@undef x		: 	undefines (x)
+#
+#		@@ifdef x		: 	included if (x) is defined.
+#		@@ifndef x		: 	included if (x) is not defined.
+#						(both need matching @@endif)
+#
+#		@@endif			: 	closes up @@ifhost, @@ifdef,
+#						and @@ifndef.
+#
+#	Example:
+#	A host-dependent inclusion can be specified many ways so tw.config
+#	files can be shared among multiple machines.  So, if the machine 
+#	"mentor.cc.purdue.edu" is the only machine that has a certain file,
+#	you could use:
+#
+#		@@ifhost mentor.cc.purdue.edu
+#		/etc/tw.log.mentor	R
+#		@@endif
+#
+
+/etc		R
+/etc/config	R
+=/tmp		N
+/bin		R
+/home		R
+/lib		R
+=/mnt		R
+/usr		R
+/var/log	L
+=/var/tmp	+pinugs12-amc

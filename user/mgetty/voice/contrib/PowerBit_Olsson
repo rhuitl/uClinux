@@ -1,0 +1,77 @@
+From: =?iso-8859-1?Q?H=E5kan?= Olsson <suntron@algonet.se>
+Subject: PowerBit modem configuration
+This seems to work.
+Changes are in mgetty.config and in the modem setup.
+I have also upgraded the modem software to v2.30b.
+
+Modem (PowerBit Pro 56K Flash+)
+
+New software
+ati3      V2.30b
+
+----------------------------------------------------------------
+mgetty/vgetty will complain about 
+"WARNING: DSR is off - modem turned off or bad cable?"
+after a restart. You can ignore this.
+
+ATZ do NOT reset the modem properly, use DTR.
+There is a AT#CID bug, see mgetty.config for details.
+----------------------------------------------------------------
+
+Modem configuration
+
+at&v
+(changed from &D2 to &D3)
+ACTIVE PROFILE:
+B0 E1 L2 M1 N1 Q0 T V1 W0 X4 Y0 &C1 &D3 &G0 &J0 &K3 &Q5 &R1 &S0 &T5 &X0 &Y0
+S00:000 S01:000 S02:043 S03:013 S04:010 S05:008 S06:010 S07:060 S08:002 S09:006
+S10:020 S11:070 S12:050 S18:000 S25:005 S26:001 S36:007 S37:000 S38:010 S44:010
+S46:138 S48:007 S95:041
+
+STORED PROFILE 0:
+B0 E1 L2 M1 N1 Q0 T V1 W0 X4 Y0 &C1 &D3 &G0 &J0 &K3 &Q5 &R1 &S0 &T5 &X0 
+S00:000 S02:043 S06:010 S07:060 S08:002 S09:006 S10:020 S11:070 S12:050 S18:000
+S36:007 S37:000 S40:232 S41:071 S46:138 S95:041
+
+at\s
+CMD DESCRIPTION / OPTION   CMD DESCRIPTION / OPTION   CMD DESCRIPTION / OPTION
+--- --------------------   --- --------------------   --- --------------------
+    DTE BPS.........115K   &C  DCD OPTION.........1   )M  CELLULAR.........OFF
+    DTE PARITY.....8NONE   &D  DTR OPTION.........3   S0  RINGS TO ANS.....000
+    DIAL MODE.......TONE   &G  GUARD TONE......NONE   S1  RING COUNT.......000
+    LINE SPEED......NONE   &K  FLOW CONTROL.....RTS   S2  <ESC> CHAR.......043
+B   BELL MODE........OFF   &L  NETWORK.........PSTN   S3  <CR> CHAR........013
+E   CMD ECHO..........ON   &P  PULSE MODE.........0   S4  <LF> CHAR........010
++MS LINE MODE.......AUTO   &Q  ASYNC/SYNC.........5   S5  <BS> CHAR........008
+L   SPKR VOLUME......MED   &R  RTS/CTS............1   S7  CONNECT TIME.....060
+M   SPKR CONTROL.......1   &S  DSR OPT............0   S8  PAUSE TIME.......002
+N   AUTO MODE.........ON   &T  ENABLE RDL........NO   S12 ESC GUARD TIME...050
+Q   QUIET............OFF   &X  SYNC CLOCK.......INT   S24 SLEEP INACT......061
+V   RESULT FORM.....LONG   &Y  PROFILE........NVM.0   S30 CONNECT INACT....000
+W   EC MSG.............0   \A  MAX BLK SIZE.....256   S32 XON CHAR.........017
+X   EXT RESULTS........4   \G  REMOTE FLOW......OFF   S33 XOFF CHAR........019
+Y   LONG SPACE DISC...NO   \K  BRK OPT............5   S36 FALLBACK ACTION..007
+%C  COMPRESSION.....BOTH   \N  ECL MODE........AUTO   S37 MODE SELECT......000
+%E  AUTO RETRAIN...FB/FF   \W  SPLIT SPEED......OFF   S48 V42 NEG CTRL.....007
+-K  EXT. SERVICES......0   *H  NEG. SPEED......HIGH   S95 RES. CODE........041
+
+---------------------------------------------------------------------
+
+mgetty.config
+
+# Powerbit
+port ttyS1
+speed 115200
+data-only n 
+#
+# The minimum amount of delay after reset is \d\d\d.
+# CID won't work at all if you put AT#CID=1 in 'init-cat'.
+# S70.1=1       Start the fax if DTMF *0 is detected. (not yet tested)
+init-chat ""  \d\d\dATS70.1=1 OK
+#
+# AT#CID=1 must be ONLY in post-init-chat, or it won't work.
+# Must do this two times, or the moden won't detect 
+#   CID for the first call (???????????)
+#  post-init-chat "" AT#CID=1 OK ***** DON'T WORK *****
+post-init-chat "" AT#CID=1 OK AT#CID=1 OK
+

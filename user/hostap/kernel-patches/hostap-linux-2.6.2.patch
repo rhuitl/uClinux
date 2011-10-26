@@ -1,0 +1,111 @@
+diff -udrNP linux-2.6.2.orig/MAINTAINERS linux-2.6.2/MAINTAINERS
+--- linux-2.6.2.orig/MAINTAINERS	2004-02-04 04:43:57.000000000 +0100
++++ linux-2.6.2/MAINTAINERS	2004-02-07 12:47:05.000000000 +0100
+@@ -905,6 +905,13 @@
+  L:	compaqandlinux@cpqlin.van-dijk.net
+  S:	Supported 
+  
++HOST AP DRIVER
++P:	Jouni Malinen
++M:	jkmaline@cc.hut.fi
++L:	hostap@shmoo.com
++W:	http://hostap.epitest.fi/
++S:	Maintained
++
+ HP100:	Driver for HP 10/100 Mbit/s Voice Grade Network Adapter Series
+ P:	Jaroslav Kysela
+ M:	perex@suse.cz
+diff -udrNP linux-2.6.2.orig/drivers/net/wireless/Kconfig linux-2.6.2/drivers/net/wireless/Kconfig
+--- linux-2.6.2.orig/drivers/net/wireless/Kconfig	2004-02-04 04:43:19.000000000 +0100
++++ linux-2.6.2/drivers/net/wireless/Kconfig	2004-02-07 12:47:05.000000000 +0100
+@@ -292,6 +292,74 @@
+ 	 It has basic support for Linux wireless extensions and initial
+ 	 micro support for ethtool.
+ 
++config HOSTAP
++	tristate "Host AP support for Prism2/2.5/3 IEEE 802.11b"
++	depends on NET_RADIO
++	---help---
++	A driver for 802.11b wireless cards based on Intersil Prism2/2.5/3
++	chipset. This driver supports so called Host AP mode that allows
++	the card to act as an IEEE 802.11 access point.
++
++	See <http://hostap.epitest.fi/> for more information about the
++	Host AP driver configuration and tools.
++
++	This option includes the base Host AP driver code that is shared by
++	different hardware models. You will also need to enable support for
++	PLX/PCI/CS version of the driver to actually use the driver.
++
++	The driver can be compiled as modules and they will be called
++	"hostap.o" and "hostap_crypt_wep.o".
++
++config HOSTAP_FIRMWARE
++	bool "Support downloading firmware images with Host AP driver"
++	depends on HOSTAP
++	---help---
++	Configure Host AP driver to include support for firmware image
++	download. Current version supports only downloading to volatile, i.e.,
++	RAM memory. Flash upgrade is not yet supported.
++
++	Firmware image downloading needs user space tool, prism2_srec. It is
++	available from http://hostap.epitest.fi/.
++
++config HOSTAP_PLX
++	tristate "Host AP driver for Prism2/2.5/3 in PLX9052 PCI adaptors"
++	depends on PCI && HOSTAP
++	---help---
++	Host AP driver's version for Prism2/2.5/3 PC Cards in PLX9052 based
++	PCI adaptors.
++
++	"Host AP support for Prism2/2.5/3 IEEE 802.11b" is required for this
++	driver and its help text includes more information about the Host AP
++	driver.
++
++	The driver can be compiled as a module and will be named
++	"hostap_plx.o".
++
++config HOSTAP_PCI
++	tristate "Host AP driver for Prism2.5 PCI adaptors"
++	depends on PCI && HOSTAP
++	---help---
++	Host AP driver's version for Prism2.5 PCI adaptors.
++
++	"Host AP support for Prism2/2.5/3 IEEE 802.11b" is required for this
++	driver and its help text includes more information about the Host AP
++	driver.
++
++	The driver can be compiled as a module and will be named
++	"hostap_pci.o".
++
++config HOSTAP_CS
++	tristate "Host AP driver for Prism2/2.5/3 PC Cards"
++	depends on PCMCIA!=n && HOSTAP
++	---help---
++	Host AP driver's version for Prism2/2.5/3 PC Cards.
++
++	"Host AP support for Prism2/2.5/3 IEEE 802.11b" is required for this
++	driver and its help text includes more information about the Host AP
++	driver.
++
++	The driver can be compiled as a module and will be named "hostap_cs.o".
++
+ # yes, this works even when no drivers are selected
+ config NET_WIRELESS
+ 	bool
+diff -udrNP linux-2.6.2.orig/drivers/net/wireless/Makefile linux-2.6.2/drivers/net/wireless/Makefile
+--- linux-2.6.2.orig/drivers/net/wireless/Makefile	2004-02-04 04:45:13.000000000 +0100
++++ linux-2.6.2/drivers/net/wireless/Makefile	2004-02-07 12:47:32.000000000 +0100
+@@ -22,6 +22,12 @@
+ obj-$(CONFIG_AIRO)		+= airo.o
+ obj-$(CONFIG_AIRO_CS)		+= airo_cs.o airo.o
+ 
++obj-$(CONFIG_HOSTAP)		+= hostap.o hostap_crypt_wep.o \
++					hostap_crypt_tkip.o hostap_crypt_ccmp.o
++obj-$(CONFIG_HOSTAP_CS)		+= hostap_cs.o
++obj-$(CONFIG_HOSTAP_PLX)	+= hostap_plx.o
++obj-$(CONFIG_HOSTAP_PCI)	+= hostap_pci.o
++
+ # 16-bit wireless PCMCIA client drivers
+ obj-$(CONFIG_PCMCIA_RAYCS)	+= ray_cs.o
+ obj-$(CONFIG_PCMCIA_ATMEL)      += atmel_cs.o atmel.o 

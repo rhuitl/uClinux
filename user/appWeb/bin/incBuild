@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+#	incBuild -- Increment the build number.
+#	Copyright (c) Mbedthis LLC, 2003-2004. All Rights Reserved.
+#
+
+#
+#	Edit conf/config.cache
+#
+if [ -r conf/config.cache ]
+then
+	oldNum=`grep "BLD_NUMBER=" conf/config.cache | \
+		sed -e 's/BLD_NUMBER="//;s/"//'`
+	newNum=`expr $oldNum + 1`
+	cp conf/config.cache conf/.config.cache.sav 
+	sed -e "/BLD_NUMBER/s/[0-9][0-9]*/${newNum}/" <conf/.config.cache.sav \
+		>conf/config.cache
+	rm -f conf/.config.cache.sav
+	./configure --quiet
+fi

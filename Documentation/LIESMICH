@@ -1,0 +1,192 @@
+Datei:      LIESMICH
+Ort:        uClinux-dist/Documentation/
+Author:     Heiko Degenhardt (linux@sentec-elektronik.de)
+Inhalt:     Dies ist die Top-Level-LIESMICH fuer die Distribution.
+Version:    v01.01
+Datum:      Mit Apr  3 11:57:48 CEST 2002
+Lizenz:     Dieses Dokument steht unter der GNU GPL
+            (siehe uClinux-dist/COPYING)
+______________________________________________________________________
+
+CHANGES
+020403   v01.01 Korrektur "Ort", Typos
+         (hede)
+020325   v01.00 Erstellung
+         (hede)
+______________________________________________________________________
+
+uClinux/distribution
+====================
+
+Inhalt
+------
+
+1) Instruktionen fuer das Compilieren
+2) Aendern der Optionen/Bibliotheken fuer Applikationen/Kernel
+3) Compilieren fuer Debugging
+4) Layout der Sourcen
+5) Hinzufuegen einer Plattform
+6) Hinzufuegen einer Applikation
+7) FAQ
+
+
+1) Instruktionen fuer das Compilieren
+-------------------------------------
+
+  1. Sie brauchen einen Cross-Compiler fuer Ihren Target. Es gibt eine
+     ganze Reihe von Paketen mit Binary-Tools fuer das Compilieren von
+     uClinux. Sie sollten zunaechst eines dieser Pakete wie gewohnt
+     installieren. Wenn Sie beispielsweise fuer m68k oder ColdFire
+     entwickeln wollen, koennen Sie die Pakete der m68k-elf-tools
+     von www.uclinux.org verwenden.
+    
+  2. Wenn Sie das Paket mit den Quellen noch nicht ausgepackt haben,
+     sollten Sie dies jetzt tun, z. B. mit:
+     
+       tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+ 
+     Dies entpackt die Quellen in ein Verzeichnis "uClinux-dist".
+     Sie koennen dies in jedem beliebigen Verzeichnis tun, sollten
+     aber moeglichst Ihr eigenes Home-Verzeichnis als Basis verwenden.
+     (Es ist nicht empfehlenswert, als Root zu arbeiten! Es ist keine
+     gute Praxis, und wird sich definitiv eines Tages raechen!
+ 
+  
+  3. Nun in das Sourcen-Verzeichnis wechseln:
+  
+          cd uClinux-dist
+  
+  4. Fuer den Target konfigurieren:
+  
+          make xconfig
+  
+     (Sie koennen auch "make config" oder "make menuconfig" verwenden).
+  
+     Das erste Konfigurations-Menue ist selbsterklaerend wenn man den
+     Hersteller des Boards weiss, fuer das man entwickeln will.
+     Man kann hier auch einstellen, ob man die Kernel-Konfiguration
+     oder die der Anwendungen veraendern will.
+     
+     Es ist hier ratsam, zunaechst die Standart-Konfiguration fuer das
+     gewuenschte Target-Board zu verwenden. Damit sollte sich am
+     schnellsten ein funktionierendes Image erzeugen lassen.
+     
+     In Abhaengigkeit von der in diesem Schritt ausgewaehlten Plattform
+     wird dann im folgenden der Compilier-Prozess beeinflusst.
+
+	  Gelegentlich erscheinen nach "Save and Exit" eine ganze Reihe von
+     Fragen. Hier sollte man sich nicht verunsichern lassen. Dies ist
+     nur ein Zeichen dafuer, dass neue Konfigurationsoptionen in die
+     Kernel-Quellen eingefuegt wurden, fuer die es bisher noch keine
+     Standartwerte gibt. Wenn man ganz sicher gehen will, beantwortet
+     man am besten all diese Fragen mit "N".
+     
+  5. Erzeugen der Abhaengigkeiten:
+  
+          make dep
+  
+  6. Bau des Images:
+  
+          make
+  
+  
+  Das wars!
+  
+  Das "make" wird ein geeignetes Binaer-Image fuer die gewaehlte  
+  Ziel-Hardware erzeugen. Die exakten Dateinamen haengen vom
+  eingestellten Target ab. Typischeweise findet man eine Datei
+  "image.bin" im Unterverzeichnis "images".
+  
+  Wie man das Image in den Target laedt und startet haengt wieder
+  von der Hardware des Zielsystems ab. Hier sei auf die Beschreibung
+  des jeweiligen Herstellers verwiesen.
+  
+2) Aendern der Optionen/Bibliotheken fuer Applikationen/Kernel
+--------------------------------------------------------------
+
+Die beste Moeglichkeit fuer das Aendern der Konfiguration der
+Applikationen ist die Verwendung des config-Systems.
+Dies kann durch Aufruf eines der drei folgenden Kommandos geschehen:
+
+    make xconfig             - graphische (X11 basierte) Konfiguration
+    make menuconfig          - graphische (ncurses-basierte) Config
+    make config              - portabelste (aber langweiligste) Config
+                               auf Basis eines Shell-Script
+
+Bei Verwendung von X Window's kann "make xconfig" verwendet werden.
+Dies wird im weiteren Dokument angenommen, wobei der Aufruf
+entsprechend ersetzt werden kann.
+
+Die Optionen des ersten Config-Bildschirms sind:
+
+	Default all settings (lose changes)
+      Die Werte fuer die Konfiguration werden entsprechend denen im
+      Verzeichnis vendors/Vendor/Board gesetzt. Wenn Sie vorher
+      Aenderungen vorgenommen haben, gehen diese verloren.
+      Diese Option ist standartmaessig immer auf "N" gesetzt.
+
+	Customize Kernel Settings
+      Zum "Fein-Tunen" der Kernel-Config. ACHTUNG: Eine falsche
+      Einstellung im Kernel kann dazu fuehren, dass sich das Board
+      nicht mehr booten laesst!
+
+	Customize Vendor/User Settings
+      Fuer die Einstellung, welche Programme und Bibliotheken erzeugt
+      bzw. installiert werden sollen.
+      
+   Update Default Vendor Settings
+      Soll die gerade erstellte Konfiguration als neue Standart-Config
+      fuer den Vendor verwendet werden. Diesen Punkt sollte man nur
+      auswaehlen, wenn man sich von der Funktionsfaehigkeit des
+      geaenderten Images ueberzeugt hat.
+      
+Wenn Sie ein Verzeichnis fuer Module angelegt haben, die ausserhalb
+der Kernel-Quellen erzeugt werden sollen, befindet sich hier ebenfalls
+eine Konfigurations-Option dafuer.
+
+Nach "Save and Exit" werden alle fuer eine Neukonfigurierung
+ausgewaehlten Menues durchlaufen.
+
+3) Compilieren fuer Debugging
+-----------------------------
+
+Etwas was Sie sicher benoetigen werden ist die Moeglichkeit, die
+Quellen fuer symbolisches bzw. Source-Debugging zu compilieren.
+Dies ist leicht einzustellen, aber schwer zu finden. :-)
+
+	* Ausfuehren von "make xconfig"
+	* Waehlen von "Customize Kernel Settings"
+	* Waehlen von "Customize Vendor/User Settings"
+	* Save and Exit
+
+Im Menu "kernel config", gehen Sie auf die "Kernel Hacking"-Sektion
+und schalten "Full symbolic/source level debugging" ein.
+
+
+4) Layout der Sourcen
+---------------------
+
+Siehe das Dokument ./SOURCE dieser Distribution.
+
+5) Hinzufuegen einer Plattform
+------------------------------
+
+Siehe das File ./Documentation/Adding-Platforms-HOWTO.
+
+6) Hinzufuegen einer Applikation
+--------------------------------
+
+Siehe Datei ./Documentation/Adding-User-Apps-HOWTO.
+
+7) FAQ
+------
+
+Noch nichts derzeit.
+
+______________________________________________________________________
+HINWEIS: Diese Datei ist eine Uebersetzung der Top-Level-README.
+Sie ist keinesfalls vollstaendig, und soll nur einen ersten Einstieg
+in die Distribution ermoeglichen. Hinweise auf Fehler, Verbesserungen
+etc. fuer die deutsche Version bitte an mich.
+Heiko Degenhardt (linux@sentec-elektronik.de).
+

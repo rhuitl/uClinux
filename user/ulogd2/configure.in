@@ -1,0 +1,70 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT
+
+AM_INIT_AUTOMAKE(ulogd, 2.0.0beta1)
+AM_CONFIG_HEADER(config.h)
+
+dnl Checks for programs.
+AC_PROG_MAKE_SET
+AC_PROG_CC
+AC_PROG_INSTALL
+AM_PROG_LIBTOOL
+
+dnl Checks for libraries.
+AC_CHECK_LIB(dl, dlopen)
+AC_CHECK_HEADER(pcap.h,HAVE_PCAP_H=true)
+
+dnl Checks for header files.
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_CHECK_HEADERS(fcntl.h unistd.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+
+dnl Checks for library functions.
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS(socket strerror)
+
+AC_CHECK_HEADER([libnetfilter_log/linux_nfnetlink_log.h], [AC_MSG_RESULT([found])],
+		[AC_MSG_ERROR([libnetfilter_log Version 0.0.11 or later needed])])
+
+AC_CHECK_HEADER([libnetfilter_conntrack/libnetfilter_conntrack.h], [AC_MSG_RESULT([found])],
+		[AC_MSG_ERROR([libnetfilter_conntrack Version 0.0.11 or later needed])])
+
+
+CT_CHECK_POSTGRES_DB()
+AM_CONDITIONAL(HAVE_PGSQL, test "x$PQLIBPATH" != "x")
+
+CT_CHECK_MYSQL_DB()
+AM_CONDITIONAL(HAVE_MYSQL, test "x$MYSQL_LIB" != "x")
+
+CT_CHECK_SQLITE3_DB()
+AM_CONDITIONAL(HAVE_SQLITE3, test "x$SQLITE3_LIB" != "x")
+
+CT_CHECK_PCAP()
+AM_CONDITIONAL(HAVE_PCAP, test "x$PCAP_LIB" != "x")
+
+
+dnl AC_SUBST(DATABASE_DIR)
+dnl AC_SUBST(DATABASE_LIB)
+dnl AC_SUBST(DATABASE_LIB_DIR)
+dnl AC_SUBST(DB_DEF)
+dnl AC_SUBST(EXTRA_MYSQL_DEF)
+dnl AC_SUBST(EXTRA_PGSQL_DEF)
+
+dnl AC_SUBST(DATABASE_DRIVERS)
+dnl AC_SUBST(HAVE_PCAP_H)
+
+dnl AM_CONDITIONAL(HAVE_MYSQL, test x$mysqldir != x)
+dnl AM_CONDITIONAL(HAVE_PGSQL, test x$pgsqldir != x)
+
+AC_OUTPUT(doc/Makefile \
+	  include/Makefile include/ulogd/Makefile include/libipulog/Makefile \
+	  libipulog/Makefile \
+	  input/Makefile input/packet/Makefile input/flow/Makefile \
+	  filter/Makefile filter/raw2packet/Makefile filter/packet2flow/Makefile \
+	  output/Makefile output/pcap/Makefile output/mysql/Makefile output/pgsql/Makefile output/sqlite3/Makefile \
+	  src/Makefile Makefile Rules.make ulogd.conf)

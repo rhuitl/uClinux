@@ -1,0 +1,116 @@
+IP Autoforward for Linux kernels 2.0.0 - June 28, 1996
+Written by Richard Lynch (rlynch@scoot.netis.com)
+
+This patch allows linux masquerading available in the 2.0.0 kernel to work
+with programs such as RealAudio which don't send out a packet on all ports
+they wish to receive on.
+
+For the curious, the patch works by adding an entry to the kernel
+masquerading table (viewed from /proc/net/ip_masquerade) whenever a packet
+is received on a given range of ports. Normally, the masquerading code
+takes care of this, but it can only do so if the masqueraded host first
+sends a packet on one of those ports. Programs like RealAudio only send
+packets out on one port (7070) and expect to receive packets on a wide range
+of ports (6970-7170 inclusive). Without the patch, any packet received on a
+port other than 7070 would be discarded.
+
+The patch is installed by going to the linux kernel directory, doing a
+"patch -p1 < /whereever/ipautofw/2.0.0/ipautofw-2.0.0.diff" and
+recompiling.  Next, compile the control program by doing a "make" and "make
+install" Finally add the configuration commands to your /etc/rc.d/rc.inet1
+or /etc/rc.d/rc.local. They should be in the following format:
+
+ipautofw -A -r <proto> <low> <high> [-h <hiddenhost>] [-c <ctltype> <ctlport>]
+
+The <proto> parameter should be either tcp or udp, depending on the type of
+packet that will be received (generally udp). <low> and <high> specify the
+range of ports which should be forwarded to <hiddenhost>. <ctltype> and
+<ctlport> are optional parameters to replace the -h option to determine which
+host packets should be sent to. When ever a connection is opened to port
+<ctlport>, protocol <ctltype>, the IP address of that host is saved and
+will receive packets on the specified ports.
+
+Here's an example installation/configuration:
+
+cd /usr/src/linux 
+patch -p1 < /usr/local/src/ipautofw/2.0.0/ipautofw-2.0.0.diff 
+make mrproper 
+make config 
+make dep 
+make clean 
+make zlilo 
+cd /usr/local/src/ipautofw/2.0.0
+make
+make install
+
+Then add the following line to either /etc/rc.d/rc.inet1 or
+/etc/rc.d/rc.local
+
+/sbin/ipautofw -F
+/sbin/ipautofw -A -r udp 6970 7170 -c tcp 7070
+
+The ipautofw line sets up linux to forward packets on udp ports 6970-7170
+inclusive to the last masqueraded host which sent a tcp packet on port 7070
+(RealAudio's control connection).
+
+After adding the lines, reboot and the masqueraded machines should be able
+to use RealAudio!
+
+Help on additional parameters is available by running ipautofw without any
+parameters. Please don't use single port redirection yet (-p), it won't work
+and might even make your system a little unstable.
+
+The following is a listing of some common programs which need an ipautofw
+entry:
+
+RealAudio: 
+tcp 7070 
+udp 6970-7170
+
+Internet Phone: 
+udp 22555
+
+StreamWorks:
+udp 8000
+
+PowWow:
+tcp 13223
+
+WebPhone:
+tcp 21845 
+udp 21845
+
+Note: I haven't tested all these apps, I'm copying the list from the slirp
+documentation which has some common configurations listed. Some may work,
+some may not.
+
+John Fulmer (jfulmer@blanket.com) has also been able to get ipautofw to
+redirect X sessions. He accomplished this by redirecting tcp ports 6000-6100
+to the masqueraded machine running X windows and using udp port 177 and tcp
+ports 23 and 6000 as the control ports. Here are the commands he's using to
+get it to work.
+
+/sbin/ipautofw -A -r tcp 6000 6100 -c tcp 23
+/sbin/ipautofw -A -r tcp 6000 6100 -c udp 177
+/sbin/ipautofw -A -r tcp 6000 6100 -c tcp 6000
+
+Please direct any questions regarding X windows to him as I have little
+experience with X.
+
+He has also determined that RealAudio for Linux uses an unusual port range,
+udp ports 1024-2048. This is probably a bug that will go away, but if anyone
+else is running RealAudio for Linux and the default port range, 6970-7170,
+doesn't work, you might want to try 1024-2048. The following command
+implements that:
+
+/sbin/ipautofw -A -r udp 1024 2048 -c tcp 7070
+
+Many thanks to John Fulmer for his help.
+
+If you have any questions or comments about the patch, or especially if
+you're having trouble getting the patch to work, please let me know at
+rlynch@scoot.netis.com (it's hard to fix a problem I don't know exists). I
+just rewrote the readme file today and I've started rechecking the patch
+today so I'd really appreciate any input you may have on how things are
+working and if the readme file still makes sense.. Updates should be
+available from ftp://ftp.netis.com/pub/members/rlynch/

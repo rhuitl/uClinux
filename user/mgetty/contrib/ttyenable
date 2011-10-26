@@ -1,0 +1,423 @@
+From colin!hphbbs.E.open.DE!hph Sat May 21 23:02:58 1994
+Return-Path: <colin!hphbbs.E.open.DE!hph>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0q4yC9-0001kqC@greenie.muc.de>; Sat, 21 May 94 23:02 MEST
+Received: from mail.Germany.EU.net ([192.76.144.65]) by colin.muc.de with SMTP id <135940(1)>; Sat, 21 May 1994 17:57:30 +0200
+Received: by mail.Germany.EU.net with SMTP (8.6.5:29/EUnetD-2.4.3.c) via EUnet
+	id RAA20948; Sat, 21 May 1994 17:57:28 +0200
+Received: by ruhr.de (/\88/\ Smail3.1.22.1 #22.6)
+	id <m0q4vGW-000wpwC@ruhr.de>; Sat, 21 May 94 17:55 GMT
+Received: by hphbbs.E.open.DE (Smail3.1.28.1 #6)
+	id m0q4szj-0004s4C; Sat, 21 May 94 17:29 MET DST
+Message-Id: <m0q4szj-0004s4C@hphbbs.E.open.DE>
+From:	hph@hphbbs.E.open.DE (H.P.Heidinger)
+Subject: ttyenable/-disable V1.5
+To:	oklein@smallo.BO.open.de (Olaf Klein),
+	gert@greenie.muc.de (Gert Doering)
+Date:	Sat, 21 May 1994 17:29:46 +0200
+Reply-To: hph@hphbbs.E.open.DE
+Organization: HPHBBS - UseNet City-Router, Essen (Germany)
+Phone: +49-201-287433 (data+voice) Voice = 3 times 1 ring, wait on 4th call
+X-Mailer: ELM [version 2.4 PL23]
+Content-Type: text
+Content-Length: 10697     
+Status: RO
+
+Hi,
+
+   Anbei kommt ttyenable/-disable V1.5.
+   Gegenueber V1.2 sind folgende Maengel behoben:
+
+   	- ein Bug, nachdem zB ttyS2 und ttyS20..29 gleich handelt
+	  wurden (in Funktion 'isTTY'):
+	     
+ 	  alt:  gotcha=`find /dev -type c -follow|grep /dev/$token`	&&\
+ 	  neu:  gotcha=`find /dev -type c -follow|grep -w /dev/$token`	&&\
+
+	  Hinweis: das "ange'pipe'te" grep ist absolut notwendig, weil
+	  "find" leider IMMER einen Exit-Code von 0 (true) ausspuckt,
+	   wenn er nicht SELBST aus irgendwelchen Gruenden kaputt geht.
+	   Wenn "ls" nicht so eloquent waere, wenn das gesuchte Device
+	   NICHT existiert ("No such blafasel ..."), wuerde sich das
+	   zeitaufwendige "find|grep" auch ersetzen lassen.
+	   Vorschlaege??
+
+        - ein Crosscheck gegen die temporaere 'inittab', um mehrfache
+	  gettys auf dem selben Device aber unter verschiedenen Labels
+	  auszuschliessen (siehe Programmtext, Funktion: 'crosscheck'
+
+--------------------------- 8< schnipp ... schnapp 8< --------------------------
+#!/bin/sh 
+#set -x
+###############################################################################
+# /etc/ttyenable (link to /etc/ttydisable as well)	-- for LINUX
+# (C)May-1994, H.P. Heidinger, Essen, Germany -- All rights released!
+# -----------------------------------------------------------------------------
+# Rights: -rwx------   1 root     root            0 May 13 14:29 /etc/ttyenable
+# -----------------------------------------------------------------------------
+#   Enable/Disable tty channels in the inittab-file; i.e. change the
+#   entry for a given device from :off: to :respawn: and vice-versa.
+#
+#   Usage: a){ttyenable|ttydisable} [-D] [ -v] [ -h] <spec>
+# 	   b){ttyenable|ttydisable} [-D] [ -v] [ -h] { -d <device> | -l <label>}
+#
+#   Mode a) is auto-detection. The program checks itself whether <spec>
+#   was a label in inittab or a device name.
+#
+#   Mode b) might be used in tough situations, where one needs to specify
+#   explicitly whether a label or device is meant.
+#
+#   Options:
+#	-h hangup init process
+#	-v verbose on
+#	-D debug on
+# 	-d <device> 
+#	-l <label>
+#
+#   Although mode b) is actually not needed it is supplied via commandline
+#   options, since the corresponding modules are in this program.
+#
+########################### RCS stamps ########################################
+# $Id: ttyenable,v 1.5 1994/05/21 14:49:50 root Exp root $
+# $Log: ttyenable,v $
+# Revision 1.5  1994/05/21  14:49:50  root
+# some cosmetics at error reporting
+#
+# Revision 1.4  1994/05/15  19:59:57  root
+# fixed a bug in device checking: e.g. ttyS2 and ttyS2? were treated even
+#
+# Revision 1.3  1994/05/15  16:01:31  root
+# added device checking
+# added crosschecking for multiple gettys on the same device
+# ... with different labels
+#
+# Revision 1.2  1994/05/14  12:30:50  root
+# added auto-determination (device or label)
+#
+# Revision 1.1  1994/05/13  18:23:13  root
+# Initial revision
+#
+#
+###############################################################################
+
+#################################
+#	Constants
+#################################
+InitTab=/etc/inittab
+LockDir=/usr/spool/uucp
+TTYmajors="4 5"
+
+DEBUG=0
+VERBOSE=0
+
+###################################
+#	Globals
+###################################
+Entry=''
+Linenum=''
+Label=''
+Device=''
+Major=''
+Minor=''
+
+trap cleanup 0
+
+#################################
+#	Functions
+#################################
+cleanup()	{ rm -f $InitTab.tmp }
+handlerrors()	{ echo "$Linenum"; exit 1 }
+fatal()		{ echo "$0: PROGRAM ERROR: $1 .. exiting"; exit 1 }
+die()		{ echo "$0: Nothing appropriate $*"; exit -1 }
+
+view()		{ echo "$*" >/dev/tty }
+
+##+
+# Look up a token in /dev; 
+# If found clarify whether it is:
+#   - a character device ... AND ...
+#   - a tty (system-specific, [see 'TTYmajors' above])
+#
+# We return 'true' (0) to indicate that the device exists (by name, sym-links
+# are followed) and IS a tty -- otherwise we point out 'false' (1)
+#
+##-
+isTTY() {
+local token=$1
+local gotcha=''
+local major=''
+local minor=''
+local i
+
+	gotcha=`find /dev -type c -follow|grep -w /dev/$token`	&&\
+	major=`ls -lL $gotcha |awk '{print $5}'|cut -f1 -d","`	&&\
+	minor=`ls -lL $gotcha |awk '{print $6}'`
+
+	if [ -z $gotcha ] 
+	then return 1
+	else	
+		for i in $TTYmajors
+		do
+		   if [ .$major = .$i ]
+		   then
+			Major=$major
+			Minor=$minor
+			Device=$token
+
+		        if [ $VERBOSE = 1  -o  $DEBUG = 1 ] 
+		        then
+		            view "Found device '$Device' ($Major,$Minor)"
+		        fi
+			return 0
+		   fi
+		done
+	fi
+	return 1
+}
+
+
+##+
+# Determine the device associated with a label (found in field 4 of inittab)
+# The major/minor-combo identifies the device definitely
+#
+# On entry we have a bare label.
+#
+# On exit we flag OK (return 0) and have set $Major/$Minor (global) by 'isTTY'
+# Further we know the unique line number (global) in inittab and grabbed 
+# that entry (global) for further investigations.
+#
+# Otherwise we give notice to die ... i.e. return 1 ... nah! we just die
+##-
+scandevice() {
+local tokenlist
+local i
+
+	Linenum=`lookup_lab $1` 
+	case $Linenum in
+		ERROR*)	return 1
+		;;
+		[1-9]*) Entry=`sed -ne $Linenum\p $InitTab` \
+			&& tokenlist=`echo $Entry | awk -F":" '{print $4}'`
+		;;
+		*)	die 
+	esac
+	
+	if [ $DEBUG = 1 ]
+	then
+		view Line: $Linenum '=' $Entry
+		view Tokenlist: $tokenlist
+	fi
+
+	###
+	# Run over all tokens in field 4 and determine the device
+	###
+	for i in $tokenlist
+	do
+		if [ $DEBUG = 1 ]; then view "Dev-check $i";fi
+		
+		if isTTY $i
+		then return
+		fi
+	done
+	
+	# Should never be reached
+ 	# bad times for liers ... empty tokenlist :-))
+	die ": no associated device determined for $Label"
+}
+
+
+##+
+# We have to take care that we never activate 2 gettys for the same device.
+# This might easily be done, if we access the entry via a label; e.g.:
+#
+#	f1:2345:respawn:/etc/getty 19200 modem
+#	v1:2345:off:/usr/local/etc/vgetty -s 38400 modem
+#
+# A simple 'ttyenable v1' would do the trick ... which we avoid here.
+##-
+crosscheck() {
+local regex=".*:respawn:.*getty.*$Device"
+local unique
+
+	unique=`egrep -v "^[ \t]*\#" $InitTab.tmp | egrep -c "$regex"`
+
+	if [ $unique != 1 ]
+	then
+	    view "FATAL: Would produce multiple gettys on device /dev/$Device"
+	    view "`egrep -v "^[ \t]*\#" $InitTab.tmp | egrep "$regex"`"
+	    die ": switch off other devices first"
+	fi
+}
+
+##+
+# Return a unique line number in inittab or flag "ERROR..."
+##-
+lookup_dev() {
+	awk -F":" -v whichdevice=$1 '
+	BEGIN { count=0 }
+	/^[ \t]*\#/	{ next } # ignore comment lines
+	/^[ \t]*$/	{ next } # ... and empty lines too
+			{ if (index($4, whichdevice) != 0) { ++count; linum=NR } }
+	END { if (count == 1) 
+	           print linum
+	      else if (count < 1)
+			print "ERROR: not found ",whichdevice
+		   else print "ERROR: ambiguous ",whichdevice,count,"times"  
+	}
+	' $InitTab
+}
+
+##+
+# Return a unique line number in inittab or flag "ERROR..."
+#
+# Note that a LABEL in inittab can only exist once or init would complain
+# ... makes it easier here
+##-
+lookup_lab() {
+	awk -F":" -v whichlabel=$1 '
+	BEGIN { count=0 }
+	/^[ \t]*\#/	{ next } # ignore comment lines
+	/^[ \t]*$/	{ next } # ... and empty lines too
+			{ if (index($1, whichlabel) == 1) { ++count; linum=NR } }
+	END {	if (count == 1) 
+		     print linum
+		else print "ERROR: no such Label",whichlabel
+	}
+	' $InitTab
+}
+
+lookup() {
+	case $Mode in
+		DEV)	 echo `lookup_dev $1` ;;
+		LAB)	 echo `lookup_lab $1` ;;
+	esac
+}
+
+log() {  
+     case $0 in
+     	*ttyenable)	TAG="to on"	;;
+     	*ttydisable)	TAG="to off"	;;
+     esac
+
+     case $Mode in
+	  DEV) logger "Changed (ge)tty state for device: \"$Device\" $TAG" ;;
+	  LAB) logger "Changed (ge)tty state for label: \"$Label\" $TAG"  ;;
+     esac
+}
+
+seton() {
+	eval sed  -e "$Linenum\s/:off:/:respawn:/" $InitTab >$InitTab.tmp  \
+	&& crosscheck \
+	&& (mv $InitTab.tmp $InitTab; log)
+}
+
+
+
+setoff() {
+	eval sed -e "$Linenum\s/:respawn:/:off:/" $InitTab >$InitTab.tmp \
+	&& ( mv $InitTab.tmp $InitTab; log)
+}
+
+change() {
+	case $0 in
+	     *ttyenable)	seton	;;
+	     *ttydisable)	setoff	;;
+	esac
+}
+
+usage() { echo $0 '[ -D][ -h][ -v] { -d <device> | -l <label> | spec }' }
+
+
+##################################################################
+#
+#	 Main program
+#
+##################################################################
+while getopts "Dvhd:l:" arg
+do
+	case $arg in
+	    D)  DEBUG=1		;;
+	    v)  VERBOSE=1	;;
+	    h)	HANGUPINIT=1	;;
+	    d)	Device=`echo "$OPTARG"`;	Mode="DEV" ;;
+	    l)	Label=`echo "$OPTARG"`;		Mode="LAB" ;;
+	    ?)	usage; exit ;;
+	esac
+done
+
+if [ "$OPTIND" -gt 1 ] ; then shift $[$OPTIND - 1]; fi
+
+
+if [ .$Mode = "." ]
+then
+	if [ $# = 0 ]; then usage; exit; fi
+	
+	if egrep -q "^$1\:" $InitTab
+	then
+		Mode=LAB
+		Label=$1
+	else
+		Mode=DEV
+		Device=$1
+	fi
+fi
+
+
+#######################################################################
+# 1st step: no-one except root can do
+# (although above rights should be set propperly and thus do the job)
+#######################################################################
+
+	if [ $LOGNAME != root ]
+	then
+		echo "$0: Sorry, only 'root' can do .. bye"
+		exit
+	fi
+
+##########################################################
+# 2nd step: get an unambiguous line from the inittab-file
+##########################################################
+
+	###
+	# Check the junk which the user hacked in ...
+	###
+	case $Mode in
+	     DEV) isTTY		$Device	&& Linenum=`lookup $Device` ;;
+	     LAB) scandevice	$Label	;; # Linenum will be set by scandevice
+	     *)	  fatal "no mode"
+	esac
+
+	###
+	# Either we have now a number in 'Linenum' which designates the line
+	# where the entry in inittab was found or the string "ERROR..."
+	# In the latter case we can't go on.
+	###
+	case $Linenum in
+		ERROR*)	handlerrors ;;
+		[1-9]*)	change 
+			######################################################
+			# If we reach here everything went fine
+			# So if the user requested to restart 'init' do so ...
+			######################################################
+			if [ .$HANGUPINIT != "." ]; then init Q; fi
+		;;
+		*)	die ;;	# Oh, well ....
+	esac
+
+# well ... done! welldone?
+exit 0
+--------------------------- 8< schnipp ... schnapp 8< --------------------------
+
+
+    Kritik ist willkommen ...
+
+Gruss, Peter	
+-- 
+####################===============================****************************
+# H.P. Heidinger   # Call  : +49-201-287433 (data) *      ~~ HPHBBS  ~~       *
+# Steeler Str. 121 #       : V22/32/42bis/FAX, 8N1 *    UseNet City-Router    *
+# 45138 Essen      # E-Mail: hph@hphbbs.E.open.de  *    for Essen/Germany     *
+# Germany          # Login : guest, gast, public   * anon. UUCP nuucp/nuucp   *
+####################===============================****************************
+# A supercomputer is a machine, that runs an endless loop in just 2 seconds   #
+

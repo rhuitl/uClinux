@@ -1,0 +1,27 @@
+CC=@CC@
+DEBUG=@DEBUG@
+DEFINES=@DEFINES@
+CFLAGS=-Wall ${DEFINES} ${DEBUG} -c
+LFLAGS=-Wall ${DEFINES} ${DEBUG} -o
+OBJS=radauth.o md5.o
+BIN=radauth
+LIBS=@LIBS@
+
+all: ${OBJS}
+	${CC} ${LFLAGS} ${BIN} ${OBJS} ${LIBS}
+
+radauth.o: radauth.c
+	${CC} ${CFLAGS} radauth.c -o radauth.o
+
+md5.o: md5.c
+	${CC} ${CFLAGS} md5.c -o md5.o
+
+install: ${OBJS}
+	cp radauth /usr/local/bin/radauth
+	chmod 755 /usr/local/bin/radauth
+
+distclean:
+	rm -f core ${BIN} *.o config.status config.cache Makefile config.log
+
+clean:
+	rm -f core ${BIN} *.o

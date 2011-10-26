@@ -1,0 +1,433 @@
+<!DOCTYPE HTML PUBLIC "-//W3C/DTD/ HTML 3.2//EN">
+
+<HTML>
+
+    <HEAD>
+        <TITLE>LIRC - Linux Infrared Remote Control</TITLE>
+        <META NAME="description" CONTENT="LIRC - linux infrared remote control">
+        <META NAME="keywords" CONTENT="linux, kernel module, remote control, animax, multimedia">
+    </HEAD>
+
+    <BODY BACKGROUND="../images/marb18.jpg"
+          BGCOLOR="#FFFFFF" TEXT="#000000" LINK="#7070E0" 
+          VLINK="#808080" ALINK="#8080FF">
+        <TABLE WIDTH="100%" BORDER="0" CELLSPACING="0" CELLPADDING="0">
+            <TR>
+                <TD WIDTH="100%" HEIGHT="150" BGCOLOR="#000080" 
+                    ALIGN="RIGHT" VALIGN="TOP">
+                <IMG SRC="../images/diode.gif" ALT=""
+                     WIDTH="300" HEIGHT="150" BORDER="0" HSPACE="20"
+                     VSPACE="0" ALIGN="LEFT"> 
+                <IMG SRC="../images/lirc.gif" ALT=""
+                     WIDTH="300" HEIGHT="150" BORDER="0" HSPACE="20"
+                     VSPACE="0" ALIGN="RIGHT">
+                </TD>
+            </TR>
+            <TR>
+                <TD WIDTH="100%" ALIGN="LEFT" VALIGN="TOP">&#160;<BR>
+                    <TABLE WIDTH="100%" BORDER="0" CELLSPACING="0" CELLPADDING="0"
+                           HSPACE="0" VSPACE="0">
+                        <TR>
+                            <TD WIDTH="15%">&#160;<BR></TD>
+                            <TD WIDTH="70%" ALIGN="LEFT" VALIGN="TOP">&#160;<BR>
+
+<!-- Text ------------------------------------------------------------------->
+
+
+
+
+    <!-- lircd.conf --------------------------------------------------------->
+
+<A NAME="lircd.conf"><HR></A>
+<H1 ALIGN="CENTER">Configuring lircd (the LIRC daemon)</H1>
+<HR WIDTH="70%">
+
+<OL>
+<LI>Check if there is already a config file in
+<em>/usr/local/etc/lircd.conf</em>. If not</LI>
+
+<LI>check if there is a config file available for your remote control
+at the LIRC homepage and copy it to
+<em>/usr/local/etc/lircd.conf</em>. If not</LI>
+
+<LI>start <em>irrecord</em> (finish all applications that access
+<em>/dev/lirc</em> first) and follow the instructions given to you by
+this program. Copy the resulting file to
+<em>/usr/local/etc/lircd.conf</em>.
+</OL>
+
+<P>If you want to use more than one remote control you can simply
+concatenate the config files: <em>cat config1 config2
+&gt;config</em></P>
+
+<P><B>Note:</B> If you already have a config file for the libirman
+package you can convert it using the <em>irman2lirc</em> script that
+you can find in the contrib directory.</P>
+
+    <!-- lircd.conf fileformat ---------------------------------------------->
+
+<A NAME="lircd.conf_format"><HR></A>
+<H1 ALIGN="CENTER">The lircd.conf file format</H1>
+<HR WIDTH="70%">
+
+<P>There's no description of the file format available. In fact you
+don't need to know anything about it except that it's maybe the most
+important part of the package.</P>
+
+    <!-- lircmd.conf -------------------------------------------------------->
+
+<A NAME="lircmd.conf"><HR></A>
+<H1 ALIGN="CENTER">Configuring lircmd (the LIRC mouse daemon)</H1>
+<HR WIDTH="70%">
+
+<P><em>lircmd</em> can be used to emulate a mouse with your remote
+control. Depending on the config file described in the next section it
+converts IR signals into mouse events. It currently supports two mouse
+protocols. For compatibility reasons the default protocol is the
+MouseSystems protocol but the preferred is the IMPS/2 protocol. The
+advantage of this protocol is its wheel-mouse support. That way you
+can for example configure Netscape to scroll if you press certain
+buttons.</P>
+
+<P>lircmd can basically be used with two applications: X11 and gpm<BR>
+
+Configuration of both is described here:</P>
+
+<H3>X11</H3>
+
+
+<H4>3.x</H4>
+<P>Just put this section in your XF86Config file to use the mouse in
+addition to your normal one.</P>
+
+<PRE>
+    Section "XInput"
+        Subsection "Mouse"
+            Protocol    "IMPS/2"
+            Device      "/dev/lircm"
+            DeviceName  "Remote"
+            AlwaysCore
+        EndSubsection
+    EndSection
+</PRE>
+Additionally you might have to add
+<PRE>
+        Buttons 5
+</PRE>
+to your normal &quot;Pointer&quot; Section in order to make the wheel
+buttons work. Of course you have to replace IMPS/2 with MouseSystems if
+you really want to use this protocol. Colas Nahaboo's <A
+HREF="http://www.inria.fr/koala/colas/mouse-wheel-scroll/">X mouse
+wheel scroll page</A> gives you further information how to make use of
+your new wheel mouse.</P>
+
+<P>Make sure you use a current version of X11. There seems to be a bug
+in X version 3.3 that can make X crash if you use both mouse and
+remote control mouse simultaneously. At least I couldn't reproduce
+this with other versions. I also received some notes that lircmd does
+not work with certain X11 versions. But almost always at least one of
+the protocols did work. So try them both before trying another X11
+version. But always remember that you have to modify both XF86Config and
+lircmd.conf so they use the same protocol.</P>
+
+<H4>4.x</H4>
+<P>
+I received this configuration from a user. I didn't test it myself yet.
+</P>
+<PRE>
+Section "InputDevice"
+        Identifier  "Mouse2"
+        Driver      "mouse"
+        Option      "Protocol" "ImPS/2"
+        Option      "Device" "/dev/lircm"
+        Option      "DeviceName" "Remote"
+        Option      "AlwaysCore"
+        Option      "Buttons" "5"
+EndSection
+</PRE>
+
+<H3>gpm</H3>
+
+<P>You can also e.g. use <em>multimouse</em> (available at <A
+HREF="ftp://sunsite.unc.edu/">ftp://sunsite.unc.edu/</A> or mirrors)
+or <em>gpm</em> to use it parallel to your normal mouse. With:
+<PRE>
+    gpm -t ps2 -R -M -m /dev/lircm -t imps2
+</PRE>
+resp.<BR>
+<PRE>
+    gpm -t ps2 -R -M -m /dev/lircm -t msc
+</PRE>
+
+I can use my usual PS/2 mouse and my remote control (IMPS/2
+resp. MouseSystems protocol) at the same time to control the mouse
+pointer.</P>
+
+<P><B>Note:</B> If you update lircmd.conf you can send the HUP signal
+to lircmd:
+<PRE>
+killall -HUP lircmd
+</PRE>
+This instructs lircmd to reread its config file. The same is true for
+lircd if you change lircd.conf. lircd will also reopen its log file on
+SIGHUP.</P>
+
+
+
+    <!-- lircmd.conf fileformat --------------------------------------------->
+
+<A NAME="lircmd.conf_format"><HR></A>
+<H1 ALIGN="CENTER">The lircmd.conf file format</H1>
+<HR WIDTH="70%">
+
+<P>The config file for lircmd is quite simple. Just look at the
+example in the contrib directory. Some drivers even already bring
+their config file for lircmd with them so lircmd is ready to run.</P>
+
+<DL>
+<DT>PROTOCOL&nbsp;&nbsp;&lt;<em>protocol</em>&gt;</DT>
+<DD>
+<P>
+You can choose between MouseSystems and IMPS/2 protocol. The default
+is MouseSystems protocol.
+</P>
+</DD>
+<DT>ACCELERATOR&nbsp;&nbsp;&lt;<em>start</em>&gt; &lt;<em>max</em>&gt; &lt;<em>multiplier</em>&gt;</DT>
+<DD>
+<P>
+Change the values here if your mouse pointer is moving too
+fast/slow. Usually the mouse pointer moves 1 pixel every time it
+receives a signal. The values here specify how much mouse movement
+accelerates if you hold down the according button on your remote
+control for a longer timer. The <em>start</em> value is the threshold
+that starts acceleration. Then the amount of pixels is calculated with
+the following formula: <em>x</em>=<em>repeat</em>*<em>multiplier</em>,
+where repeat is the number of repeated signals. <em>max</em> specifies
+the maximum number of pixels the pointer can move due to a single
+command.
+</P>
+</DD>
+<DT>ACTIVATE&nbsp;&nbsp;&lt;<em>remote</em>&gt; &lt;<em>button</em>&gt;</DT>
+<DT>TOGGLE_ACTIVATE&nbsp;&nbsp;&lt;<em>remote</em>&gt; &lt;<em>button</em>&gt;</DT>
+<DD>
+<P>
+I recommend that you use a special button to activate the mouse daemon
+with this command. You will see whenever the daemon is
+activated/deactivated directly on the screen. If you omit this command
+the daemon will always be active.
+</P>
+<P>
+The difference between ACTIVATE and TOGGLE_ACTIVATE is how you leave
+the mouse mode. With TOGGLE_ACTIVATE you have to press the button that
+you use to enter the mode to leave it. With ACTIVATE you will leave
+mouse mode as soon as you press a button that is not used for any
+function in the config file.
+</P>
+</DD>
+<DT>MOVE_ [ N [ E | W ] | E | S [ E | W ] | W ]&nbsp;&nbsp;&lt;<em>remote</em>&gt; &lt;<em>button</em>&gt;</DT>
+<DD>
+<P>
+The obvious functionality. You can even get better granularity by
+combing different commands (copied from the config file for AnimaX
+remotes):
+<PRE>
+MOVE_N    ANIMAX_MOUSE_PAD   MOUSE_NNE
+MOVE_NE   ANIMAX_MOUSE_PAD   MOUSE_NNE
+</PRE>
+This also demonstrates that all commands are executed beginning at the
+top.
+</P>
+</DD>
+<DT>MOVE_[IN|OUT]&nbsp;&nbsp;&lt;<em>remote</em>&gt; &lt;<em>button</em>&gt;</DT> 
+<DD>
+<P>
+This will only work with the IMPS/2 protocol and indicates movement of
+the wheel.
+</P>
+</DD>
+</DL>
+
+'*' is allowed as wild card for button and remote. Please note that
+every line that fits to the received signal will be executed. Parsing
+starts at the top of the file.</P>
+
+
+    <!-- .lircrc fileformat ------------------------------------------------->
+
+<A NAME="lircrc_format"><HR></A>
+<H1 ALIGN="CENTER">The .lircrc file format</H1>
+<HR WIDTH="70%">
+
+<P>At this point all you need are the tools, which react on the
+signals decoded by lircd. To do this you need a file called
+<em>.lircrc</em>. It should be placed in your home directory. The idea
+is to have configuration information of all clients in one place. That
+lets you keep a better overview of clients and simplifies the use of
+modes explained later.</P>
+
+<P>First I will explain the syntax of the .lircrc file itself.  The
+config file for LIRC tools consists of one or more of the following
+constructions:</P>
+
+<PRE>
+    begin
+	prog	= ...
+	remote	= ...
+	button	= ...
+	repeat	= ...
+	config	= ...
+	mode	= ...
+	flags	= ...
+    end
+</PRE>
+
+<P>Bringing it to the point the above says which program
+(<em>prog</em>) should do what (<em>config</em>, <em>mode</em>,
+<em>flags</em>) if you press a certain button (<em>remote</em>,
+<em>button</em>) a specified time (<em>repeat</em>).</P>
+
+<DL>
+<DT>prog</DT>
+<DD>gives the name of the program that should receive the config
+    string given in config.
+</DD>
+<DT>remote, button</DT>
+<DD>specify a key of a remote control that launches
+    an action. Key sequences can be specified by giving more then
+    one remote/button string. The character '*' can be used as a
+    wild card for remote or button. The default for remote is '*'.
+</DD>
+<DT>repeat</DT>
+<DD>tells the program what shall happen if a key is repeated.
+    A value of zero tells the program to ignore repeated keys.
+    Any other positive value 'n' tells the program to pass the config
+    string every 'n'-th time to the according application, when a key is
+    repeated. The default for repeat is zero.
+</DD>
+<DT>config</DT>
+<DD>is the string that will be passed to the according application
+    whenever the specified key sequence is received by lircd. If you
+    give more than one config string, the config strings will be passed
+    to the applications by turns. With this feature you can for example
+    implement toggle buttons.<BR>
+
+    You can pass non-printable characters to applications with all
+    standard C escape sequences (most common are: \n = line-feed, \r =
+    carriage return, \t = tab, \e = escape, \&lt;<em>n</em>&gt; = ASCII
+    code in octal representation, \x&lt;<em>n</em>&gt; = ASCII code in
+    hexadecimal representation, \\ = backslash). Additionally you can
+    supply Ctrl-X by specifying \X where X is an upper character or
+    @. For example \C is Ctrl-C.
+
+</DD>
+<DT>mode</DT>
+<DD>tells the program to enter a special mode.
+    You can group several configurations by putting them into the
+    following, where mode stands for the mode where these configurations
+    should be active:
+<PRE>
+    begin mode
+	...
+    end mode
+</PRE>
+    If mode is equal to the name of a client application this
+    application will always start in this mode. Consider this
+    situation: you want to start <em>xawtv</em> with <em>irexec</em>
+    and enter the <em>tv</em> mode. Then irexec would enter the tv
+    mode but xawtv would begin without any mode enabled. By renaming
+    the mode from <em>tv</em> to <em>xawtv</em> you can solve this
+    problem.
+
+    <br>Another way to specify a startup mode is by using the startup_mode
+    flag as described bellow.
+</DD>
+</DL>
+The following are valid flags:
+<DL>
+<DT>once</DT>
+
+<DD>
+    This is only allowed in conjunction with the mode directive. The
+    config string is passed to the application only the first time the
+    mode is entered or you have explicitly left this mode. This is
+    useful for starting an application whenever you enter a special
+    mode.
+</DD>
+<DT>quit</DT>
+<DD>Usually all configurations are examined if they have
+    to be executed. You can stop this immediately with this flag.
+</DD>
+<DT>mode</DT>
+<DD>This is only allowed within a mode block. It tells the
+    program to leave this mode.
+</DD>
+<DT>startup_mode</DT>
+<DD>Tells the program to start in the mode given in the mode keyword.
+    The following example tells the program to start in the  <em>browser</em>
+    mode
+<PRE>
+begin
+	flags = startup_mode
+	mode = browser
+end
+</PRE>
+
+</DL>
+
+<P>Ok, now a simple example for a <em>.lircrc</em> file (supposed you
+use an AnimaX remote and use the sample files for this remote from the
+remotes/ directory. If you have another remote change <em>remote=</em>
+and <em>button=</em> according to your remote [this definitions are
+made in the <em>lircd.conf</em> file] )</P>
+
+<PRE>
+    begin
+        remote = ANIMAX
+        button = MENU_DOWN
+        prog   = irexec
+        repeat = 0
+        config = echo "Hello world!"
+    end
+</PRE>
+
+<P>
+If you have saved this as <em>.lircrc</em> in your home directory,
+start <em>irexec</em>. Press the button which is selected in the
+<em>button=</em> line and you will see a 'Hello world!' on your
+screen. As you can see irexec is a simple program launcher. Of course
+you can do a lot more than just start programs.
+</P>
+
+<P>
+If you start a LIRC client program, it reads your ~/.lircrc and reacts
+only on prog= entries which point to itself. All programs should give
+you the possibility to use an alternative config file. If you have
+included more than one program in your .lircrc, then start all these
+programs, they react only to their according entries in .lircrc. This
+also leads to a disadvantage of the mode concept. If you don't start
+all client programs at a time the mode they have to maintain may
+differ between applications. Also key sequences might not be
+recognized equally because all programs then don't have the same
+starting point.
+</P>
+
+<!--------------------------------------------------------------------------->
+
+                        <BR> <BR>
+                        <CENTER>[<A HREF="http://www.lirc.org/">LIRC homepage</A>]<BR>
+                                <I>The LIRC Manual, last update: 10-Sep-2000</I></CENTER>
+                        <BR> <BR>
+                        </TD>
+                        <TD WIDTH="15%">&#160;<BR></TD>
+                    </TR></TABLE>
+                </TD>
+            </TR>
+            <TR>
+                <TD WIDTH="100%" BGCOLOR="#000080" ALIGN="LEFT" 
+                    VALIGN="TOP">&#160;<BR>
+                </TD>
+            </TR>
+        </TABLE>
+    </BODY>
+
+</HTML>

@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# chkconfig: - 95 05
+# description: The ip-sentinel daemon keeps your IP space clean by \
+#	       preventing unauthorized usage of IPs
+# processname: ip-sentinel
+# pidfile:     /var/run/ip-sentinel.pid
+
+# Source function library.
+. /etc/init.d/functions
+
+# Check that networking is not down.
+test -f /etc/sysconfig/network && . /etc/sysconfig/network
+test "$NETWORKING" != "no" || exit 0
+
+defuser=ip-sentinel
+test -f /etc/sysconfig/ip-sentinel && . /etc/sysconfig/ip-sentinel
+
+prog="ip-sentinel"
+lockfile=/var/lock/subsys/ip-sentinel
+
+addOption() {
+    opt="$opt${2:+$1$2 }"
+}
+
+start () {
+	echo -n $"Starting $prog: "
+	if test x"${IPS_NEEDS_NUMERIC_UID}" = xyes; then
+	    test -z "$IPS_GROUP" && \
+	    x=`id -g ${IPS_USER:-$defuser} 2>/dev/null` && IPS_GROUP="$x"
+	    x=`id -u ${IPS_USER:-$defuser} 2>/dev/null` && IPS_USER="$x"
+	fi
+
+	opt=
+	addOption "-u " "$IPS_USER"
+	addOption "-g " "$IPS_GROUP"
+	addOption "-r " "$IPS_CHROOT"
+	addOption "-i " "$IPS_IPFILE"
+	addOption "-l " "$IPS_LOGFILE"
+	addOption "-e " "$IPS_ERRFILE"
+	addOption ""    "$IPS_OPTIONS"
+
+	daemon ip-sentinel ${opt} ${IPS_DEVICE:-eth0}
+	ret=$?
+	echo
+	[ $ret -eq 0 ] && touch $lockfile
+	return $ret
+}
+
+stop () {
+	echo -n $"Stopping $prog: "
+	killproc ip-sentinel
+	ret=$?
+	echo
+	[ $ret -eq 0 ] && rm -f $lockfile
+	return $ret
+}
+
+restart () {
+	stop
+	start
+}
+
+# See how we were called.
+case "$1" in
+  start|stop|restart)	$1 ;;
+  status)
+	status ip-sentinel
+	;;
+  reload)
+	restart
+	;;
+  condrestart)
+	test ! -f $lockfile || restart
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|restart|reload|condrestart}"
+	exit 2
+esac

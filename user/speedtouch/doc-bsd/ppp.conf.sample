@@ -1,0 +1,46 @@
+#################################################################
+# PPP  Sample Configuration File to use with the Speedtouch USB
+# Written by Francois Rogler <francois@rogler.org>
+# 
+# You will have to fill in :
+# - <login>
+# - <password>
+# - <VPI>.<VCI> as defined by your provider.
+#   Check the file vpivci for some commom values.
+# `adsl' profile is for the default PPPoA mode
+# `pppoe' profile is for the bridged PPPoE mode
+#
+#   $Id: ppp.conf.sample,v 1.5 2003/07/23 03:36:41 rogler Exp $
+#################################################################
+
+default:
+ ident user-ppp VERSION (built COMPILATIONDATE)
+ set log Phase Chat IPCP CCP tun command
+ set ifaddr 10.0.0.1/0 10.0.0.2/0
+
+adsl:
+ set authname <login>
+ set authkey <password>
+ set device !"/usr/local/sbin/pppoa2 -vpi <VPI> -vci <VCI> -v 1"
+ accept chap
+ set speed sync
+ set timeout 0
+ enable lqr
+ set lqrperiod 5
+ set redial 15 10000
+ set dial ""
+ add default HISADDR
+ enable dns
+
+pppoe:
+ set authname <login>
+ set authkey <pasword>
+ set device PPPoE:tap0
+ set speed sync
+ set timeout 0
+ set redial 15 10000
+ set dial
+ set login
+ add default HISADDR
+ enable dns
+

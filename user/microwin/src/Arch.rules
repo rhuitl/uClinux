@@ -1,0 +1,273 @@
+##############################################################################
+# Microwindows Architecture rules Makefile
+# Copyright (c) 2000 Martin Jolicoeur, Greg Haerr
+# Portions Copyright 2002 by Koninklijke Philips Electronics N.V.
+#
+# This makefile should be placed at the top of a project hierarchy
+#
+# NOTE: The TOP environment variable should be set to that top directory
+##############################################################################
+
+# Standard set of warnings for all platforms that use GCC
+#GCC_WARNINGS := -Wall -Wstrict-prototypes -Wpointer-arith -Wbad-function-cast -Wmissing-prototypes
+GCC_WARNINGS := -Wall -Wpointer-arith
+
+# Platform dependent flags & definitions
+
+ifeq ($(ARCH), LINUX-NATIVE)
+ifeq ($(USE_CCACHE), 1)
+COMPILER = ccache gcc
+else
+COMPILER = gcc
+endif
+CXX_COMPILER = g++
+TOOLSPREFIX =
+DEFINES += -DLINUX=1 -DUNIX=1
+CFLAGS += $(GCC_WARNINGS) $(OPTFLAGS)
+LDFLAGS +=
+# include the following line for static libraries
+#LDFLAGS += -static
+endif
+
+ifeq ($(ARCH), LINUX-TCC)
+COMPILER = tcc
+CXX_COMPILER = tcc
+TOOLSPREFIX =
+DEFINES += -DLINUX=1 -DUNIX=1
+CFLAGS += -Dlinux=1
+#CFLAGS += -Wall $(OPTFLAGS)
+LDFLAGS +=
+# include the following line for static libraries
+#LDFLAGS += -static
+endif
+
+ifeq ($(ARCH), LINUX-ARM)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX = $(ARMTOOLSPREFIX)
+DEFINES += -DLINUX=1 -DUNIX=1
+CFLAGS += $(GCC_WARNINGS) $(OPTFLAGS) -mstructure-size-boundary=8
+LDFLAGS +=
+endif
+
+ifeq ($(ARCH), LINUX-MIPS)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX = $(MIPSTOOLSPREFIX)
+DEFINES += -DLINUX=1 -DUNIX=1
+CFLAGS += -msoft-float $(GCC_WARNINGS) $(OPTFLAGS)
+ifneq ($(DEBUG), Y)
+CFLAGS += -s
+endif
+LDFLAGS +=
+endif
+
+ifeq ($(ARCH), LINUX-POWERPC)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX = $(POWERPCTOOLSPREFIX)
+DEFINES += -DLINUX=1 -DUNIX=1
+CFLAGS += -msoft-float $(GCC_WARNINGS) $(OPTFLAGS)
+ifneq ($(DEBUG), Y)
+CFLAGS += -s
+endif
+LDFLAGS +=
+# Added define to avoid compiler error for PPC
+DEFINES += -DARCH_LINUX_POWERPPC=1
+endif
+
+ifeq ($(ARCH), LINUX-SH)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX =$(SHTOOLSPREFIX)
+DEFINES += -DLINUX=1 -DUNIX=1
+CFLAGS += -m1 -m3 $(GCC_WARNINGS) $(OPTFLAGS)
+LDFLAGS +=
+endif
+
+ifeq ($(ARCH), LINUX-SPARC)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX =
+DEFINES += -DLINUX=1 -DUNIX=1 -DMW_CPU_BIG_ENDIAN=1
+CFLAGS += $(GCC_WARNINGS) $(OPTFLAGS)
+LDFLAGS +=
+# include the following line for static libraries
+#LDFLAGS += -static
+# Added define to avoid compiler error for SPARC
+DEFINES += -DARCH_LINUX_SPARC=1
+endif
+
+ifeq ($(ARCH), SOLARIS)
+# may require using cc if gcc not installed:
+COMPILER = gcc
+HOSTCC = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX =
+DEFINES += -DUNIX=1 -DMW_CPU_BIG_ENDIAN=1
+CFLAGS += $(GCC_WARNINGS) $(OPTFLAGS)
+LDFLAGS += -lsocket -lnsl -lrt
+endif
+
+ifeq ($(ARCH), TRIMEDIA)
+LUD_ROOT = ../../../../../../..
+COMPILER = cc
+CXX_COMPILER = CC
+TOOLSPREFIX = tm
+DEFINES += -DTRIMEDIA=1 -DTCS2 -DOSAL -DLUD_USE_MEMSPACE
+DEFINES += -DMW_NOSIGNALS -DMW_FEATURE_GDERROR=1
+INCLUDEDIRS += -I$(LUD_ROOT)/src/include -I$(LUD_ROOT)/src/modules/fb/include
+HOSTCFLAGS += -I$(LUD_ROOT)/src/include -I$(LUD_ROOT)/src/modules/fb/include
+CFLAGS += -O2 -el -target tm1 -host nohost -tmconfig=$(LUD_ROOT)/src/misc/tmconfig2.1 -B -Xdiag=1
+LDFLAGS += -O2 -el -target tm1 -host nohost -tmconfig=$(LUD_ROOT)/src/misc/tmconfig2.1 -B -Xdiag=1
+# include the following line for static libraries
+#LDFLAGS += -static
+endif
+
+ifeq ($(ARCH), FREEBSD-X86)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX =
+DEFINES += -DUNIX=1
+CFLAGS += -Wall $(OPTFLAGS)
+LDFLAGS +=
+endif
+
+ifeq ($(ARCH), ELKS)
+COMPILER = bcc
+HOSTCC = gcc
+CXX_COMPILER =
+TOOLSPREFIX =
+INCLUDEDIRS += -I/usr/bcc/include -I/home/greg/net/elks/include
+DEFINES += -DELKS=1 -DUNIX=1 -Dconst= -Dvolatile=
+CFLAGS += -0 -ansi -O
+LDFLAGS +=
+endif
+
+ifeq ($(ARCH), DJGPP)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX =
+DEFINES += -DDOS_DJGPP=1 -D_NAIVE_DOS_REGS=1 -DMSDOS=1
+CFLAGS += -Wall $(OPTFLAGS)
+LDFLAGS +=
+endif
+
+ifeq ($(ARCH), RTEMS)
+COMPILER = gcc
+CXX_COMPILER = g++
+TOOLSPREFIX = $(RTEMSTOOLSPREFIX)
+INCLUDEDIRS += -I$(RTEMS_BUILD)/$(RTEMS_BSP)/lib/include \
+-I$(RTEMS_BUILD)/$(RTEMS_BSP)/lib/include/networking \
+-I$(RTEMS_BUILD)/$(RTEMS_BSP)/lib/include/sys
+DEFINES += -DUNIX=1
+CFLAGS += -O4 -Wall -Wno-unused -fasm -g \
+-B$(RTEMS_BUILD)/$(RTEMS_BSP)/lib/ -specs bsp_specs -qrtems
+endif
+
+# I think the ARCH is m68knommu. So the "ifeq ($(ARCH), uClinux)"
+# may not work. I do rather check if people are compiling for our board:
+ifeq ($(CONFIG_COBRA5272), y) # Compiling for COBRA5272?
+COMPILER = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCC = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCFLAGS :=
+CXX_COMPILER = g++
+TOOLSPREFIX =
+# INCLUDEDIRS += -I/usr/bcc/include -I/home/greg/net/elks/include
+CFLAGS += -DUNIX=1 -DCONFIG_COBRA5272=1
+# CFLAGS += -0 -ansi -O
+# LDFLAGS += --verbose
+FLTFLAGS += -s 64000
+SYS_LIBS =
+LDLIBS += -lgcc -lc -lgcc
+else # Not compiling for COBRA5272 (same code as before):
+ifeq ($(CONFIG_COBRA5329), y) # Compiling for COBRA5329?
+COMPILER = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCC = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCFLAGS :=
+CXX_COMPILER = g++
+TOOLSPREFIX =
+# INCLUDEDIRS += -I/usr/bcc/include -I/home/greg/net/elks/include
+CFLAGS += -DUNIX=1 -DCONFIG_COBRA5329=1
+DEFINES += -DUNIX=1 -DLINUX=1 -DMW_CPU_BIG_ENDIAN=1
+# CFLAGS += -0 -ansi -O
+# LDFLAGS += --verbose
+FLTFLAGS += -s 64000
+SYS_LIBS =
+#LDLIBS += -lgcc -lc -lgcc
+else
+ifdef CONFIG_UCLINUX
+COMPILER = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCC = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCFLAGS :=
+CXX_COMPILER = g++
+TOOLSPREFIX =
+# INCLUDEDIRS += -I/usr/bcc/include -I/home/greg/net/elks/include
+CFLAGS += -DUNIX=1
+DEFINES += -DUNIX=1 -DLINUX=1
+# CFLAGS += -0 -ansi -O
+# LDFLAGS += --verbose
+FLTFLAGS += -s 64000
+SYS_LIBS =
+# LDLIBS += -lgcc -lc -lgcc
+endif # end for "ifdef CONFIG_UCLINUX"
+endif # end for "ifeq ($(CONFIG_COBRA5329), y)"
+endif # end for "ifeq ($(CONFIG_COBRA5272), y)"
+
+
+ifeq ($(ARCH), CLEOPATRA)
+COMPILER = gcc -m5200 -DCONFIG_COLDFIRE -I$(ROOTDIR)/user/microwin/src/include
+HOSTCC = gcc -I$(ROOTDIR)/user/microwin/src/include
+HOSTCFLAGS :=
+CXX_COMPILER = g++
+TOOLSPREFIX = $(CROSS)
+CFLAGS += -DUNIX=1
+FLTFLAGS += -s 64000
+SYS_LIBS =
+#LDLIBS += -lgcc -lc -lgcc
+
+DEFINES += -DCLEOPATRA=1
+CFLAGS += -DCLEOPATRA=1
+ifeq ($(CONFIG_M5307), y)
+CFLAGS +=  -I$(ROOTDIR)/vendors/Feith/Cleopatra_src/lib
+LDFLAGS +=  -L$(ROOTDIR)/vendors/Feith/Cleopatra_src/lib
+else
+CFLAGS += -DCLEOVERSION=1
+CFLAGS +=  -I$(ROOTDIR)/vendors/Feith/Cleopatra2_src/lib
+LDFLAGS +=  -L$(ROOTDIR)/vendors/Feith/Cleopatra2_src/lib
+endif
+
+endif
+
+
+ifeq ($(ARCH), ECOS)
+    COMPILER = gcc
+    CXX_COMPILER = g++
+    TOOLSPREFIX = $(ARMTOOLSPREFIX)
+    ECOS_PREFIX = /work/iPAQ/ecos/install
+    INCLUDEDIRS += -I$(ECOS_PREFIX)/include
+    DEFINES += -D__ECOS -DUNIX=1
+    CFLAGS += -mcpu=strongarm -Wall -ffunction-sections -fdata-sections -O2 -g
+    LDFLAGS += -nostdlib
+endif
+
+ifeq ($(ARCH), CYGWIN)
+ifeq ($(USE_CCACHE), 1)
+COMPILER = ccache gcc
+else
+COMPILER = gcc
+endif
+CXX_COMPILER = g++
+TOOLSPREFIX =
+#Note: to detect from C code, do "#ifdef __CYGWIN__"
+DEFINES += -DUNIX=1
+CFLAGS += -Wall $(OPTFLAGS)
+LDFLAGS +=
+# include the following line for static libraries
+#LDFLAGS += -static
+endif
+
+ifeq ($(BIGENDIAN), Y)
+DEFINES += -DMW_CPU_BIG_ENDIAN=1
+endif
+

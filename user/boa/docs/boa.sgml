@@ -1,0 +1,622 @@
+<!doctype linuxdoc system>
+
+<report>
+
+<TITLE>Boa Webserver</TITLE>
+<img src="boa_banner.gif">
+<author>Larry Doolittle and Jon Nelson</author>
+<date>02 February 1998</date>
+<abstract>
+Welcome to your personal documentation for Boa, a high performance
+web server for Unix-alike computers, covered by the
+<htmlurl url="Gnu&lowbar;License" name="Gnu General Public License">.  
+The current release is boa-0.93.
+The on-line, updated copy of this documentation lives at 
+<url url="http://www.boa.org/">.
+
+</abstract>
+
+<toc>
+<chapt>Introduction
+<p>
+
+<sect>Introduction
+<p>
+
+Boa is a single-tasking HTTP server.  That means that unlike
+traditional web servers, it does not fork for each incoming
+connection, nor does it fork many copies of itself to handle multiple
+connections.  It internally multiplexes all of the ongoing HTTP
+connections, and forks only for CGI programs (which must be separate
+processes), automatic directory generation, and automatic file
+gunzipping.  Preliminary tests show Boa is capable of
+handling several hundred hits per second on a 100 MHz Pentium,
+and dozens of hits per second on a lowly 20 MHz 386/SX.
+
+The primary design goals of Boa are speed and security.  Security,
+in the sense of <sq>can't be subverted by a malicious user,</sq> not
+<sq>fine grained access control and encrypted communications</sq>.
+Boa is not intended as a feature-packed server; if you want one of those,
+check out 
+<url url="http://hopf.math.nwu.edu/" name="WN"> from John Franks.
+Modifications to Boa that improve its speed, security, robustness, and
+portability, are eagerly sought.  Other features may be added if they
+can be achieved without hurting the primary goals.
+
+Boa was created by Paul Phillips <tt>&lt;psp@well.com&gt;</tt>.
+It is now being maintained and enhanced by Larry Doolittle
+<tt>&lt;ldoolitt@jlab.org&gt;</tt> and 
+Jon Nelson <tt>&lt;nels0988@tc.umn.edu&gt;</tt>.
+Please see the acknowledgement section for further details.
+
+Linux is the development platform at the moment, other OS's are
+known to work.  If you'd like to contribute to this effort, contact
+Larry or Jon via e-mail.
+
+<chapt>Installation and Usage
+<P>
+
+Boa is currently being developed and tested on Linux/i386.
+The code is straightforward (more so than most other servers),
+so it should run easily on most modern Unix-alike platforms.  Recent
+versions of Boa worked fine on FreeBSD, SunOS 4.1.4, Linux/SPARC, and
+HP-UX 9.0.  Pre-1.2.0 Linux kernels may not work because of deficient
+mmap() implementations.
+
+It should be very simple to install and use Boa:
+<descrip>
+  <tag>Unpack</tag>
+  <enum>
+    <item>Choose, and cd into, a convenient directory for the package.
+    <item><tt>tar -xvzf boa-0.93.tar.gz</tt>, or for those of you with
+    an archaic non-GNU tar, <newline>
+    <tt>gzip -cd &lt; boa-0.93.tar.gz | tar -xvf -</tt>
+    <item>Read the documentation.  Really.
+  </enum>
+  <tag>Build</tag>
+  <enum>
+    <item>cd into the <tt>src</tt> directory.
+    <item>(optional) Change the default SERVER&lowbar;ROOT by setting the #define
+    at the top of src/defines.h
+    <item>Type <tt>./configure; touch .depend; make depend; make</tt>
+    <item>Report any errors to the maintainers for resolution, or strike
+    out on your own.
+  </enum>
+  <tag>Configure</tag>
+  <enum>
+    <item>Choose a user and server port under which Boa can run.  The
+    traditional port is 80, and user <tt>nobody</tt> (create if
+    you need to) is often a good selection for security purposes.
+    If you don't have (or choose not to use) root privileges, you
+    can not use port numbers less than 1024, nor can you switch user id.
+    <item>Choose a server root.  The <tt>conf</tt> directory within the
+    server root must hold your copy of the configuration file
+    <em>boa.conf</em>.
+    <item>Choose locations for log files, CGI programs (if any), and
+    the base of your URL tree.
+    <item>Set the location of the <tt>mime.types</tt> file.
+    <item>Edit <EM>conf/boa.conf</EM> according to your
+    choices above (this file documents itself).  Read through this file
+    to see what other features you can configure.
+  </enum>
+  <tag>Start</tag>
+    Start Boa.  If you didn't build the right SERVER&lowbar;ROOT into the
+    binary, you can specify it on the command line with the -c option
+    (command line takes precedence).<newline>
+    Example: <tt>./boa -c /usr/local/boa</tt>
+  
+  <tag>Test</tag>
+    At this point the server should run and serve documents.
+    If not, check the error&lowbar;log file for clues.
+  
+  <tag>Install</tag>
+    Copy the binary to a safe place, and put the invocation into
+    your system startup scripts.  Use the same -c option you used
+    in your initial tests.
+</descrip>
+
+<sect>Files used by Boa
+<p>
+
+<descrip>
+<tag>boa.conf</tag>
+This file is the sole configuration file for Boa. The directives in this 
+file are defined in the DIRECTIVES section. 
+
+<tag>mime.types</tag>
+The MimeTypes &lt;filename&gt; defines what Content-Type Boa will send in an 
+HTTP/1.0 or better transaction. 
+</descrip>
+
+<sect>Compile-Time and Command-Line Options
+<p>
+
+<descrip>
+<tag>SERVER_ROOT</tag>The default server root as #defined by
+SERVER_ROOT in <em>defines.h</em> can be overridden on the
+commandline using the <bf>-c</bf> option.
+The server root must hold your local copy of the configuration
+file <em>boa.conf</em>.<newline>
+Example: /usr/sbin/boa -c /etc/boa
+</descrip>
+
+<sect>boa.conf Directives
+<p>
+
+The Boa configuration file is parsed with a lex/yacc or flex/bison 
+generated parser. If it reports an error, the line number will be 
+provided; it should be easy to spot. The syntax of each of these rules 
+is very simple, and they can occur in any order. Where possible, these 
+directives mimic those of NCSA httpd 1.3; I (Paul Phillips) saw no reason 
+to introduce gratuitous differences. 
+
+Note: the "ServerRoot" is not in this configuration file. It can be 
+compiled into the server (see defines.h ) or specified on the command
+line with the -c option. 
+
+The following directives are contained in the <em>boa.conf</em> file, and most, 
+but not all, are required. 
+
+<descrip>
+<tag>Port &lt;integer&gt;</tag>
+This is the port that Boa runs on. The default port for http servers is 80.
+If it is less than 1024, the server must be started as root. 
+
+<tag>User &lt;user name or UID&gt;</tag>
+The name or UID the server should run as. For Boa to attempt this, the
+server must be started as root. 
+
+<tag>Group &lt;group name or GID&gt;</tag>
+The group name or GID the server should run as. For Boa to attempt this,
+the server must be started as root. 
+
+<tag>ServerAdmin &lt;email address&gt;</tag>
+The email address where server problems should be sent. Note: this is not
+currently used. 
+
+<tag>ErrorLog &lt;filename&gt;</tag>
+The location of the error log file. If this does not start with /, it is
+considered relative to the server root. Set to /dev/null if you don't want
+errors logged. 
+
+<tag>AccessLog &lt;filename&gt;</tag>
+The location of the access log file. If this does not start with /, it is
+considered relative to the server root. Comment out or set to /dev/null
+(less effective) to disable access logging. 
+
+<tag>VerboseCGILogs</tag>
+This is a logical switch and does not take any parameters. Comment out to
+disable. 
+
+<tag>ServerName &lt;server_name&gt;</tag>
+The name of this server that should be sent back to clients if different
+than that returned by gethostname. VirtualHost This is a logical
+switch and does not take any parameters. Comment out to disable. Given 
+DocumentRoot /var/www, requests on interface `A' or IP
+`IP-A' become /var/www/IP-A. Example: http://localhost/ becomes 
+/var/www/127.0.0.1 
+
+<tag>DocumentRoot &lt;directory&gt;</tag>
+The root directory of the HTML documents. If this does not start with /, 
+it is considered relative to the server root. 
+
+<tag>UserDir &lt;directory&gt;</tag>
+The name of the directory which is appended onto a user's home directory 
+if a ~user request is received. 
+
+<tag>DirectoryIndex &lt;filename&gt;</tag>
+Name of the file to use as a pre-written HTML directory index. Please 
+make and use these files. On the fly creation of directory indexes
+can be slow. 
+
+<tag>DirectoryMaker &lt;directory&gt;</tag>
+Name of the program used to generate on-the-fly directory listings. 
+The program must take one or two command-line arguments, the
+first being the directory to index (absolute), and the second, which is 
+optional, should be the "title" of the document be. Comment out if you don't 
+want on the fly directory listings. If this 
+does not start with /, it is considered relative to the server root. 
+
+<tag>KeepAliveMax &lt;integer&gt;</tag>
+Number of KeepAlive requests to allow per connection. Comment out, or set 
+to 0 to disable keepalive processing. 
+
+<tag>KeepAliveTimeout &lt;integer&gt;</tag>
+Number of seconds to wait before keepalive connections time out. 
+
+<tag>MimeTypes &lt;file&gt;</tag>
+The location of the mime.types file. If this does not start with /, it is 
+considered relative to the server root. 
+
+<tag>DefaultType &lt;mime type&gt;</tag>
+MIME type used if the file extension is unknown, or there is no file 
+extension. 
+
+<tag>AddType &lt;mime type&gt; &lt;extension&gt; extension...</tag>
+Associates a MIME type 
+with an extension or extensions. 
+
+<tag>Redirect, Alias, and ScriptAlias &lt;path1&gt; &lt;path2&gt;</tag>
+Redirect, Alias, and 
+ScriptAlias all have the same semantics -- they match the
+beginning of a request and take appropriate action. Use Redirect for 
+other servers, Alias for the same server, and ScriptAlias to enable
+directories for script execution. 
+
+<descrip>
+<tag>Redirect</tag>allows you to tell clients about documents which used to exist 
+in your server's namespace, but do not anymore. This allows you
+tell the clients where to look for the relocated document. 
+
+<tag>Alias</tag>aliases one path to another. Of course, symbolic links in the 
+file system work fine too. 
+
+<tag>ScriptAlias</tag>maps a virtual path to a directory for serving scripts. 
+</descrip>
+</descrip>
+
+<sect>Security
+<p>
+
+Boa has been designed to use the existing file system security.  
+In <em>boa.conf</em>, the directives <bf>user</bf> and 
+<bf>group</bf> determine who Boa will run as, if launched by root.
+By default, the user/group is nobody/nogroup.  This allows quite a bit
+of flexibility.  For example, if you want to disallow access to otherwise
+accessible 
+directories or files, simply make them inaccessible to nobody/nogroup.
+If the user that Boa runs as is &quot;boa&quot; and the groups that 
+&quot;boa&quot; belongs to include &quot;web-stuff&quot; 
+then files/directories accessible by users with group 
+&quot;web-stuff&quot; will also be accessible to Boa.
+
+<chapt>Relative Performance, Limits, and Design Philosophy
+<p>
+
+There are many issues that become more difficult to resolve in a single 
+tasking web server than in the normal forking model.  Here is a partial 
+list -- there are probably many that haven't encountered yet.
+
+<sect>Relative Performance
+<p>
+
+Performance is a very difficult thing to quantitively measure.
+Due to the fact that there are very few good and accessible 
+performance benchmarks, our benchmarking is limited to
+very simple means.  We use the Benchmark ZeusBench, which may no longer
+be available.  ZeusBench takes only a few commandline parameters, which
+makes it easy to use.  It is also useful as a diagnostic tool.
+
+ZeusBench has the capacity to make its requests over ethernet as well
+as localhost.  However, as bad as using localhost for anything might
+well be, it *does* eliminate to a great deal the bottleneck that is
+ethernet.  As a standard rule, we use options that have ZeusBench attempt
+to make either 10,000 or 20,000 successfull requests
+
+The following benchmarks were run on a Linux 2.0.33 egcs 1.0.1 compiled
+kernel, on an Intel Pentium 200 MMX, over localhost, and with 
+a file size of 2448 bytes.  Each server was tuned with the following options:
+access logging turned off, 100 keepalive, and no DNS lookups 
+or unnecessary modules for Apache.
+
+Like so many benchmarks, these are to be taken with a grain of salt.
+
+Boa:
+<verb>
+---
+Server:                 Boa/0.93.9
+Doucment Length:        2448
+Concurency Level:       215
+Time taken for tests:   27.526 seconds
+Complete requests:      20000
+Failed requests:        0
+Keep-Alive requests:    20091
+Bytes transfered:       53743425
+HTML transfered:        49182768
+Requests per seconds:   726.59
+Transfer rate:          1952.46 kb/s
+
+Connnection Times (ms)
+           min   avg   max
+Connect:     0     2   325
+Total:      87   292  5602
+---  
+</verb>
+
+Apache:
+<verb>
+---
+Server:                 Apache/1.2.5
+Doucment Length:        2448
+Concurency Level:       215
+Time taken for tests:   38.100 seconds
+Complete requests:      20000
+Failed requests:        0
+Keep-Alive requests:    19850
+Bytes transfered:       54576586
+HTML transfered:        49035804
+Requests per seconds:   524.93
+Transfer rate:          1432.46 kb/s
+
+Connnection Times (ms)
+           min   avg   max
+Connect:     0     0   101
+Total:       4   250 37783
+---
+</verb>
+
+As can be seen, Boa is significantly faster than Apache.
+
+<sect>Limits
+<p>
+
+<descrip>
+<tag>Slow file systems</tag>
+The file systems being served should be much faster than the
+network connection to the HTTP requests, or performance will suffer.
+For instance, if a document is served from a CD-ROM, the whole server
+(including all other currently incomplete data transfers) will stall
+while the CD-ROM spins up.  This is a consequence of the fact that Boa
+mmap()'s each file being served, and lets the kernel read and cache
+pages as best it knows how.  When the files come from a local disk
+(the faster the better), this is no problem, and in fact delivers
+nearly ideal performance under heavy load.  Avoid serving documents
+from NFS and CD-ROM unless you have even slower inbound net
+connections (e.g., POTS SLIP).
+
+<tag>DNS lookups</tag>
+Writing a nonblocking gethostbyaddr is a difficult and not very
+enjoyable task.  Paul Phillips experimented with several methods, 
+including a separate logging process, before removing hostname 
+lookups entirely. There is a companion program with Boa 
+<em>util/resolver.pl</em> that will postprocess the logfiles and 
+replace IP addresses with hostnames, which is much faster no matter 
+what sort of server you run.
+
+<tag>Identd lookups</tag>
+Same difficulties as hostname lookups; not included.
+Boa provides a REMOTE&lowbar;PORT environment variable, in addition
+to REMOTE&lowbar;ADDR, so that a CGI program can do its own ident.
+
+<tag>Password file lookups via NIS</tag>
+If users are allowed to serve HTML from their home directories,
+password file lookups can potentially block the process.  To lessen
+the impact, each user's home directory is cached by Boa so it need
+only be looked up once.
+
+<tag>Running out of file descriptors</tag>
+Since a file descriptor is needed for every ongoing connection
+(two for non-nph CGIs, directories, and automatic gunzipping of files),
+it is possible though highly improbable to run out of file
+descriptors.  The symptoms of this conditions may vary with
+your particular unix variant, but you will probably see log
+entries giving an error message for <tt>accept</tt>.
+Try to build your kernel to give an adequate number for
+your usage - Linux provides 256 out of the box, more than
+enough for most people.
+</descrip>
+
+<sect>Differences between Boa and other web servers
+<p>
+
+In the pursuit of speed and simplicity, some aspects of Boa differ
+from the popular web servers.  In no particular order:
+
+<descrip
+  <tag>REMOTE&lowbar;HOST environment variable not set for CGI programs</tag>
+  The REMOTE&lowbar;HOST environment variable is not set for CGI programs,
+  for reasons already described.  This is easily worked around because the
+  IP address is provided in the REMOTE&lowbar;ADDR variable, so (if the CGI program
+  actually cares) gethostbyaddr or a variant can be used.
+  
+  <tag>There are no server side includes in Boa</tag> 
+  We don't like them, and they are too slow to parse.  We will consider
+  more efficient alternatives, see the 
+  <htmlurl url="todo.txt"> to-do list.
+  
+  <tag>There are no access control features</tag>
+  Boa will follow symbolic links, and serve any file that it can
+  read.  The expectation is that you will configure Boa to run as user
+  <sq>nobody</sq>, and only files configured world readable will come
+  out.  See the 
+  <htmlurl url="todo.txt"> to-do list.
+  
+  <tag>No chroot option</tag>
+  There is no option to run chrooted.  If anybody wants this, and is
+  willing to try out experimental code, contact the maintainers.
+</descrip
+
+<sect>Unexpected behavior
+<p>
+
+<descrip>
+<tag>SIGHUP handling</tag>
+Like any good server, Boa traps SIGHUP and rereads <em>boa.conf</em>.
+However, under normal circumstances, it has already given away
+permissions, so many items listed in <em>boa.conf</em> can not take effect.
+No attempt is made to change uid, gid, log files, or server port.
+All other configuration changes should take place smoothly.
+
+<tag>Relative URL handling</tag>
+Not all browsers handle relative URLs correctly.  Boa will not
+cover up for this browser bug, and will typically report 404 Not Found
+for URL's containing odd combinations of <sq>../</sq>'s.
+</descrip>
+
+<appendix>
+<chapt>Appendix
+<p>
+
+<sect>License
+<p>
+
+This program is distributed under the
+<htmlurl url="Gnu&lowbar;License" name="GNU General Public License">,
+as noted in each source file:
+
+<verb>
+/*
+ *  Boa, an http server
+ *  Copyright (C) 1995 Paul Phillips <psp@well.com>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 1, or (at your option)
+ *  any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ */
+</verb>
+
+<sect>Acknowledgments
+<p>
+
+The Boa Webserver is currently maintained and enhanced by 
+Larry Doolittle <tt>&lt;doolitt@jlab.org&gt;</tt>
+and Jon Nelson <tt>&lt;nels0988@tc.umn.edu&gt;</tt>.
+
+We would like to thank Russ Nelson <tt>&lt;nelson@crynwr.com&gt;</tt>
+for hosting the <url url="http://www.boa.org"> web site.
+
+We would also like to thank Paul for writing code that is
+worth maintaining and supporting.
+
+Paul Phillips wrote the first versions of Boa, up to and including
+version 0.91.  Version 0.92 of Boa was officially release December 1996
+by Larry Doolittle.  Version 0.93 is a development version of 0.94.
+
+Many people have contributed to Boa, including (but not
+limited to) Charles F. Randall <tt>&lt;randall@goldsys.com&gt;</tt>,
+Christoph Lameter <tt>&lt;chris@waterf.org&gt;</tt>, 
+Russ Nelson <tt>&lt;nelson@crynwr.com&gt;</tt>, and 
+Alain Magloire <tt>&lt;alain.magloire@rcsm.ee.mcgill.ca&gt;</tt>.
+
+Paul Phillips records his acknowledgments as follows: 
+<quote>
+Thanks to
+everyone in the WWW community, in general a great bunch of people.
+Special thanks to Clem Taylor <tt>&lt;ctaylor@eecis.udel.edu&gt;</tt>, who
+provided invaluable feedback on many of my ideas, and offered good
+ones of his own.  Also thanks to John Franks, author of wn, for
+writing what I believe is the best webserver out there.
+</quote>
+
+<sect>Reference documents
+<p>
+
+Links to documents relevant to 
+<htmlurl url="http://www.boa.org/" name="Boa">
+development and usage.  Incomplete, we're still working on this.
+NCSA has a decent
+<url url="http://hoohoo.ncsa.uiuc.edu/docs/Library.html"> page along
+these lines, too.
+
+Also see
+Yahoo's list<newline>
+<url url="http://www.yahoo.com/Computers&lowbar;and&lowbar;Internet/Software/Internet/World&lowbar;Wide&lowbar;Web/Servers/">
+
+<itemize>
+<item>W3O HTTP page<newline>
+<url url="http://www.w3.org/pub/WWW/Protocols/"> 
+<item>RFC 1945 HTTP-1.0 (informational)<newline>
+<url url="http://ds.internic.net/rfc/rfc1945.txt">
+<item>IETF Working Group Draft 07 of HTTP-1.1<newline>
+<url url="http://www.w3.org/pub/WWW/Protocols/HTTP/1.1/draft-ietf-http-v11-spec-07.txt">
+<item>HTTP: A protocol for networked information<newline>
+<url url="http://www.w3.org/pub/WWW/Protocols/HTTP/HTTP2.html">
+<item>The Common Gateway Interface (CGI)<newline>
+<url url="http://hoohoo.ncsa.uiuc.edu/cgi/overview.html">
+<item>commonlog format?
+<item>RFC 1738 URL syntax and semantics<newline>
+<url url="http://ds.internic.net/rfc/rfc1738.txt">
+<item>RFC 1808 Relative URL syntax and semantics<newline>
+<url url="http://ds.internic.net/rfc/rfc1808.txt">
+</itemize>
+
+<sect>Other web servers
+<p>
+
+For unix-alike platforms, with published source code.
+
+<itemize>
+<item>tiny/turbo/throttling httpd very similar to Boa, with a throttling
+feature<newline>
+<htmlurl url="http://www.acme.com/software/thttpd/">
+<item>Roxen: based on ulpc interpreter, non-forking (interpreter implements
+threading), GPL'd<newline>
+<url url="http://www.roxen.com/">
+<item>WN: featureful, GPL'd<newline>
+<url url="http://hopf.math.nwu.edu/">
+<item>Apache: fast, PD<newline>
+<url url="http://www.apache.org/">
+<item>NCSA: standard, legal status?<newline>
+<url url="http://hoohoo.ncsa.uiuc.edu/">
+<item>CERN: standard, PD, supports proxy<newline>
+<url url="http://www.w3.org/pub/WWW/Daemon/Status.html">
+<item>xs-httpd 2.0: small, fast, pseudo-GPL'd<newline>
+<url url="http://www.stack.nl/~sven/xs-httpd/">
+<item>bozohttpd.tar.gz sources, in perl<newline>
+<url url="ftp://ftp.eterna.com.au/bozo/bsf/attware/bozohttpd.tar.gz">
+<item>Squid is actually an <sq>Internet Object Cache</sq><newline>
+<url url="http://squid.nlanr.net/Squid/">
+</itemize>
+Also worth mentioning is Zeus.
+It is commercial, with a free demo, so it doesn't belong on the list above.
+Zeus seems to be based on technology similar to Boa and thttpd,
+but with more bells and whistles.<newline>
+<url url="http://www.zeus.co.uk/products/server/"> 
+
+<sect>Benchmarks
+<p>
+
+<itemize>
+<item>ZeusBench (missing)<newline>
+<url url="http://www.zeus.co.uk/products/server/intro/bench2/zeusbench.shtml">
+<item>WebBench (binary-ware)<newline>
+<url url="http://web1.zdnet.com/zdbop/webbench/webbench.html">
+<item>Route 66?
+<item>WebStone<newline>
+<url url="http://www.sgi.com/Products/WebFORCE/WebStone/"> 
+<item>SpecWeb96<newline>
+<url url="http://www.specbench.org/osg/web96/">
+</itemize>
+
+<sect>Tools
+<p>
+
+
+<itemize>
+<item>Analog logfile analyzer<newline>
+<url url="http://www.statslab.cam.ac.uk/&tilde;sret1/analog/">
+
+<item>wwwstat logfile analyzer<newline>
+<url url="http://www.ics.uci.edu/pub/websoft/wwwstat/">
+
+<item>gwstat wwwstat postprocessor<newline>
+<url url="http://dis.cs.umass.edu/stats/gwstat.html"> 
+
+<item>The Webalizer logfile analyzer<newline>
+<url url="http://www.usagl.net/webalizer/">
+
+<item>cgiwrap<newline>
+<url url="http://www.umr.edu/&tilde;cgiwrap/">
+
+<item>suEXEC (Boa would need to be ..umm.. <sq>adjusted</sq> to support this)<newline>
+<url url="http://www.apache.org/docs/suexec.html">
+</itemize>
+
+<p>
+References last checked: 06 October 1997<newline>
+Conversion to SGML by Jon Nelson<newline>
+Original html documentation by Larry Doolittle<newline>
+Copyright (c) 1996, 1997, 1998
+
+</report>

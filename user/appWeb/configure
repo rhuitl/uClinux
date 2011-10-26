@@ -1,0 +1,1414 @@
+#!/bin/bash
+#
+#
+#	configure -- Build configuration script for Mbedthis AppWeb Server
+#	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+#
+#	This script creates the config.h, config.make and config.sh 
+#	configuration files. config.h is included in every C/C++ source file, 
+#	config.make is included by all makefiles and config.sh is included by the 
+#	bld program and some other scripts.
+#
+#	It uses the conf/template.config.* files as output templates. 
+#	The initial default settings are derrived from conf/config.defaults and
+#	the current settings are stored in conf/config.cache.
+#
+
+CONFIG_VERSION=1.0.0
+FIRST_TIME=0
+BLD_PRODUCT=appWeb
+PRODUCTS="appWeb"
+
+###############################################################################
+
+checkSetup() {
+#
+# FUTURE -- not working yet
+#	if access w .
+#	then
+#		echo "You do not have write permission for this directory."
+#		echo "Log in as root or modify the permissions of this directory"
+#		echo "and all its files."
+#		exit 255
+#	fi
+
+	if [ ! -f ./configure -o ! -d mpr ]
+	then
+		echo "You must be in the top source directory when you run configure"
+		exit 255
+	fi
+	BLD_TOP=.
+	BLD_TOOLS_DIR=${BLD_TOP}/bin
+	BLD_BIN_DIR=${BLD_TOP}/bin
+}
+
+###############################################################################
+#
+#	Set the destination host system configuration.
+#	Usage: setHostconfiguration CPU OS
+#
+
+setHostConfiguration() {
+
+	BLD_CPU=$1
+	BLD_OS=$2
+	case $BLD_OS in
+	WIN)
+		BLD_UNIX=0
+		;;
+	LINUX)
+		BLD_UNIX=1
+		;;
+	SOLARIS*)
+		BLD_UNIX=1
+		BLD_OS=SOLARIS
+		;;
+	MACOSX)
+		BLD_UNIX=1
+		;;
+	esac
+
+	case $BLD_CPU in
+	arm*|strongarm*)
+		MPR_CPU=MPR_CPU_ARM
+		;;
+	mips*)
+		MPR_CPU=MPR_CPU_MIPS
+		;;
+	ppc*|powerpc*)
+		MPR_CPU=MPR_CPU_PPC
+		;;
+	sparc*)
+		MPR_CPU=MPR_CPU_SPARC
+		;;
+	x86*|i386*)
+		MPR_CPU=MPR_CPU_IX86
+		;;
+	xscale*)
+		MPR_CPU=MPR_CPU_XSCALE
+		;;
+	*)
+		MPR_CPU=MPR_UNKNOWN
+		;;
+	esac
+}
+
+###############################################################################
+
+setupBin() {
+
+	if [ ! -x ${BLD_TOOLS_DIR}/bldout${BLD_EXE} -a /bin/cat${BLD_EXE} ]
+	then
+		cp /bin/cat${BLD_EXE} ${BLD_TOOLS_DIR}/bldout${BLD_EXE}
+	fi
+	if [ ! -x ${BLD_TOOLS_DIR}/genDepend${BLD_EXE} -a -f /bin/true${BLD_EXE} ]
+	then
+		cp /bin/true${BLD_EXE} ${BLD_TOOLS_DIR}/genDepend${BLD_EXE}
+	fi
+}
+
+###############################################################################
+
+setupMakeRules() {
+
+	[ $quiet = 0 ] && echo "    # Creating make.os ..."
+	rm -f make.os
+	ln -s conf/make.os.${BLD_OS} make.os
+}
+
+###############################################################################
+# 
+#	Prompt the user to select from a set of options. 
+#	Usage: ans=`prompt "prompt" "default" "option1" "option2" ...`
+#	Returns the selection or default if <ENTER> is pressed
+#
+
+prompt() {
+	echo -e "\n${1}:" 1>&2 ; shift
+	default=$1 ; shift
+	count=1
+	index=1
+	for o in $*
+	do
+		echo "    $count. $o" 1>&2
+		[ "$o" = "$default" ] && index=$count
+		eval option_${count}=$o
+		count=`expr $count + 1`
+	done
+	echo -n "Enter selection [$index] : " 1>&2
+	read ans
+	if [ "$ans" = "" ]
+	then echo $default
+	else 
+		eval echo $`echo option_${ans}`
+	fi
+}
+
+###############################################################################
+
+firstTimeBuild()
+{
+	if [ ! -f conf/config.defaults ]
+	then
+		cd conf/${BLD_PRODUCT} >/dev/null
+		DEFAULTS=`echo *.defaults`
+		cd - >/dev/null
+		file=`prompt "Select your ${BLD_PRODUCT} configuration defaults" \
+			release.defaults ${DEFAULTS}`
+		echo
+		rm -f conf/config.defaults
+		ln -s ${BLD_PRODUCT}/${file} conf/config.defaults
+		echo "    ln -s ${BLD_PRODUCT}/${file} conf/config.defaults"
+		FIRST_TIME=1
+	fi
+}
+
+###############################################################################
+
+patchAppWebConf() {
+
+	file=$1
+	prefix=$2
+	webPrefix=$3
+	docPrefix=$4
+	ed -s $file <<!PATCH_EOF
+H
+g/ServerRoot/s^\".*\"^\"${prefix}\"^
+g/DocumentRoot[^$]*$/s^\".*\"^\"${webPrefix}\"^
+g/Alias \/doc\//s^\".*\"^\"${docPrefix}\/doc\/\"^
+w
+q
+!PATCH_EOF
+}
+
+###############################################################################
+#
+#	Ensure users have set required environment variables
+#
+
+checkEnv() {
+
+	if [ $BLD_OS = "LINUX" -o $BLD_OS = "SOLARIS" ]
+	then
+		if [ "`echo $LD_LIBRARY_PATH | grep bin`" = "" ]
+		then 
+			#	Only warn first time
+			if [ ! -f conf/config.cache -a $quiet = 0 ]
+			then
+			echo ""
+			echo "    #"
+			echo "    # If you wish to debug in the tree, you will need to set"
+			echo "    # LD_LIBRARY_PATH to include the \"bin\" directory. Try:"
+			echo -e "    #\n    #    export LD_LIBRARY_PATH=`pwd`/bin"
+			echo -e "    #\n    # See \"INSTALL.TXT\" for details."
+			echo -e "    #\n"
+			fi
+		fi
+	fi
+}
+
+###############################################################################
+
+patchConfig()
+{
+	template=$1
+	outFile=$2
+
+	[ $quiet = 0 ] && echo "    # Creating ${outFile} ..."
+	rm -f ${outFile}
+
+	#
+	#	Split into two seds as some Unix systems can't handle this many edits
+	#
+	sed "\
+		s^_MPR_CPU^${MPR_CPU}^g; \
+		s^_BLD_WEB_PREFIX^${BLD_WEB_PREFIX}^g; \
+		s^_BLD_VERSION^${BLD_VERSION}^g; \
+		s^_BLD_UNIX^${BLD_UNIX}^g; \
+		s^_BLD_TYPE^${BLD_TYPE}^g; \
+		s^_BLD_TOP^${BLD_TOP}^g; \
+		s^_BLD_TOOLS_DIR^${BLD_TOOLS_DIR}^g; \
+		s^_BLD_SSL_PORT^${BLD_SSL_PORT}^g; \
+		s^_BLD_SRC_PREFIX^${BLD_SRC_PREFIX}^g; \
+		s^_BLD_SHOBJ^${BLD_SHOBJ}^g; \
+		s^_BLD_SHLIB^${BLD_SHLIB}^g; \
+		s^_BLD_SBIN_PREFIX^${BLD_SBIN_PREFIX}^g; \
+		s^_BLD_ROOT_PREFIX^${BLD_ROOT_PREFIX}^g; \
+		s^_BLD_RANLIB^${BLD_RANLIB}^g; \
+		s^_BLD_PRODUCT^${BLD_PRODUCT}^g; \
+		s^_BLD_PREFIX^${BLD_PREFIX}^g; \
+		s^_BLD_PIOBJ^${BLD_PIOBJ}^g; \
+		s^_BLD_PHP4_LIBS^${BLD_PHP4_LIBS}^g; \
+		s^_BLD_PHP5_LIBS^${BLD_PHP5_LIBS}^g; \
+		s^_BLD_PHP4_DIR^${BLD_PHP4_DIR}^g; \
+		s^_BLD_PHP5_DIR^${BLD_PHP5_DIR}^g; \
+		s^_BLD_OS^${BLD_OS}^g; \
+		s^_BLD_OPENSSL_LIBS^${BLD_OPENSSL_LIBS}^g; \
+		s^_BLD_OPENSSL_DIR^${BLD_OPENSSL_DIR}^g; \
+		s^_BLD_OBJ_DIR^${BLD_OBJ_DIR}^g; \
+		s^_BLD_OBJ^${BLD_OBJ}^g; \
+		s^_BLD_NUMBER^${BLD_NUMBER}^g; \
+		s^_BLD_NAME^${BLD_NAME}^g; \
+		s^_BLD_LIB_VERSION^${BLD_LIB_VERSION}^g; \
+		s^_BLD_LIB_PREFIX^${BLD_LIB_PREFIX}^g; \
+		s^_BLD_LD_FOR_BUILD^${BLD_LD_FOR_BUILD}^g; \
+		s^_BLD_LDFLAGS^${BLD_LDFLAGS}^g; \
+		s^_BLD_LD^${BLD_LD}^g; \
+		s^_BLD_JAVAC^${BLD_JAVAC}^g; \
+		s^_BLD_INC_PREFIX^${BLD_INC_PREFIX}^g; \
+		s^_BLD_IFLAGS^${BLD_IFLAGS}^g; \
+		s^_BLD_HTTP_PORT^${BLD_HTTP_PORT}^g; \
+		s^_BLD_FEATURE_XDB_MODULE_LOADABLE^${BLD_FEATURE_XDB_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_XDB_MODULE_BUILTIN^${BLD_FEATURE_XDB_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_XDB_MODULE^${BLD_FEATURE_XDB_MODULE}^g; \
+		s^_BLD_FEATURE_UPLOAD_MODULE_LOADABLE^${BLD_FEATURE_UPLOAD_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_UPLOAD_MODULE_BUILTIN^${BLD_FEATURE_UPLOAD_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_UPLOAD_MODULE^${BLD_FEATURE_UPLOAD_MODULE}^g; \
+		s^_BLD_FEATURE_TEST^${BLD_FEATURE_TEST}^g; \
+		s^_BLD_FEATURE_STATIC_LINK_LIBC^${BLD_FEATURE_STATIC_LINK_LIBC}^g; \
+		s^_BLD_FEATURE_STATIC^${BLD_FEATURE_STATIC}^g; \
+		s^_BLD_FEATURE_SSL_MODULE_LOADABLE^${BLD_FEATURE_SSL_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_SSL_MODULE_BUILTIN^${BLD_FEATURE_SSL_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_SSL_MODULE^${BLD_FEATURE_SSL_MODULE}^g; \
+		s^_BLD_FEATURE_SQUEEZE^${BLD_FEATURE_SQUEEZE}^g; \
+		s^_BLD_FEATURE_SHARED^${BLD_FEATURE_SHARED}^g; \
+		s^_BLD_FEATURE_SESSION^${BLD_FEATURE_SESSION}^g; \
+		s^_BLD_FEATURE_SAMPLES^${BLD_FEATURE_SAMPLES}^g; \
+		s^_BLD_FEATURE_SAFE_STRINGS^${BLD_FEATURE_SAFE_STRINGS}^g; \
+		s^_BLD_FEATURE_RUN_AS_SERVICE^${BLD_FEATURE_RUN_AS_SERVICE}^g; \
+		s^_BLD_FEATURE_ROMFS^${BLD_FEATURE_ROMFS}^g; \
+	" < ${template} >${outFile}
+
+
+	sed -i "\
+		s^_BLD_FEATURE_PHP4_MODULE_LOADABLE^${BLD_FEATURE_PHP4_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_PHP5_MODULE_LOADABLE^${BLD_FEATURE_PHP5_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_PHP4_MODULE_BUILTIN^${BLD_FEATURE_PHP4_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_PHP5_MODULE_BUILTIN^${BLD_FEATURE_PHP5_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_PHP4_MODULE^${BLD_FEATURE_PHP4_MODULE}^g; \
+		s^_BLD_FEATURE_PHP5_MODULE^${BLD_FEATURE_PHP5_MODULE}^g; \
+		s^_BLD_FEATURE_OPENSSL_MODULE_LOADABLE^${BLD_FEATURE_OPENSSL_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_OPENSSL_MODULE_BUILTIN^${BLD_FEATURE_OPENSSL_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_OPENSSL_MODULE^${BLD_FEATURE_OPENSSL_MODULE}^g; \
+		s^_BLD_FEATURE_MULTITHREAD^${BLD_FEATURE_MULTITHREAD}^g; \
+		s^_BLD_FEATURE_MALLOC_STATS^${BLD_FEATURE_MALLOC_STATS}^g; \
+		s^_BLD_FEATURE_MALLOC_LEAK^${BLD_FEATURE_MALLOC_LEAK}^g; \
+		s^_BLD_FEATURE_MALLOC_HOOK^${BLD_FEATURE_MALLOC_HOOK}^g; \
+		s^_BLD_FEATURE_MALLOC^${BLD_FEATURE_MALLOC}^g; \
+		s^_BLD_FEATURE_LOG^${BLD_FEATURE_LOG}^g; \
+		s^_BLD_FEATURE_LIB_STDCPP^${BLD_FEATURE_LIB_STDCPP}^g; \
+		s^_BLD_FEATURE_KEEP_ALIVE^${BLD_FEATURE_KEEP_ALIVE}^g; \
+		s^_BLD_FEATURE_IF_MODIFIED^${BLD_FEATURE_IF_MODIFIED}^g; \
+		s^_BLD_FEATURE_ESP_MODULE_LOADABLE^${BLD_FEATURE_ESP_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_ESP_MODULE_BUILTIN^${BLD_FEATURE_ESP_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_ESP_MODULE^${BLD_FEATURE_ESP_MODULE}^g; \
+		s^_BLD_FEATURE_EJS_MODULE_LOADABLE^${BLD_FEATURE_EJS_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_EJS_MODULE_BUILTIN^${BLD_FEATURE_EJS_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_EJS_MODULE^${BLD_FEATURE_EJS_MODULE}^g; \
+		s^_BLD_FEATURE_EGI_MODULE_LOADABLE^${BLD_FEATURE_EGI_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_EGI_MODULE_BUILTIN^${BLD_FEATURE_EGI_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_EGI_MODULE^${BLD_FEATURE_EGI_MODULE}^g; \
+		s^_BLD_FEATURE_DLL^${BLD_FEATURE_DLL}^g; \
+		s^_BLD_FEATURE_DIGEST^${BLD_FEATURE_DIGEST}^g; \
+		s^_BLD_FEATURE_COPY_MODULE_LOADABLE^${BLD_FEATURE_COPY_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_COPY_MODULE_BUILTIN^${BLD_FEATURE_COPY_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_COPY_MODULE^${BLD_FEATURE_COPY_MODULE}^g; \
+		s^_BLD_FEATURE_COOKIE^${BLD_FEATURE_COOKIE}^g; \
+		s^_BLD_FEATURE_CONFIG^${BLD_FEATURE_CONFIG}^g; \
+		s^_BLD_FEATURE_COMPAT_MODULE_LOADABLE^${BLD_FEATURE_COMPAT_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_COMPAT_MODULE_BUILTIN^${BLD_FEATURE_COMPAT_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_COMPAT_MODULE^${BLD_FEATURE_COMPAT_MODULE}^g; \
+		s^_BLD_FEATURE_CGI_MODULE_LOADABLE^${BLD_FEATURE_CGI_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_CGI_MODULE_BUILTIN^${BLD_FEATURE_CGI_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_CGI_MODULE^${BLD_FEATURE_CGI_MODULE}^g; \
+		s^_BLD_FEATURE_C_API_MODULE_LOADABLE^${BLD_FEATURE_C_API_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_C_API_MODULE_BUILTIN^${BLD_FEATURE_C_API_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_C_API_MODULE^${BLD_FEATURE_C_API_MODULE}^g; \
+		s^_BLD_FEATURE_AUTH_MODULE_LOADABLE^${BLD_FEATURE_AUTH_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_AUTH_MODULE_BUILTIN^${BLD_FEATURE_AUTH_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_AUTH_MODULE^${BLD_FEATURE_AUTH_MODULE}^g; \
+		s^_BLD_FEATURE_ASSERT^${BLD_FEATURE_ASSERT}^g; \
+		s^_BLD_FEATURE_ADMIN_MODULE_LOADABLE^${BLD_FEATURE_ADMIN_MODULE_LOADABLE}^g; \
+		s^_BLD_FEATURE_ADMIN_MODULE_BUILTIN^${BLD_FEATURE_ADMIN_MODULE_BUILTIN}^g; \
+		s^_BLD_FEATURE_ADMIN_MODULE^${BLD_FEATURE_ADMIN_MODULE}^g; \
+		s^_BLD_FEATURE_ACCESS_LOG^${BLD_FEATURE_ACCESS_LOG}^g; \
+		s^_BLD_EXP_OBJ_DIR^${BLD_EXP_OBJ_DIR}^g; \
+		s^_BLD_EXE^${BLD_EXE}^g; \
+		s^_BLD_DOC_PREFIX^${BLD_DOC_PREFIX}^g; \
+		s^_BLD_DIRS^${BLD_DIRS}^g; \
+		s^_BLD_DEFAULTS^${BLD_DEFAULTS}^g; \
+		s^_BLD_DEBUG^${BLD_DEBUG}^g; \
+		s^_BLD_CPU^${BLD_CPU}^g; \
+		s^_BLD_COMPANY^${BLD_COMPANY}^g; \
+		s^_BLD_CLEAN_INSTALL^${BLD_CLEAN_INSTALL}^g; \
+		s^_BLD_CLASS^${BLD_CLASS}^g; \
+		s^_BLD_CFLAGS^${BLD_CFLAGS}^g; \
+		s^_BLD_CC_FOR_BUILD^${BLD_CC_FOR_BUILD}^g; \
+		s^_BLD_CC^${BLD_CC}^g; \
+		s^_BLD_BUILD_OS^${BLD_BUILD_OS}^g; \
+		s^_BLD_BUILD_CPU^${BLD_BUILD_CPU}^g; \
+		s^_BLD_BIN_DIR^${BLD_BIN_DIR}^g; \
+		s^_BLD_ARGS^${ARGS}^g; \
+		s^_BLD_ARCHIVE^${BLD_ARCHIVE}^g; \
+		s^_BLD_AR^${BLD_AR}^g; \
+		s^_BLD_APPWEB_CONFIG^${BLD_APPWEB_CONFIG}^g; \
+	" ${outFile}
+	chmod 444 ${outFile}
+}
+
+
+###############################################################################
+
+help()
+{
+	cat <<!EOF_HELP
+
+usage: configure [OPTIONS]...
+
+Installation directories:
+  --prefix=PATH            Set the default installation path for the product.
+                           Default is /etc/${BLD_PRODUCT} on Unix, /${BLD_PRODUCT} on Windows.
+                           "make install" will install to this location.
+  --docDir=PATH            Set the installation directory for the documentation.
+  --incDir=PATH            Set the directory for include headers.
+  --libDir=PATH            Set the directory for libraries.
+  --sbinDir=PATH           Set the directory for system binaries.
+  --srcDir=PATH            Set the directory for source files.
+  --webDir=PATH            Set the directory for web documents (DocumentRoot).
+
+System types:
+  --build=cpu-vendor-os    Set the build system system configuration.
+  --host=cpu-vendor-os     Set the host system configuration.
+
+General:
+  --buildNumber=NUMBER     Set the build number part of the version (1.0.0.X).
+  --defaults=FILE          Set the file name of the defaults master in 
+                             conf/${BLD_PRODUCT}.
+  --help                   Display this message.
+  --name=NAME              Set the full product name (BLD_NAME define).
+  --port=PORT              Set the default HTTP port to use for the product.
+  --product=NAME           Set the one word (no spaces) name of the product.
+  --quiet, -q, --silent    Run quietly.
+  --reset                  Reset all values to their defaults.
+  --setLibVersion=X.X.X    Set the shared library version number.
+  --setVersion=X.X.X       Set the product version number.
+  --sslPort=PORT           Set the default SSL port to use for the product.
+  --type=BUILD             Set the build type (DEBUG|RELEASE).
+
+Optional Features:
+  --disable-FEATURE        Do not include the FEATURE.
+  --enable-FEATURE         Include the FEATURE.
+
+  --enable-access-log      Enable logging of requests to the AppWeb access log.
+  --disable-access-log     Do not log requests to the AppWeb access log.
+
+  --enable-assert          Build with assert checking.
+  --disable-assert         Do not build with assert checking.
+
+  --enable-config          Build with the ability to parse Apache-style config
+                             files to configure AppWeb.
+  --disable-config         Do not include the config file parser. AppWeb must
+                             be configured programatically if this is disabled.
+
+  --enable-cookie          Build with cookie handling support.
+  --disable-cookie         Do not include cookie handling.
+
+  --enable-digest-auth     Build with digest authentication support.
+  --disable-digest-auth    Do not build with digest authentication.
+
+  --enable-fast-malloc     Build with the Mbedthis fast malloc.
+  --disable-fast-malloc    Do not include the fast malloc.
+
+  --enable-if-modified     Build with HTTP If-Modified checking.
+  --disable-if-modified    Do not include HTTP If-Modified checking.
+
+  --enable-keep-alive      Build with HTTP Keep-Alive support.
+  --disable-keep-alive     Do not include HTTP Keep-Alive handling.
+
+  --enable-log             Build with the AppWeb trace log facility.
+  --disable-log            Do not build with the AppWeb trace log facility.
+
+  --enable-modules         Build with the dynamically loaded modules capability.
+  --disable-modules        Do not include the ability to load modules.
+
+  --enable-multi-thread    Build AppWeb multi-threaded.
+  --disable-multi-thread   Build AppWeb single threaded.
+
+  --enable-rom-fs          Build with the ability to load web pages from ROM.
+  --disable-rom-fs         Do not build the ability to load web pages from ROM.
+
+  --enable-run-as-service  Build with the ability to run as a service/daemon.
+  --disable-run-as-service Do not include the ability to run as a service.
+
+  --enable-safe-strings    Enforce safe string handling.
+  --disable-safe-strings   Do not enforce safe string handling.
+
+  --enable-session         Build with HTTP session support.
+  --disable-session        Do not build with HTTP session support.
+
+  --enable-shared          Build an ${BLD_PRODUCT} shared library and program. [default]
+  --disable-shared         Do not build an ${BLD_PRODUCT} shared library and program.
+
+  --enable-shared-libc     Link with the shared versions of libc.
+  --disable-shared-libc    Link with the static versions of libc.
+
+  --enable-squeeze         Build in squeeze mode for minimal memory footprint.
+  --disable-squeeze        Build for speed.
+
+  --enable-static          Build a static ${BLD_PRODUCT} library and program. [default]
+  --disable-static         Do not build a static ${BLD_PRODUCT} library and program.
+
+Optional Modules:
+  --with-admin             Include the admin handler.
+  --without-admin          Do not include the admin handler.
+
+  --with-auth              Include the authorization handler.
+  --without-auth           Do not include the authorization handler.
+
+  --with-c_api             Include the C API.
+  --without-c_api          Do not include the C API.
+
+  --with-cgi               Include the CGI handler.
+  --without-cgi            Do not include the CGI handler.
+
+  --with-gacompat          Include GoAhead WebServer API compatibility.
+  --without-gacompat       Do not include GoAhead WebServer API compatibility.
+
+  --with-copy              Build support for the copy handler.
+  --without-copy           Do not include support for the copy handler.
+
+  --with-egi               Include the EGI handler.
+  --without-egi            Do not include the EGI handler.
+
+  --with-esp               Include the ESP handler.
+  --without-esp            Do not include the ESP handler.
+
+  --with-ssl               Build support for the SSL protocol.
+  --without-ssl            Do not include support for the SSL protocol.
+
+  --with-upload            Build with the file upload handler
+  --without-upload         Do not include the upload handler
+
+  --with-xdb               Build with XDB 
+  --without-xdb            Do not include XDB
+
+Optional Packages:
+  Supported PACKAGE names: openssl, php4, php5
+
+  --with-PACKAGE=[builtin|, module]       
+                           Include support for the PACKAGE. Link into ${BLD_PRODUCT} 
+                           statically and/or build as a module
+  --with-PACKAGE-dir=DIR   Set the source directory of the package
+  --with-PACKAGE-libs=libs Set a list of libraries to use when linking with
+                             the PACKAGE
+  --without-PACKAGE        Do not include support for the PACKAGE
+
+Some important environment variables that may be defined to control
+building for the destination host. Note that environment variables will have
+no effect when passed into makefiles, they must be passed via configure.
+
+  AR                       Archiver command
+  CC                       C/C++ compiler command.
+  LD                       Linker command.
+  RANLIB                   The ranlib command.
+  CFLAGS                   Compiler flags for compilation
+  IFLAGS                   Preprocessor and include flags.
+  LDFLAGS                  Linker flags. For example: use -L<dir> to specify 
+                           where to find libraries in non-standard directories.
+
+These variables are for native compilation of tools needed by the build
+process.
+  CC_FOR_BUILD             C/C++ compiler to use for native /local compilation
+                           and linking on the build system.
+  LD_FOR_BUILD             Linker to use for native /local linking on the
+                           build system.
+!EOF_HELP
+}
+
+###############################################################################
+#
+#	Some shells don't have a standard getopts. Must supply our own.
+#
+#	Spec chars: ';' == no arg, ':' required arg, '.' optional arg
+#
+
+getoptex()
+{
+	let $# || return 1
+	local optlist="${1#;}"
+	let OPTIND || OPTIND=1
+	[ $OPTIND -lt $# ] || return 1
+	shift $OPTIND
+	if [ "$1" != "-" -a "$1" != "${1#-}" ]
+	then OPTIND=$[OPTIND+1]; if [ "$1" != "--" ]
+	then
+		local o
+		o="-${1#-$OPTOFS}"
+		for opt in ${optlist#;}
+		do
+			OPTOPT="${opt%[;.:]}"
+			unset OPTARG
+			local opttype="${opt##*[^;:.]}"
+			[ -z "$opttype" ] && opttype=";"
+			if [ ${#OPTOPT} -gt 1 ]
+			then # long-named option
+				case $o in
+				"--$OPTOPT")
+					if [ "$opttype" != ":" ]; then return 0; fi
+					OPTARG="$2"
+					if [ "$OPTARG" != "${OPTARG#-}" ];
+					then # error: must have an agrument
+						let OPTERR && \
+							echo "$0: error: $OPTOPT must have an argument" >&2
+						OPTARG="$OPTOPT";
+						OPTOPT="?"
+						return 1;
+					fi
+					OPTIND=$[OPTIND+1] # skip option's argument
+					return 0
+				;;
+				"--$OPTOPT="*)
+					if [ "$opttype" = ";" ];
+					then	# error: must not have arguments
+						let OPTERR && \
+						  echo "$0: error: $OPTOPT must not have arguments" >&2
+						OPTARG="$OPTOPT"
+						OPTOPT="?"
+						return 1
+					fi
+					OPTARG=${o#"--$OPTOPT="}
+					return 0
+				;;
+				esac
+			else # short-named option
+				case "$o" in
+					"-$OPTOPT")
+						unset OPTOFS
+						[ "$opttype" != ":" ] && return 0
+						OPTARG="$2"
+						if [ -z "$OPTARG" ]
+						then
+							echo "$0: error: -$OPTOPT must have an argument" >&2
+							OPTARG="$OPTOPT"
+							OPTOPT="?"
+							return 1
+						fi
+						OPTIND=$[OPTIND+1] # skip option's argument
+						return 0
+					;;
+					"-$OPTOPT"*)
+						if [ $opttype = ";" ]
+						then 
+							# option with no argument is in a chain of options
+							# move to the next option in the chain
+							# the chain still has other options
+							OPTOFS="$OPTOFS?" 
+							OPTIND=$[OPTIND-1] 
+							return 0
+						else
+							unset OPTOFS
+							OPTARG="${o#-$OPTOPT}"
+							return 0
+						fi
+					;;
+				esac
+			fi
+		done
+		echo "$0: error: Invalid option: $o"
+		exit 255
+	fi; fi
+	OPTOPT="?"
+	unset OPTARG
+	return 1
+}
+
+###############################################################################
+#
+#	Usage: parseSystem in-String out-cpu out-vendor out-os
+#
+
+parseSystem() {
+	cpu=${1%%-*} 
+	vendor=${1##${cpu}-} 
+	vendor=${vendor%%-*} 
+	kernel=${1##${cpu}-${vendor}-} 
+	os=${kernel##*-}
+	kernel=${kernel%%-*}
+	if [ "$kernel" != "" ]
+	then
+		os=$kernel
+	fi
+
+	os=`echo $os | tr '[:lower:]' '[:upper:]'`
+
+	if [ "${cpu}" = "i386" -o "${cpu}" = "i386" -o "${cpu}" = "i486" -o \
+		"${cpu}" = "i586" -o "${cpu}" = "i686" -o "${cpu}" = "i786" ]
+	then
+		cpu=i386
+	fi
+	case "${os}" in
+	CYGWIN*)
+		os=WIN
+		;;
+	SOLARIS*)
+		os=SOLARIS
+		;;
+	esac
+
+	eval ${2}=$cpu
+	eval ${3}=$vendor
+	eval ${4}=$os
+}
+
+###############################################################################
+#
+#	Main 
+#
+quiet=0
+help=0
+
+checkSetup
+buildSystem=`conf/config.guess`
+hostSystem=${buildSystem}
+
+#
+#	Pre-parse the build and host settings
+#
+CMD_LINE="$@"
+ARGS="\
+	build: \
+	buildNumber: \
+	defaults: \
+	disable-access-log \
+	disable-assert \
+	disable-config \
+	disable-cookie \
+	disable-digest-auth \
+	disable-fast-malloc \
+	disable-if-modified \
+	disable-keep-alive \
+	disable-log \
+	disable-modules \
+	disable-multi-thread \
+	disable-multithread \
+	disable-rom-fs \
+	disable-run-as-service \
+	disable-safe-strings \
+	disable-session \
+	disable-shared \
+	disable-shared-libc \
+	disable-squeeze \
+	disable-static \
+	docDir: \
+	enable-access-log \
+	enable-assert \
+	enable-cookie \
+	enable-config \
+	enable-digest-auth \
+	enable-fast-malloc \
+	enable-if-modified \
+	enable-keep-alive \
+	enable-log \
+	enable-modules \
+	enable-multi-thread \
+	enable-multithread \
+	enable-rom-fs \
+	enable-run-as-service \
+	enable-safe-strings \
+	enable-session \
+	enable-shared \
+	enable-squeeze \
+	enable-static \
+	enable-shared-libc \
+	help \
+	host: \
+	incDir: \
+	libDir: \
+	name: \
+	port: \
+	prefix: \
+	product: \
+	quiet \
+	reset \
+	sbinDir: \
+	setLibVersion: \
+	setVersion: \
+	silent \
+	srcDir: \
+	sslPort: \
+	type: \
+	version \
+	webDir: \
+	with-admin: \
+	with-auth: \
+	with-c_api: \
+	with-cgi: \
+	with-gacompat: \
+	with-copy: \
+	with-egi: \
+	with-esp: \
+	with-openssl: \
+	with-openssl-dir: \
+	with-openssl-libs: \
+	with-php4: \
+	with-php4-dir: \
+	with-php4-libs: \
+	with-php5: \
+	with-php5-dir: \
+	with-php5-libs: \
+	with-upload: \
+	with-ssl: \
+	with-xdb: \
+	without-admin \
+	without-auth \
+	without-c_api \
+	without-cgi \
+	without-gacompat \
+	without-copy \
+	without-egi \
+	without-esp \
+	without-php4 \
+	without-php5 \
+	without-ssl \
+	without-openssl \
+	without-upload \
+	without-xdb."
+
+unset OPTIND
+while getoptex "$ARGS" "$@"
+do
+	case "$OPTOPT" in 
+	build)
+		buildSystem=${OPTARG}
+		;;
+	host)
+		hostSystem=${OPTARG}
+		;;
+	product)
+		BLD_PRODUCT=${OPTARG}
+		;;
+	q)
+		quiet=1
+		;;
+	quiet)
+		quiet=1
+		;;
+	*)
+		;;
+	esac
+done
+
+firstTimeBuild
+
+buildSystem=`conf/config.sub ${buildSystem}`
+hostSystem=`conf/config.sub ${hostSystem}`
+
+parseSystem ${hostSystem} bld_cpu vendor bld_os
+setHostConfiguration $bld_cpu $bld_os
+mpr_cpu=$MPR_CPU
+
+#
+#	Now parse any --product or --defaults switches
+#
+unset OPTIND
+while getoptex "$ARGS" "$@"
+do
+	case "$OPTOPT" in 
+	defaults)
+		file=${OPTARG}
+		if [ ! -f "conf/${BLD_PRODUCT}/${file}.defaults" ]
+		then
+			echo "configure: can't find conf/${BLD_PRODUCT}/${file}.defaults"
+			exit 2
+		fi
+		rm -f conf/config.defaults
+		rm -f conf/config.cache
+		ln -s "${BLD_PRODUCT}/${file}.defaults" conf/config.defaults
+		SAVE_BLD_NUMBER=$BLD_NUMBER
+		unset BLD_AR BLD_CC BLD_CC_FOR_BUILD BLD_LD BLD_LD_FOR_BUILD BLD_RANLIB
+		unset BLD_CFLAGS BLD_IFLAGS BLD_LDFLAGS BLD_RANLIB
+		. conf/config.defaults
+		BLD_NUMBER=$SAVE_BLD_NUMBER
+		;;
+	product)
+		BLD_PRODUCT=${OPTARG}
+		;;
+	*)
+		;;
+	esac
+done
+
+#
+#	Read in past saved settings or initial defaults
+#
+if [ -f conf/config.cache ]
+then
+	BASE="conf/config.cache"
+else
+	BASE="conf/config.defaults"
+fi
+. $BASE
+
+if [ $quiet = 0 ]
+then
+	echo
+	echo "    # Configuring ${BLD_PRODUCT}"
+	echo "    # Base configuration: conf/${BLD_DEFAULTS}.defaults"
+	echo "    # Build system: ${buildSystem}"
+	echo "    # Host system: ${hostSystem}"
+fi
+
+#
+#	After reading config.defauls or config.cache we must restore these
+#	settings
+#
+BLD_CPU=$bld_cpu
+BLD_OS=$bld_os
+BLD_BUILD_CPU=$bld_build_cpu
+BLD_BUILD_OS=$bld_build_os
+MPR_CPU=$mpr_cpu
+
+unset OPTIND
+while getoptex "$ARGS" "$@"
+do
+	#
+	#	Peek at the args to do some prep work
+	#
+	case "$OPTOPT" in
+	without*)
+		;;
+	with*-dir)
+		;;
+	with*-libs)
+		;;
+	with*)
+		BUILTIN=0
+		LOADABLE=0
+		MODULE=`echo ${OPTOPT#with-} | tr '[:lower:]' '[:upper:]'`
+		[ "${OPTARG/builtin/}" != "${OPTARG}" ] && BUILTIN=1
+		[ "${OPTARG/loadable/}" != "${OPTARG}" ] && LOADABLE=1
+		if [ $BUILTIN = 0 -a $LOADABLE = 0 ]
+		then
+			echo "configure: bad parameter for: $OPTOPT=$OPTARG"
+			exit 2
+		fi
+		eval BLD_FEATURE_${MODULE}_MODULE_BUILTIN=$BUILTIN
+		eval BLD_FEATURE_${MODULE}_MODULE_LOADABLE=$LOADABLE
+		;;
+	esac
+
+	#
+	# 	Parse the args
+	#
+	case "$OPTOPT" in 
+	build)
+		# Done above
+		:
+		;;
+	buildNumber)
+		BLD_NUMBER=${OPTARG}
+		;;
+	defaults)
+		# Done above 
+		;;
+	disable-access-log)
+		BLD_FEATURE_ACCESS_LOG=0
+		;;
+	disable-assert)
+		BLD_FEATURE_ASSERT=0
+		;;
+	disable-config)
+		BLD_FEATURE_CONFIG=0
+		;;
+	disable-cookie)
+		BLD_FEATURE_COOKIE=0
+		;;
+	disable-digest-auth)
+		BLD_FEATURE_DIGEST=0
+		;;
+	disable-fast-malloc)
+		BLD_FEATURE_MALLOC=0
+		BLD_FEATURE_MALLOC_STATS=0
+		BLD_FEATURE_MALLOC_LEAK=0
+		BLD_FEATURE_MALLOC_HOOK=0
+		;;
+	disable-if-modified)
+		BLD_FEATURE_IF_MODIFIED=0
+		;;
+	disable-keep-alive)
+		BLD_FEATURE_KEEP_ALIVE=0
+		;;
+	disable-log)
+		BLD_FEATURE_LOG=0
+		;;
+	disable-modules)
+		BLD_FEATURE_DLL=0
+		if [ $quiet = 0 ] 
+		then
+			echo "    #"
+			echo -e "    # WARNING: Making all modules builtin."
+			echo "    #"
+		fi
+		BLD_FEATURE_AUTH_MODULE_BUILTIN=${BLD_FEATURE_AUTH_MODULE}
+		BLD_FEATURE_ADMIN_MODULE_BUILTIN=${BLD_FEATURE_ADMIN_MODULE}
+		BLD_FEATURE_CGI_MODULE_BUILTIN=${BLD_FEATURE_CGI_MODULE}
+		BLD_FEATURE_C_API_MODULE_BUILTIN=${BLD_FEATURE_C_API_MODULE}
+		BLD_FEATURE_COMPAT_MODULE_BUILTIN=${BLD_FEATURE_COMPAT_MODULE}
+		BLD_FEATURE_COPY_MODULE_BUILTIN=${BLD_FEATURE_COPY_MODULE}
+		BLD_FEATURE_EGI_MODULE_BUILTIN=${BLD_FEATURE_EGI_MODULE}
+		BLD_FEATURE_EJS_MODULE_BUILTIN=${BLD_FEATURE_EJS_MODULE}
+		BLD_FEATURE_ESP_MODULE_BUILTIN=${BLD_FEATURE_ESP_MODULE}
+		BLD_FEATURE_OPENSSL_MODULE_BUILTIN=${BLD_FEATURE_OPENSSL_MODULE}
+		BLD_FEATURE_PHP4_MODULE_BUILTIN=${BLD_FEATURE_PHP4_MODULE}
+		BLD_FEATURE_PHP5_MODULE_BUILTIN=${BLD_FEATURE_PHP5_MODULE}
+		BLD_FEATURE_SSL_MODULE_BUILTIN=${BLD_FEATURE_SSL_MODULE}
+		BLD_FEATURE_UPLOAD_MODULE_BUILTIN=${BLD_FEATURE_UPLOAD_MODULE}
+		BLD_FEATURE_XDB_MODULE_BUILTIN=${BLD_FEATURE_XDB_MODULE}
+
+		BLD_FEATURE_AUTH_MODULE_LOADABLE=0
+		BLD_FEATURE_ADMIN_MODULE_LOADABLE=0
+		BLD_FEATURE_CGI_MODULE_LOADABLE=0
+		BLD_FEATURE_C_API_MODULE_LOADABLE=0
+		BLD_FEATURE_COMPAT_MODULE_LOADABLE=0
+		BLD_FEATURE_COPY_MODULE_LOADABLE=0
+		BLD_FEATURE_EGI_MODULE_LOADABLE=0
+		BLD_FEATURE_EJS_MODULE_LOADABLE=0
+		BLD_FEATURE_ESP_MODULE_LOADABLE=0
+		BLD_FEATURE_OPENSSL_MODULE_LOADABLE=0
+		BLD_FEATURE_PHP4_MODULE_LOADABLE=0
+		BLD_FEATURE_PHP5_MODULE_LOADABLE=0
+		BLD_FEATURE_SSL_MODULE_LOADABLE=0
+		BLD_FEATURE_UPLOAD_MODULE_LOADABLE=0
+		BLD_FEATURE_XDB_MODULE_LOADABLE=0
+		;;
+	disable-multi-thread|disable-multithread)
+		BLD_FEATURE_MULTITHREAD=0
+		;;
+	disable-rom-fs)
+		BLD_FEATURE_ROMFS=0
+		;;
+	disable-run-as-service)
+		BLD_FEATURE_RUN_AS_SERVICE=0
+		;;
+	disable-safe-strings)
+		BLD_FEATURE_SAFE_STRINGS=0
+		;;
+	disable-session)
+		BLD_FEATURE_SESSION=0
+		;;
+	disable-shared)
+		BLD_FEATURE_SHARED=0
+		;;
+	disable-shared-libc)
+		BLD_FEATURE_STATIC_LINK_LIBC=1
+		;;
+	disable-squeeze)
+		BLD_FEATURE_SQUEEZE=0
+		;;
+	disable-static)
+		BLD_FEATURE_STATIC=0
+		;;
+	enable-access-log)
+		BLD_FEATURE_ACCESS_LOG=1
+		;;
+	enable-assert)
+		BLD_FEATURE_ASSERT=1
+		;;
+	enable-config)
+		BLD_FEATURE_CONFIG=1
+		;;
+	enable-cookie)
+		BLD_FEATURE_COOKIE=1
+		;;
+	enable-digest-auth)
+		BLD_FEATURE_DIGEST=1
+		;;
+	enable-modules)
+		BLD_FEATURE_DLL=1
+		;;
+	enable-shared)
+		BLD_FEATURE_SHARED=1
+		;;
+	enable-shared-libc)
+		BLD_FEATURE_STATIC_LINK_LIBC=0
+		;;
+	enable-fast-malloc)
+		BLD_FEATURE_MALLOC=1
+		BLD_FEATURE_MALLOC_STATS=1
+		BLD_FEATURE_MALLOC_LEAK=1
+		BLD_FEATURE_MALLOC_HOOK=0
+		;;
+	enable-if-modified)
+		BLD_FEATURE_IF_MODIFIED=1
+		;;
+	enable-keep-alive)
+		BLD_FEATURE_KEEP_ALIVE=1
+		;;
+	enable-log)
+		BLD_FEATURE_LOG=1
+		;;
+	enable-multi-thread|enable-multithread)
+		BLD_FEATURE_MULTITHREAD=1
+		;;
+	enable-rom-fs)
+		BLD_FEATURE_ROMFS=1
+		;;
+	enable-run-as-service)
+		BLD_FEATURE_RUN_AS_SERVICE=1
+		;;
+	enable-session)
+		BLD_FEATURE_COOKIE=1
+		BLD_FEATURE_SESSION=1
+		;;
+	enable-safe-strings)
+		BLD_FEATURE_SAFE_STRINGS=1
+		;;
+	enable-squeeze)
+		BLD_FEATURE_SQUEEZE=1
+		;;
+	enable-static)
+		BLD_FEATURE_STATIC=1
+		;;
+	help)
+		help=1
+		;;
+	host)
+		# Done above
+		:
+		;;
+	docDir)
+		BLD_DOC_PREFIX=${OPTARG}
+		;;
+	incDir)
+		BLD_INC_PREFIX=${OPTARG}
+		;;
+	libDir)
+		BLD_LIB_PREFIX=${OPTARG}
+		;;
+	name)
+		BLD_NAME=${OPTARG}
+		;;
+	port)
+		BLD_HTTP_PORT=${OPTARG}
+		;;
+	prefix)
+		BLD_PREFIX=${OPTARG}
+		;;
+	product)
+		# Done above 
+		;;
+	q)
+		# Done above 
+		;;
+	quiet)
+		# Done above 
+		;;
+	reset)
+		rm -f conf/config.cache
+		SAVE_BLD_NUMBER=$BLD_NUMBER
+		unset BLD_AR BLD_CC BLD_CC_FOR_BUILD BLD_LD BLD_LD_FOR_BUILD BLD_RANLIB
+		unset BLD_CFLAGS BLD_IFLAGS BLD_LDFLAGS BLD_RANLIB
+		. conf/config.defaults
+		BLD_NUMBER=$SAVE_BLD_NUMBER
+		;;
+	sbinDir)
+		BLD_SBIN_PREFIX=${OPTARG}
+		;;
+	setLibVersion)
+		BLD_LIB_VERSION=${OPTARG}
+		;;
+	setVersion)
+		BLD_VERSION=${OPTARG}
+		;;
+	silent)
+		quiet=1
+		;;
+	srcDir)
+		BLD_SRC_PREFIX=${OPTARG}
+		;;
+	sslPort)
+		BLD_SSL_PORT=${OPTARG}
+		;;
+	type)
+		BLD_TYPE=${OPTARG}
+		if [ $BLD_TYPE = "DEBUG" ] 
+		then
+			BLD_DEBUG=1
+		else
+			BLD_DEBUG=0
+		fi
+		;;
+	V)
+		echo $CONFIG_VERSION
+		exit 0
+		;;
+	version)
+		echo $CONFIG_VERSION
+		exit 0
+		;;
+	webDir)
+		BLD_WEB_PREFIX=${OPTARG}
+		;;
+	with-admin)
+		BLD_FEATURE_ADMIN_MODULE=1
+		;;
+	with-auth)
+		BLD_FEATURE_AUTH_MODULE=1
+		;;
+	with-c_api)
+		BLD_FEATURE_C_API_MODULE=1
+		;;
+	with-cgi)
+		BLD_FEATURE_CGI_MODULE=1
+		;;
+	with-gacompat)
+		BLD_FEATURE_COMPAT_MODULE=1
+		BLD_FEATURE_ESP_MODULE=1
+		BLD_FEATURE_EGI_MODULE=1
+		BLD_FEATURE_EJS_MODULE=1
+		;;
+	with-copy)
+		BLD_FEATURE_COPY_MODULE=1
+		;;
+	with-egi)
+		BLD_FEATURE_EGI_MODULE=1
+		;;
+	with-esp)
+		BLD_FEATURE_ESP_MODULE=1
+		BLD_FEATURE_EJS_MODULE=1
+		BLD_FEATURE_EJS_MODULE_BUILTIN=$BUILTIN
+		BLD_FEATURE_EJS_MODULE_LOADABLE=$LOADABLE
+		;;
+	with-openssl)
+		BLD_FEATURE_OPENSSL_MODULE=1
+		BLD_FEATURE_SSL_MODULE=1
+		BLD_FEATURE_SSL_MODULE_BUILTIN=$BUILTIN
+		BLD_FEATURE_SSL_MODULE_LOADABLE=$LOADABLE
+		;;
+	with-openssl-dir)
+		BLD_OPENSSL_DIR=${OPTARG}
+		;;
+	with-openssl-libs)
+		BLD_OPENSSL_LIBS=${OPTARG}
+		;;
+	with-php4)
+		BLD_FEATURE_PHP4_MODULE=1
+		;;
+	with-php5)
+		BLD_FEATURE_PHP5_MODULE=1
+		;;
+	with-php4-dir)
+		BLD_PHP4_DIR=${OPTARG}
+		;;
+	with-php4-libs)
+		BLD_PHP4_LIBS=${OPTARG}
+		;;
+	with-php5-dir)
+		BLD_PHP5_DIR=${OPTARG}
+		;;
+	with-php5-libs)
+		BLD_PHP5_LIBS=${OPTARG}
+		;;
+	with-ssl)
+		BLD_FEATURE_SSL_MODULE=1
+		;;
+	with-upload)
+		BLD_FEATURE_UPLOAD_MODULE=1
+		;;
+	with-xdb)
+		BLD_FEATURE_XDB_MODULE=1
+		;;
+	without-admin)
+		BLD_FEATURE_ADMIN_MODULE=0
+		BLD_FEATURE_ADMIN_MODULE_BUILTIN=0
+		BLD_FEATURE_ADMIN_MODULE_LOADABLE=0
+		;;
+	without-auth)
+		BLD_FEATURE_AUTH_MODULE=0
+		BLD_FEATURE_AUTH_MODULE_BUILTIN=0
+		BLD_FEATURE_AUTH_MODULE_LOADABLE=0
+		;;
+	without-c_api)
+		BLD_FEATURE_C_API_MODULE=0
+		BLD_FEATURE_C_API_MODULE_BUILTIN=0
+		BLD_FEATURE_C_API_MODULE_LOADABLE=0
+		;;
+	without-cgi)
+		BLD_FEATURE_CGI_MODULE=0
+		BLD_FEATURE_CGI_MODULE_BUILTIN=0
+		BLD_FEATURE_CGI_MODULE_LOADABLE=0
+		;;
+	without-gacompat)
+		BLD_FEATURE_COMPAT_MODULE=0
+		BLD_FEATURE_COMPAT_MODULE_BUILTIN=0
+		BLD_FEATURE_COMPAT_MODULE_LOADABLE=0
+		;;
+	without-copy)
+		BLD_FEATURE_COPY_MODULE=0
+		BLD_FEATURE_COPY_MODULE_BUILTIN=0
+		BLD_FEATURE_COPY_MODULE_LOADABLE=0
+		;;
+	without-egi)
+		BLD_FEATURE_EGI_MODULE=0
+		BLD_FEATURE_EGI_MODULE_BUILTIN=0
+		BLD_FEATURE_EGI_MODULE_LOADABLE=0
+		;;
+	without-esp)
+		BLD_FEATURE_ESP_MODULE=0
+		BLD_FEATURE_ESP_MODULE_BUILTIN=0
+		BLD_FEATURE_ESP_MODULE_LOADABLE=0
+		BLD_FEATURE_EJS_MODULE=0
+		BLD_FEATURE_EJS_MODULE_BUILTIN=0
+		BLD_FEATURE_EJS_MODULE_LOADABLE=0
+		;;
+	without-openssl)
+		BLD_FEATURE_OPENSSL_MODULE=0
+		BLD_FEATURE_OPENSSL_MODULE_BUILTIN=0
+		BLD_FEATURE_OPENSSL_MODULE_LOADABLE=0
+		BLD_OPENSSL_DIR=
+		;;
+	without-php4)
+		BLD_FEATURE_PHP4_MODULE=0
+		BLD_FEATURE_PHP4_MODULE_BUILTIN=0
+		BLD_FEATURE_PHP4_MODULE_LOADABLE=0
+		BLD_PHP4_DIR=
+		;;
+	without-php5)
+		BLD_FEATURE_PHP5_MODULE=0
+		BLD_FEATURE_PHP5_MODULE_BUILTIN=0
+		BLD_FEATURE_PHP5_MODULE_LOADABLE=0
+		BLD_PHP5_DIR=
+		;;
+	without-ssl)
+		BLD_FEATURE_SSL_MODULE=0
+		BLD_FEATURE_SSL_MODULE_BUILTIN=0
+		BLD_FEATURE_SSL_MODULE_LOADABLE=0
+		BLD_FEATURE_OPENSSL_MODULE=0
+		BLD_FEATURE_OPENSSL_MODULE_BUILTIN=0
+		BLD_FEATURE_OPENSSL_MODULE_LOADABLE=0
+		;;
+	without-upload)
+		BLD_FEATURE_UPLOAD_MODULE=0
+		BLD_FEATURE_UPLOAD_MODULE_BUILTIN=0
+		BLD_FEATURE_UPLOAD_MODULE_LOADABLE=0
+		;;
+	without-xdb)
+		BLD_FEATURE_XDB_MODULE=0
+		BLD_FEATURE_XDB_MODULE_BUILTIN=0
+		BLD_FEATURE_XDB_MODULE_LOADABLE=0
+		;;
+	*)	echo "configure: bad option: $OPTOPT"
+		exit 2
+		;;
+	esac
+done
+shift $[OPTIND-1]
+
+if [ "$*" != "" ]
+then
+	echo "configure: bad usage"
+	exit 2
+fi
+if [ "$help" = 1 ]
+then
+	help
+	exit 0
+fi
+
+checkEnv
+
+if [ ! -f ${BLD_PRODUCT}/conf/${BLD_APPWEB_CONFIG} ]
+then
+	echo "Can't locate the appWeb configuration file ${BLD_PRODUCT}/conf/${BLD_APPWEB_CONFIG}"
+	exit 2
+fi
+
+#
+#	Overwrite if key environment variables are defined
+#
+BLD_AR=${AR:-$BLD_AR}
+BLD_CC=${CC:-$BLD_CC}
+BLD_CC_FOR_BUILD=${CC_FOR_BUILD:-$BLD_CC_FOR_BUILD}
+BLD_LD=${LD:-$BLD_LD}
+BLD_LD_FOR_BUILD=${LD_FOR_BUILD:-$BLD_LD_FOR_BUILD}
+BLD_RANLIB=${RANLIB:-$BLD_RANLIB}
+BLD_CFLAGS=${CFLAGS:-$BLD_CFLAGS}
+BLD_IFLAGS=${IFLAGS:-$BLD_IFLAGS}
+BLD_LDFLAGS=${LDFLAGS:-$BLD_LDFLAGS}
+
+
+#
+#	Create the config.sh files
+#
+patchConfig conf/template.config.sh config.sh
+chmod 444 config.sh
+
+#
+#	Create config.make
+#
+patchConfig conf/template.config.make config.make
+chmod 444 config.make
+
+#
+#	Create the config.h
+#
+rm -f config.h
+patchConfig conf/template.config.h config.h
+chmod 644 config.h
+
+#
+#	If first time, we must not save configuration in the cache. Makefile
+#	uses the absense of config.cache to trigger a first time build.
+#
+if [ $FIRST_TIME = 0 ]
+then
+	echo -e "#\n#	config.cache -- Saved Build Configuration.\n#\n" \
+		>conf/config.cache
+	cat config.sh >>conf/config.cache
+	[ $quiet = 0 ] && echo "    # Creating config.cache ..."
+fi
+
+echo -e "#!/bin/bash\n\nconfigure $CMD_LINE" >conf/config.args
+
+[ $quiet = 0 ] && echo "    # Creating config.args ..."
+
+setupBin
+setupMakeRules
+
+#
+#	Patch appWeb.conf (used when debugging) and install.conf (used in 
+#	release distributions)
+#
+[ $quiet = 0 ] && \
+	echo "    # Copy ${BLD_PRODUCT}/conf/${BLD_APPWEB_CONFIG} to ${BLD_PRODUCT}/appWeb.conf"
+cp ${BLD_PRODUCT}/conf/${BLD_APPWEB_CONFIG} ${BLD_PRODUCT}/appWeb.conf
+cp ${BLD_PRODUCT}/conf/${BLD_APPWEB_CONFIG} ${BLD_PRODUCT}/install.conf
+patchAppWebConf ${BLD_PRODUCT}/appWeb.conf "." "./web" ".."
+patchAppWebConf ${BLD_PRODUCT}/install.conf ${BLD_PREFIX} \
+	${BLD_WEB_PREFIX} ${BLD_DOC_PREFIX}
+
+if [ -d http/test/conf ]
+then
+	[ $quiet = 0 ] && \
+	echo "    # Copy http/test/conf/${BLD_APPWEB_CONFIG} to http/test/http.conf"
+	cp http/test/conf/${BLD_APPWEB_CONFIG} http/test/http.conf
+	patchAppWebConf http/test/http.conf "." "./web" ".."
+fi
+
+if [ -d appWeb/test/conf ]
+then
+	[ $quiet = 0 ] && \
+	echo "    # Copy appWeb/test/conf/${BLD_APPWEB_CONFIG} to appWeb/test/appWeb.conf"
+	cp appWeb/test/conf/${BLD_APPWEB_CONFIG} appWeb/test/appWeb.conf
+	patchAppWebConf appWeb/test/appWeb.conf "." "./web" ".."
+fi
+
+rm -f /tmp/features$$.tmp
+rm -f needConfigure
+exit 0
+
+#
+#  vim:tw=78
+#  vim600: sw=4 ts=4 fdm=marker
+#  vim<600: sw=4 ts=4
+#

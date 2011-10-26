@@ -1,0 +1,101 @@
+Hwclock is a program that runs under Linux and sets and queries the 
+Hardware Clock, which is often called the Real Time Clock, RTC, or
+CMOS clock.
+
+You can set the Hardware Clock to a particular time or from the Linux
+System Time.  You can set the Linux System Time from the Hardware
+Clock, and a typical usage is to invoke Hwclock from a system startup
+script to initialize the System Time.
+
+Hwclock's --adjust function corrects systematic drift in the Hardware
+Clock.  You just invoke it regularly and it corrects for a fast or
+slow Hardware Clock.  Hwclock automatically computes how fast or slow
+the Hardware Clock is every time you set it.
+
+Hwclock uses /dev/rtc if it is available.  Otherwise, it uses its own
+direct I/O to do what the rtc device driver would normally do.
+
+
+INSTALLATION
+------------
+
+Hwclock is shipped with an ELF executable built for ISA (Intel)
+machines.  So there is nothing to build for those machines.  Just
+install the executable file 'hwclock' and the man page file
+'hwclock.8' in suitable directories (such as /sbin/hwclock and
+/usr/man/man8/hwclock.8) and you're ready to go.
+
+
+Sometimes, you need to install Hwclock setuid root.  If you want users
+other than the superuser to be able to display the clock value using the
+direct ISA I/O method, install it setuid root.  If you have the /dev/rtc
+interface on your system or are on a non-ISA system, there's no need for
+users to use the direct ISA I/O method, so don't bother.
+
+To install setuid root, do something like this:
+
+  chmod a=rx,u=s /sbin/hwclock
+
+In any case, Hwclock will not allow you to set anything unless you
+have the superuser _real_ uid.  (This restriction is not necessary if
+you haven't installed setuid root, but it's there for now).
+
+You may want to preformat and/or compress the man page before installing.
+
+If you want to build Hwclock, just cd to the src directory and invoke
+make with no parameters.
+
+Hwclock calls option processing routines in the libsshopt library,
+which is part of Sverre H. Huseby's "shhopt" package.  A copy of the
+source code for this library is included in the package and the build
+process will build a private copy of the library.  But you can use a
+copy that is already on your system by altering the make file.  You
+can find a more authoritative copy of this library, and its source
+code, on sunsite (ftp://sunsite.unc.edu/pub/Linux/libs/shhopt-X.Y).
+The shipped Hwclock executable has those routines statically linked 
+in, so you don't need to be concerned about the shhopt library unless
+you are _building_ Hwclock.
+
+
+SPECIAL NOTE - C LIBRARY COMPATIBILITY
+--------------------------------------
+
+The Hwclock executable included in the distribution needs the libc 5
+shared library (i.e. libc.so.5).  If you don't have that on your
+system, you will have to build (make) Hwclock.  Your build environment
+is probably set up to build Hwclock for whatever C library you do
+have.
+
+HOWEVER, even if you have libc 5 on your system, your system may not
+be built properly to use it.  We have seen this on Red Hat 6.0.  You
+see, libc 5 uses a different method from newer C libraries to
+determine what time zone you're in.  Your system may contain the
+proper files for one C library to figure it out, but not for libc 5 to
+figure it out.
+
+The problem is easy to fix.  If you use the distributed Hwclock 
+executable (or, indeed, if you have libc 5 on your system at all),
+make sure you have the file '/usr/lib/zoneinfo/localtime' on your
+system.  If not, you probably have '/etc/localtime', and all you have
+to do is create the former as a symbolic link to the latter:
+
+  ln --symbolic /etc/localtime /usr/lib/zoneinfo/localtime
+
+
+
+SERVICE
+-------
+
+Hwclock is enthusiastically maintained by bryanh@giraffe-data.com
+(Bryan Henderson).  Please email Bryan any bug reports, questions, or
+suggestions.
+
+
+LICENSE
+-------
+
+Hwclock is distributed under the GNU Public License.  See the file
+GPL_LICENSE.txt.
+
+The copyright is held by the authors identified in the HISTORY file
+and run from the dates of first publication stated in that file.

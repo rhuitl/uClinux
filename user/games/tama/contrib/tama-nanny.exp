@@ -1,0 +1,119 @@
+#! /usr/bin/expect -f
+## tama-nanny.exp -- the tama feeder script
+## (C) 2001 Gergely Nagy <algernon@debian.org>
+## Thanks to Christian Kurz <shorty@debian.org> for the idea
+##
+## Released under the terms of the GNU GPL, version two.
+##
+## $MadHouse: tama/contrib/tama-nanny.exp,v 1.1 2001/12/01 10:56:24 algernon Exp $
+
+## Usage:
+##   tama-nanny.exp host port name password
+##			OR
+##   tama-nanny.exp name password
+##			OR
+##   tama-nanny.exp, and write a ~/.tama-nanny file
+##
+## Examples:
+##   tama-nanny.exp localhost 9112 Tammy FatLady
+##   tama-nanny.exp Chuck F00D
+##
+## An example ~/.tama-nanny file:
+## localhost:9112 Tammy:FatLady
+## Chuck:F00D
+
+global host port name password rcfile line default_host default_port
+
+## Set up defaults
+match_max 100000
+set timeout -1
+set line 0
+set default_host localhost
+set default_port 9111
+set rcfile "~/.tama-nanny"
+
+## Another set of defaults
+set host $default_host
+set port $default_port
+set password ""
+set name ""
+
+proc sanity_check {} {
+	global host port name password line
+
+	if {"" == $host || "" == $port ||
+	    "" == $name || "" == $password} {
+	    	puts "Warning: Skipping line $line."
+		return 1
+	}
+	return 0
+}
+
+proc do_job {} {
+	global host port name password line
+
+	if {[sanity_check] != 0} {return}
+
+	## Spawn a telnet session
+	spawn telnet $host $port
+
+	## Log in
+	expect "What do you wanna call your Tamagotchi? "
+	send -- "$name\r"
+	expect "Tamagotchi found. Please enter password: "
+	send -- "$password\r"
+	expect "\r> "
+
+	## Pet & Feed
+	send -- "pet\r"
+	expect "\r> "
+	send -- "feed\r"
+	expect "\r> "
+
+	## Exit
+	send -- "exit\r"
+	expect eof
+}
+
+proc rcfile_exec {} {
+	global host port name password rcfile line default_host default_port
+
+	if {[catch {open $rcfile} fp]} {
+		puts "Error: Cannot open $rcfile"
+		exit
+	}
+
+	set line 0
+	while {[gets $fp buf] != -1} {
+		incr line
+		if {[regexp "^(\[^:\]*):(\[0-9\]*) (\[^:\]*):(.*)\$" $buf junk host port name password]} {
+			do_job
+		} elseif {[regexp "^(\[^:\]*):(\[^:\]*)\$" $buf junk name password]} {
+			set host $default_host
+			set port $default_port
+			do_job
+		}
+	}
+	close $fp
+}
+
+if {$argc > 0} {
+	switch -- $argc \
+	2 {
+		set name [lindex $argv 0]
+		set password [lindex $argv 1]
+	} \
+	4 {
+		set host [lindex $argv 0]
+		set port [lindex $argv 1]
+		set name [lindex $argv 2]
+		set password [lindex $argv 3]
+	} \
+	default {
+		puts "Usage: $argv0 \[\[host port\] name password\]"
+		exit
+	}
+	do_job
+} else {
+	rcfile_exec
+}

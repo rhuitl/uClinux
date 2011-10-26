@@ -1,0 +1,402 @@
+#  -*- mode: Outline; fill-column: 78; fill-prefix: "	" -*-
+#
+#  klips2-design.txt
+#	Richard Guy Briggs <rgb@conscoop.ottawa.on.ca>
+#
+#  RCSID $Id: klips2-design.txt,v 1.18 2001/07/06 07:32:43 rgb Exp $
+#
+
+* Outline Commands cheat sheet (C-c C-s to see this)
+        C-c C-t         Hide EVERYTHING in buffer
+        C-c C-a         Show EVERYTHING in buffer
+
+        C-c C-d         Hide THIS item and subitems (subtree)
+        C-c C-s         Show THIS item and subitems (subtree)
+
+        C-c C-c         Hide ONE item
+        C-c C-e         Show ONE item
+
+* Introduction
+
+Linux FreeS/WAN IPSec -- KLIPS2 DESIGN
+======================================
+
+# This document outlines the proposed design for KLIPS2, the second
+# generation Linux FreeS/WAN IPSec kernel implementation.  It is
+# accompanied by the following:
+#
+# klips2-design.dia		dia(1) diagram
+# klips2-design-legend.txt	diagram legend
+# klips2-design-api.txt		API descriptions
+# klips2-design-api-trips.txt	scenarios that force trips through the
+#				various APIs to verify all needed resources
+#				are available
+
+# This document is devided up into Introduction, Goals, Feature requests,
+# Packet path overview, NetFilter overview, IPSec path description, and
+# Other issues.
+#
+# This document was originally written 2.5 weeks after OLS2000, inspired
+# from a meeting with Rusty and Marc Boucher in Montreal in November 1999
+# and two meetings at OLS2000.
+#
+# Please comment to the linux-ipsec, netfilter-devel or netdev lists.
+#
+# Current kernel version reference is 2.4.4 with iptables 1.2
+
+* Goals:
+
+	To get rid of the current IPSec virtual interfaces that associate with
+	a specific physical network interfaces and replace them with IPSec
+	virtual interfaces that specify a local gateway address as a source
+	address, a remote gateway address as a destination address and
+	specific tunnel policy or SAs.
+
+	To use existing packet matching engines rather than re-invent.
+
+	To support more of the required selectors, especially source and
+	destination ports, and possibly userid.  Security labels are not of
+	obvious value, but the selectors will be easy to add in the future if
+	they are implemented in the Linux kernel.
+
+	To get access to *all* packets incoming and outgoing to enforce policy
+	in both directions.
+
+	To better support opportunistic encryption.
+
+	To take advantage of the parallellism of SMP and H/W encryption.
+
+	To make encryption and authentication modular.
+
+The idea is to redesign KLIPS (kernel parts of FreeS/WAN) to avoid all the
+'stoopid routing tricks' (TM) to which we have had to resort since the project
+started by disassociating any IPSec devices from physical devices and to add a
+proper SPDB to do proper incoming IPSec policy checks.  We are hoping to use
+existing pattern-matching tools rather than invent our own.  NetFilter appears
+to have all the pattern matching capabilities with the exception of security
+labels which Linux doesn't appear to have anyways, but may be limited in other
+ways.
+
+There is also a significant interest in enabling FreeS/WAN to communicate with
+routing daemons and be able to do load sharing and failover:
+
+	http://www.quintillion.com/fdis/moat/ipsec+routing/
+
+
+
+* Feature requests:
+
+Code=Level/Status/Priority
+Level:
+	S = strategic
+	M = middle
+	T = tactical
+	U = unset
+Status:
+	U = unstarted
+	C = coded
+	T = tested
+	D = deleted
+Priority:
+	H = high
+	M = medium
+	L = low
+	U = unset
+	D = deprecated
+
+Code	Feature		Implementation
+====	=======		==============
+S/U/U	changeable gw wild-side addresses on-the-fly
+			- road warriors with RSA keys and hooks from DHCP
+			  to move to a new set of SAs upon expiry of previous
+			  DHCP lease.  Notify peers.  Negociate new tunnels.
+			  Handle delayed or denied renewal see: conn up, down,
+			  wanted.
+M/U/U	address inertia for remote gw's with changeable wild-side addresses
+	so local gw reboots will initiate reconnect to remotes.
+			- this requires a disk cache.
+			- 3 possible levels:
+				- save list of connections
+				- save IKE phase 1 keys
+				- save IPSEC SA keys (requires KLIPS mods)
+T/U/U	mini-database of road warriors that persists across reboots.
+			- this requires a disk cache.
+M/U/U	connection up, down, wanted
+			- KLIPS2?
+S/U/U	routing below tunnel layer to support mobility and multi-homing
+			-
+M/U/U	tunnel identified by subnets served?
+			-
+M/U/U	why do equalizing schedulers not play well with tunnels?
+			-
+M/U/U	decouple SA retrieval from DADDR (don't care how it arrived)
+			- protocol redesign
+				sysctl and ifdef for dstaddr
+T/U/U	SPIs unique, independant of protocol and DADDR
+			- 
+				sysctl and ifdef for protocol
+S/U/U	routing above tunnel layer
+			-
+S/U/U	granularity smaller than host
+			- SPORT, DPORT, UID, SecLev
+M/U/U	/dev/ipsecNNN devices that could be chown(1)ed and chmod(1)ed.
+
+M/U/U	process to process tunnels
+
+T/U/U	netfilter,pf_key,ioctl,/dev/ipsecNNN ways to manipulate tunnel perms.
+
+S/U/U	KLIPS as a loadable module (isn't it already?)
+
+S/U/U	stats: {number,time_of_last} packets {out,good_in,error_in}
+
+S/U/U	integrate IPSec and firewall policy into Security Policy.
+	(What APIs and user-level tools?)
+
+S/U/U	full inbound policy checking
+S/U/U	secure ciphers and hashes
+T/U/U	kernel implementation (should be faster)
+S/U/U	plays well with routing daemons
+S/U/U	free of export restrictions
+T/U/U	standard crypto api to add newer ciphers and hashes
+S/U/U	opportunistic
+T/U/U	SADB hash table will be locked for additions/deletions
+T/U/U	use a refcount on each SA to increase locking granularity
+
+
+
+* Packet path overview:
+
+The basic path through the kernel as it concerns IPSec for the three
+types of packets is as follows:
+
+IN:
+	NIC
+	basic sanity checks
+	NF_IP_PRE_ROUTING hook
+	route-in
+	ip-options processing
+	defragmentation
+	NF_IP_LOCAL_IN hook
+	transport layer demux
+	application
+
+FORWARD:
+	NIC
+	basic sanity checks
+	NF_IP_PRE_ROUTING hook
+	routing-in
+	ip-options processing
+	ttl decrement and check
+	NF_IP_FORWARD hook
+	fragmentation
+	NF_IP_POST_ROUTING hook
+	fragmentation
+	output()
+	NIC
+
+OUT:
+	application
+	transport layer mux
+	NF_IP_LOCAL_OUT hook
+	route-out
+	NF_IP_POST_ROUTING hook
+	fragmentation
+	output()
+	NIC
+
+
+
+* NetFilter overview:
+
+The basic architecture of NetFilter is:
+
+       --->[1]--->(ROUTE)--->[3]--->[4]--->     where:
+                     |            ^             [1] NF_IP_PRE_ROUTING
+                     |            |             [2] NF_IP_LOCAL_IN
+                     |         (ROUTE)          [3] NF_IP_FORWARD
+                     v            |             [4] NF_IP_POST_ROUTING
+                    [2]          [5]            [5] NF_IP_LOCAL_OUT
+                     |            ^             
+                     |            |             
+                     v            |             
+
+Destination NAT (port forwarding) gets applied in NF_IP_PRE_ROUTING and
+NF_IP_LOCAL_OUT at priority NF_IP_PRIORITY_DNAT = -100, and Source NAT
+(masquerading) gets applied in NF_IP_POST_ROUTING at priority
+NF_IP_PRIORITY_SNAT = 100, .  Filtering is applied in NF_IP_LOCAL_IN,
+NF_IP_FORWARD and NF_IP_LOCAL_OUT at priority NF_IP_PRIORITY_FILTER = 0.
+
+
+Hook processing order would generally be:
+<PRE>
+PRE	IN	FWD	OUT	POST	PRIORITY MACRO         PRI
+=======.=======.=======.=======.=======.=================== = ====
+-500?  .       .       .       .       .NF_IP_PRI_IPSEC_IN  = -500 (?)
+-200   .       .       .-200   .       .NF_IP_PRI_CONNTRACK = -200
+-175? . . . . . . . . . . . . . . . . .	NF_IP_PRI_IPSEC_IN  = -175 (?)
+-150   .       .       .-150   .       .NF_IP_PRI_MANGLE    = -150
+-100   .       .       .-100   .       .NF_IP_PRI_NAT_DST   = -100
+. . . . . .0. . . .0. .	. .0. . . . . . NF_IP_PRI_FILTER    =    0
+       .       .       .       . 100   .NF_IP_PRI_NAT_SRC   =  100
+       .       .       .       . 500   .NF_IP_PRI_IPSEC_OUT =  500
+=======.=======.=======.=======.=======.=================== = ====
+</PRE>
+
+Not all modules are present at each hook.  I am uncertain still if IPSEC_IN
+should be before or after CONNTRACK.  Any comments?
+
+
+
+* IPSec path description:
+
+Treat incoming IPSec encapsulation as a transport layer protocol and
+decapsulate it at the transport layer demultiplexer since it appears as a
+transport layer protocol from the bottom of the Internet Protocol network
+stack.  For outgoing, we treat IPSec as a network layer protocol since that is
+what IPSec appears to be from the top of the IP stack.
+
+An incoming packet starts off with a sanity check.  It then goes through all
+the NF_IP_PRE_ROUTING hooks starting with the SPDB checking.  It would have
+several possible targets: DROP; REJECT; ACCEPT; PEEK.  DROP, REJECT, ACCEPT
+are standard NetFilter targets.  It would DROP if it should have been
+encrypted.  REJECT is a special case of DROP where an ICMP is returned.  It
+would ACCEPT if it was an encrypted IPSec packet bound for this machine and no
+other policy was expected first, it had already been decrypted from expected
+SAs indicated by nfmarks or virtual IPSec device or there was policy to allow
+it through.  PEEK would let the KMd have a look at the packet to see if it
+needed to start thinking about opportunistic and then pass it on.  Since it is
+a fresh ESP or AH packet, it will not have any nfmarks or virtual IPSec device
+association and unless that outer IP header should have been processed by
+another SG in between, no policy will have been required, letting it through.
+
+The rest of the NF_IP_PRE_ROUTING hooks may cause it to be DNATed and
+defragmented.  It then goes through routing which thinks it is a local packet,
+deals with any outer header IP options, then defragmentation and
+NF_IP_LOCAL_IN filter (allow ESP,AH) before getting to ipsec_rcv() where the
+outer bundle is authenticated and decrypted and nfmarked or associated with a
+virtual IPSec device to indicate what decapsulation happenned before being
+passed back to netif_rx().  The next IP header is now visible.  The packet now
+gets re-injected at the beginning.  It goes through the incoming sanity check
+again, getting checked at NF_IP_PRE_ROUTING for policy using previously set
+nfmark or virtual IPSec device from decryption.  It may again be DNATed and
+defragmented.  Routing looks at the now-visible next IP header and routes it
+locally or via the forward hook.
+
+If it is a local packet, IP options and defragmentation are processed.
+NF_IP_LOCAL_IN then gets to check filtering policy for other transport layer
+protocols.  If it is the endpoint for nested bundles, it is sent back to
+netif_rx(), having exposed the next IP header.
+
+If it is not a local packet, routing has selected a route, potentially through
+an existing virtual IPSec device, one per connection, not per physical I/F.
+IP options and TTL are processed before being filtered at NF_IP_FORWARD,
+fragmented, then sent to NF_IP_POST_ROUTING.
+
+If it is a locally generated packet, it would go through normal filtering at
+NF_IP_LOCAL_OUT, then go through routing, then be sent to NF_IP_POST_ROUTING.
+
+At NF_IP_POST_ROUTING, the ipsec table would make a decision about the fate of
+the packet.  It would have several possible targets: ACCEPT; IPSEC SAList;
+DROP; REJECT; TRAP; HOLD.  ACCEPT would allow the packet through with no
+processing.  IPSEC would return NF_STOLEN, stealing the packet and applying
+the policy specified by its parameter of an SA list.  If the SA(s) do(es)n't
+exist(s) or if the TRAP target was specified, it would send up an ACQUIRE to
+all listening key management daemons via PF_KEYv2 and put in a HOLD that would
+keep only the last packet that matched for that HOLD, waiting for the
+appropriate SA(s).  If or once the SA(s) is/are available, it then IPSec
+processes the packet, then re-injects the packet at NF_IP_LOCAL_OUT (since the
+packet now appears to originate from this host) and sets nfmark or associates
+it with a virtual IPSec device to indicate what processing happenned.  The
+packet would then be routed and sent back to NF_IP_POST_ROUTING.  If the IPSec
+remote security gateway is not different upon policy lookup, the ipsec table
+would ACCEPT it.  DROP would drop the packet if previous attempts to do
+opportunistic encryption failed and the default policy was to block non-IPSec
+packets.  REJECT would be almost the same as DROP, except that it returns
+ICMPs.  ACCEPT, DROP, REJECT are standard NetFilter targets.
+
+A packet routed through an optional IPSec virtual I/F simply gets assigned a
+specific source address, and has the nfmark/SA list preloaded.
+
+
+
+* Other issues:
+
+The way that nfmark is used is rather vague.  It is presently only 32 bits.
+Ideally, I would like to be able to indicate exactly which SAs were processed
+on the way in, which would most easily be represented by as many as 4 SAs (AH,
+ESP, IPCOMP, IPIP), each having an 8 bit protocol field (absolute minimum of
+2-bits), 32-bit destination address field (for IPv4, IPv6 would be 128) and a
+32-bit SPI.  This is a potential maximum of 672 bits.  A way of mapping 672
+bits on to the 32 bits available would be required to use this.  A lookup
+table could be used to map nfmarks to SAIDs, not the SAs themselves, since the
+SAs could disappear at any time the SADB is not locked.  It should be
+able to represent a bundle of SAs where one SA could be used in more than one
+bundle.  There could also be more than one right answer for the incoming SPDB.
+I have an idea how to accomplish this by changing/extending nfmark by
+converting it to a list of nfmark structures that contain a pointer to the
+next item on the list, a cookie for the specific netfilter function that owns
+the data and a pointer to a data structure.
+
+nfmark may not be the right tool for this.  Another possible solution is to
+add a member to the struct sk_buff to point to this information.  This has the
+benefit of not depending on anyone else, but the drawback of needing to patch
+a header file *and recompiling the entire kernel*.  There is also the
+possibility of using the NetFilter Connection Tracking facility.
+
+The SADB would be managed via the PF_KEYv2 socket I/F.
+
+The SPDB would be managed via a combination of PF_KEYv2 socket I/F extensions
+and iptables.  A separate NetFilter table called 'ipsec' (as opposed to
+'filter', 'nat' or 'mangle') would have the first hook at NF_IP_PRE_ROUTING
+and the last hook at NF_IP_POST_ROUTING.  iptables(8) currently uses
+get/set_sockopt(2) system calles, but there is discussion of having it
+converted to use the AF_NETLINK socket family.  Having it use a PF_POLICY
+interface that was interoperable with multiple platforms would be a big win.
+
+For matches, we have source/destination address/mask/port, userid (owner) and
+security label.  source/destination address/mask/port and userid are already
+supplied by iptables.  We only need to supply security label, if we even think
+we need it.
+
+
+For targets, how do we do this?  SPDB with policies, or name specific SAs, SA
+chains or SA lists or even virtual IPSec devices.  Currently, we name specific
+SAs which are chained exclusively together.
+ 
+We could have a target iptables library and kernel module that has a target of
+IPSEC which:
+	1. names a specific SA/chain which are unsharable
+	2. lists SAs to apply which are sharable
+	3. names a specific virtual IPSec device which implies a list of SAs
+	4. spec's req'd policy, ie.: cipher, hash, shared?, remote gw
+		(pfs should not be and option)
+ 
+I am favouring option number 2.  Option number 3 would map to number 2 in the
+SPDB.
+ 
+SAs would still be stored in a SADB hash table.  The prev and next fields of
+struct ipsec_sa would be removed if SAs were no longer chained, but were
+listed in lists, either from a direct list, virtual IPSec device or from an
+SPDB.
+
+
+We could use one table for ipsec matching or maybe use one table for each of
+ipsec_in and ipsec_out.  It would have to use a table separate from filter,
+nat or mangle since we need an input NF_IP_PREROUTE priority of less than -200
+(CONNTRACK) and an output NF_IP_POST_ROUTING priority of more than 200
+(CONNTRACK?).  I suggest NF_IP_PRIORITY_IPSEC_IN = -500 and
+NF_IP_PRIORITY_IPSEC_OUT = 500.
+
+There might be a security level iptables library and netfilter kernel
+module, if needed.
+
+There would be "IPSEC", "TRAP" and "HOLD" iptables target libraries
+and netfilter target kernel modules.
+
+Equivalent ipsec_rcv() functionality would be installed as an IP
+transport layer protocol handler and be included with the netfilter
+ipsec table module.
+
+Equivalent ipsec_tunnel_start_xmit() functionality would be in the
+IPSEC netfilter target kernel module.
+

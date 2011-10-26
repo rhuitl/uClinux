@@ -1,0 +1,78 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(peekfd.c)
+
+dnl
+dnl Version
+dnl
+DHCPCD_VERSION=1.3.20
+AC_SUBST(DHCPCD_VERSION)
+
+dnl
+dnl Patch level (optional)
+dnl
+DHCPCD_REL=-pl0
+AC_SUBST(DHCPCD_REL)
+
+dnl
+dnl RPM doesn't like dashes in the version string
+dnl
+RH_VERSION=`echo $DHCPCD_VERSION$DHCPCD_REL | sed 's/-//g'`
+AC_SUBST(RH_VERSION)
+
+dnl
+dnl Setup for automake
+dnl
+AM_INIT_AUTOMAKE(dhcpcd, $DHCPCD_VERSION$DHCPCD_REL)
+
+dnl
+dnl Detect the canonical host and target build environment
+dnl
+AC_CANONICAL_HOST
+
+dnl
+dnl Determining the compilation flags
+dnl
+
+case $host_os in
+	linux*)	CFLAGS="$CFLAGS -fomit-frame-pointer -Wall $ADDS"
+		;;
+esac
+
+case $host_cpu in
+	i486)	CFLAGS="$CFLAGS -m486 -malign-loops=2 -malign-jumps=2 -malign-functions=2"
+		;;
+esac
+
+LDFLAGS="-s"
+
+dnl
+dnl Checks for programs.
+dnl
+AC_PROG_CC
+AC_PROG_INSTALL
+
+dnl
+dnl Checks for libraries.
+dnl
+
+dnl
+dnl Checks for header files.
+dnl
+AC_HEADER_STDC
+AC_CHECK_HEADERS(fcntl.h paths.h sys/ioctl.h sys/time.h syslog.h unistd.h)
+
+dnl
+dnl Checks for typedefs, structures, and compiler characteristics.
+dnl
+AC_TYPE_MODE_T
+AC_TYPE_PID_T
+AC_HEADER_TIME
+
+dnl
+dnl Checks for library functions.
+dnl
+AC_PROG_GCC_TRADITIONAL
+AC_FUNC_MEMCMP
+AC_CHECK_FUNCS(select socket uname)
+
+AC_OUTPUT([Makefile dhcpcd.spec])

@@ -1,0 +1,18 @@
+
+# This is used to hook into Red Hat's network configuration tools.
+# You can delete it if that isn't desired.  We look for network
+# options in /etc/sysconfig/network-scripts if it appears that the
+# interface can't be set up using settings given higher up in this
+# file.
+
+is_true $PUMP || is_true $BOOTP || is_true $DHCP || \
+if [ ! "$IPADDR" -a -f /etc/sysconfig/network-scripts/ifcfg-$2 ] ; then
+    INFO="Red Hat netconf setup"
+    start_fn () {
+	. /etc/sysconfig/network-scripts/ifcfg-$1
+	if [ "$ONBOOT" = "yes" ] ; then log /sbin/ifup $1 ; fi
+    }
+    stop_fn () {
+	log /sbin/ifdown $1
+    }
+fi

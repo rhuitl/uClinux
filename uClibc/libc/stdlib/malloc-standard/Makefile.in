@@ -1,0 +1,23 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2006 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+# calloc.c can be found at uClibc/libc/stdlib/calloc.c
+# valloc.c can be found at uClibc/libc/stdlib/valloc.c
+CSRC := malloc.c calloc.c realloc.c free.c memalign.c mallopt.c mallinfo.c
+
+STDLIB_MALLOC_STANDARD_DIR := $(top_srcdir)libc/stdlib/malloc-standard
+STDLIB_MALLOC_STANDARD_OUT := $(top_builddir)libc/stdlib/malloc-standard
+
+STDLIB_MALLOC_STANDARD_SRC := $(patsubst %.c,$(STDLIB_MALLOC_STANDARD_DIR)/%.c,$(CSRC))
+STDLIB_MALLOC_STANDARD_OBJ := $(patsubst %.c,$(STDLIB_MALLOC_STANDARD_OUT)/%.o,$(CSRC))
+
+libc-$(MALLOC_STANDARD) += $(STDLIB_MALLOC_STANDARD_OBJ)
+
+objclean-y += stdlib_malloc_standard_objclean
+
+stdlib_malloc_standard_objclean:
+	$(RM) $(STDLIB_MALLOC_STANDARD_OUT)/*.{o,os}

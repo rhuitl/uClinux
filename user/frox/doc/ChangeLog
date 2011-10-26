@@ -1,0 +1,364 @@
+Changes from version 0.7.17-->0.7.18
+
+        * Log IP address in xfer logs when name resolution fails.
+
+        * Add ForceHTTP option to force downloads to go via the HTTP proxy
+        even where caching will not be possible
+
+        * Close all file descriptors before execing virus scanner. Prevents
+        frox waiting forever for some virus scanners to exit
+
+        * Compile time option for frox to alter argv[] so ps gives info as
+        to what each frox process is doing
+
+        * Improve SSL logging and docs
+
+        * Fix for incorrect parsing of Deny ACLs which was introduced in 0.7.16
+
+Changes from version 0.7.16-->0.7.17
+
+	* Fix for initialisation error when called with no arguments.
+
+Changes from version 0.7.15-->0.7.16
+
+	* Compile fix for documentation (removed unsupported options)
+
+	* Fix some versions of linux not being identified by ./configure
+
+	* Stop "make install" from installing frox.conf
+
+	* Make frox listen for passive connections on listen address not
+	PASVAddress
+
+	* Allow a forwarding ftp proxy to be enabled in subsections
+
+	* Fix config file subsection matching rules bug
+
+	* Compile fix for *bsd using ssl
+
+	* Fix for NULL pointer derefernce when called with no arguments
+
+	* Allow localcache to be larger than 4GB
+
+	* Make data connections to client come from listen ip address
+
+	* Compile fix for NetBSD 2.0
+
+Changes from version 0.7.14-->0.7.15
+
+	* Allow ACLs and config file subsections to be matched on username
+
+	* Add SSL/TLS AUTH support
+
+	* Add client IP addresses to transfer log lines
+
+	* Remove telnet line control processing
+
+	* Fix ACL/subsection parsing for hostnames containing "-"
+
+	* Prevent frox lingering on its listen socket
+
+	* Remove size limit on http GET string
+
+	* Dynamically allocate strings in write_log(), to allow unlimited
+	line length
+
+Changes from version 0.7.13-->0.7.14
+
+	* Compile fixes where nanosleep() or setenv() aren't defined
+	
+	* Include limits.h from configure.in when testing for netfilter
+	headers -- otherwise configure thinks they are broken.
+
+	* Make http caching fall back to a direct transfer when the http
+	proxy fails to retrieve the file. A bit of a hack, but this needed
+	to go in.
+
+	* Fix a memory leak with http caching
+
+	* Different transfer speeds availiable for downloaded and uploaded
+	files
+
+	* Additional checks on config file for port ranges, and to prevent
+	crashes on mangled config file.
+
+Changes from version 0.7.12-->0.7.13
+
+        * Allow CacheModule to be explicitly specified as "None" for use in
+	config file subsections
+
+	* Make fileinfo.host the IP address when server_name is empty (ie.
+	the IP didn't resolve to a hostname) even when UseFQDN is set. (in
+	cache.c)
+
+	* In user_munge() don't send the ":port" part of the user string
+	to a subsequent ftp proxy if it is the default port.
+
+Changes from version 0.7.11-->0.7.12
+
+	* Clean up vscan temp files on close
+
+	* Option to limit upload rates as well as downloads
+	
+Changes from version 0.7.11-->0.7.12
+
+	* Compile fix for transparent data (removed get_kernel() call)
+
+Changes from version 0.7.10-->0.7.11
+
+	* Made NTP user logins go to the CCP.
+
+	* Typo fix in config file code causing occasional segfaults
+
+Changes from version 0.7.10-->0.7.11
+
+	* Fixed running from inetd which was broken by the 0.7.8-->0.7.9
+	changes
+
+Changes from version 0.7.9-->0.7.10
+
+	* Really fixed ipfilter this time! Added os_init() call to open
+	ipfilter fd before dropping privs.
+
+Changes from version 0.7.8-->0.7.9
+
+	* Added option to cache non anonymous sessions
+
+	* Allow caching options to be changed in subsections.
+
+	* Fixed ipfilter based transparent proxying in *BSD.
+
+	* Added PASVAddress to config options
+
+	* Fixed DOS attack where certain port scans caused frox to exit
+
+	* Improved logging of file transfers
+
+Changes from version 0.7.7-->0.7.8
+
+	* Allow usernames with "@" in them when doing non transparent
+	proxying.
+	
+	* Fixed downloading of filenames with spaces in when using caching.
+
+	* Delete virus scanning temporary file on RETR failure.
+
+	* Close all data connections on PASV command to prevent race condition
+	causing some downloads to hang.
+	
+Changes from version 0.7.6-->0.7.7
+
+	* Fixed virus scanning to work with concurrent downloads (patch from
+	Albrecht Gebhardt).
+	
+	* Logging and error reporting made more verbose/useful. If LogFile is
+	defined frox will now NOT log to syslog as well.
+
+	* Fixed ACL error when round robin DNS used.
+
+	* Optionally allow non printable characters to support foreign
+	character sets.
+
+	* Added NoDetach option to allow running from daemontools.
+
+	* Change set_server_name to resolv_addr()
+
+	* Add X-Forwarded-For header to outgoing http requests.
+
+	* Fixes for compilation on Solaris
+	
+	* Allow selection of outgoing IP address. (EXPERIMENTAL)
+
+	* Allow Passive-->Active conversion. (EXPERIMENTAL)
+
+Changes from version 0.7.5-->0.7.6
+
+	* Changes to allow linking with dietlibc -- check for u_int??_t in
+	configure, switch from sys_errlist to syserror(), and use the more
+	portable padded field widths in place of precisions for generating
+	cache file headers with printf().
+
+	* Added ability to throttle downloads.
+
+	* Increased size of data transfer buffer (BUF_LEN). This speeds
+	things up a lot.
+	
+	* Increased size of MAX_LINE_LEN for servers with long single-line
+	welcome messages.
+
+	* Rearranged sstrlib to reduce the number of places where dealing
+	with the raw buffer.
+
+	* Removed obsolete acconfig.h
+	
+Changes from version 0.7.4-->0.7.5
+
+	* Moved srand() to main.c to prevent reseeding on every call of
+	bind_me().
+
+	* Initialise logging before chroot so logs can use local time
+	rather than GMT.
+
+Changes from version 0.7.3-->0.7.4
+
+	* data.c -- fixed forwarddata2server() from producing 0 length file
+	uploads in passive mode. Also fix error messages about bad file
+	descriptor by early return on fd close.
+
+Changes from version 0.7.2-->0.7.3
+
+	* Changed behaviour when server closes control connection while we
+	are sending file from a cache -- now we stay open until the
+	transfer is done.
+
+	* Fixed up StrictCaching.
+
+	* Cleaned up example CCP script.
+	
+Changes from version 0.7.1-->0.7.2
+
+	* ccp.c -- New implementation of CCP, existing along side the
+	previous one.
+
+	* data.c -- Changed select() to select on data connection fds
+	when not downloading. If not downloading the buffer is emptied.
+	Prevents data connection hanging in some error conditions.
+
+	* Added FTPProxy config file option -- allows frox to forward
+	connections on to another ftp proxy.
+
+	* Added new server address variables to cope with ccp and FTPProxy
+	changing our destination address.
+	
+Changes from version 0.7.0-->0.7.1
+
+	* ntp.c -- change to allow QUIT before USER when doing ntp.
+
+	* doc/Makefile.am -- Remove doc/ prefix from man page paths
+
+Changes from version 0.6.4-->0.7.0
+
+	* Chroot is done by default. Running as root must be explicitly
+	  requested.
+
+	* Added sstrlib buffer handling code.
+
+	* Config file parsing code now done from template. Added config
+	file subsections. Logging level can be selected.
+
+	* Timeout now done with an alarm() call.
+
+	* Added StrictCaching code to cache.c -- see FAQ for details.
+	
+	* Added virus scanning code.
+
+	* SIGCHLD signal handler loops on waitpid() to pick up all children
+
+	* linux.c -- added kernel 2.0 support
+
+	* main.c -- continue if accept() dies with errno==EINTR
+	
+	* configure.in -- test for socklen_t
+
+	* Added option to limit connections from single IP.
+
+	* main.c -- support for running from inetd
+
+Changes from version 0.6.3-->0.6.4
+
+	* Altered logging to log IP as well as name to prevent DNS
+	spoofing hiding an attacker's identity ( changed in addr2name()).
+
+	* Compilation fix in byteSwap() in localcache.c (Big endian 
+	architectures configured with --enable-local-cache only).
+
+Changes from version 0.6.2-->0.6.3
+
+	* In cache_retr() fixed broken file retrieval when caching while
+	in ASCII mode.
+
+Changes from version 0.6.1-->0.6.2
+
+	* parseuser() changed so ntp connections default to port 21 properly.
+	
+Changes from version 0.6.0-->0.6.1
+
+	* Changed server_control_forward() to check with
+	cache_parsed_reply() before forwarding -- replies to NOOPs were
+	going passed through.
+
+	* Changed NOOP_INTERVAL to 30 in cache.c
+	
+Changes from version 0.5.3-->0.6.0
+
+	* Reworking of caching. Added local caching and split http caching
+	into separate file.
+
+	* Cleaned up the char/unsigned char mess.
+
+	* Removed boolean algebra of info->state. Data connection fd is
+	now set to -1 to indicate closed socket, and active/passive is
+	indicated by an enum.
+
+	* Added ACLs to config file
+
+	* Each data connection now only allows transfer in one direction.
+
+	* Central loop for each session changed.
+	
+	* Added debian packaging support
+
+	* Documentation updates.
+	
+Changes from version 0.5.2-->0.5.3
+
+	* We no longer quit on data connection errors.
+
+	* Documentation updates.
+
+	* Non transparent proxying now compiled in by default.
+	
+Changes from version 0.5.1-->0.5.2
+
+	* Fixed typo which meant SameAddress config option was always on.
+
+	* Better integration of transparent data connections and cache
+	code.
+
+	* Added check for chains we need in linux.c
+	
+Changes from version 0.5-->0.5.1
+
+	* Added optional support for transparent proxying of the data
+	connections.
+	
+Changes from version 0.4.1-->0.5
+
+	* Changed method of control stream parsing (added ftp-cmds files).
+
+	* Replaced the address_info structures with struct sockaddr_in.
+
+	* Added config file options to pick the port ranges used for
+	active, passive, and control connections.
+
+	* Changed cache.c to use ftp-cmds. Also eliminated use of wget -
+	cache.c now speaks HTTP (sort of).
+
+	* Support restarts when caching.
+
+	* Added optional support for non transparent proxying.
+
+	* Added support for active-->passive conversion.
+
+	* Sending HUP now causes a config file reread.
+	
+Changes from version 0.4-->0.4.1
+
+	* Quick change to support 2.4 series of Linux kernels
+
+Changes from version 0.3-->0.4
+
+	*  Deny REST command when using cache
+
+	*  Added NOOP keepalives during cache transfer. Big/slow downloads
+	   should now complete rather than stop half way through!!

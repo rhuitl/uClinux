@@ -1,0 +1,4741 @@
+#############################################################################
+
+#
+#	Kconfig - user applications and library configuration
+#
+
+#############################################################################
+
+menu "Core Applications"
+
+config USER_INIT_INIT
+	bool "init"
+	help
+	  Include the init executable (highly recommended).
+	  Approx. binary size: 14k
+
+config USER_INIT_CONSOLE_SH
+	bool "enable console shell"
+	help
+	  Init will automatically spawn a shell on the console.
+
+config USER_INIT_RUN_FIREWALL
+	bool "execute firewall rules"
+	help
+	  Init will automatically run the firewall script on start up.
+
+config USER_INIT_CONF
+	bool "process init.conf"
+	help
+	  Read and process simple configuration from /etc/config/init.conf
+	  or /etc/init.conf.  The format of the file is as follows (this is
+	  also all the current config options).  Any lines that are not
+	  understood are ignored.
+
+choice
+	prompt "Shell Program"
+	default USER_SASH_SH
+	help
+	  Select the primary system shell to use.
+
+config USER_SASH_SH
+	bool "sash"
+	help
+	  The SASH Shell. (Approx. binary size: 44k)
+
+config USER_SH_SH
+	bool "minix-shell"
+	help
+	  The Minix Shell. (Approx. binary size: 108k)
+
+config USER_NWSH_SH
+	bool "nwsh"
+	help
+	  The NEW shell (Approx. binary size: 25k)
+
+config USER_BASH_BASH
+	bool "bash"
+	help
+	  The Bourne-Again Shell. (large)
+
+config USER_MSH_SH
+	bool "msh"
+	help
+	  A little linux shell (small)
+
+config USER_OTHER_SH
+	bool "other"
+	help
+	  Some other shell configured.
+
+endchoice
+
+config USER_SASH_HISTORY
+	bool "simple (sash) history"
+	depends on USER_SASH_SH
+	default n
+	help
+	  Support simple command history in SASH.
+
+config USER_SASH_PS
+	bool "sash ps"
+	depends on USER_SASH_SH
+	default y
+	help
+	  Command to display process status.
+
+config USER_SASH_REBOOT
+	bool "reboot (sash)"
+	help
+	  Command to reboot the system.
+	  Approx. binary size: 8k
+
+config USER_SASH_REBOOT_SNAPGEAR
+	bool "SnapGear reboot script"
+	depends on USER_BUSYBOX_BUSYBOX && USER_SASH_REBOOT
+	select USER_BUSYBOX_KILLALL
+	help
+	  Use a simple script to send flatfsd a SIGHUP in place of reboot.
+	  Requires busybox killall command (turned on automatically).
+
+config USER_SASH_SHUTDOWN
+	bool "shutdown (sash)"
+	help
+	  Command to shutdown the system.
+	  Approx. binary size: 5k
+
+config USER_INIT_EXPAND
+	bool "expand"
+	help
+	  A simple filesystem decompressor.
+	  Approx. binary size: 5k
+
+config USER_INIT_EXPAND_NOZEROES
+	bool "expand should not write zeroes"
+	depends on USER_INIT_EXPAND
+	help
+	  If your RAM disk or device you are expanding to assumes
+	  that all blocks are initialised to zero,  you can enable
+	  this option.  This is particularly good for the RAM disk
+	  driver on 2.4.  With this option off it allocates the
+	  maximum amount of memory for the filesystem because we
+	  write every byte with zero initially.  Enabling this
+	  option may save you a lot of memory on mostly empty ram disks.
+
+config USER_VERSION_VERSION
+	bool "version"
+	help
+	  Print the version of the system software.
+	  Approx. binary size: 6k
+
+config USER_LOGIN_LOGIN
+	bool "login"
+	help
+	  A login program.
+	  Approx. binary size: 8k
+
+config USER_OLD_PASSWORDS
+	bool "old passwords"
+	select LIB_LIBCRYPT_OLD
+	help
+	  Support root password in /etc/config/config.  This option is for
+	  backwards compatibility with older firmware.  New/changed passwords
+	  still live in /etc/config/passwd.
+
+config USER_ONLY_ROOT
+	bool "only allow root login"
+	help
+	  Only allow root to login.  All other users will be denied login
+	  access.
+
+config USER_AGETTY_AGETTY
+	bool "agetty"
+	help
+	  Install "agetty"in /bin
+	  Approx. binary size: 19k
+
+config USER_GETTYD_GETTYD
+	bool "gettyd"
+	help
+	  Another getty program.
+	  Approx. binary size: 16k
+
+config USER_MGETTY_MGETTY
+	bool "mgetty"
+	help
+	  Another getty program. Capable of operating concurrently with 
+	  dial-out software.
+	  Approx. binary size: 80k
+
+config USER_LOGIN_PASSWD
+	bool "passwd"
+	help
+	  The passwd program (for changing passwords)
+
+config USER_CRON_CRON
+	bool "cron"
+	help
+	  Daemon to execute scheduled commands
+	  Approx. binary size: 27k
+
+
+comment "Real Time Clock"
+
+config USER_HWCLOCK_HWCLOCK
+	bool "hwclock"
+
+config USER_RTC_M41T11
+	bool "rtc m41t11"
+	help
+	  Command line utility to support the M41T11 real time clock chip.
+	  This command lets you set the system time from the clock chip, set
+	  the time in the clock chip from the system clock and read and
+	  write values into the battery backed RAM on the clock chip.
+	  This utility requires the kernel to support MBUS.
+	  Approx. binary size: 12k
+
+config USER_RTC_DS1302
+	bool "rtc ds1302"
+
+comment "USB Root Hub Controller"
+config USER_USBHUBCTRL_USBHUBCTRL
+	bool "usb hub ctrl"
+	help
+		Command line utility to control enabled ports on the SG560U
+		and some other USB-booting devices
+
+comment "Vixie-cron"
+
+config USER_VIXIECRON_CRON
+	bool "cron"
+
+config USER_VIXIECRON_CRONTAB
+	bool "crontab"
+
+
+comment "at"
+
+config USER_AT_AT
+	bool "at"
+
+config USER_AT_ATD
+	bool "atd"
+
+config USER_AT_ATRUN
+	bool "atrun"
+
+
+comment "OOM killer tinkering"
+
+config USER_NOOOM_NOOOM
+	bool "Build no_oom"
+
+config USER_NOOOM_BINARIES
+	string "disable OOM killer for these binaries"
+	depends on USER_NOOOM_NOOOM
+	default ""
+	help
+
+endmenu
+
+#############################################################################
+
+menu "Flash Tools"
+
+config USER_FLASHW_FLASHW
+	bool "flashw"
+	help
+	  A tool for writing to the non-volatile FLASH chips.
+	  Approx. binary size: 10k
+
+config USER_SETMAC_SETMAC
+	bool "setmac"
+
+config USER_FCONFIG_FCONFIG
+	bool "fconfig"
+	help
+	  A program that lets you manipulate your RedBoot 
+	  configuration from Linux. 
+
+
+comment "netflash tool"
+
+config USER_NETFLASH_NETFLASH
+	bool "netflash"
+	help
+	  Tool to upgrade the firmware of the server across the network.
+	  Approx. binary size: 29k
+
+config USER_NETFLASH_WITH_FTP
+	bool "netflash uses FTP"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+	help
+	  Add ftp to the mechanisms that netflash may use to download
+	  new flash images.
+
+config USER_NETFLASH_WITH_CGI
+	bool "netflash can run as cgi-bin"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+	help
+	  Add support for netflash to run as a CGI executable.
+	  This allows netflash to be invoked directly as part of a POST request
+	  to upgrade the firmware with minimal overhead.
+
+config USER_NETFLASH_WITH_FILE
+	bool "netflash defaults to writing out ordinary file"
+	depends on USER_NETFLASH_NETFLASH
+	help
+	  Some systems will not be using a traditional flash storage device
+	  for storing images. Some newer platforms use USB flash sticks, or
+	  Compact Flash devices as their promary storage. On these types of
+	  devices netflash should write out ordinay files. The usual checksum
+	  and decryption/decompression steps are carried out.
+
+config USER_NETFLASH_VERSION
+	bool "netflash recognises version"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+	help
+	  Check the version information on the end of the image downloaded
+	  to the device.
+
+config USER_NETFLASH_VERSION_ALLOW_CURRENT
+	bool "netflash accepts same version"
+	depends on USER_NETFLASH_VERSION
+	help
+	  Allow upgrading to images where the version string matches that of the
+	  currently running firmware.
+
+config USER_NETFLASH_VERSION_ALLOW_OLDER
+	bool "netflash accepts older version"
+	depends on USER_NETFLASH_VERSION
+	help
+	  Allow upgrading to images where the version string is older than that
+	  of the currently running firmware.
+
+config USER_NETFLASH_DECOMPRESS
+	bool "netflash can decompress"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+	help
+	  Add option to decompress images before writing them to flash.
+
+config USER_NETFLASH_AUTODECOMPRESS
+	bool "netflash auto-decompresses"
+	depends on USER_NETFLASH_DECOMPRESS
+	help
+	  Netflash automatically decompresses images if they have a gzip header.
+
+config USER_NETFLASH_HMACMD5
+	bool "netflash uses HMAC-MD5 signature"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+
+config USER_NETFLASH_HMACMD5_KEY
+	string "netflash HMAC-MD5 key"
+	depends on USER_NETFLASH_HMACMD5
+	default "HMAC-MD5 key"
+
+config USER_NETFLASH_SHA256
+	bool "netflash uses SHA256 as checksum"
+	depends on USER_NETFLASH_NETFLASH
+	depends on !USER_NETFLASH_CRYPTO_V2
+	help
+	  Image files must also contain a SHA256 hash of the image contents.
+	  By default this is in addition to the old style 32bit checksum (for
+	  backword compatabilty). The check of this hash can be disabled
+	  using the netflash "-i" option.
+
+config USER_RECOVER_BIOS
+	bool "recover bios only"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+
+config USER_NETFLASH_CRYPTO
+	bool "netflash needs public key encryption"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+	select LIB_LIBSSL
+	help
+	  Netflash requires a public key authentication to be attached to an
+	  image and won't commit an image without this or with an invalid
+	  authentication.
+
+config USER_NETFLASH_CRYPTO_V2
+	bool "netflash supports public key encryption using SHA256 checksum"
+	depends on USER_NETFLASH_NETFLASH || USER_RECOVER_RECOVER
+	select LIB_LIBSSL
+	select USER_NETFLASH_CRYPTO
+	help
+	  Netflash requires a public key authentication to be attached to an
+	  image and won't commit an image without this or with an invalid
+	  authentication. A SHA256 hash of the firmware image is used as
+	  the signed block data.
+
+config USER_NETFLASH_CRYPTO_OPTIONAL
+	bool "netflash optional public key encryption"
+	depends on USER_NETFLASH_CRYPTO
+	help
+	  Netflash will commit images with or without public key authentication
+	  but won't commit an image with an invalid authentication.
+
+config USER_RECOVER_STATIC_TFTP
+	bool "bootloader uses server config from flash"
+
+config USER_RECOVER_RECOVER
+	bool "recover"
+	help
+	  Recovery application to allow programming of a new flash image
+	  when the current flash image cannot boot.
+
+config USER_RECOVER_ETHERNET_INTERFACE
+	string "recover ethernet interface"
+	depends on USER_RECOVER_RECOVER
+	default "eth0"
+	help
+	  Specify the ethernet interface that the recover application uses.
+
+config USER_RECOVER_USE_STATIC_SERVER
+	bool "recover uses static server"
+	depends on !USER_RECOVER_STATIC_TFTP
+	help
+	  Enable use of a static recovery TFTP server.  The default is to use
+	  the DHCP server.
+
+config USER_RECOVER_STATIC_SERVER
+	string "recover static server"
+	depends on USER_RECOVER_USE_STATIC_SERVER
+	default "0.0.0.0"
+	help
+	  The IP address of the static recovery TFTP server.
+
+config USER_RECOVER_PRESERVE_CONFIG_FS
+	bool "recover preserves existing config"
+	depends on USER_RECOVER_RECOVER
+
+
+comment "Arcturus uCbootloader Apps/Libs"
+
+config USER_BOOTTOOLS_LOADER
+	bool "flashloader / ramloader"
+	help
+	  The uCsimm/uCdimm flash/ram loader.
+
+config USER_BOOTTOOLS_HIMEMLOADER
+	bool "himemloader"
+	help
+	  The uCsimm/uCdimm himem loader.
+
+config USER_BOOTTOOLS_PRINTBENV
+	bool "printbenv"
+	help
+	  The uCsimm/uCdimm tools.
+
+config USER_BOOTTOOLS_SETBENV
+	bool "setbenv"
+	help
+	  The uCsimm/uCdimm tools.
+
+config USER_BOOTTOOLS_RESET
+	bool "reset"
+	help
+	  The uCsimm/uCdimm tools.
+
+config USER_BOOTTOOLS_MD5SUM
+	bool "md5sum"
+	help
+	  Compute MD5 message digest.
+
+config LIB_LIBBSC
+	bool "libbsc"
+	help
+	  Bootloader trap library
+
+
+comment "MTD utils"
+
+config USER_MTDUTILS
+	bool "mtd-utils"
+	select LIB_ZLIB
+
+config USER_MTDUTILS_ERASE
+	bool "flash_erase"
+	depends on USER_MTDUTILS
+	help
+	  A tool for erasing MTD partitions.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_ERASEALL
+	bool "flash_eraseall"
+	depends on USER_MTDUTILS
+	help
+	  A tool for erasing entire MTD partitions.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_LOCK
+	bool "flash_lock"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UNLOCK
+	bool "flash_unlock"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_FLASH_INFO
+	bool "flash_info"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_FLASHCP
+	bool "flashcp"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_FLASH_OTP_INFO
+	bool "flash_otp_info"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_FLASH_OTP_DUMP
+	bool "flash_otp_dump"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_FTL_CHECK
+	bool "ftl_check"
+	depends on USER_MTDUTILS
+	help
+	  Check the Flash Translation Layer.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_FTL_FORMAT
+	bool "ftl_format"
+	depends on USER_MTDUTILS
+	help
+	  Format a Flash Translation Layer.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_MTD_DEBUG
+	bool "mtd_debug"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_MKFSJFFS2
+	bool "mkfs.jffs2"
+	depends on USER_MTDUTILS
+	select LIB_LIBLZO
+
+config USER_MTDUTILS_JFFS2DUMP
+	bool "jffs2dump"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_NFTLDUMP
+	bool "nftldump"
+	depends on USER_MTDUTILS
+	help
+	  Dump a NAND flash.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_NFTL_FORMAT
+	bool "nftl_format"
+	depends on USER_MTDUTILS
+	help
+	  Format a Flash Translation Layer on NAND flash.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_NANDDUMP
+	bool "nanddump"
+	depends on USER_MTDUTILS
+	help
+	  Dump a NAND device.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_NANDTEST
+	bool "nandtest"
+	depends on USER_MTDUTILS
+	help
+	  Test a NAND device.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_NANDWRITE
+	bool "nandwrite"
+	depends on USER_MTDUTILS
+	help
+	  Write to a NAND device.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_DOC_LOADBIOS
+	bool "doc_loadbios"
+	depends on USER_MTDUTILS
+	help
+	  Load the BIOS portion of a Disk On Chip.
+	  This option adds approximately 40K to the image.
+
+config USER_MTDUTILS_DOC_LOADIPL
+	bool "doc_loadipl"
+	depends on USER_MTDUTILS
+	help
+	  Load an IPL into a DoC Millennium Plus
+	  This option adds approximately 45K to the image.
+
+config USER_MTDUTILS_RFDDUMP
+	bool "rfddump"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_RFDFORMAT
+	bool "rfdformat"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_RECV_IMAGE
+	bool "recv_image"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_SERVE_IMAGE
+	bool "serve_image"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_SUMTOOL
+	bool "sumtool"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_MKFSUBIFS
+	bool "mkfs.jffs2"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIUPDATEVOL
+	bool "ubiupdatevol"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIMKVOL
+	bool "ubimkvol"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIRMVOL
+	bool "ubirmvol"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBICRC32
+	bool "ubicrc32"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBINFO
+	bool "ubinfo"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIATTACH
+	bool "ubiattach"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIDETACH
+	bool "ubidetach"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBINIZE
+	bool "ubinize"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIFORMAT
+	bool "ubiformat"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIRENAME
+	bool "ubirename"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_MTDINFO
+	bool "mtdinfo"
+	depends on USER_MTDUTILS
+
+config USER_MTDUTILS_UBIRSVOL
+	bool "ubirsvol"
+	depends on USER_MTDUTILS
+
+endmenu
+
+#############################################################################
+
+menu "Filesystem Applications"
+
+config USER_FLATFSD_FLATFSD
+	bool "flatfsd"
+	help
+	  This program saves RAM filesystems back to FLASH.
+	  Approx. binary size: 12k
+
+choice
+	prompt "flatfsd storage type"
+	depends on USER_FLATFSD_FLATFSD
+	default USER_FLATFSD_AUTO
+
+config USER_FLATFSD_AUTO
+	bool "auto"
+	help
+	  Determine the config filesystem type based on the platform settings.
+	  This will be the correct choice for most platforms.
+
+config USER_FLATFSD_USE_FLASH_FS
+	bool "filesystem"
+	help
+	  Use the existing FLASH (or other writable) filesystem, instead of
+	  creating a flat FS.  Requires a writable FS (JFFS/JFFS2/DoC/ext2,
+	  etc.).
+
+config USER_FLATFSD_DISKLIKE
+	bool "disk like"
+	help
+	  /dev/flash/config is a disk-like device.
+
+config USER_FLATFSD_CONFIG_BLOBS
+	bool "file blobs"
+	help
+	  The configuration filesystem storage is within a single file blob
+	  on some attached mass storage (could be flash or hard disk).
+	  There may be multiple of these configuration blobs on any mass
+	  storage device.
+
+endchoice
+
+config USER_FLATFSD_COMPRESSED
+	bool "Compress /etc/config to flash as required"
+	depends on USER_FLATFSD_FLATFSD
+	help
+	  Use deflate to compress the flat filesystem to flash.  This is
+	  particularly useful for situations where you have a few large
+	  files in your configuration filesystem.
+
+config USER_FLATFSD_ENCRYPTED
+	bool "Encrypt /etc/config to flash as required"
+	depends on USER_FLATFSD_FLATFSD
+	help
+	  Use AES to encrypt the flat filesystem into flash.
+
+config USER_FLATFSD_HAS_RTC
+	bool "Device has Real Time Clock"
+	depends on USER_FLATFSD_FLATFSD
+	help
+	  If the device does *not* have a real time clock, flatfsd helps
+	  keep time increasing by storing the time when it saves the config
+	  and restores it upon boot.
+
+config USER_FLATFSD_EXTERNAL_INIT
+	bool "External init"
+	depends on USER_FLATFSD_FLATFSD
+	help
+	  Instead of initialising the file system after an erase, flatfsd
+	  will just create a .init file, and an external program must perform
+	  any initialisation needed.
+
+config USER_MOUNT_MOUNT
+	bool "mount"
+	help
+	  Mount a filesystem.  You need this to access NFS and SMB filesystems.
+	  Approx. binary size: 63k
+
+config USER_MOUNT_UMOUNT
+	bool "umount"
+	help
+	  Unmount a filesystem.
+
+config USER_FDISK_FDISK
+	bool "fdisk"
+	help
+	  Disk partitioning utility.
+	  Approx. binary size: 70k
+
+config USER_FDISK_SFDISK
+	bool "sfdisk"
+
+config USER_HDPARM_HDPARM
+	bool "hdparm"
+
+
+comment "EXT2"
+
+config USER_E2FSPROGS_E2FSCK_E2FSCK
+	bool "e2fsck"
+	help
+	  Filesystem fsck,  for checking damaged filesystems.
+	  Approx. binary size: 121k
+
+config USER_E2FSPROGS_MISC_MKE2FS
+	bool "mke2fs"
+	help
+	  Make a filesystem.
+	  Approx. binary size: 62k
+
+config USER_E2FSPROGS_MISC_BADBLOCKS
+	bool "badblocks"
+	help
+	  A filesystem tool
+	  Approx. binary size: 148k
+
+config USER_E2FSPROGS_MISC_CHATTR
+	bool "chattr"
+	help
+	  A filesystem tool
+	  Approx. binary size: 11k
+
+config USER_E2FSPROGS_MISC_DUMPE2FS
+	bool "dumpe2fs"
+	help
+	  A filesystem tool
+	  Approx. binary size: 42k
+
+config USER_E2FSPROGS_MISC_E2LABEL
+	bool "e2label"
+	help
+	  A filesystem tool
+	  Approx. binary size: 6k
+
+config USER_E2FSPROGS_MISC_FSCK
+	bool "fsck"
+	help
+	  A filesystem tool
+	  Approx. binary size: 18k
+
+config USER_E2FSPROGS_MISC_LSATTR
+	bool "lsattr"
+	help
+	  A filesystem tool
+	  Approx. binary size: 13k
+
+config USER_E2FSPROGS_MISC_MKLOST_FOUND
+	bool "mklost+found"
+	help
+	  A filesystem tool
+	  Approx. binary size: 6k
+
+config USER_E2FSPROGS_MISC_TUNE2FS
+	bool "tune2fs"
+	help
+	  A filesystem tool
+	  Approx. binary size: 36k
+
+config USER_E2FSPROGS_MISC_UUIDGEN
+	bool "uuidgen"
+	help
+	  A filesystem tool
+	  Approx. binary size: 98k
+
+
+comment "RESIERFS"
+
+config USER_REISERFSPROGS
+	bool "reiserfsprogs"
+
+config USER_REISERFSPROGS_DEBUGRESIERFS
+	bool "debugreiserfs"
+
+config USER_REISERFSPROGS_MKREISERFS
+	bool "mkreiserfs"
+
+config USER_REISERFSPROGS_REISERFSCK
+	bool "reiserfsck"
+
+config USER_REISERFSPROGS_RESIZE_REISERFS
+	bool "resize_reiserfs"
+
+config USER_REISERFSPROGS_UNPACK
+	bool "unpack"
+
+
+comment "SAMBA"
+
+config USER_SAMBA
+	bool "samba"
+
+config USER_SAMBA_SMBD
+	bool "smbd"
+	depends on USER_SAMBA
+
+config USER_SAMBA_NMBD
+	bool "nmbd"
+	depends on USER_SAMBA
+
+config USER_SAMBA_SMBMOUNT
+	bool "smbmount"
+	depends on USER_SAMBA
+
+config USER_SAMBA_SMBUMOUNT
+	bool "smbumount"
+	depends on USER_SAMBA
+
+config USER_SAMBA_MOUNT_CIFS
+	bool "mount.cifs"
+	depends on USER_SAMBA
+
+config USER_SAMBA_UMOUNT_CIFS
+	bool "umount.cifs"
+	depends on USER_SAMBA
+
+config USER_SAMBA_SHARED
+	bool "uses shared library"
+	depends on USER_SAMBA
+
+
+comment "SMBFS"
+
+config USER_SMBMOUNT_SMBMOUNT
+	bool "smbmount"
+	help
+	  mount an SMB filesystem.
+	  Approx. binary size: 22k
+
+config USER_SMBMOUNT_SMBUMOUNT
+	bool "smbumount"
+	help
+	  un-mount  and SMB filesystem.
+	  Approx. binary size: 6k
+
+
+comment "CRAMFS"
+
+config USER_CRAMFS_CRAMFSCK
+	bool "cramfsck"
+	select LIB_ZLIB
+	help
+	  cramfs fsck program.
+
+config USER_CRAMFS_TEST
+	bool "Various extra tests on the cramfs"
+	depends on USER_CRAMFS_CRAMFSCK
+	help
+	  cramfs fsck extra tests which allow you to extract a cramfs to
+	  a directory.
+
+config USER_CRAMFS_MKCRAMFS
+	bool "mkcramfs"
+	help
+	  cramfs fsck program.
+
+
+comment "MSDOS"
+
+config USER_DOSFSTOOLS_MKDOSFS
+	bool "mkdosfs"
+	help
+	  MSDOS filesystem creation utility for FAT12, FAT16 & FAT32
+
+config USER_DOSFSTOOLS_DOSFSCK
+	bool "dosfsck"
+	help
+	  MSDOS filesystem checking utility for FAT12, FAT16 & FAT32
+
+config USER_DOSFSTOOLS_DOSFSLABEL
+	bool "dosfslabel"
+	help
+	  MSDOS filesystem labeling utility for FAT12, FAT16 & FAT32
+
+
+comment "SquashFS"
+
+config USER_SQUASHFS_MKSQUASHFS
+	bool "mksquashfs"
+	select LIB_ZLIB
+	help
+	  Utility to create squashfs filesystems.
+
+config USER_SQUASHFS_MKSQUASHFS7Z
+	bool "mksquashfs7z"
+	select LIB_LIBLZMA
+	help
+	  Utility to create squashfs filesystems using p7zip instead of zlib.
+
+endmenu
+
+#############################################################################
+
+menu "Network Applications"
+
+config USER_APPWEB_APPWEB
+	bool "appWeb"
+	help
+	  Secure, fast, modular embedded web server supporting Embedded
+	  Server Pages.  Approx. binary size: 110-400k
+
+config USER_APPWEB_CGI
+	bool "AppWeb supports CGI"
+	depends on USER_APPWEB_APPWEB
+	help
+	  Fast Common Gateway Interface (CGI). AppWeb also has better
+	  alternatives such as Embedded Server Pages.
+
+config USER_APPWEB_SSL
+	bool "AppWeb supports SSL"
+	depends on USER_APPWEB_APPWEB
+	select LIB_LIBSSL
+	help
+	  Do you want AppWeb to support SSL. AppWeb can support both standard
+	  HTTP and secure HTTPS/SSL at the same time on different virtual hosts.
+
+config USER_APPWEB_MULTITHREAD
+	bool "AppWeb is multithreaded"
+	depends on USER_APPWEB_APPWEB
+	help
+	  Build AppWeb as a multithreaded application. This allows multiple 
+	  requests to be served concurrently.
+
+config USER_APPWEB_DYNAMIC
+	bool "AppWeb can dynamically load AppWeb modules"
+	depends on USER_APPWEB_APPWEB
+	help
+	  Build AppWeb with the ability to dynamically load AppWeb modules. 
+	  AppWeb modules are a convenient way to add your application code 
+	  to AppWeb.
+
+config USER_ASTERISK
+	bool "asterisk PBX"
+	select LIB_PWLIB
+	select LIB_LIBOPENH323
+	select LIB_STLPORT
+	select LIB_STLPORT_SHARED
+	select LIB_EXPAT
+	help
+	  Asterisk is a software-based PBX
+
+config USER_ASTERISK_MYSQL
+	bool "asterisk MySQL module"
+	depends on USER_ASTERISK
+	select USER_MYSQL_CLIB
+	help
+	  The MySQL modules for CDR in Asterisk.
+
+config USER_TRUSTEDSOURCE
+	bool "antispam - trusted source"
+	select USER_CLAMAV_CLAMSMTP
+
+config USER_BIND_BIND
+	bool "bind"
+	help
+	  ISC BIND DNS nameserver.
+
+config USER_FNORD_HTTPD
+	bool "fnord web server"
+	help
+	  A small, fast webserver which is an alternative to boa. Since fnord
+	  runs under inetd, you will need to enable inetd to run it.  Also,
+	  fnord doesn't support SSL natively. You will need to enable sslwrap.
+
+config USER_FNORD_NOAUTH
+	bool "fnord does not do auth"
+	depends on USER_FNORD_HTTPD
+	help
+	  Disables user authentication in fnord. This is useful if ALL of your
+	  cgi programs do their own authentication.
+
+config USER_FNORD_PAM
+	bool "fnord uses PAM for auth"
+	depends on !USER_FNORD_NOAUTH
+	select LIB_LIBPAM
+	help
+	  Uses PAM to authenticate users in fnord.
+
+config USER_FNORD_404_REDIR
+	bool "fnord 404 redirect"
+	depends on USER_FNORD_HTTPD
+	help
+	  Automatically redirects all invalid URL requests to the main 
+	  cgi-bin/ webpage.
+
+config USER_BOA_SRC_BOA
+	bool "boa"
+	help
+	  A small webserver.
+	  Approx. binary size: 54k
+
+config USER_BOA_WITH_SSL
+	bool "boa uses SSL"
+	depends on USER_BOA_SRC_BOA
+	select LIB_LIBSSL
+	help
+	  Do you want BOA to use SSL for all connections.
+
+config USER_BOA_EMERG
+	bool "emergency syslog"
+	depends on USER_BOA_SRC_BOA
+	help
+	  If enabled, boa will syslog all messages at the emergency level
+
+config USER_BOA_LOGGING
+	bool "enable log files"
+	depends on USER_BOA_SRC_BOA
+
+config USER_BPALOGIN_BPALOGIN
+	bool "bpalogin"
+	help
+	  Telstra Bigpond broadband internet authentication program.
+	  Approx. binary size: 39k
+
+config USER_BR2684CTL_BR2684CTL
+	bool "br2684ctl"
+	select LIB_LIBATM
+	help
+	  ATM to ethernet bridging helper program.
+	  Approx. binary size: 28k
+
+config USER_BRCFG_BRCFG
+	bool "brcfg"
+	help
+	  Helper applications cor configuring bridges.
+
+config USER_BRCTL_BRCTL
+	bool "bridge utils"
+	help
+	  Program for configuring the bridge.  Use this on 2.4 kernels for
+	  generic bridging (not ATM-ethernet) and for GRE bridges.
+
+config USER_CLAMAV_CLAMAV
+	bool "clamav"
+	select LIB_LIBBZ2
+	select LIB_ZLIB
+	select LIB_LIBSSL
+	help
+	  Clam anti-virus checker.  This option builds the clam library but
+	  does not install any of the executables.
+
+config USER_CLAMAV_CLAMD
+	bool "clamd"
+	depends on USER_CLAMAV_CLAMAV
+	help
+	  Build and install the clamd daemon.  This daemon accepts requests
+	  via a socket and scans files based on these.
+
+config USER_CLAMAV_CLAMDSCAN
+	bool "clamdscan"
+	depends on USER_CLAMAV_CLAMAV
+	help
+	  Build a simple wrapper program that scans files and directories
+	  using clamd.
+
+config USER_CLAMAV_CLAMSCAN
+	bool "clamscan"
+	depends on USER_CLAMAV_CLAMAV
+
+config USER_CLAMAV_FRESHCLAM
+	bool "freshclam"
+	depends on USER_CLAMAV_CLAMAV
+	help
+	  Build the clamav database update program which downloads the
+	  latest signature files from the Internet automatically.
+
+config USER_CLAMAV_NODB
+	bool "do not install db files"
+	depends on USER_CLAMAV_FRESHCLAM
+	help
+	  Enabling this option will stop the installation of clamav database
+	  files.  Without these files, clamav will be non-functional until
+	  they are downloaded.
+
+config USER_CLAMAV_SIGTOOL
+	bool "sigtool"
+	depends on USER_CLAMAV_CLAMAV
+	help
+	  Tool to help generate virus signatures.
+
+config USER_CLAMAV_TESTS
+	bool "clamav tests"
+	depends on USER_CLAMAV_CLAMAV
+	help
+	  Install the supplied clamav test files into the romfs at
+	  /etc/clamav/test/
+
+config USER_CLAMAV_CLAMSMTP
+	bool "clamsmtp"
+	help
+	  Install the clamsmtp SMTP proxy server which can run both as a
+	  transparent and a normal SMTP proxy.
+
+config USER_CONNTRACK_CONNTRACK
+	bool "conntrack"
+	select LIB_NFNETLINK
+	select LIB_NETFILTER_CONNTRACK
+	help
+	  Conntrack is a tool for listing and modifying the netfilter
+	  conntrack table.
+
+config USER_CTORRENT_CTORRENT
+	bool "ctorrent"
+	help
+	  Bit torrent client written in C.  It is much smaller than most
+	  other torrent clients, but it can't act as a tracker.
+
+config USER_DHCPCD_DHCPCD
+	bool "dhcpcd"
+	help
+	  The DHCP client daemon,  used to get an IP address from a DHCP server.
+	  Approx. binary size: 37k
+
+config USER_DHCPCD_LLIP
+	bool "dhcpcd link-local support"
+	depends on USER_DHCPCD_DHCPCD
+	help
+	  Compile in Link-local Auto IP configuration option, -A into dhcpcd.
+	  Auto IP addressing will take place if the client is unable to
+	  configure the interface with an address from a dhcp server. Auto IP
+	  addresses are used by win & mac machines for local area network
+	  application such as IrDA links and networks without dhcp servers.
+	  If this option is not compiled in, dhcpcd will just ignore the
+	  -A command line option, noting that it was ignored in the system
+	  log.
+
+config USER_DHCPCD_NEW_DHCPCD
+	bool "dhcpcd-new (2.0/2.4)"
+	help
+	  The DHCP client daemon,  used to get an IP address from a DHCP server.
+	  This version works on 2.0 and 2.4 kernels.
+
+config USER_DHCPD_DHCPD
+	bool "dhcpd"
+	help
+	  A small DHCP server,  suitable for small office networks.
+	  Approx. binary size: 27k
+
+config USER_DHCP_ISC_SERVER_DHCPD
+	bool "dhcpd(ISC)"
+	help
+	  A full featured DHCP daemon that can do almost anything.
+
+config USER_DHCP_ISC_CLIENT_DHCLIENT
+	bool "dhclient(ISC)"
+	help
+	  A DHCP client daemon that supports most everything.
+
+config USER_DHCP_ISC_RELAY_DHCRELAY
+	bool "dhcrelay (ISC)"
+	help
+	  A DHCP relay daemon.
+
+config USER_DIALD_DIALD
+	bool "diald"
+	help
+	  The dial-on-demand daemon.
+	  Approx. binary size: 80k
+
+config USER_DISCARD_DISCARD
+	bool "discard"
+	help
+	  A utility which listens on the discard port,  suitable for testing
+	  network performance.
+	  Approx. binary size: 1k
+
+config USER_DISCARD_NO_INSTALL
+	bool "Do not auto install discard"
+	depends on USER_DISCARD_DISCARD
+	help
+	  Stop discard from installing an entry into inetd.conf
+
+config USER_DISCARD_INETD_ECHO
+	bool "inetd-echo"
+	help
+	  An echo utility.
+
+config USER_DISCARD_ECHO_NO_INSTALL
+	bool "Do not auto install echo"
+	depends on USER_DISCARD_INETD_ECHO
+	help
+	  Stop echo from installing an entry into inetd.conf
+
+config USER_DNSMASQ_DNSMASQ
+	bool "dnsmasq"
+	help
+	  DNS masquerading
+
+config USER_DNSMASQ2_DNSMASQ2
+	bool "Build dnsmasq v2 instead of v1"
+	depends on USER_DNSMASQ_DNSMASQ
+	help
+	  DNS masquerading (v2)
+
+config USER_DNSMASQ2_RESOLVE_AS_SERVER
+	bool "Add 'resolve as server IP' feature"
+	depends on USER_DNSMASQ2_DNSMASQ2
+	help
+	  Adds feature where dnsmasq2 will resolve all DNS requests to the 
+	  IP address that they came in on. For use when network isn't setup 
+	  yet and all data should be redirected to the DNS server.
+
+config USER_DROPBEAR_DROPBEAR
+	bool "dropbear"
+	depends on USER_INETD_INETD
+	select LIB_ZLIB
+	help
+	  Dropbear-SSH ist a small sshd-replacement, that does not depend on
+	  foreign Libraries. It is configured to be statically linked, without
+	  zlib and most features disabled. It is configured to be invoked from
+	  inetd and may therefore need a few seconds to answer a connection.
+	  Approx. binary size: 100k
+
+config USER_ETHATTACH_ETHATTACH
+	bool "ethattach"
+	select LIB_LIBNETOLD
+	help
+	  A Network tool
+
+config USER_ETHERWAKE
+	bool "etherwake"
+	help
+	  Scyld's (Donald Becker) Wake-On-LAN magic packet generator
+
+config USER_ETHTOOL_ETHTOOL
+	bool "ethtool"
+	help
+	  ethtool is a small utility for examining and tuning your
+	  ethernet-based network interface. (80k+)
+
+config USER_EZIPUPDATE_EZIPUPDATE
+	bool "ez-ipupdate"
+	help
+	  Dynamic DNS IP update client.
+
+config USER_FAKEIDENTD_IDENTD
+	bool "fakeidentd"
+	help
+	  A minimal ident/auth server that replies with a fixed username.
+	  
+
+config USER_DDNS3_CLIENT_DDNS3
+	bool "ddns3 client"
+
+config USER_EBTABLES_EBTABLES
+	bool "Ethernet bridge frame table administration"
+
+config USER_FERRET_FERRET
+	bool "ferret"
+	select LIB_LIBPCAP
+	help
+	  A passive network sniffing tool.
+
+config USER_FTP_FTP_FTP
+	bool "ftp"
+	help
+	  An ftp client
+	  Approx. binary size: 8k
+
+config USER_FTPD_FTPD
+	bool "ftpd"
+
+config USER_FROX_FROX
+	bool "frox"
+	help
+	  The frox ftp proxy daemon.
+
+config USER_FREESWAN
+	bool "freeswan-apps"
+	help
+	  The FreeSwan tools and applications
+
+config USER_IPSEC_KEEPALIVE
+	bool "ipsec keep alive"
+	depends on USER_FREESWAN
+	help
+	  Tool to detect whether an IPSec tunnel needs renegotiating.
+	  Approx. binary size: 10k
+
+config USER_FREESWAN_PLUTO_PLUTO
+	bool "pluto"
+	depends on USER_FREESWAN
+	select LIB_LIBGMP
+	help
+	  Freeswan pluto.
+	  Approx. binary size: 255k
+
+config USER_FREESWAN_PLUTO_WHACK
+	bool "whack"
+	depends on USER_FREESWAN
+	help
+	  Freeswan whack.
+	  Approx. binary size: 38k
+
+config USER_FREESWAN_UTILS_RANBITS
+	bool "ranbits"
+	depends on USER_FREESWAN
+	help
+	  Freeswan ranbits.
+	  Approx. binary size: 12k
+
+config USER_FREESWAN_UTILS_RSASIGKEY
+	bool "rsasigkey"
+	depends on USER_FREESWAN
+	select LIB_LIBGMP
+	help
+	  Freeswan rsasigkey.
+	  Approx. binary size: 71k
+
+config USER_FREESWAN_KLIPS_EROUTE
+	bool "eroute"
+	depends on USER_FREESWAN
+	help
+	  Freeswan eroute.
+	  Approx. binary size: 64k
+
+config USER_FREESWAN_KLIPS_KLIPSDEBUG
+	bool "klipsdebug"
+	depends on USER_FREESWAN
+	help
+	  Freeswan klipsdebug.
+	  Approx. binary size: 43k
+
+config USER_FREESWAN_KLIPS_SPI
+	bool "spi"
+	depends on USER_FREESWAN
+	help
+	  Freeswan spi.
+	  Approx. binary size: 68k
+
+config USER_FREESWAN_KLIPS_SPIGRP
+	bool "spigrp"
+	depends on USER_FREESWAN
+	help
+	  Freeswan spigrp.
+	  Approx. binary size: 53k
+
+config USER_FREESWAN_KLIPS_TNCFG
+	bool "tncfg"
+	depends on USER_FREESWAN
+	help
+	  Freeswan tncfg.
+	  Approx. binary size: 15k
+
+config USER_FSWCERT_FSWCERT
+	bool "fswcert"
+	depends on USER_FREESWAN
+ 	select LIB_LIBSSL
+	help
+	  Application to extract private keys from certificates for ipsec
+
+config USER_OPENSWAN
+	bool "openswan-apps"
+	help
+	  The Openswan tools and applications
+
+config USER_OPENSWAN_PLUTO_PLUTO
+	bool "pluto"
+	depends on USER_OPENSWAN
+	select LIB_LIBGMP
+	help
+
+config USER_OPENSWAN_PLUTO_WHACK
+	bool "whack"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_UTILS_RANBITS
+	bool "ranbits"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_UTILS_RSASIGKEY
+	bool "rsasigkey"
+	depends on USER_OPENSWAN
+	select LIB_LIBGMP
+
+config USER_OPENSWAN_KLIPS_EROUTE
+	bool "eroute"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_KLIPS_KLIPSDEBUG
+	bool "klipsdebug"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_KLIPS_SPI
+	bool "spi"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_KLIPS_SPIGRP
+	bool "spigrp"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_KLIPS_TNCFG
+	bool "tncfg"
+	depends on USER_OPENSWAN
+
+config USER_OPENSWAN_PROGRAMS_LWDNSQ
+	bool "lwdnsq (required)"
+	default y
+	depends on USER_OPENSWAN
+
+config IPSEC_CONNECTION_LIMIT_BOOL
+	bool "Enable IPSec tunnel limit"
+	depends on USER_FREESWAN || USER_OPENSWAN
+	help
+	  Enable the limit checking for the maximum tunnels supported by IPSec.
+
+config IPSEC_CONNECTION_LIMIT
+	int "IPSec tunnel limit"
+	depends on IPSEC_CONNECTION_LIMIT_BOOL
+	help
+	  The absolute maximum number of tunnels allowed to be supported by IPSec.
+
+config USER_GNUGK_GNUGK
+	bool "gnugk"
+	select LIB_PWLIB
+	select LIB_LIBOPENH323
+	help
+	  GNU Gatekeeper is a full featured H.323 (VoIP) gatekeeper.
+
+config USER_HPING_HPING
+	bool "hping"
+	help
+	  A command-line oriented TCP/IP packet assembler/analyzer.
+
+config USER_HTTPD_HTTPD
+	bool "httpd"
+	help
+	  Another HTTPD
+
+config USER_HTTPTUNNEL_CLIENT
+	bool "http tunnel client"
+	help
+	  Client side daemon for the httptunnel protocol that permits
+	  the tunnelling of a network connection via the HTTP protocol
+	  to a remote httptunnel server.
+
+config USER_HTTPTUNNEL_SERVER
+	bool "http tunnel server"
+	help
+	  Server side daemon for the httptunnel protocol that permits
+	  the tunnelling of a network connection via the HTTP protocol
+	  from a remote httptunnel client.
+
+config USER_IFATTACH_IFATTACH
+	bool "ifattach"
+	select LIB_LIBNETOLD
+	help
+	  Network interface attach
+
+config USER_INETD_INETD
+	bool "inetd"
+	help
+	  Starts network daemons as required.
+	  Approx. binary size: 11k
+
+config USER_IPCHAINS_IPCHAINS
+	bool "ipchains"
+	help
+	  An alternate method for configuring the firwall rules.  Note that you
+	  must have ipchains configured in your kernel for this program to work.
+	  Approx. binary size: 53k
+
+config USER_IPERF_IPERF
+	bool "iperf"
+	help
+	  An application for measuring network performance.
+
+config USER_IPFWADM_IPFWADM
+	bool "ipfwadm"
+	help
+	  Tool for configuring forwarding/masquerading rules.
+	  Approx. binary size: 38k
+
+config USER_IPMASQADM_IPMASQADM
+	bool "ipmasqadm"
+	help
+	  Tool for configuring port forwarding for Linux 2.2.x kernels.  You
+	  must have port forwarding enabled in your kernel for this program to
+	  work.
+
+config USER_IPPORTFW_IPPORTFW
+	bool "ipportfw"
+	help
+	  Tool for configuring port forwarding.
+	  Approx. binary size: 13k
+
+config USER_IPREDIR_IPREDIR
+	bool "ipredir"
+	help
+	  IP port redirector
+	  Approx. binary size: 23k
+
+config USER_IPROUTE2
+	bool "iproute2"
+
+config USER_IPROUTE2_TC_TC
+	bool "tc"
+	depends on USER_IPROUTE2
+	help
+	  Traffic shaper from iproute2 package.
+
+config USER_IPROUTE2_IP_IFCFG
+	bool "ifcfg (complex scripting reqd.)"
+	depends on USER_IPROUTE2
+	help
+	  Prints interface configuration.  This script requires
+	  advanced shell scripts and other iproute2 apps.
+
+config USER_IPROUTE2_IP_IP
+	bool "ip"
+	depends on USER_IPROUTE2
+	help
+	  The core app for iproute2.
+
+config USER_IPROUTE2_IP_ROUTEF
+	bool "routef"
+	depends on USER_IPROUTE2
+	help
+	  routef from the iproute2 package.
+
+config USER_IPROUTE2_IP_ROUTEL
+	bool "routel"
+	depends on USER_IPROUTE2
+	help
+	  routel from the iproute2 package.
+
+config USER_IPROUTE2_IP_RTACCT
+	bool "rtacct"
+	depends on USER_IPROUTE2
+	help
+	  rtacct from the iproute2 package.
+
+config USER_IPROUTE2_IP_RTMON
+	bool "rtmon"
+	depends on USER_IPROUTE2
+	help
+	  Route monitor.
+
+config USER_IPROUTE2_IP_GENL
+	bool "genl"
+	depends on USER_IPROUTE2
+	help
+	  genl utility frontend.
+
+config USER_IPROUTE2_IP_RTPR
+	bool "rtpr"
+	depends on USER_BUSYBOX_TR && USER_BASH_BASH
+	help
+	  Print routes.
+
+config USER_IPSENTINEL_IPSENTINEL
+	bool "ipsentinel"
+	help
+	  Tool that attempts to prevent unauthorised use of "dead"address
+	  space on a network by providing invalid MAC addresses in response to
+	  ARP requests.
+
+config USER_IPSET_IPSET
+	bool "ipset"
+	help
+	  Tool for configuring sets in iptables rules.
+
+config USER_IPTABLES_IPTABLES
+	bool "iptables"
+	help
+	  Iptables is the IP firewall administration tool for 2.4 linux.
+
+config USER_LAYER7_PROTOCOLS
+	bool "layer7 protocol definitions"
+	depends on USER_IPTABLES_IPTABLES
+	help
+	  Layer 7 Protocol patterns for iptables use
+	  Approx. size: 160k
+
+config USER_IPTABLES_IP6TABLES
+	bool "ip6tables"
+
+config USER_IPUTILS_IPUTILS
+	bool "iputils apps"
+	help
+	  The iputils package of ip utilities :)
+	  glibc is recommended.
+
+config USER_IPUTILS_PING
+	bool "ping"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Send IPv4 ICMP ECHO_REQUEST packets to network hosts.
+
+config USER_IPUTILS_PING6
+	bool "ping6"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Send IPv6 ICMP ECHO_REQUEST packets to network hosts.
+
+config USER_IPUTILS_TRACEROUTE6
+	bool "traceroute6"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Print the IPv6 route packets take to a network host.
+
+config USER_IPUTILS_RDISC
+	bool "rdisc"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Client side of the ICMP router discovery protocol.
+
+config USER_IPUTILS_CLOCKDIFF
+	bool "clockdiff"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Measures the clock difference between the local host and
+	  a remote host using either ICMP TIMESTAMP packets or the 
+	  IP TIMESTAMP option in a ICMP ECHO.
+
+config USER_IPUTILS_TFTPD
+	bool "tftpd"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  IPv4 TFTP server.
+
+config USER_IPUTILS_TRACEPATH
+	bool "tracepath"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Traces a path to a network host discovering MTU along the way.
+
+config USER_IPUTILS_TRACEPATH6
+	bool "tracepath6"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Traces a path to a IPv6 network host discovering MTU 
+	  along the way.
+
+config USER_IPUTILS_ARPING
+	bool "arping"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Send ARP REQUEST to a neighbouring host
+
+config USER_IPUTILS_RARPD
+	bool "rarpd"
+	depends on USER_IPUTILS_IPUTILS
+	help
+	  Reverse Address Resolution Protocol (RARP) Daemon.
+
+config USER_KENDIN_CONFIG
+	bool "kendin-config"
+
+config USER_KLAXON_KLAXON
+	bool "klaxon"
+	help
+	  Klaxon is a utility that attempts to detect and log
+	  probes against the host.  Only those services selected
+	  will be detected.  Inetd must also be installed.
+	  This option adds about 17.5k to the image.
+
+config USER_KLAXON_RFC931
+	bool "use RFC931"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Use IDENT (RFC931) to attempt to find out the user
+	  behind the probe.  This option adds an additional 3k to
+	  the image.
+
+config USER_KLAXON_CHARGEN
+	bool "detect chargen"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  CHARGEN (tcp & udp ports 19).
+
+config USER_KLAXON_DISCARD
+	bool "detect discard"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  DISCARD (tcp & udp ports 9).
+
+config USER_KLAXON_ECHO
+	bool "detect echo"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  ECHO (tcp & udp ports 7).
+
+config USER_KLAXON_FTP
+	bool "detect ftp"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  FTP (tcp ports 20 & 21).
+
+config USER_KLAXON_HTTP
+	bool "detect http"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  HTTP (tcp port 80).
+
+config USER_KLAXON_SMTP
+	bool "detect smtp"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  SMTP (tcp port 25).
+
+config USER_KLAXON_SNMP
+	bool "detect snmp"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  SNMP (tcp & udp ports 161).
+
+config USER_KLAXON_SSH
+	bool "detect ssh"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  SSH (tcp port 22).
+
+config USER_KLAXON_TELNET
+	bool "detect telnet"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  TELNET (tcp port 23).
+
+config USER_KLAXON_TFTP
+	bool "detect tftp"
+	depends on USER_KLAXON_KLAXON
+	help
+	  Configure klaxon to report connection attempts to the
+	  TFTP (udp port 69).
+
+config USER_LANBYPASS_LANBYPASS
+	bool "lanbypass"
+	help
+	  The lanbypass program can be used to control the LAN bypass
+	  switches on the Advantech x86 based hardware platforms.
+	  Approx. binary size: 10k
+
+config USER_L2TPD_L2TPD
+	bool "l2tpd"
+	help
+	  Layer 2 Tunnelling Protocol Daemon
+	  Approx. binary size: 70k
+
+config USER_LINUXIGD_LINUXIGD
+	bool "linux-igd"
+	select LIB_LIBUPNP
+	help
+	  Linux Internet Gateway Device. A UPnP-IGD NAT-based 
+	  Daemon. 
+	  Needs libupnp (turned on automatically) and pthreads. 
+	  Approx. total binary size (including libupnp): 350k
+
+config USER_LINUXIGD_DEFAULT
+	bool "use default configuration"
+	depends on USER_LINUXIGD_LINUXIGD
+	help
+	  Use the unmodified default configuration files for the 
+	  linux-igd daemon and not the snapgear customised files.
+
+config USER_MINIUPNPD
+	bool "miniupnpd"
+	help
+	  Alternate upnpd with less overhead
+	  Approx binary size 60K
+
+config USER_LOATTACH_LOATTACH
+	bool "loattach"
+	select LIB_LIBNETOLD
+	help
+	  Loopback attach
+
+config USER_LRPSTAT_LRPSTAT
+	bool "lrpstat"
+	help
+	  Real time bandwidth and CPU monitoring Java applet.
+
+config USER_SMTP_SMTPCLIENT
+	bool "mail"
+	help
+	  Client which allows mail to be sent to other hosts that support SMTP
+
+config USER_MAIL_MAIL_IP
+	bool "mail_ip"
+	help
+	  Some kind of mail proggy
+	  Approx. binary size: 27k
+
+config USER_MARADNS_MARADNS
+	bool "maradns"
+	help
+	  The MaraDNS nameserver (UDP query daemon); see also zoneserver.
+	  Approx. binary size: 55k
+
+
+config USER_MINI_HTTPD_MINI_HTTPD
+	bool "mini_httpd"
+	help
+	  A small HTTP server.
+
+config USER_MINI_HTTPD_WITH_SSL
+	bool "mini_httpd uses SSL"
+	depends on USER_MINI_HTTPD_MINI_HTTPD
+	select LIB_LIBSSL
+
+config USER_MSNTP_MSNTP
+	bool "msntp"
+	help
+	  Simple Network Time Protocol utility.
+	  Approx. binary size: 66k
+
+
+config USER_NESSUS
+	bool "nessus"
+	select USER_NESSUS_NASL
+	select USER_NESSUS_CORE
+	select USER_NESSUS_PLUGINS
+	help
+	  The Nessus security scanner
+
+config USER_NESSUS_NASL
+	bool "nasl"
+	select USER_NESSUS_LIBRARIES
+	select LIB_LIBPCAP
+	help
+	  The Nessus scripting language (NASL) interpreter.
+
+config USER_NESSUS_CORE
+	bool
+	default n
+
+config USER_NESSUS_PLUGINS
+	bool
+	default n
+
+config USER_NESSUS_LIBRARIES
+	bool
+	default n
+
+config USER_NETCAT_NETCAT
+	bool "netcat"
+	help
+	  The netcat utility. Netcat is a fully featured 
+	  networking utility which reads and writes data 
+	  across network connections. 
+	  Approximate size: 22k
+
+config USER_NETPERF_NETPERF
+	bool "netperf"
+	help
+	  The client piece for a network performance measuring application 
+	  with many options.
+
+config USER_NETPERF_NETSERVER
+	bool "netserver"
+	help
+	  The server piece for a network performance measuring application
+	  with many options.
+
+config USER_NETPIPE_NETPIPE
+	bool "netpipe"
+	help
+	  A client/server ping-pong packet performance test.
+
+config USER_NETSTAT_NAT_NETSTAT_NAT
+	bool "netstat-nat"
+	help
+	  Pretty print the ipfilter NAT translations.
+
+config USER_NETSNMP_SNMPD
+	bool "net-snmp"
+	help
+	  net-snmp (www.net-snmp.org) Simple Network Management Protocol
+	  implementation.  Build/Install the agent (snmpd).
+
+config USER_NETSNMP_SNMPD_MINI
+	bool "Build mini agent"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Build a minimal agent.
+
+config USER_NETSNMP_APPS
+	bool "Build Applications"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Build the applications (snmpget, ...)
+
+config USER_NETSNMP_APPS_BULKGET
+	bool "snmpbulkget"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpbulkget.
+
+config USER_NETSNMP_APPS_BULKWALK
+	bool "snmpbulkwalk"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpbulkwalk.
+
+config USER_NETSNMP_APPS_DELTA
+	bool "snmpdelta"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpdelta.
+
+config USER_NETSNMP_APPS_DF
+	bool "snmpdf"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpdf.
+
+config USER_NETSNMP_APPS_GET
+	bool "snmpget"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpget.
+
+config USER_NETSNMP_APPS_GETNEXT
+	bool "snmpgetnext"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpgetnext.
+
+config USER_NETSNMP_APPS_SET
+	bool "snmpset"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpset.
+
+config USER_NETSNMP_APPS_STATUS
+	bool "snmpstatus"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpstatus.
+
+config USER_NETSNMP_APPS_TABLE
+	bool "snmptable"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmptable.
+
+config USER_NETSNMP_APPS_TEST
+	bool "snmptest"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmptest.
+
+config USER_NETSNMP_APPS_TRANSLATE
+	bool "snmptranslate"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmptranslate.
+
+config USER_NETSNMP_APPS_TRAP
+	bool "snmptrap"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmptrap.
+
+config USER_NETSNMP_APPS_TRAPD
+	bool "snmptrapd"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmptrapd.
+
+config USER_NETSNMP_APPS_USM
+	bool "snmpusm"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpusm.
+
+config USER_NETSNMP_APPS_VACM
+	bool "snmpvacm"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpvacm.
+
+config USER_NETSNMP_APPS_WALK
+	bool "snmpwalk"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpwalk.
+
+config USER_NETSNMP_APPS_NETSTAT
+	bool "snmpnetstat"
+	depends on USER_NETSNMP_APPS
+	help
+	  Install snmpnetstat.
+
+config USER_NETSNMP_BUILDSTATIC
+	bool "Build static"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Link with static libraries.
+
+config USER_NETSNMP_MANUALS
+	bool "Install manuals"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Install the manuals.
+
+config USER_NETSNMP_SCRIPTS
+	bool "Install scripts"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Install the scripts (mib2c, ...).
+
+config USER_NETSNMP_MIBS
+	bool "Install MIBs"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Install the mib files.
+
+config USER_NETSNMP_MIBLOADING
+	bool "Enable MIB loading"
+	depends on USER_NETSNMP_MIBS
+	help
+	  Include code that parses and manipulates the mib files.
+
+config USER_NETSNMP_NOV1
+	bool "Disable SNMP v1"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Do not include code that implements SNMPv1.
+
+config USER_NETSNMP_NOV2C
+	bool "Disable SNMP v2c"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Do not include code that implements SNMPv2c.
+
+config USER_NETSNMP_IPV6
+	bool "IPv6 support"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Generate IPv6 ready version.
+
+config USER_NETSNMP_NOTRANSPORTS
+	bool "Exclude transports"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Exclude listed SNMP transports.
+	  (UDP UDPIPv6 TCPIPv6 TCP Unix Callback AAL5PVC IPX)
+
+config USER_NETSNMP_EXTRANSPORTS
+	string "Exclude Transports"
+	depends on USER_NETSNMP_NOTRANSPORTS
+	default "TCP"
+	help
+	  Transports to exclude (space separated list).
+
+config USER_NETSNMP_OPENSSL
+	bool "With OpenSSL"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Look for openssl in PATH/lib.
+
+config USER_NETSNMP_OVRDEFAULTS
+	bool "Override defaults"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Override defaults for prompted values.
+
+config USER_NETSNMP_DEFVERSION
+	string "Default version"
+	depends on USER_NETSNMP_OVRDEFAULTS
+	default "3"
+	help
+	  Default version of SNMP to use.
+
+config USER_NETSNMP_DEFSYSCONTACT
+	string "Default Sys Contact"
+	depends on USER_NETSNMP_OVRDEFAULTS
+	default "unknown"
+	help
+	  Default system contact.
+
+config USER_NETSNMP_DEFSYSLOCATION
+	string "Default Sys Location"
+	depends on USER_NETSNMP_OVRDEFAULTS
+	default "unknown"
+	help
+	  Default system location.
+
+config USER_NETSNMP_DEFLOGFILE
+	string "Default Log file"
+	depends on USER_NETSNMP_OVRDEFAULTS
+	default "/var/log/snmp.log"
+	help
+	  Default log file location.
+
+config USER_NETSNMP_DEFPERSISDIR
+	string "Default Persistent Directory "
+	depends on USER_NETSNMP_OVRDEFAULTS
+	default "/var/net-snmp"
+	help
+	  Default directory for persistent data storage.
+
+config USER_NETSNMP_DEFENTERPRISEOID
+	string "Enterprise OID"
+	depends on USER_NETSNMP_OVRDEFAULTS
+	default "8072"
+	help
+	  The enterprise number assigned by IANA
+	  (Warning: this should be used with caution.)
+
+config USER_NETSNMP_ADDMIBS
+	bool "Additional MIBS"
+	depends on USER_NETSNMP_SNMPD
+	help
+	  Compile with additional MIB modules.
+
+config USER_NETSNMP_ADDITIONALMIBS
+	string "Additional MIBS"
+	depends on USER_NETSNMP_ADDMIBS
+	default ""
+	help
+	  Additional MIB modules (space spearated list).
+
+config USER_MARADNS_ZONESERVER
+	bool "zoneserver"
+	help
+	  The MaraDNS TCP Zone Transfer daemon; see also maradns.
+	  Approx. binary size: 41k
+
+config USER_NMAP_NMAP
+	bool "nmap"
+	select LIB_STLPORT
+	help
+	  Network mapper is a tool for network exploration and security auditing.
+
+config USER_NTPCLIENT_NTPCLIENT
+	bool "ntpclient: ntpclient"
+	help
+	  Larry Doolittles ntpclient
+	  http://doolittle.faludi.com/ntpclient/
+
+config USER_NTPCLIENT_ADJTIMEX
+	bool "ntpclient: adjtimex"
+	help
+	  Larry Doolittles adjtimex
+	  http://doolittle.faludi.com/ntpclient/
+
+config USER_NTPD_NTPD
+	bool "ntpd"
+	help
+	  Network time protocol daemon version 4.1.1.
+
+config USER_NTPD_NTPDC
+	bool "ntpdc"
+	depends on USER_NTPD_NTPD
+	help
+	  Private mode query program for ntpd.
+
+config USER_NTPD_NTPDATE
+	bool "ntpdate"
+	help
+	  Poll NTP server and set system date.  Part of the NTPD package.
+
+config USER_NTPD_NTPQ
+	bool "ntpq"
+	help
+	  NTP utility.  Part of the NTPD package.
+
+config USER_OPENSSL_APPS
+	bool "openssl"
+	select LIB_LIBSSL
+	help
+	  OpenSSL is a cryptography toolkit implementing the Secure Sockets
+	  Layer (SSL v2/v3) and Transport Layer Security (TLS v1) network
+	  protocols and related cryptography standards required by them.
+	  The openssl program is a command line tool for using the various
+	  cryptography functions of OpenSSL's crypto library from the shell.
+	  It can be used for
+	   o  Creation of RSA, DH and DSA key parameters
+	   o  Creation of X.509 certificates, CSRs and CRLs
+	   o  Calculation of Message Digests
+	   o  Encryption and Decryption with Ciphers
+	   o  SSL/TLS Client and Server Tests
+	   o  Handling of S/MIME signed or encrypted mail
+
+config USER_OPENVPN_OPENVPN
+	bool "openvpn"
+	select LIB_LIBLZO
+	select LIB_LIBSSL
+
+config USER_SSCEP
+	bool "sscep"
+	select LIB_LIBSSL
+	help
+		SSCEP is a Simple SCEP client. SCEP is a protocol used
+		for certificate management
+
+config USER_PING_PING
+	bool "ping"
+	help
+	  Diagnostic tool for testing network connections.
+	  Approx. binary size: 27k
+
+config USER_PLUG_PLUG
+	bool "plugdaemon"
+	help
+	  This daemon acts as a dumb proxy forwarding a TCP/IP stream
+	  from a port on one host to a possibly different port
+	  on a separate host.
+	  Approx. binary size: 23k
+
+config USER_POP3PROXY_POP3PROXY
+	bool "pop3proxy"
+	help
+	  Simple transparent pop3 proxy server.
+
+config USER_PORTMAP_PORTMAP
+	bool "portmap"
+	help
+	  The portmapper service, needed for NFS under 2.4.
+	  Approx. binary size: 49k
+
+config USER_PORTMAP_PMAP_SET
+	bool "pmap_set"
+	depends on USER_PORTMAP_PORTMAP
+	help
+	  Set the list of portmap registered programs.
+
+config USER_PORTMAP_PMAP_DUMP
+	bool "pmap_dump"
+	depends on USER_PORTMAP_PORTMAP
+	help
+	  Print the list of portmap registered programs.
+
+config USER_PPPD_PPPD_PPPD
+	bool "pppd"
+	help
+	  Dialup networking daemon.
+	  Approx. binary size: 250k
+
+config USER_PPPD_WITH_DYNAMIC_PLUGINS
+	bool "enable dynamic plugins"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  The additional plugin features of pppd are built as dynamically
+	  loaded plugin objects. Otherwise they are statically built into
+	  the pppd binary. (Only supported on systems with VM)
+
+config USER_PPPD_WITH_IPV6
+	bool "enable ipv6"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Enable pppd to support IPv6.
+
+config USER_PPPD_WITH_PAM
+	bool "enable PAM"
+	depends on USER_PPPD_PPPD_PPPD
+	select LIB_LIBPAM
+	help
+	  If you want PPP/PPTP to use PAM for user authentication.
+
+config USER_PPPD_WITH_MPPE
+	bool "enable MPPE"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  If you want to run PPP/PPTP with encrypted connections, enable this.
+
+config USER_PPPD_WITH_TACACS
+	bool "enable TACACS+"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  TACACS+ authentication plugin for pppd.
+
+config USER_PPPD_WITH_RADIUS
+	bool "enable RADIUS"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  RADIUS authentication plugin for pppd.
+
+config USER_PPPD_WITH_PPPOE
+	bool "enable PPPOE"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Allow kernel mode PPPOE support.
+
+config USER_PPPD_WITH_PPPOA
+	bool "enable PPPOA"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Allow kernel mode PPPOATM support.
+
+config USER_PPPD_PPPOE_RETRIES
+	int "default number of PPPOE retries"
+	depends on USER_PPPD_WITH_PPPOE
+	default 6
+
+config USER_PPPD_NO_AT_REDIRECTION
+	bool "disable redirection of passwords starting with @"
+	depends on USER_PPPD_PPPD_PPPD
+
+config USER_PPPD_WITH_MINCONN
+	bool "enable minconn"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Enable support for the minconn plugin.
+
+config USER_PPPD_WITH_PASSPROMPT
+	bool "enable passprompt"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Enable support for the passprompt plugin.
+
+config USER_PPPD_WITH_PASSWORDFD
+	bool "enable passwordfd"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Enable support for the passwordfd plugin.
+
+config USER_PPPD_WITH_WINBIND
+	bool "enable winbind"
+	depends on USER_PPPD_PPPD_PPPD
+	help
+	  Enable support for the winbind plugin.
+
+config USER_PPTPD_PPTPCTRL
+	bool "pptpctrl"
+	help
+	  PPTP VPN controller.
+	  Approx. binary size: 30k
+
+config USER_PPTPD_PPTPD
+	bool "pptpd"
+	help
+	  PPTP VPN daemon.
+	  Approx. binary size: 31k
+
+config USER_PPTP_PPTP
+	bool "pptp"
+	help
+	  PPTP Client for establishing VPN's.
+
+config USER_PPTP_CLIENT_PPTP
+	bool "pptp client (ok for !MMU)"
+	help
+	  PPTP Client for establishing VPN's.
+	  Approx. binary size: 34k
+
+config USER_PPTP_CLIENT_PPTP_CALLMGR
+	bool "pptp_callmgr"
+	help
+	  PPTP Call manager for the PPTP client.
+	  Approx. binary size: 30k
+
+config USER_PROFTPD_PROFTPD
+	bool "proftpd"
+
+config USER_QUAGGA_ZEBRA_ZEBRA
+	bool "quagga"
+	help
+	  The Quagga (unofficial GNU Zebra replacement) routing daemon server
+	  process.
+
+config USER_QUAGGA_BGPD_BGPD
+	bool "quagga-bgpd"
+	depends on USER_QUAGGA_ZEBRA_ZEBRA
+	help
+	  The Quagga BGP daemon.
+
+config USER_QUAGGA_OSPFD_OSPFD
+	bool "quagga-ospfd"
+	depends on USER_QUAGGA_ZEBRA_ZEBRA
+	help
+	  The Quagga OSPF daemon.
+
+config USER_QUAGGA_OSPF6D_OSPF6D
+	bool "quagga-ospf6d"
+	depends on USER_QUAGGA_ZEBRA_ZEBRA
+	help
+	  The Quagga OSPF6 daemon.
+
+config USER_QUAGGA_RIPD_RIPD
+	bool "quagga-ripd"
+	depends on USER_QUAGGA_ZEBRA_ZEBRA
+	help
+	  The Quagga RIP daemon.
+
+config USER_QUAGGA_RIPNGD_RIPNGD
+	bool "quagga-ripngd"
+	depends on USER_QUAGGA_ZEBRA_ZEBRA
+	help
+	  The Quagga RIPNG daemon.
+
+config USER_QUAGGA_WATCHQUAGGA_WATCHQUAGGA
+	bool "quagga-watchquagga"
+	depends on USER_QUAGGA_ZEBRA_ZEBRA
+	help
+	  The Quagga 'watchquagga' utility.
+
+config USER_RADVD_RADVD
+	bool "radvd"
+	select LIB_FLEX
+	help
+	  The router advertisement daemon (radvd) is run by Linux or BSD
+	  systems acting as IPv6 routers. It sends Router Advertisement
+	   messages, specified by RFC 2461, to a local Ethernet LAN
+	   periodically and when requested by a node sending a Router
+	   Solicitation message. These messages are required for IPv6
+	   stateless autoconfiguration.
+
+config USER_RADAUTH_RADAUTH
+	bool "radauth"
+	help
+	  Simple command-line based radius client for testing authentication
+	  settings
+
+config USER_RDATE_RDATE
+	bool "rdate"
+	help
+	  Remote date print/set program.  Conforms to RFC 868.
+
+config USER_ROUTED_ROUTED
+	bool "routed"
+	help
+	  A RIPv1 routed
+
+config USER_RP_PPPOE_PPPOE
+	bool "rp-pppoe"
+	help
+	  The Roaring Penguin PPPOE.
+	  Approx. binary size: 38k
+
+config USER_RP_PPPOE_PPPOE_SERVER
+	bool "rp-pppoe server"
+	depends on USER_RP_PPPOE_PPPOE
+	help
+	  The Roaring Penguin PPPOE Server.
+
+config USER_RSYNC_RSYNC
+	bool "rsync"
+	help
+	  network file copying utility that copies only the differences
+	  between files Approx. binary size on SH4: 255k
+
+config USER_RSYSLOG_RSYSLOGD
+	bool "rsyslog"
+	help
+	  Full featured syslog daemon.
+
+config USER_RSYSLOGD_RSYSLOGD
+	bool "rsyslogd"
+	help
+	  Simple remote syslog receiver.
+
+config USER_LOGROTATE_LOGROTATE
+	bool "logrotate"
+	select LIB_POPT
+	help
+	  system log rotation/backup/compression utility
+  
+config USER_SENDIP_SENDIP
+	bool "sendip"
+	help
+	  Send constructed IP packets.  Useful for testing vulnerabilities.
+
+config USER_SER_SER
+	bool "ser"
+	help
+	  SIP Express Router is a configurable Session Initiation
+	  Protocol router & proxy.
+
+config USER_SER_RTPPROXY
+	bool "rtpproxy"
+	depends on USER_SER_SER
+	help
+	  A Real-Time Protocol proxy mechanism which can be used by SIP
+	  Express Router to allow symmetric clients to traverse a NAT firewall.
+
+config USER_SETHDLC_SETHDLC
+	bool "sethdlc"
+	help
+	  Small utility for configuring HDLC network interfaces.
+
+config USER_SIPROXD_SIPROXD
+	bool "siproxd"
+	select LIB_OSIP2
+	help
+	  siproxd is a SIP proxy. See http://siproxd.sourceforge.net/
+
+config USER_SLATTACH_SLATTACH
+	bool "slattach"
+	select LIB_LIBNETOLD
+	help
+	  Slip attach
+
+config USER_SNMPD_SNMPD
+	bool "snmpd"
+	help
+	  SNMP daemon
+	  Approx. binary size: 20k with no modules
+
+config USER_SNORT_SNORT
+	bool "snort"
+	select LIB_LIBPCRE
+	select LIB_LIBNET
+	help
+	  Snort is a network intrusion detection system.  It is capable of
+	  performing real-time traffic analysis and packet logging on IP
+	  networks.  It can perform protocol analysis, content searching and
+	  can be used to detect a variety of attacks and probes, such as
+	  buffer overflows, stealth port scans, CGI attacks, SMB probes,
+	  OS fingerprinting attempts and much more.
+	  Approx. binary size: 800k
+
+config USER_SPEEDTOUCH_MODEM_RUN
+	bool "speedtouch modem_run"
+	help
+	  Utility to configure Speed Touch USB ADSL modems.
+
+config USER_STUNNEL_STUNNEL
+	bool "stunnel"
+
+config USER_SSLWRAP_SSLWRAP
+	bool "sslwrap"
+	help
+	  Allows plain services to be accessed via SSL.
+	  Smaller and simpler than stunnel.
+
+config USER_SQUID_SQUID
+	bool "squid"
+	help
+	  The Squid Web proxy cache.
+
+config USER_SSH_SSH
+	bool "ssh"
+	select LIB_LIBSSL
+	help
+	  A secure shell client.  You can set up a vpn connection using both
+	  the client and the server.
+	  Approx. binary size: 610k
+
+config USER_SSH_SSHD
+	bool "sshd"
+	select LIB_LIBSSL
+        select LIB_ZLIB
+	help
+	  A secure shell server.  This one is the openssh variant and supports
+	  ssh v1 and ssh v2. You probably want to include the tinylogin stuff,
+	  and a passwd and group file in /etc/config so that this works
+	  properly.
+	  Approx. binary size: 580k
+
+config USER_SSH_SSHKEYGEN
+	bool "ssh-keygen"
+	select LIB_LIBSSL
+	help
+	  This program generates and manages authentication keys for ssh and
+	  sshd.
+	  Approx. binary size: 480k
+
+config USER_SSH_SCP
+	bool "scp"
+	depends on USER_SSH_SSH
+
+config USER_SSH_SFTP
+	bool "sftp"
+	depends on USER_SSH_SSH
+
+config USER_SSH_SFTP_SERVER
+	bool "sftp-server"
+	depends on USER_SSH_SSH
+
+config USER_SSH_SSH_KEYSIGN
+	bool "ssh-keysign"
+	depends on USER_SSH_SSH
+
+config USER_SSH_ONLY_RSA_V2_KEYGEN
+	bool "ssh-only-rsa-v2-keygen"
+	depends on USER_SSH_SSH
+	help
+	  This limits the SSH keys generated to RSAv2 only.
+
+config USER_STP_STP
+	bool "stp"
+	help
+	  simple network time daemon
+	  Approx. binary size: 19k
+
+config USER_TCPWRAP_TCPD
+	bool "tcpd"
+	help
+	  The tcpd program can be set up to monitor incoming requests for
+	  telnet, finger, ftp, exec, rsh, rlogin, tftp, talk, comsat and other
+	  services that have a one-to-one mapping onto executable files.
+	  It also provides some access control facilities for any monitored
+	  services.
+
+config USER_TCPWRAP_MISCD
+	bool "miscd"
+	depends on USER_TCPWRAP_TCPD
+
+config USER_TCPWRAP_FINGER
+	bool "safe finger"
+	depends on USER_TCPWRAP_TCPD
+	help
+	  A safe finger client wrapper that protects against nasty stuff
+	  from finger servers.
+
+config USER_TCPWRAP_TCPDMATCH
+	bool "tcpd match"
+	depends on USER_TCPWRAP_TCPD
+	help
+	  This utility will explain what tcpd would do in a specific case.  It
+	  examines the tcpd access control tables and prints out is conclusion.
+
+config USER_TCPWRAP_TRYFROM
+	bool "try from"
+	depends on USER_TCPWRAP_TCPD
+	help
+	  This program can be called via a remote shell command to find out
+	  if the hostname and address are properly recognized, if username
+	  lookup works, and (SysV only) if the TLI on top of IP heuristics
+	  work.
+
+config USER_TCPWRAP_TCPDCHK
+	bool "tcpdchk"
+	depends on USER_TCPWRAP_TCPD
+	help
+	  This utility examines your tcp wrapper configuration and reports all
+	  potential and real problems that it can find.  The program examines
+	  the tcpd access control files and compares the entries in these files
+	  against entries in the inetd network configuration files.
+
+config USER_TCPBLAST_TCPBLAST
+	bool "tcpblast"
+
+config USER_TCPDUMP_TCPDUMP
+	bool "tcpdump"
+	select LIB_LIBPCAP
+	help
+	  Monitor network traffic
+	  Approx. binary size: 22k
+
+config USER_TELNETD_TELNETD
+	bool "telnetd"
+	help
+	  Allow remote users to login to the system using telnet.
+	  Approx. binary size: 20k
+
+config USER_TELNETD_DOES_NOT_USE_OPENPTY
+	bool "telnetd does not use openpty()"
+	depends on USER_TELNETD_TELNETD
+	help
+	  Force telnetd to use its own internal method of opening a pty,
+	  rather than relying upon libc's openpty().  This is included as
+	  a work-around to file permission issues when using uClibc and
+	  ROMFS filesystems.
+
+config USER_TELNET_TELNET
+	bool "telnet"
+	select LIB_LIBG
+	help
+	  A telnet client application.
+	  Approx. binary size: 76k
+
+config USER_TFTP_TFTP
+	bool "tftp"
+
+config USER_TFTPD_TFTPD
+	bool "tftpd"
+	help
+	  A tftp server.
+	  Approx. binary size: 19k
+
+config USER_TFTPD_TFTPD_LOW_SEC
+	bool "Low security on tftp server"
+	depends on USER_TFTPD_TFTPD
+
+config USER_THTTPD_THTTPD
+	bool "thttpd"
+	help
+	  Tiny HTTPD
+	  Approx. binary size: 52k
+
+config READ_TIMEOUT
+	bool "cgi timeout"
+	depends on USER_THTTPD_THTTPD
+	help
+	  enable read timeout for CGI child process on MMUless system
+
+config USER_TINYPROXY_TINYPROXY
+	bool "tinyproxy"
+	help
+	  Tiny HTTP proxy
+
+config USER_TRACEROUTE_TRACEROUTE
+	bool "traceroute"
+	help
+	  A tool for tracing the route packets take on the network.
+	  Approx. binary size: 32k
+
+config USER_UDEV
+	bool "udev"
+	help
+	  udev allows Linux users to have a dynamic /dev directory and it
+	  provides the ability to have persistent device names.
+
+config USER_ULOGD_ULOGD
+	bool "ulogd"
+	help
+	  Ulogd is a userspace logging facility for iptables.
+
+config USER_ULOGD2_ULOGD
+	bool "ulogd2"
+	select LIB_NFNETLINK
+	select LIB_NETFILTER_LOG
+	select LIB_NETFILTER_CONNTRACK
+	help
+	  Ulogd is a userspace logging facility for iptables.  This is
+	  version 2, which requires a linux 2.6 kernel.
+
+config USER_VCONFIG_VCONFIG
+	bool "vconfig"
+	help
+	  Tool to allow configuration of VLANs.
+
+config USER_VPNLED_VPNLED
+	bool "vpnled"
+	help
+	  Control the VPN led.
+	  Approx. binary size: 5k
+
+config USER_WGET
+	bool "wget"
+	help
+	  Web site downloading utility.
+
+config USER_XL2TPD_XL2TPD
+	bool "xl2tpd"
+	help
+	  Layer 2 Tunnelling Protocol Daemon
+
+config USER_ZEBRA_ZEBRA_ZEBRA
+	bool "zebra"
+	help
+	  The GNU Zebra routing daemon server process.
+	  Approx. binary size: 124k
+
+config USER_ZEBRA_BGPD_BGPD
+	bool "zebra-bgpd"
+	depends on USER_ZEBRA_ZEBRA_ZEBRA
+	help
+	  The GNU Zebra BGP daemon.
+	  Approx. binary size: 329k
+
+config USER_ZEBRA_OSPFD_OSPFD
+	bool "zebra-ospfd"
+	depends on USER_ZEBRA_ZEBRA_ZEBRA
+	help
+	  The GNU Zebra OSPF daemon.
+	  Approx. binary size: 270k
+
+config USER_ZEBRA_RIPD_RIPD
+	bool "zebra-ripd"
+	depends on USER_ZEBRA_ZEBRA_ZEBRA
+	help
+	  The GNU Zebra RIP daemon.
+	  Approx. binary size: 167k
+
+
+comment "Net-tools"
+
+config USER_NET_TOOLS_ARP
+	bool "arp"
+	help
+	  Manipulate the system ARP cache.
+
+config USER_NET_TOOLS_HOSTNAME
+	bool "hostname"
+	help
+	  Show or set the system's host name.
+
+config USER_NET_TOOLS_IFCONFIG
+	bool "ifconfig"
+	help
+	  Configure a network interface.
+
+config USER_NET_TOOLS_NAMEIF
+	bool "nameif"
+	help
+	  Name network interfaces based on MAC addresses.
+
+config USER_NET_TOOLS_NETSTAT
+	bool "netstat"
+	help
+	  Print  network  connections,  routing  tables,
+	  interface statistics, masquerade connections,  and
+	  multicast memberships.
+
+config USER_NET_TOOLS_PLIPCONFIG
+	bool "plipconfig"
+	help
+	  Fine tune PLIP device parameters.
+
+config USER_NET_TOOLS_RARP
+	bool "rarp"
+	help
+	  Manipulate the system RARP table.
+
+config USER_NET_TOOLS_ROUTE
+	bool "route"
+	help
+	  Show / manipulate the IP routing table.
+
+config USER_NET_TOOLS_SLATTACH
+	bool "slattach"
+	help
+	  Attach a network interface to a serial line.
+
+config USER_NET_TOOLS_MII_TOOL
+	bool "mii-tool"
+	help
+	  Manipulate media-independent interface status.
+
+config USER_NET_TOOLS_MII_TOOL_FEC
+	bool "mii-tool-fec"
+	help
+	   Manipulate media-independent interface status.
+	   Specific to extensions for 5272 FEC driver
+
+
+comment "Wireless-tools"
+
+config USER_WIRELESS_TOOLS
+	bool "wireless_tools support"
+	help
+	  Enable building of the Wireless tools.
+	  
+
+config USER_WIRELESS_TOOLS_IWCONFIG
+	bool "iwconfig"
+	depends on USER_WIRELESS_TOOLS
+	help
+	  Wireless interface config tool
+
+config USER_WIRELESS_TOOLS_IWGETID
+	bool "iwgetid"
+	depends on USER_WIRELESS_TOOLS
+	help
+	  Wireless getid
+
+config USER_WIRELESS_TOOLS_IWLIST
+	bool "iwlist"
+	depends on USER_WIRELESS_TOOLS
+	help
+	  List wireless interfaces.
+
+config USER_WIRELESS_TOOLS_IWPRIV
+	bool "iwpriv"
+	depends on USER_WIRELESS_TOOLS
+	help
+	  Something cool.
+
+config USER_WIRELESS_TOOLS_IWSPY
+	bool "iwspy"
+	depends on USER_WIRELESS_TOOLS
+	help
+	  If its a spy tool it must be worth having.
+
+config USER_HOSTAP_HOSTAP
+	bool "hostap"
+
+config USER_HOSTAP_PCI
+	bool "PCI cards"
+	depends on USER_HOSTAP_HOSTAP
+
+config USER_HOSTAP_CS
+	bool "PCMCIA cards"
+	depends on USER_HOSTAP_HOSTAP
+
+config USER_HOSTAP_HOSTAPD
+	bool "hostapd"
+	depends on USER_HOSTAP_HOSTAP
+
+config USER_WLAN_NG
+	bool "wlan-ng"
+
+config USER_WLAN_NG_WLAND
+	bool "wlandl"
+	depends on USER_WLAN_NG
+
+config USER_WLAN_NG_WLANCFG
+	bool "wlancfg"
+	depends on USER_WLAN_NG
+
+config USER_WLAN_NG_WLANCTL
+	bool "wlanctl"
+	depends on USER_WLAN_NG
+
+config USER_WLAN_NG_PCMCIA
+	bool "Prism2 PCMCIA"
+	depends on USER_WLAN_NG
+
+config USER_WLAN_NG_PLX
+	bool "Prism2 PLX"
+	depends on USER_WLAN_NG
+
+config USER_WLAN_NG_PCI
+	bool "Prism2 PCI"
+	depends on USER_WLAN_NG
+
+config USER_WLAN_NG_USB
+	bool "Prism2 USB"
+	depends on USER_WLAN_NG
+
+endmenu
+
+#############################################################################
+
+menu "Miscellaneous Applications"
+
+config USER_P7ZIP_7ZA
+	bool "7za"
+	help
+	  The p7zip command line utility
+
+config USER_LANG_A60
+	bool "a60"
+	help
+	  A relatively complete Algol 60 interpreter.  This
+	  options adds about 99k to the image.
+
+config USER_LANG_A60_EGS
+	bool "examples"
+	depends on USER_LANG_A60
+	help
+	  Some example Algol 60 programs.  These will be installed
+	  into /home/a60-examples.  This represents about 15k of text
+	  files.
+
+config USER_LANG_A60_TEST
+	bool "tests"
+	depends on USER_LANG_A60
+	help
+	  A small test suite for the Algol 60 interpreter.
+	  These will be installed into /home/a60-test.  This
+	  represents about 45k of text files.
+
+config USER_ARJ_ARJ
+	bool "arj"
+	help
+	  THe arj archiving program for dealing with .arj archives.
+
+config USER_BZIP2_BZIP2
+	bool "bzip2"
+	select LIB_LIBBZ2
+	help
+	  The bzip2 data compression program.
+	  Features high compression rate but slower performance than
+	  gzip and compress.
+
+config USER_CAL_CAL
+	bool "cal"
+	help
+	  Calender program
+	  Approx. binary size: 10k
+
+config USER_CAN_EXAMPLES
+	bool "can4linux examples"
+	help
+	  can4linux user examples.
+
+config USER_CHAT_CHAT
+	bool "chat"
+	help
+	  The chat command is used for PPP and other processes that need
+	  to talk to modems.
+	  Approx. binary size: 29k
+
+config USER_CHAT_CHAT_NETWORK
+	bool "chat network/telnet support"
+	depends on USER_CHAT_CHAT
+
+config USER_CKSUM_CKSUM
+	bool "cksum"
+	help
+	  Checksumming utility
+
+config USER_CLOCK_CLOCK
+	bool "clock"
+	help
+	  Some kind of clock
+
+config USER_CPU_CPU
+	bool "cpu"
+	help
+	  cpu tool
+
+config USER_CRYPTO_TOOLS_CMACTEST
+	bool "cmactest"
+	help
+	  A small app to help debug cmac and mac problems
+	  with OCF drivers.
+
+config USER_CRYPTO_TOOLS_CRYPTOTEST
+	bool "cryptotest"
+	help
+	  OpenBSD's cryptotest program for testing OCF
+
+config USER_CRYPTO_TOOLS_CRYPTOKEYTEST
+	bool "cryptokeytest"
+	help
+	  OpenBSD's cryptokeytest program for testing OCF
+
+config USER_CAL_DATE
+	bool "date"
+	help
+	  Print the date
+	  Approx. binary size: 5k
+
+config USER_DE2TSCAL_DE2TSCAL
+	bool "de2ts-cal"
+
+config USER_EXPAT_EXAMPLES
+	bool "expat-examples"
+	select LIB_EXPAT
+
+config USER_EXPECT_EXPECT
+	bool "expect"
+	select USER_TCL_LIBTCL
+
+config USER_TCL_LIBTCL
+	bool
+	default n
+
+config USER_FLTHDR_FLTHDR
+	bool "flthdr"
+	help
+	  FLAT binary format header manipulation program.
+
+config USER_FROB_LED_FROB_LED
+	bool "frob-led"
+	help
+	  Utility to send commands to the ledman driver.
+
+config USER_GDB_GDBREPLAY
+	bool "gdbreplay"
+	help
+	  install gdbreplay onto target.
+	  ** NEED TO ENABLE 'PTHREADS_DEBUG_SUPPORT' in uClibc config ** 
+
+config USER_GDB_GDBSERVER
+	bool "gdbserver"
+	help
+	  gdbserver is used to remotely debug user applications running on the
+	  server.
+	  ** NEED TO ENABLE 'PTHREADS_DEBUG_SUPPORT' in uClibc config **
+
+config USER_GDB_TARGET
+	bool "gdb (target)"
+	select LIB_TERMCAP
+	help
+	  A full gdb which runs on the target.
+	  ** NEED TO ENABLE 'PTHREADS_DEBUG_SUPPORT' in uClibc config **
+
+config USER_GDB_HOST
+	bool "gdb (host)"
+	help
+	  The host-side gdb which can connect to the gdbserver on the target.
+
+config USER_GDBSERVER_GDBREPLAY
+	bool "gdbreplay (old)"
+	help
+	  The gdbserver replay client. (old version - mk68k targets only)
+	  Approx. binary size: 13k
+
+config USER_GDBSERVER_GDBSERVER
+	bool "gdbserver (old)"
+	help
+	  gdbserver is used to remotely debug user applications running on the
+	  server. (old version - mk68k targets only)
+	  Approx. binary size: 14k
+
+config USER_DEBUG_DEBUG
+	bool "debug"
+	help
+	  Nios2 debug application stub
+
+config USER_GREP_GREP
+	bool "grep"
+	help
+	  GNU grep, egrep and fgrep
+
+config USER_HASERL_HASERL
+	bool "haserl"
+	help
+	  A tiny (<30K) cgi wrapper that uses a UNIX shell to provide
+	  PHP-like scripting for dynamic web content. It parses form data
+	  placing the data in environment variables. It also supports
+	  file-uploads and running as a non-privleged user.
+
+config USER_HD_HD
+	bool "hd"
+	help
+	  Flexible hex dump program.
+
+config USER_LOAD_LOAD
+	bool "load"
+	help
+	  Simple SPI flash loader.
+
+config USER_CAN_HORCH
+	bool "horch"
+
+config USER_JAMVM_JAMVM
+	bool "jamvm"
+	help
+	  Virtual machine which conforms to JVM specification 2
+
+config USER_JQUERY_UI
+	bool "jquery"
+	help
+	  jQuery UI javascript library
+
+config USER_KEXEC_KEXEC
+	bool "kexec loader"
+	help
+	  The kexec-tools "kexec" kernel loader.
+
+config USER_SGUTOOL_SGUTOOL
+	bool "sgutool"
+	help
+	  Tool that can manipulate SGU images. Options to extract the
+	  vendor, hardware and version fields and extract the old style
+	  checksums. Also ability to extract and write out the kernel and
+	  filesystem parts, and also extract crypto signature information.
+
+config USER_LCD_LCD
+	bool "lcd"
+	help
+	  LCD program
+	  Approx. binary size: 7k
+
+config USER_LEDCMD_LEDCMD
+	bool "ledcmd"
+	help
+	  Set LED action.
+
+config USER_LEDCON_LEDCON
+	bool "ledcon"
+	help
+	  Control all the leds.
+	  Approx. binary size: 10k
+
+config USER_LHA_LHA
+	bool "lha"
+	help
+	  The lha archiving program for dealing with .lzh archives.
+
+config USER_LILO_LILO
+	bool "lilo"
+	help
+	  The lilo boot loader (C version).
+	  This option adds approximately 120K to the image.
+
+config USER_LISSA_LISSA
+	bool "lissa"
+	help
+	  Lissa
+
+config USER_LPR
+	bool "lpr"
+	help
+	  The BSD printer spooler and associated utilities.
+
+config USER_LSOF_LSOF
+	bool "lsof"
+	help
+	  The LiSt Open Files (lsof) utility.
+
+config USER_USBCBI_USBCBI
+	bool "mcf5272 cbi client"
+
+config USER_USBISO_USBISO
+	bool "mcf5272 iso client"
+
+config USER_MATH_TEST
+	bool "mathstests"
+	help
+	  A number of programs used to test the proper functioning of the maths
+	  library.
+
+config USER_MAWK_AWK
+	bool "mawk"
+	help
+	  The mawk program is an interpreter for the AWK programming language.
+	  The AWK language is useful for manipulation of data files, text
+	  retrieval and provessing, for prototyping and experimenting with
+	  algorithms and for general scripting.  The mawk program is installed
+	  as /bin/awk.
+	  Approx. binary size: 110k
+
+config USER_MYSQL
+	bool "mysql"
+	select LIB_TERMCAP
+	help
+	  Enable building the various mysql components.
+
+config USER_MYSQL_CLIB
+	bool "client library"
+	depends on USER_MYSQL
+	help
+	  Build mysql client support library. This allows clients to
+	  access a remote (or local) mysql database.
+
+config USER_NULL_NULL
+	bool "null"
+	help
+	  The NULL program. Only useful for testing.
+
+config USER_OPROFILE
+	bool "oprofile"
+	select LIB_BFD
+	select LIB_LIBIBERTY
+	select LIB_POPT
+	help
+	  A system-wide profiler.
+
+config USER_PALMBOT_PALMBOT
+	bool "palmbot"
+	help
+	  A half-baked app to drive the Palm Pilot robot.
+
+config USER_PCMCIA_CS
+	bool "pcmcia-cs (Card Services)"
+	help
+	  PCMCIA Card Services package and all associated bits
+
+config USER_PERL_PERL
+	bool "perl"
+	help
+	  The PERL scripting language.
+
+config USER_POTRACE_POTRACE
+	bool 'potrace'
+	help
+	  The protrace graphics utility that converts bitmaps to vector graphics
+
+config USER_PYTHON_PYTHON
+	bool "python"
+	help
+	  The Python scripting language.
+
+config USER_READPROFILE_READPROFILE
+	bool "readprofile"
+	help
+	  Tools for use with kernel profiling
+	  Approx. binary size: 16k
+
+config USER_ROOTLOADER_ROOTLOADER
+	bool "rootloader"
+	help
+	  The root loader
+	  Approx. binary size: 9k
+
+config USER_RRDTOOL_RRDTOOL
+	bool "rrdtool"
+	help
+	  A port of "rrdtool"for small footprint systems.
+
+config USER_SETSERIAL_SETSERIAL
+	bool "setserial"
+	help
+	  User level serial port configuration tool.
+	  Approx binary size: 18k
+
+config USER_SHADOW_UTILS
+	bool "shadow utilities"
+	help
+	  A collection of shadow password file based utilities.
+	  These are generally full featured with lots of flexibility.
+
+config USER_SHADOW_PAM
+	bool "use PAM"
+	depends on USER_SHADOW_UTILS
+	select LIB_LIBPAM
+	help
+	  Instead of using the shadow password file, authentication and session
+	  control is managed by PAM the pluggable authentication framework.
+
+config USER_SHADOW_SHAREDLIB
+	bool "use shared library"
+	depends on USER_SHADOW_UTILS
+	help
+	  Enabling this option creates a shadow shared library and all the
+	  various applications then use this library.  Enabling this option will
+	  save space.  The cost of this space saving is the opening of a trivial
+	  escalation from normal user privileges to super user ones.  You have
+	  been warned.
+
+config USER_SHADOW_CHAGE
+	bool "chage"
+	depends on USER_SHADOW_UTILS
+	help
+	  Change user password expiry information.
+
+config USER_SHADOW_CHFN
+	bool "chfn"
+	depends on USER_SHADOW_UTILS
+	help
+	  Change real user name and information.
+
+config USER_SHADOW_CHPASSWD
+	bool "chpasswd"
+	depends on USER_SHADOW_UTILS
+	help
+	  Update passwords in batch mode.
+
+config USER_SHADOW_CHSH
+	bool "chsh"
+	depends on USER_SHADOW_UTILS
+	help
+	  Change login shell.
+
+config USER_SHADOW_EXPIRY
+	bool "expiry"
+	depends on USER_SHADOW_UTILS
+	help
+	  Check and enforce password expiration policy.
+
+config USER_SHADOW_FAILLOG
+	bool "faillog"
+	depends on USER_SHADOW_UTILS
+	help
+	  Display faillog records or set login failure limits.
+
+config USER_SHADOW_GPASSWD
+	bool "gpasswd"
+	depends on USER_SHADOW_UTILS
+	help
+	  Administer the groups file.
+
+config USER_SHADOW_GROUPADD
+	bool "groupadd"
+	depends on USER_SHADOW_UTILS
+	help
+	  Create a new group.
+
+config USER_SHADOW_GROUPDEL
+	bool "groupdel"
+	depends on USER_SHADOW_UTILS
+	help
+	  Delete a group.
+
+config USER_SHADOW_GROUPMOD
+	bool "groupmod"
+	depends on USER_SHADOW_UTILS
+	help
+	  Modify a group.
+
+config USER_SHADOW_GROUPS
+	bool "groups"
+	depends on USER_SHADOW_UTILS
+	help
+	  Print the groups a user is in.
+
+config USER_SHADOW_GRPCK
+	bool "grpck"
+	depends on USER_SHADOW_UTILS
+	help
+	  Verify integrity of group files.
+
+config USER_SHADOW_GRPCONV
+	bool "grpconv"
+	depends on USER_SHADOW_UTILS
+	help
+	  Convert to and from shadow passwords and groups.
+
+config USER_SHADOW_GRPUNCONV
+	bool "grpunconv"
+	depends on USER_SHADOW_UTILS
+	help
+	  Convert to and from shadow passwords and groups.
+
+config USER_SHADOW_ID
+	bool "id"
+	depends on USER_SHADOW_UTILS
+	help
+	  Print real and effective UIDs and GIDs.
+
+config USER_SHADOW_LASTLOG
+	bool "lastlog"
+	depends on USER_SHADOW_UTILS
+	help
+	  Examine the lastlog file.
+	  This file contains historic login information.
+
+config USER_SHADOW_LOGIN
+	bool "login"
+	depends on USER_SHADOW_UTILS
+	help
+	  The shadow login program.
+	  Generally fully featured login program that supports shadow passwords.
+
+config USER_SHADOW_LOGOUTD
+	bool "logoutd"
+	depends on USER_SHADOW_UTILS
+	help
+	  Enforce login time restrictions.
+
+config USER_SHADOW_NEWGRP
+	bool "newgrp"
+	depends on USER_SHADOW_UTILS
+	help
+	  Log in to a new group.
+
+config USER_SHADOW_NEWUSERS
+	bool "newusers"
+	depends on USER_SHADOW_UTILS
+	help
+	  Update and create new users in batch.
+
+config USER_SHADOW_NOLOGIN
+	bool "nologin"
+	depends on USER_SHADOW_UTILS
+	help
+	  Politely refuse a login.
+
+config USER_SHADOW_PASSWD
+	bool "passwd"
+	depends on USER_SHADOW_UTILS
+	help
+	  The shadow passwd program that complements the shadow login by
+	  allowing passwords to be changed.
+
+config USER_SHADOW_PWCK
+	bool "pwck"
+	depends on USER_SHADOW_UTILS
+	help
+	  Verify integrity of password files.
+
+config USER_SHADOW_PWCONV
+	bool "pwconv"
+	depends on USER_SHADOW_UTILS
+	help
+	  Convert to and from shadow passwords and groups.
+
+config USER_SHADOW_PWUNCONV
+	bool "pwunconv"
+	depends on USER_SHADOW_UTILS
+	help
+	  Convert to and from shadow passwords and groups.
+
+config USER_SHADOW_SU
+	bool "su"
+	depends on USER_SHADOW_UTILS
+	help
+	  Change user ID or become super-user.
+
+config USER_SHADOW_SULOGIN
+	bool "sulogin"
+	depends on USER_SHADOW_UTILS
+	help
+	  Single-user login.
+
+config USER_SHADOW_USERADD
+	bool "useradd"
+	depends on USER_SHADOW_UTILS
+	help
+	  Create a new user or update default new user information.
+
+config USER_SHADOW_USERDEL
+	bool "userdel"
+	depends on USER_SHADOW_UTILS
+	help
+	  Delete a user account and related files.
+
+config USER_SHADOW_USERMOD
+	bool "usermod"
+	depends on USER_SHADOW_UTILS
+	help
+	  Modify a user account.
+
+config USER_SHADOW_VIPW
+	bool "vipw"
+	depends on USER_SHADOW_UTILS
+	help
+	  Edit the password, group, shadow-password or shadow-group file.
+
+config USER_TRIPWIRE_SIGGEN
+	bool "siggen"
+	help
+	  Cryptographic file signature utility.
+
+config USER_STRACE_STRACE
+	bool "strace"
+	help
+	  Trace system calls and signals.
+
+config USER_STTY_STTY
+	bool "stty"
+	help
+	  Command to change the settings on serial devices.  For example
+	  you can change the baud rate,  flow control and so on.
+	  Approx. binary size: 29k
+
+config USER_TCSH_TCSH
+	bool "tcsh"
+	help
+	  Enhanced C shell (csh).
+
+config USER_TINYTCL_TCLSH
+	bool "tinytcl"
+	select LIB_TINYTCL
+	help
+	  An interactive Tcl shell, tclsh. This basically reads and executes
+	  Tcl scripts interactively or from a file
+
+config LIB_TINYTCL
+	bool "build tinytcl library"
+	default n
+	help
+	  Build the tinytcl library.
+
+config LIB_TINYTCL_STATIC
+	bool "build static libtcl and extensions"
+	depends on LIB_TINYTCL
+	help
+	  Build libtcl as a static library rather than the default shared
+	  library.
+
+config USER_THREADDEMOS_THREADDEMOS
+	bool "pThreads threaddemos"
+
+config USER_TIP_TIP
+	bool "tip"
+	help
+	  A small terminal emulator for connecting to modems and serial devices.
+	  Approx. binary size: 11k
+
+config USER_TRIPWIRE_TRIPWIRE
+	bool "tripwire"
+	help
+	  The tripwire file modification detection utility.
+
+config USER_UNRAR_UNRAR
+	bool "unrar"
+	help
+	  The unrar archive extraction program.
+
+config USER_UNZIP_UNZIP
+	bool "unzip"
+	help
+	  The unzip archive decompression and extraction program.
+
+config USER_UNZIP_FUNZIP
+	bool "funzip"
+	depends on USER_UNZIP_UNZIP
+	help
+	  Filter for extracting from a ZIP archive in a pipe.
+
+config USER_UNZOO_UNZOO
+	bool "unzoo"
+	help
+	  The unzoo archive decompression and extraction program.
+	  Can only extract and view contents of zoo archives.
+
+config USER_WATCHDOGD
+	bool "watchdogd"
+	help
+	  A simple watchdog daemon.
+
+config USER_LRZSZ_LRZSZ
+	bool "zmodem utils"
+
+config USER_LRZSZ_LRZ
+	bool "lrz"
+	depends on USER_LRZSZ_LRZSZ
+
+config USER_LRZSZ_LSZ
+	bool "lsz"
+	depends on USER_LRZSZ_LRZSZ
+
+
+comment "Benchmarks"
+
+config USER_DHRYSTONE_DHRYSTONE
+	bool "dhrystone"
+	help
+	  The dhrystone CPU benchmark program.
+
+config USER_NBENCH_NBENCH
+	bool "nbench benchmark"
+
+config USER_WHETSTONE_WHETSTONE
+	bool "whetstone benchmark"
+
+
+comment "LIRC"
+
+config USER_LIRC
+	bool "Enable LIRC tools"
+	help
+	  Build the LIRC (Linux Remote Control) tools/apps.
+
+config USER_LIRC_LIRCD
+	bool "lircd"
+	depends on USER_LIRC
+	help
+	  The main LIRC daemon.
+
+config USER_LIRC_IRRECORD
+	bool "irrecord"
+	depends on USER_LIRC
+	help
+	  For creating new entries for a remote control.
+
+config USER_LIRC_LIRCMD
+	bool "lircmd"
+	depends on USER_LIRC
+	help
+	  Not sure.
+
+config USER_LIRC_IREXEC
+	bool "irexec"
+	depends on USER_LIRC
+	help
+	  Run commands when you push a button on the remote.
+
+config USER_LIRC_IRW
+	bool "irw"
+	depends on USER_LIRC
+	help
+	  A test program.
+
+config USER_LIRC_MODE2
+	bool "mode2"
+	depends on USER_LIRC
+	help
+	  Not sure.
+
+
+comment "LM SENSORS"
+
+config USER_LM_SENSORS
+	bool "Enable lm_sensors tools"
+
+config USER_LM_SENSORS_SENSORS
+	bool "sensors"
+	depends on USER_LM_SENSORS
+	select LIB_LIBSYSFS
+
+
+comment "QSPI"
+
+config MCF_QSPI
+	bool "Enable Coldfire QSPI test programs"
+
+config USER_QSPITEST_TEST
+	bool "qspitest"
+	depends on MCF_QSPI
+	help
+	  A small testbed for receiving data from an MCP3202 device (a small
+	  two-channel ADC) on the qspi bus of a Motorola Coldfire 5272 to
+	  determine whether data is being correctly received on the qspi bus.
+
+config USER_QSPITEST_RX
+	bool "qspirx"
+	depends on MCF_QSPI
+	help
+	  A small testbed for receiving data from an MCP3202 device (a small
+	  two-channel ADC) on the qspi bus of a Motorola Coldfire 5272 using
+	  the mcf_qspi kernel driver.
+
+
+comment "Editors"
+
+config USER_LEVEE_VI
+	bool "vi (leevee)"
+	help
+	  A small version of 'vi' for editing files.
+
+config USER_ELVISTINY_VI
+	bool "vi (elvis-tiny)"
+
+
+comment "Audio tools"
+
+config USER_MP3PLAY_MP3PLAY
+	bool "mp3play"
+	help
+	  Play MP3 files
+
+config USER_MP3PLAY_SWAP_WD
+	bool "swap -d and -w options"
+	depends on USER_MP3PLAY_MP3PLAY
+	help
+	  Swap the meaning of the -w and -d command line options.
+
+config USER_OGGPLAY_OGGPLAY
+	bool "oggplay"
+
+config USER_OGGPLAY_EXAMPLE
+	bool "ivorbisfile_example"
+
+config USER_MUSICBOX_MUSICBOX
+	bool "musicbox"
+	help
+	  Front-end for mp3play and mixer
+
+config USER_PLAY_PLAY
+	bool "play"
+	help
+	  Plays .wav files
+
+config USER_PLAY_TONE
+	bool "tone"
+
+config USER_VPLAY_VPLAY
+	bool "vplay"
+
+config USER_VPLAY_VREC
+	bool "vrec"
+
+config USER_VPLAY_MIXER
+	bool "mixer"
+
+config USER_PLAYRT_PLAYRT
+	bool "playrt"
+
+
+comment "Video tools"
+
+config USER_CAMSERV
+	bool "camserv"
+	select LIB_LIBPNG
+	select LIB_LIBJPEG
+	help
+	  Webcam daemon & cgi for serving streaming images off a V4L webcam.
+	  see http://cserv.sourceforge.net/
+
+config USER_JPEGVIEW_JPEGVIEW
+	bool "jpegview"
+	select LIB_LIBPNG
+	select LIB_LIBJPEG
+	help
+	  View jpegs on a frame buffer
+
+config USER_W3CAM_VIDCAT
+	bool "vidcat"
+
+config USER_W3CAM_W3CAMD
+	bool "w3camd"
+	select LIB_LIBPNG
+	select LIB_LIBJPEG
+
+comment "Fileutils tools"
+
+config USER_FILEUTILS_CAT
+	bool "cat"
+	help
+	  Print the contents of a file to the screen.
+	  Approx. binary size: 5k
+
+config USER_FILEUTILS_CHGRP
+	bool "chgrp"
+	help
+	  Change the group of a file
+	  Approx. binary size: 7k
+
+config USER_FILEUTILS_CHMOD
+	bool "chmod"
+	help
+	  Change the permissions of a file
+	  Approx. binary size: 5k
+
+config USER_FILEUTILS_CHOWN
+	bool "chown"
+	help
+	  Change the owner of a file
+	  Approx. binary size: 7k
+
+config USER_FILEUTILS_CMP
+	bool "cmp"
+	help
+	  compare two files
+	  Approx. binary size: 6k
+
+config USER_FILEUTILS_CP
+	bool "cp"
+	help
+	  copy files and directories
+	  Approx. binary size: 6k
+
+config USER_FILEUTILS_DD
+	bool "dd"
+	help
+	  dump files in various formats
+	  Approx. binary size: 7k
+
+config USER_FILEUTILS_GREP
+	bool "grep"
+	help
+	  find patterns in files
+	  Approx. binary size: 8k
+
+config USER_FILEUTILS_L
+	bool "l"
+	help
+	  long file listing
+	  Approx. binary size: 7k
+
+config USER_FILEUTILS_LN
+	bool "ln"
+	help
+	  for linking files together
+	  Approx. binary size: 3k
+
+config USER_FILEUTILS_LS
+	bool "ls"
+	help
+	  list files
+	  Approx. binary size: 14k
+
+config USER_FILEUTILS_MKDIR
+	bool "mkdir"
+	help
+	  make directories
+	  Approx. binary size: 2k
+
+config USER_FILEUTILS_MKFIFO
+	bool "mkfifo"
+	help
+	  make a FIFO
+	  Approx. binary size: 1k
+
+config USER_FILEUTILS_MKNOD
+	bool "mknod"
+	help
+	  make a special file
+	  Approx. binary size: 2k
+
+config USER_FILEUTILS_MORE
+	bool "more"
+	help
+	  a pager for looking at files
+	  Approx. binary size: 4k
+
+config USER_FILEUTILS_MV
+	bool "mv"
+	help
+	  move a file
+	  Approx. binary size: 4k
+
+config USER_FILEUTILS_RM
+	bool "rm"
+	help
+	  remove a file
+	  Approx. binary size: 1k
+
+config USER_FILEUTILS_RMDIR
+	bool "rmdir"
+	help
+	  remove a directory
+	  Approx. binary size: 2k
+
+config USER_FILEUTILS_SYNC
+	bool "sync"
+	help
+	  synchronise filesystem memory back to disk.
+	  Approx. binary size: 1k
+
+config USER_FILEUTILS_TOUCH
+	bool "touch"
+	help
+	  change the timestamp on a file
+	  Approx. binary size: 1k
+
+
+comment "Shutils tools"
+
+config USER_SHUTILS_BASENAME
+	bool "basename"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+config USER_SHUTILS_DATE
+	bool "date"
+	help
+	  SH utils
+	  Approx. binary size: 52k
+
+config USER_SHUTILS_DIRNAME
+	bool "dirname"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+config USER_SHUTILS_ECHO
+	bool "echo"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+config USER_SHUTILS_FALSE
+	bool "false"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+config USER_SHUTILS_LOGNAME
+	bool "logname"
+	help
+	  SH utils
+	  Approx. binary size: 3k
+
+config USER_SHUTILS_PRINTENV
+	bool "printenv"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+config USER_SHUTILS_PWD
+	bool "pwd"
+	help
+	  SH utils
+	  Approx. binary size: 3k
+
+config USER_SHUTILS_TRUE
+	bool "true"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+config USER_SHUTILS_UNAME
+	bool "uname"
+	help
+	  SH utils
+	  Approx. binary size: 2k
+
+config USER_SHUTILS_WHICH
+	bool "which"
+	help
+	  SH utils
+	  Approx. binary size: 44k
+
+config USER_SHUTILS_WHOAMI
+	bool "whoami"
+	help
+	  SH utils
+	  Approx. binary size: 3k
+
+config USER_SHUTILS_YES
+	bool "yes"
+	help
+	  SH utils
+	  Approx. binary size: 1k
+
+
+comment "Sysutils tools"
+
+config USER_SYSUTILS_REBOOT
+	bool "reboot"
+	help
+	  reboot the system
+
+config USER_SYSUTILS_SHUTDOWN
+	bool "shutdown"
+	help
+	  shutdown the system
+
+config USER_SYSUTILS_DF
+	bool "df"
+	help
+	  print filesystem usage
+	  Approx. binary size: 5k
+
+config USER_SYSUTILS_FREE
+	bool "free"
+	help
+	  SYS utils
+	  Approx. binary size: 5k
+
+config USER_SYSUTILS_HOSTNAME
+	bool "hostname"
+	help
+	  print the hostname of the system
+	  Approx. binary size: 3k
+
+config USER_SYSUTILS_KILL
+	bool "kill"
+	help
+	  kill processes
+	  Approx. binary size: 4k
+
+config USER_SYSUTILS_PS
+	bool "ps"
+	help
+	  Show process status
+	  Approx. binary size: 12k
+
+
+comment "Procps tools"
+
+config USER_PROCPS_FREE
+	bool "free"
+
+config USER_PROCPS_KILL
+	bool "kill"
+
+config USER_PROCPS_PGREP
+	bool "pgrep"
+
+config USER_PROCPS_PKILL
+	bool "pkill"
+
+config USER_PROCPS_PS
+	bool "ps"
+
+config USER_PROCPS_SNICE
+	bool "snice"
+
+config USER_PROCPS_SYSCTL
+	bool "sysctl"
+
+config USER_PROCPS_TLOAD
+	bool "tload"
+
+config USER_PROCPS_TOP
+	bool "top"
+	select LIB_NCURSES
+
+config USER_PROCPS_UPTIME
+	bool "uptime"
+
+config USER_PROCPS_VMSTAT
+	bool "vmstat"
+
+config USER_PROCPS_W
+	bool "w"
+
+config USER_PROCPS_WATCH
+	bool "watch"
+
+config USER_PROCPS_PMAP
+	bool "pmap"
+
+config USER_PROCPS_SLABTOP
+	bool "slabtop"
+
+config USER_PROCPS_PWDX
+	bool "pwdx"
+
+comment "PCI utilities"
+
+config USER_PCIUTILS_LSPCI
+	bool "lspci"
+
+config USER_PCIUTILS_SETPCI
+	bool "setpci"
+
+
+comment "Test Applications"
+config USER_CXXTEST_CXXTEST
+	bool "C++ Test Applications"
+	select LIB_STLPORT
+	help
+	  Applications to test the c++ build environment.
+
+endmenu
+
+#############################################################################
+
+menu "BusyBox"
+
+config USER_BUSYBOX_BUSYBOX
+	bool "BusyBox"
+	help
+	  BusyBox combines tiny versions of many common UNIX utilities into
+	  a single small executable.  It provides minimalist replacements
+	  for most of the utilities you usually find in fileutils, shellutils,
+	  findutils, textutils, grep, gzip, tar, etc.  Simply select those
+	  utilities and options you want.
+
+if USER_BUSYBOX_BUSYBOX
+source ../user/busybox/Kconfig
+endif
+
+endmenu
+
+#############################################################################
+
+menu "Tinylogin"
+
+config USER_TINYLOGIN_TINYLOGIN
+	bool "Tinylogin"
+
+comment "Applets"
+
+config USER_TINYLOGIN_ADDUSER
+	bool "adduser"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Add a user to the system
+
+config USER_TINYLOGIN_ADDGROUP
+	bool "addgroup"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Add a group to the system
+
+config USER_TINYLOGIN_DELUSER
+	bool "deluser"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Delete a user from the system
+
+config USER_TINYLOGIN_DELGROUP
+	bool "delgroup"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Delete a group from the system
+
+config USER_TINYLOGIN_LOGIN
+	bool "login"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Begin a new session on the system
+
+config USER_TINYLOGIN_SECURETTY
+	bool "login: /etc/securetty"
+	depends on USER_TINYLOGIN_LOGIN
+	help
+	  Enable checking of /etc/securetty by login
+
+config USER_TINYLOGIN_SU
+	bool "su"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Change user id or become root
+
+config USER_TINYLOGIN_SULOGIN
+	bool "sulogin"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Single user login
+
+config USER_TINYLOGIN_PASSWD
+	bool "passwd"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Change a user password
+
+config USER_TINYLOGIN_GETTY
+	bool "getty"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Opens a tty, prompts for a login name, then invokes login
+
+comment "Features"
+
+config USER_TINYLOGIN_SHADOWPASSWDS
+	bool "Shadow passwords"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Enable using shadow passwords
+
+config USER_TINYLOGIN_MD5_PASSWORDS
+	bool "md5 passwords"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Enable using md5 passwords
+
+config USER_TINYLOGIN_SHA1_PASSWORDS
+	bool "sha passwords"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  Enable using sha passwords
+
+config USER_TINYLOGIN_TRIVIAL_HELP
+	bool "Trivial help"
+	depends on USER_TINYLOGIN_TINYLOGIN
+	help
+	  This compiles out everything but the most 
+	  trivial --help usage information (i.e. reduces binary size)
+
+endmenu
+
+#############################################################################
+
+menu "MicroWindows"
+
+config USER_MICROWIN
+	bool "MicroWindows"
+
+comment "Compiling Options"
+
+config USER_MICROWIN_OPTIMIZE
+	bool "Optimize"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_DEBUG
+	bool "Debug"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_VERBOSE
+	bool "Verbose"
+	depends on USER_MICROWIN
+
+comment "Libraries"
+
+config USER_MICROWIN_MICROWIN
+	bool "Microwin"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_NANOX
+	bool "NanoX"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_SHAREDLIBS
+	bool "SharedLibs"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_NWIDGET
+	bool "NWidget"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_OBJFRAMEWORK
+	bool "OBJFramework"
+	depends on USER_MICROWIN
+
+comment "Demos"
+
+config USER_MICROWIN_MICROWINDEMO
+	bool "MicrowinDemo"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_NANOXDEMO
+	bool "NanoXDemo"
+	depends on USER_MICROWIN
+
+comment "Applications"
+
+config USER_MICROWIN_NANOWM
+	bool "NanoWM"
+	depends on USER_MICROWIN
+
+comment "Settings"
+
+choice
+	prompt "Screeen PixType"
+	depends on USER_MICROWIN
+	default USER_MICROWIN_MWPF_TRUECOLOR0888
+
+config USER_MICROWIN_MWPF_PALETTE
+	bool "Packed-8bit-Palette"
+
+config USER_MICROWIN_MWPF_TRUECOLOR0888
+	bool "Packed-32bit-8/8/8"
+
+config USER_MICROWIN_MWPF_TRUECOLOR888
+	bool "Packed-24bit-8/8/8"
+
+config USER_MICROWIN_MWPF_TRUECOLOR565
+	bool "Packed-16bit-5/6/5"
+
+config USER_MICROWIN_MWPF_TRUECOLOR555
+	bool "Packed-16bit-5/5/5"
+
+config USER_MICROWIN_MWPF_TRUECOLOR332
+	bool "Packed-8bit-3/3/2"
+
+endchoice
+
+config USER_MICROWIN_LINK_APP_INTO_SERVER
+	depends on USER_MICROWIN
+	bool "Link App into server"
+
+config USER_MICROWIN_HAVE_FILEIO
+	bool "Have File IO"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_BMP_SUPPORT
+	bool "Have BMP Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_GIF_SUPPORT
+	bool "Have GIF Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_PNM_SUPPORT
+	bool "Have PNM Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_XPM_SUPPORT
+	bool "Have XPM Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_JPEG_SUPPORT
+	bool "Have JPEG Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_PNG_SUPPORT
+	bool "Have PNG Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_T1LIB_SUPPORT
+	bool "Have T1LIB Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_FREETYPE_SUPPORT
+	bool "Have FreeType Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_SHAREDMEM_SUPPORT
+	bool "Have SharedMemory Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_HZK_SUPPORT
+	bool "Have Han Zi Ku font Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_BIG5_SUPPORT
+	bool "Have Big5 Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVE_GB2312_SUPPORT
+	bool "Have GB2312 Support"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HAVEMSFONTS
+	bool "Have MS Fonts"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_NOFONTSORCLIPPING
+	bool "Build Screen Driver only"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_ERASEMOVE
+	bool "Window Erase Move"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_UPDATEREGIONS
+	bool "Window UpdateRegions Move"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_GRAYPALETTE
+	bool "Gray Palette"
+	depends on USER_MICROWIN
+
+comment "Display Config"
+
+config USER_MICROWIN_X11
+	bool "X11 Display"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_FRAMEBUFFER
+	bool "Frame Buffer Display"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_FBVGA
+	bool "Frame Buffer VGA"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_VTSWITCH
+	bool "VT Switch"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_PORTRAIT_MODE
+	bool "Portrait Mode"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_FBREVERSE
+	bool "Frame Buffer Reverse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_VGALIB
+	bool "VGA Lib"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HWVGA
+	bool "HW VGA"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_CLEOVGA
+	bool "Cleopatra VGA"
+	depends on USER_MICROWIN
+
+comment "Mouse/Touch Screen"
+
+config USER_MICROWIN_GPMMOUSE
+	bool "GPM Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_SERMOUSE
+	bool "Serial Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_TPMOUSE
+	bool "TP Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_TPHELIO
+	bool "TP Helio"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_ADSMOUSE
+	bool "ADS Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_IPAQMOUSE
+	bool "IPAQ Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_HARRIERMOUSE
+	bool "Harrier Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_PSIONMOUSE
+	bool "PSION Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_UCTSMOUSE
+	bool "uClinux/Palm TS"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_DE2TSMOUSE
+	bool "DragonEngine TS"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_CLEOMOUSE
+	bool "Cleopatra Mouse"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_NOMOUSE
+	bool "No Mouse"
+	depends on USER_MICROWIN
+
+comment "Keyboard"
+
+config USER_MICROWIN_TTYKBD
+	bool "TTY Keyboard"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_SCANKBD
+	bool "Scan Keyboard"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_PIPEKBD
+	bool "Pipe Keyboard"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_CLEOKBD
+	bool "Cleopatra Keyboard"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_NOKBD
+	bool "No Keyboard"
+	depends on USER_MICROWIN
+
+comment "Install These Applications"
+
+config USER_MICROWIN_BIN_LANDMINE
+	bool "Landmine"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_LAUNCHER
+	bool "Launcher"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_MOVE
+	bool "Move"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_MTERM
+	bool "MTerm"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_MTEST
+	bool "MTest"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_MTEST2
+	bool "MTest2"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_MUSERFD
+	bool "MUserFd"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NANO_X
+	bool "Nano-X"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NANOWM
+	bool "NanoWM"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NPANEL
+	bool "NPanel"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NTERM
+	bool "NTerm"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NTEST
+	bool "NTest"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NTETRIS
+	bool "NTetris"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NXCLOCK
+	bool "NXclock"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NXEV
+	bool "NXev"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NXKBD
+	bool "NXkbd"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NXLSCLIENTS
+	bool "NXlsclients"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NXTERM
+	bool "NXterm"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_NXVIEW
+	bool "NXView"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_SLIDER
+	bool "Slider"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_VNC
+	bool "VNC"
+	depends on USER_MICROWIN
+
+config USER_MICROWIN_BIN_WORLD
+	bool "World"
+	depends on USER_MICROWIN
+
+endmenu
+
+#############################################################################
+
+menu "Games"
+
+config USER_GAMES_ADVENT4
+	bool "advent4"
+	help
+	  The Colossal Cave Adventure game.  To play, telnet to port 8898 or
+	  run advent4 from the command line.
+
+config USER_GAMES_DUNGEON
+	bool "dungeon"
+	help
+	  The Dungeon Adventure game.  To play, telnet to port 8899 or run
+	  dungeon from the command line.
+
+config USER_GAMES_RUBIK
+	bool "rubik"
+	help
+	  Non-optimal rubik's cube solver.
+
+config USER_GAMES_TAMA
+	bool "Tamagotchi daemon"
+	help
+	  The Net Tamagotchi server - maintains multiple virtual pets.
+	  To be accessed via telnet.  Default port is 9111.
+
+endmenu
+
+#############################################################################
+
+menu "Miscellaneous Configuration"
+
+choice
+	prompt "RAMFS Image"
+	default USER_RAMIMAGE_RAMFS64
+
+config USER_RAMIMAGE_NONE
+	bool "none"
+
+config USER_RAMIMAGE_RAMFS64
+	bool "64K"
+
+config USER_RAMIMAGE_RAMFS128
+	bool "128K"
+
+config USER_RAMIMAGE_RAMFS256
+	bool "256K"
+
+config USER_RAMIMAGE_RAMFS512
+	bool "512K"
+
+config USER_RAMIMAGE_RAMFS1024
+	bool "1024K"
+
+config USER_RAMIMAGE_RAMFS2048
+	bool "2048K"
+
+config USER_RAMIMAGE_RAMFS8192
+	bool "8192K"
+
+endchoice
+
+config USER_CGI_GENERIC
+	bool "generic cgi"
+	help
+	  A generic CGI demo program
+	  Approx. binary size: 10k
+
+config USER_CGIHTML
+	bool "cgihtml"
+	help
+	  Some CGI sources that can for instance be used for file uploads
+	  via HTTP.
+	  ATTENTION! There are security bugs in that version! Don't use that
+	  version on an exposed host!
+
+config USER_DEMO_BUTTON
+	bool "SnapGear Button daemon"
+	help
+	  The SnapGear Button Daemon.  This daemon uses the SGIO driver to poll
+	  the state of an input and to debounce and display the state whenever
+	  it changes.
+	  Approx. binary size: 1k
+
+config USER_DEMO_LATCH
+	bool "SnapGear Latch daemon"
+
+config USER_DEMO_MORSE
+	bool "SnapGear Morse demo"
+	help
+	  The SnapGear Morse demo.  This demo program outputs a simple message
+	  in morse code using the SGIO driver to drive a binary output.
+	  Approx. binary size: 2k
+
+config USER_DEMO_R2100
+	bool "SnapGear R2100 daemon"
+
+config POOR_ENTROPY
+	bool "System has very little entropy (only use /dev/urandom)"
+	help
+	  The system does not produce enough entropy to make /dev/random usable,
+	  so point /dev/random to /dev/urandom.
+
+endmenu
+
+#############################################################################
+
+menu "Debug Builds"
+
+config LIB_DEBUG
+	bool "build debugable libraries"
+	help
+	  Build all libraries with debug symbols and reduced optimisations.
+	  See also debug build option in core applications.  Without this option
+	  debug symbols are still included, however the optimisation level is
+	  increased and this can lead to problematic debugging.
+
+config USER_DEBUG
+	bool "build debugable applications"
+	help
+	  Build all user application with debug symbols and reduced
+	  optimisation levels.  See also debug build option in force library
+	  building.  Without this option debug symbols are still included,
+	  however the optimisation level is increased and this can lead to
+	  problematic debugging.
+
+
+comment "Debug tools"
+
+config USER_TIMEPEG_TPT
+	bool "tpt"
+	help
+	  Timepeg monitoring tool.  This utility presents the information
+	  gathered by the timepeg code located in the kernel in a meaningful
+	  manner.
+	  
+
+comment "Debug libraries"
+
+config LIB_LIBCCMALLOC
+	bool "ccmalloc"
+
+endmenu
+
+#############################################################################

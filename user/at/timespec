@@ -1,0 +1,110 @@
+/* 
+ * Abbreviated version of the yacc grammar used by at(1).
+ */
+
+%token  <charval> INT
+%token  NOW
+%token  AM PM
+%token  NOON MIDNIGHT TEATIME
+%token  SUN MON TUE WED THU FRI SAT
+%token  TODAY TOMORROW
+%token  NEXT
+%token  MINUTE HOUR DAY WEEK MONTH YEAR
+%token  JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC
+%token  <charval> WORD
+
+%type <intval> inc_period
+%type <intval> inc_number
+%type <intval> day_of_week
+
+%start timespec
+%%
+timespec        : time
+                | time date
+                | time increment
+                | time date increment
+		| time decrement
+		| time date decrement
+                | nowspec
+                ;
+
+nowspec         : now
+                | now increment
+		| now decrement
+                ;
+
+now		: NOW 
+		;
+
+time            : hr24clock_hr_min
+                | hr24clock_hr_min timezone_name
+                | hr24clock_hour time_sep minute
+                | hr24clock_hour time_sep minute timezone_name
+                | hr24clock_hour am_pm
+                | hr24clock_hour am_pm timezone_name
+                | hr24clock_hour time_sep minute am_pm
+                | hr24clock_hour time_sep minute am_pm timezone_name
+                | NOON
+                | MIDNIGHT
+		| TEATIME
+                ;
+
+date            : month_name day_number
+                | month_name day_number ',' year_number
+                | day_of_week
+                | TODAY
+                | TOMORROW
+		| year_number '-' month_number '-' day_number
+		| day_number '.' month_number '.' year_number
+		| day_number '.' month_number
+		| day_number month_name
+		| day_number month_name year_number
+		| month_number '/' day_number '/' year_number
+                ;
+
+increment       : '+' inc_number inc_period
+                | NEXT inc_period		
+		| NEXT day_of_week
+                ;
+
+decrement	: '-' inc_number inc_period
+		;
+
+inc_period      : MINUTE | HOUR | DAY | WEEK | MONTH | YEAR
+		;
+
+hr24clock_hr_min: INT
+		;
+
+timezone_name	: WORD
+		;
+
+hr24clock_hour	: hr24clock_hr_min
+		;
+
+minute		: INT
+		;
+
+am_pm		: AM | PM
+		;
+
+month_name	: JAN | FEB | MAR | APR | MAY | JUN | JUL
+		| AUG | SEP | OCT | NOV | DEC
+		;
+
+month_number	: INT
+		;
+day_number	: INT
+		;
+
+year_number	: INT
+		;
+
+day_of_week	: SUN | MON | TUE | WED | THU | FRI | SAT
+		;
+
+inc_number	: INT
+		;
+
+time_sep	: ':' | '\'' | '.' | 'h' | ','
+		;

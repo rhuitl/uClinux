@@ -1,0 +1,25 @@
+--- luarocks-2.0.2/src/luarocks/fs/unix.lua.orig	2010-05-20 15:27:11.965560230 +1000
++++ luarocks-2.0.2/src/luarocks/fs/unix.lua	2010-05-20 15:32:40.464483133 +1000
+@@ -40,6 +40,8 @@
+    assert(type(file) == "string")
+    assert(type(dest) == "string")
+    
++   local destdir = os.getenv("DESTDIR") or ""
++print("Install top = " .. destdir .. " path= " .. package.path)
+    local base = dir.base_name(file)
+    local wrapname = fs.is_dir(dest) and dest.."/"..base or dest
+    local wrapper = io.open(wrapname, "w")
+@@ -47,10 +49,10 @@
+       return nil, "Could not open "..wrapname.." for writing."
+    end
+    wrapper:write("#!/bin/sh\n\n")
+-   wrapper:write('LUA_PATH="'..package.path..';$LUA_PATH"\n')
+-   wrapper:write('LUA_CPATH="'..package.cpath..';$LUA_CPATH"\n')
++   wrapper:write('LUA_PATH="'..string.gsub(package.path,destdir,"")..';$LUA_PATH"\n')
++   wrapper:write('LUA_CPATH="'..string.gsub(package.cpath,destdir,"")..';$LUA_CPATH"\n')
+    wrapper:write('export LUA_PATH LUA_CPATH\n')
+-   wrapper:write('exec "'..dir.path(cfg.variables["LUA_BINDIR"], cfg.lua_interpreter)..'" -lluarocks.loader "'..file..'" "$@"\n')
++   wrapper:write('exec "'..dir.path(cfg.variables["LUA_BINDIR"], cfg.lua_interpreter)..'" -lluarocks.loader "'..string.gsub(file,destdir,"")..'" "$@"\n')
+    wrapper:close()
+    if fs.execute("chmod +x",wrapname) then
+       return true

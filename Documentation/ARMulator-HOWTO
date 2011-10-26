@@ -1,0 +1,109 @@
+uClinux in the GDB/ARMulator
+----------------------------
+
+This page can be found on the web at:
+
+  http://www.uclinux.org/pub/uClinux/utilities/armulator/
+
+The web copy contains real links to many of the packages described herein.
+
+
+Here are some patches to GDB to allow the existing gdb ARM emulator to run
+uClinux targets. It can run both little-endian and big-endian code, as well
+as apcs-32/26 code and Thumb. I have tested little/big endian kernels but
+haven't played with thumb at this point.
+
+The patch is heavily based on an ARM7100 patch that Ben Williamson produced
+back around 1999 for gdb-4.18. The changes include Atmel AT91 emulation for
+timers/system registers and serial ports, removal of Bens LCD support and
+porting to gdb-5.0.
+
+
+1. Getting GDB/ARMulator
+
+   Here are the files you need to use to put together the GDB/ARMulator.
+
+   gdb-5.0.tar.bz2
+	The orginal gdb-5.0 archive.
+
+   gdb-5.0-uclinux-armulator-20021127.patch.gz
+	Patches against gdb-5.0 based heavily on the ARMulator changes from
+	Ben Williamson <benw@pobox.com> with changes to behave like an Atmel
+	AT91 device.
+
+
+2. Building GDB/ARMulator
+
+	bunzip2 < gdb-5.0.tar.bz2 | tar xvf -
+	gunzip < gdb-5.0-uclinux-armulator-20021127.patch.gz | patch -p0
+	cd gdb-5.0
+	./configure --target=arm-elf
+	make
+	su root -c "make install"
+
+
+3. Compiling uClinux
+
+   During the configuration stepo choose GDB/ARMulator as the target. You
+   can select either the linux-2.0.x or linux-2.4.x kernels, and you can
+   choose either uC-libc or uClibc as the libaray.
+
+
+4. Running the Binaries
+
+   The ARMulator expects the romfs to be in a file called "boot.rom".
+   So link the romfs.img to boot.rom with:
+
+	ln -s images/romfs.img boot.rom
+
+   Then to run uCLinux do:
+
+	arm-elf-gdb linux-2.X.X/linux
+
+   Then within gdb do:
+
+	...
+	gdb> target sim
+	...
+	gdb> load
+	...
+	gdb> run
+
+   To save some typing you can create a .gdbinit file that conatins:
+
+	target sim
+	load
+
+   Then you just need to use "run" to start the kernel each time.
+
+5. Using the Debugger
+
+  Just type ^C to drop into gdb. You have full source debugging of the kernel
+  (and apps if you load their symbols appropriately). You can step and
+  continue just like a normal debugger.
+
+
+6. Messing with the Emulator
+
+   If you want to see how much of a hack this really is, the main files to
+   look at are:
+
+	gdb-5.0/sim/arm/armmem.c
+	gdb-5.0/sim/arm/armio.c
+
+   These still include the old 7100 code commented out and the Atmel
+   emulation that is truly hacked in on top. You can add more memory and
+   change the size of the rom in armmem.c. You can fix most bugs in the
+   emulation in armio.c.
+
+
+7. Thanks to
+
+   Patrick Doyle for the time.h patch to fixcompiling on RedHat 7.2/7.3
+   Fernando José Cardozo de Sá for his Native 32 port (and binaries).
+   Daniel Versick's big-endian patches for uaccess
+	(taken from http://mac.os.nctu.edu.tw/distfiles/4530.patch).
+
+
+Copyright (C) 2002,
+David McCullough <davidm@snapgear.com>

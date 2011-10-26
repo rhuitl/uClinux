@@ -1,0 +1,119 @@
+#!/usr/bin/perl
+
+sub indent
+{
+    my($str) = @_;
+    $str =~ s/\n\s*(.)/\n  \1/g;
+    $str =~ s/^\s*//;
+    return "  $str";
+}
+
+sub info
+{
+    my $info = `modinfo -d $_[0]`;
+    return $info if ($info =~ /Card Services/);
+    $info = `strings -n 10 $_[0] | grep -v CPUID | head -3`;
+    return $info if ($info =~ /Card Services/);
+}
+
+print "Current kernel: ", `uname -rv`;
+$rel = `uname -r`;
+$rel =~ s/\s//g;
+$core = "/lib/modules/$rel/pcmcia/pcmcia_core.o";
+if (-f $core) {
+    print "Module info from $core:\n", indent(info($core));
+} else {
+    print "$core not found.\n";
+    print "  The PCMCIA modules are not installed for this kernel!\n"
+}
+
+foreach $f ("/etc/sysconfig/pcmcia", "/etc/pcmcia.conf",
+	    "/etc/rc.config", "/etc/rc.pcmcia") {
+    $conf = $f if (-f $f);
+}
+if ($conf) {
+    print "\nStartup options from $conf:\n";
+    if ($conf eq "/etc/rc.config") {
+	$opts = `grep PCMCIA $conf`;
+    } elsif ($conf eq "/etc/rc.pcmcia") {
+	$opts = `grep '^    [A-Z_]*=' $conf`;
+    } else {
+	$opts = `cat $conf`;
+    }
+    print indent($opts);
+}
+
+print "\nChecking current syslog files in /var/log:\n";
+foreach $f (split(/\s+/, `/bin/ls -t /var/log/*`)) {
+    next if ((!-f $f) || ($f =~ /\.\d+$/));
+    next if (system("head $f | grep -q syslogd") != 0);
+    $kernel = $f if (system("grep -q 'Card Services' $f") == 0);
+    $daemon = $f if (system("grep -q cardmgr $f") == 0);
+    last if ($kernel && $daemon);
+}
+if ($kernel || $daemon) {
+    if ($kernel eq $daemon) {
+	print "  All PCMCIA messages are in $kernel.\n";
+    } else {
+	if ($kernel) {
+	    print "  PCMCIA kernel messages are in $kernel.\n";
+	} else {
+	    print "  No PCMCIA kernel messages were found!\n";
+	}
+	if ($kernel) {
+	    print "  cardmgr messages are in $daemon.\n";
+	} else {
+	    print "  No cardmgr messages were found!\n";
+	}
+    }
+} else {
+    print "  No PCMCIA messages were found!\n";
+}
+
+print "\nModule status:\n";
+$devices = `cat /proc/devices`;
+$lsmod = `/sbin/lsmod`;
+if ($lsmod !~ /\bpcmcia_core\b/) {
+    print "  No PCMCIA modules are loaded.\n";
+} elsif (($lsmod !~ /\bi82365\b/) && ($lsmod !~ /\btcic\b/)) {
+    print "  No socket drivers are loaded.\n";
+} elsif ($lsmod !~ /\bds\b/) {
+    print "  The 'ds' module is not loaded.\n";
+} elsif ($devices !~ /pcmcia/) {
+    print "  The PCMCIA socket device is not available.\n";
+} else {
+    print "  The PCMCIA kernel modules are loaded correctly.\n";
+}
+
+$ok = 0;
+print "\nDaemon status:\n";
+if (!-f "/sbin/cardmgr") {
+    print "  /sbin/cardmgr does not exist!\n";
+}
+if (!-f "/var/run/cardmgr.pid") {
+    print "  /var/run/cardmgr.pid does not exist.\n";
+} else {
+    $pid = `cat /var/run/cardmgr.pid`;
+    $pid =~ s/\s+//g;
+    if (`cat /proc/$pid/cmdline` =~ cardmgr) {
+	print "  cardmgr is running (process $pid)\n";
+	$ok = 1;
+    } else {
+	print "  /var/run/cardmgr.pid is stale.\n";
+    }
+}
+exit if (!$ok);
+
+foreach $f ("/var/state/pcmcia/stab", "/var/lib/pcmcia/stab",
+	    "/var/run/stab") {
+    if (-f $f) {
+	$stab = $f; last;
+    }
+}
+if ($stab) {
+    print "\nCurrent socket status from $stab:\n";
+    $stat = `cat $stab`;
+    print indent($stat);
+} else {
+    print "\nSocket status file (stab) not found!\n";
+}

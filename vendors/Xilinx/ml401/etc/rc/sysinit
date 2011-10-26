@@ -1,0 +1,25 @@
+#!/bin/sh
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+TZ=JST-9
+
+echo "Mounting proc: "
+mount -t proc proc /proc
+
+echo "Mounting var: "
+mount -t ramfs none /var
+
+echo "Populating /var: "
+mkdir /var/run/ &&
+mkdir /var/tmp/ &&
+chmod 777 /var/tmp
+
+echo "Running local start scripts."
+for i in /etc/rc.d/S*
+do
+  if [ -x $i ]; then
+    /bin/sh $i
+  fi
+done
+
+

@@ -1,0 +1,239 @@
+	   Technical Documentation for LILO 22.5 and later
+		Use of the Volume ID (aka serial number)
+
+			updated: 20-May-2003
+
+
+MOTIVATION
+==========
+
+In the past, the biggest headache to getting LILO to boot reliably was the
+determination of the assignment of BIOS device codes to disks.  This
+assignment is made by the BIOS, and is quite simple on single hard disk
+systems:  the hard disk receives BIOS device code 0x80.  However, even two
+disk systems can confuse LILO if the disks are attached non-sequentially:
+viz., if the disks are /dev/hda and /dev/hdb, they are assigned device codes
+0x80 and 0x81, respectively; however, if the disks are /dev/hda and /dev/hdc
+(perhaps, /dev/hdb is an IDE CDROM), LILO will mistakenly think that the
+second disk is 0x82.  Just because /dev/hdb is not mentioned in the
+configuration file (/etc/lilo.conf), does not mean that it does not exist. 
+But on a two-disk system, attaching the second disk to the second IDE
+controller has performance advantages.  The solution was to explicitly tell
+LILO, in the configuration file, that the second disk was attached as
+/dev/hdc:  viz.,
+
+   disk = /dev/hda   bios = 0x80
+   disk = /dev/hdc   bios = 0x81
+
+
+The above assignment can be determined automatically in most cases, if the
+system was booted with a recent version of LILO that supports the "BIOS data
+check".  This scheme makes the results of certain key BIOS calls available
+to the Boot Installer (/sbin/lilo), even though it cannot execute BIOS calls
+directly (far too dangerous).  However, if one used a rescue disk created
+with another boot loader, the BIOS data check information is not available,
+and the necessity of the two lines above becomes necessary for the initial
+installation of LILO.
+
+The BIOS device code assignment situation becomes very unpredictable on
+systems with multiple disk controllers:  IDE and SCSI, IDE and super-IDE, or
+three or more controllers.
+
+Very recent BIOS's now recognize multiple controllers, and will allow
+designation of ANY disk on ANY controller as the first hard disk to boot. 
+Since this disk is the boot disk, it will receive BIOS device code 0x80, and
+the other disks will received BIOS device codes in some order (known only to
+the BIOS).  Booting from a different disk tomorrow, the BIOS device codes
+will be assigned in a still different manner.  Hence, on today's newest
+systems, the BIOS device code is quite variable, a major departure from the
+past.
+
+
+THE VOLUME ID
+=============
+
+LILO for over four years now, has been aware of an 8 byte area of the Master
+Boot Record (sector 0) lying just below the Partition Table.  DR-DOS and
+Windows NT have used 4 bytes of this area for some years now as a unique
+32-bit Volume ID, or disk Serial Number.  The usage continues with Windows
+2000, and probably Windows XP (I haven't used this last, but this is a good
+guess.)  As far as I know, Windows 98 and earlier never use this Volume ID.
+
+The power of a unique 32-bit identifier on each physical disk volume, is
+that a volume can now be identified, even if the BIOS device code changes. 
+So, since the LILO boot record is limited to one sector, and its main goal
+is to get the bulk of the boot loader into memory, the boot sector no longer
+needs to know the BIOS device code of the Second Stage Loader; it now needs
+to know the Volume ID of the disk which contains the Second Stage Loader. 
+In the past, if the BIOS device code of the volume with the Second Stage
+Loader ever changed, the dreaded:
+
+L 01 01 01 01 01 01 ...
+
+screen would indicate the failure of the First Stage (boot sector) to
+successfully load the Second Stage.  Sometimes the BIOS error code varied,
+but the result was the same:  time to go find the rescue floppy.
+
+
+LILO 22.5
+=========
+
+Beginning with 22.5, LILO now insists that every disk have a unique 32-bit
+identifier in the Volume ID field, and that all volume ID's on a system are
+unique.  BIOS device codes are still assigned, but they are no more that
+indices into a table of Volume ID's written into the Second Stage Loader
+parameter area.  With the table of Volume ID's, a correspondence may be
+established between BIOS device codes at install-time, and BIOS device codes
+at boot-time.  If a tranlation from one BIOS device code to another is
+needed, it will be made.
+
+Version 22.5 treated only 0x00000000 as an "empty" (or unassigned) Volume
+ID, and would generate a new one.  Version 22.5.1 treats 0xFFFFFFFF as an
+unassigned Volume ID also.  More recent field experience indicates that some
+low-level format programs leave a residue of identical bytes behind, so
+version 22.5.4 now treats ANY occurrence of repeated bytes in the Volume ID
+field as unassigned:  viz.,
+
+	0x00000000
+	0x6c6c6c6c
+	0xa5a5a5a5
+	0xFFFFFFFF
+
+are all considered to be "unassigned" Volume ID's, and will be filled in
+with a unique 32-bit value.  Any other combination of bits, whether assigned
+by LILO, or by Windows NT, or by DR-DOS, will be treated as valid, and will
+not be altered by LILO, except on explicit command.
+
+Note:  Any failure to locate a Volume ID during the boot process will cause
+the LILO loader to fall back to the BIOS device code assigned at
+install-time.  Hence, the boot algorithm will fall back to the older 22.4
+and earlier scheme, where BIOS device codes are considered fixed.  Thus it
+is a good idea to get them right at install-time, but no longer absolutely
+mandatory with Volume ID's in place.
+
+
+PICTURE OF A MASTER BOOT RECORD
+===============================
+
+The Master Boot Record is sector 0 (cylinder 0, head 0, sector 1) of every
+hard disk.
+
+struct BootSector {
+    char code[0x1b6];	/* boot code, BPB, other stuff */
+
+    short unused;	/* spacer, which is not used AFAIK */
+    long  Volume_ID;	/* 32-bit unique physical volume ID */
+    short marker;	/* who wrote the Volume ID */
+
+    struct PartitionTable {
+	char pt_entry[16];	/* primary partition table entry */
+    } partitions[4];	/* entire partition table is 64 bytes */
+
+    short bootID;	/* MUST be 0xAA55 to indicate disk is bootable */
+} boot_sector;		/* size must be exactly 512 bytes */
+
+Note:  Floppy disks do not contain partition tables; hence, floppies do not
+ever have Volume ID's, per the scheme above.  Floppy disk booting is based
+on BIOS device code, as with all previous versions of LILO.
+
+
+VOLUME ID MAINTENANCE
+=====================
+
+1. Duplicate Volume ID's
+
+LILO will complain if two disks have duplicate Volume ID's.  This usually
+happens when the Volume ID field is a residue of a low-level format, or a
+residue of some older boot program which overwrites the Volume ID field. 
+With duplicated Volume ID's, LILO will be unable to distinguish the two
+offending disks at boot-time, hence it may make an error and read the wrong
+disk.  Thus, it will refuse to install a boot loader as long as this
+condition persists.  Unassigned ID's are automatically overwritten, and a
+backup copy of the sector is created, so the fix is to write an "unassigned"
+value to one of the duplicated fields.  Say /dev/hda and /dev/hdb have
+duplicate Volume ID's.  Choose the disk with the higher BIOS device code,
+since it will not be a Windows NT or 2000 disk, and set the Volume ID to
+zero; viz.,
+
+	lilo -z -M /dev/hdb
+
+The disk will receive a new Master Boot Record (which boots the first active
+partition), and the Volume ID will be set to zero.  A subsequent
+installation of LILO:
+
+	lilo -v
+
+Should no longer complain about duplicated Volume ID's on /dev/hda and
+/dev/hdb.  /dev/hdb will at this time receive a newly generated Volume ID,
+which will be checked for uniqueness against all other disks in the system.
+
+CAUTION:  NEVER CHANGE THE VOLUME ID OF A WINDOWS 2000 BOOT DISK.
+
+Windows NT, 2000, and XP (presumably), all use the Volume ID during the boot
+process.  Changing the ID can render Windows unbootable.  Recovery seems to
+be possible by zeroing the Volume ID, although Windows would prefer that the
+Boot Volume ID remain unchanged.  No trouble has been encountered with
+changing the Volume ID of Windows 2000 data disks, other than the necessity
+of resetting the drive letter to its former value.  Basically, if you run
+Windows NT or later, your disks probably already have Volume ID's assigned
+by Windows.  If they do, leave them alone.  The Windows ID's are completely
+compatible with the LILO scheme, and vice versa.
+
+2.  Volume ID check
+
+The following command was added in LILO 22.5.4:
+
+	lilo -T vol-ID
+
+The volume ID's will be printed in BIOS order (as of the most recent LILO
+boot), based upon the BIOS data check information.  If you did not boot with
+LILO the last time, then the information as of the last boot will not be
+available.  Any conflicts will be noted, along with the corrective action
+LILO will take the next time a boot loader is installed (/sbin/lilo
+command).  This is the preferred check of the state of Volume ID's on the
+disks.
+
+Sample output from "lilo -T vol-id":
+
+  BIOS     Volume ID
+
+  0x80     B21AB21A 
+  0x81     EBF5EB74 
+  0x82     EBF5EB7B 
+  0x83     34225390 
+  0x84     78711C09 
+
+Volume ID's are all unique.
+
+
+A volume ID check (Volume S/N) will be printed with the following command:
+
+	lilo -t -v2
+
+The "-t" switch means a "test mode" install, with no boot record written,
+and your system unmodified.  The "-v2" is needed to set the verbosity of the
+output high enough to print the table of BIOS device codes used by LILO (not
+necessarily the same as the BIOS itself), and the corresponding disk Volume
+ID's.  This information indicates the order of the BIOS device code
+translate table, as it would be set up for the next boot.  Disks are
+indicated by major/minor device numbers, in hex.
+
+Sample output from "lilo -t -v2 | tail":
+
+...
+Mapped 6 (4+1+1) sectors.
+Added Windows
+
+ BIOS  Volume S/N  Device
+  80    B21AB21A    0300
+  81    EBF5EB74    0340
+  82    EBF5EB7B    1600
+  83    34225390    2100
+  84    78711C09    0800
+The boot sector and the map file have *NOT* been altered.
+
+
+In the two examples above, the Volume ID's are in the same BIOS order,
+indicating that the BIOS device codes are being assigned by LILO for the
+boot loader in the correct sequence on this 5 disk system.
+

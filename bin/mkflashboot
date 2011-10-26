@@ -1,0 +1,76 @@
+#!/bin/bash
+##############################################################################
+
+#
+#	mkboot -- construct an boot flash image.
+#
+#	(C) Copyright 2001, Roman Wagner (rw@feith.de)
+#
+
+#
+#	The starting index figure... 0x5aa5ff00
+#	This strings is in octal below, ugh...
+#
+INDEX="\132\245\377\000"
+
+##############################################################################
+#
+#	Define the files to use.
+#
+FLASH=images/flashboot.bin
+FPGA=boot/fpga.hex
+BMP=boot/img_c2.dat
+
+##############################################################################
+
+usage()
+{
+	echo "usage: mkflashboot fpga-file bmp-file name"
+	exit 1
+}
+
+##############################################################################
+
+#
+#	Check for any args...
+#
+if [ $# -ne 3 ]
+then
+	usage
+fi
+
+FPGA=$1
+BMP=$2
+echo
+echo "Bootflash config:" $3
+echo
+
+rm -f $FLASH
+#
+#	Index figure first.
+#
+echo -e "$INDEX\c" > $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+echo "INDEX:  flash size=$SIZE"
+
+#
+#	Bitmapt next.
+#
+cat $BMP >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+echo "BMP: flash size=$SIZE"
+
+#
+#	Fpga next.
+#
+cat $FPGA >> $FLASH
+SIZE=`wc $FLASH | awk '{ print $3}'`
+PAD=`expr 524288 - $SIZE`
+echo "FPGA: flash size=$SIZE padding=$PAD"
+dd if=/dev/zero count=1 bs=$PAD >> $FLASH 2> /dev/null
+
+
+cp $FLASH /tftpboot
+echo
+echo "netflash -n -r /dev/rom10 xxx.xxx.xxx.xxx flashboot.bin"
+exit 0

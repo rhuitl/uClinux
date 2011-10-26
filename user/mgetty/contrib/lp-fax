@@ -1,0 +1,93 @@
+:
+#	@(#) FaxPrinter 1.0
+#
+#	modelled to resemble the SCO printer drivers as closely
+#	as possible
+#
+#	install this as /usr/spool/lp/model/fax, then add a printer
+#	(via sysadmsh) with printer interface "fax" (name it what you
+#	want, e.g. "fax"). Then send faxes from your applications with
+#
+#		lp -d <fax-name> -o to=<fax-number> <files>"
+#	e.g.:
+#		lp -dfax -oto=0893243328 /tmp/fax1.ps
+#
+#	works only if "faxspool" can be found in the command path
+
+PATH=/usr/local/bin:$PATH
+export PATH
+
+# return everything to the right of the first "="
+
+parse () {
+	echo  "`expr \"$1\" : \"^[^=]*=\(.*\)\"`"
+}
+
+# general error handling
+
+LP_ERR_LABEL="UX:lp"
+
+errmsg () {
+	case $1 in
+	ERROR )
+		sev="  ERROR";
+		;;
+	WARNING )
+		sev="WARNING";
+		;;
+	esac
+	echo "${LP_ERR_LABEL}: ${sev}: $2
+        TO FIX: $3" >&2
+}
+
+printer=`basename $0`
+request=$1
+name=$2
+title=$3
+copies=$4
+options=$5
+shift; shift; shift; shift; shift
+
+# resolution
+normal_res=no
+# fax number
+fax_no=""
+
+for i in $options
+do
+	case $i in
+		n|normal|low)
+			normal_res=yes
+			;;
+		to=*)
+			fax_no=`parse ${i}`
+			;;
+	esac
+done
+
+# user = fifth field of /etc/passwd
+user=`sed -n "s/^$name:.*:.*:.*:\(.*\):.*:.*$/\1/p" /etc/passwd`
+
+if [ -z "$fax_no" ]
+then
+	errmsg ERROR "no fax telephone number given" \
+		     "set option \"-o to=<fax_number>\""
+	exit 1
+fi
+
+# for the sake of faxq
+umask 022
+
+# send the file(s) to the standard out $copies times
+while	[ "$copies" -gt 0 ]
+do
+	/usr/local/bin/faxspool -u $name -f "$name ($user)" $fax_no $*
+#	for file
+#	do
+#		0<${file} eval ${FILTER} 2>&1 
+#		echo "\033E\c"
+#	done
+	copies=`expr $copies - 1`
+done
+
+exit 0

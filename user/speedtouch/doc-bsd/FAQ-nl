@@ -1,0 +1,147 @@
+Francois Rogler, francois@rogler.org, 26/10/2001
+Last update : $Id: FAQ-nl,v 1.2 2003/07/27 23:00:57 rogler Exp $
+Demulder Timothy, syphon@wanadoo.be, 23/07/2003 (Nederlandse vertaling)
+
+
+
+                         Speedtouch USB Driver voor *BSD
+                           Frequently Asked Questions
+
+--------------------------------------------------------------------------------
+
+de kernel kan de modem niet vinden
+modem_run of pppoa2 kan de modem niet vinden
+de bandbreedte is niet zo groot als het zou moeten zijn
+de modem verbindt niet van de eerste keer
+de driver compileert niet wanneer ik make typ
+
+--------------------------------------------------------------------------------
+
+Probleem  : de kernel kan de modem niet vinden
+
+Oplossing : contolleer of de optie 'Assign IRQ to USB' aanstaat in jouw bios en
+            dat Not PnP OS ook aanstaat.
+
+--------------------------------------------------------------------------------
+
+Probleem  : modem_run of pppoa2 kan de modem niet vinden
+
+Oplossing : Dit probleem kan veroorzaakt worden door verschillende dingen.
+
+1. controlleer dat jouw modem gevonden wordt door de kernel.
+Je zou dit in dmesg moeten vinden:
+            ugen0: ALCATEL Speed Touch USB , rev 1.10/0.00, addr 2
+het kan ook ugen1 or ugen2 of ... zijn, afhankelijk van de usb hardware die je
+verbonden hebt.
+
+2. controlleer dat alles is aangemaakt in /dev:
+ a. Als je verschillende usb controllers hebt, moet je misschien nodes maken
+ voor usb1 (of usbX ,X is een cijfer)
+    cd /dev && ./MAKEDEV usbX (X is het nummer van de controler)
+ b. Als je verschillende usb hardware apparaten hebt, moet je misschien nodes
+ maken voor ugen1 (of ugenX ,X is een cijfer).
+    cd /dev && ./MAKEDEV ugenX
+    ugenX moet hetzelfde zijn als degene die je hebt in dmesg.
+
+3. Als modem_run nog altijd de modem niet kan vinden, kan je het als argument
+meegeven met de optie: -d /dev/ugenX (ugenX nog steeds dezelfde als degene in
+dmesg die je juist gemaakt heb.)
+
+tips : Vergeet niet '-d /dev/ugenX' bij te voegen in de pppoa2 lijn in ppp.conf
+
+   voorbeeld : # modem_run -v 1 -m -d /dev/ugen0 -f /usr/local/libdata/mgmt.o
+   en in ppp.conf : device !"pppoa2 -vpi 8 -vci 35 -d /dev/ugen0"
+
+--------------------------------------------------------------------------------
+
+Probleem  : de bandbreedte is niet zo groot als het zou moeten zijn
+
+Oplossing : Je kan het aantal mbufs verhogen door een nieuwe kernel te
+compileren met een grotere waarde voor `maxusers' en/of NMBCLUSTERS. Je kan ook
+NMBCLUSTERS vervangen door kern.ipc.nmbclusters.
+
+Uitleg : De driver gebruikt te veel mbufs en soms zijn er nog te weinig. Dit is
+een bug in de driver en we proberen dat op te lossen.
+
+Voorbeeld :
+voeg de volgende lijn toe aan /boot/loader.conf :
+kern.ipc.nmbclusters="4096"
+
+of speel wat met deze waarden in de kernel :
+maxusers        32
+options         NMBCLUSTERS=4096
+
+--------------------------------------------------------------------------------
+
+Probleem  : de modem verbindt niet van de eerste keer.
+
+Oplossing : verbindt een tweede keer.
+
+Uitleg : Dit is nog een bug in de driver. In sommige gevallen forkt pppoa2 niet
+goed.
+
+--------------------------------------------------------------------------------
+
+Probleem  : verbinding is ok maar ik kan geen site opvragen.
+
+Oplossing : 2 mogelijke fouten :
+Eerst en vooral: een test om te zien of de verbinding ok is:
+Probeer de computer te pingen waarmee je verbonden bent.
+
+Voorbeeld:
+`ifconfig tun0' toont je :
+tun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1500
+        inet6 fe80::2e0:18ff:fe90:9b25%tun0 prefixlen 64 scopeid 0x7
+        inet 8.1.1.10 --> 8.1.1.1 netmask 0xffffff00
+        Opened by PID 666
+Probeer dan: `ping 8.1.1.1'
+
+Als de ping werkt is je verbinding ok en heb je gewoon een probleempje met de
+configuratie van jouw netwerk.
+Als de ping niet werkt, controlleer de ppp en pppoax lof bestanden.
+
+* Controlleer de DNS in /etc/resolv.conf
+  het zou er zo moeten uitzien:
+nameserver xxx.xxx.xxx.xxx
+
+
+* Controlleer of de routing tafel ok is : 'netstat -rn'
+  Als de standaard route niet wijst naar de computer waarmee je verbonden bent,
+  kan je de standaard route manueel opgeven met:
+`route add default' dan het ip van de computer.
+Voorbeeld : `route add default 8.1.1.1'
+
+Je kan ook ppp dwingen om de standaard route te gebruiken door ppp.conf te
+veranderen:
+`add default HISADDR' by `add! default HISADDR'
+
+--------------------------------------------------------------------------------
+
+Probleem  : Driver compileert niet wanneer ik 'make' typ en ik krijg het
+            volgende:
+   "Makefile", line 10: Could not find speedtouch.tmpl
+   make: fatal errors encountered -- cannot continue
+
+Oplossing : typ eerst : `./configure' dan `make'
+
+Uitleg : Je hebt het INSTALL bestand niet goed gelezen!
+
+--------------------------------------------------------------------------------
+
+Probleem  : Ik kan de logfiles niet vinden van pppoa2 en modem_run.
+
+Oplossing : Je moet wat toevoegen aan /etc/syslog.conf of deze functie
+uitschakelen
+
+Voor syslog.conf moet je de volgende lijnen toevoegen (FreeBSD) :
+!pppoa2
+*.*                                             /var/log/pppoa2.log
+!modem_run
+*.*                                             /var/log/modem_run.log
+
+Ik denk dat dat verschillend is van OpenBSD (en NetBSD) omdat je de logs zou
+moeten vinden in /var/log/messages
+
+Om syslog uit te schakelen voor de driver moet je dit doen:
+./configure --enable-syslog=no
+dan `make' en `make install' zoals anders.

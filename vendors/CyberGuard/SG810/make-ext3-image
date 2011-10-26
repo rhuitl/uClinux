@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Copies the contents out of a romfs image into an ext3-image
+# and sets up a lilo boot sector on it.
+# Need to be root to do this.
+#
+# Usage: make-ext3-image CYLS HEADS SECTORS CONFIG
+
+CYLS="$1"
+HEADS="$2"
+SECTORS="$3"
+CONFIG="$4"
+
+count=`expr $CYLS \\* $HEADS \\* $SECTORS - $CONFIG - 1`
+
+# First make an MBR with the appropriate partition table
+dd if=/dev/zero of=mbr.img bs=512 count=1
+printf "1,$count,L,*\n,,61,-\n" | /sbin/sfdisk -uS -C $CYLS -H $HEADS -S $SECTORS mbr.img
+
+# Create an empty ext3 image
+dd if=/dev/zero of=ext3.img bs=512 count=$count
+/sbin/mke2fs -F -m0 -v ext3.img
+/sbin/tune2fs -i 0 -j ext3.img
+
+rm -rf romfs.mnt ext3.mnt
+mkdir romfs.mnt ext3.mnt
+
+trap "umount romfs.mnt; umount ext3.mnt; sleep 1" EXIT
+
+# Now mount it and copy in the contents of the romfs image
+mount -t romfs -o loop romfs.img romfs.mnt
+mount -t ext2 -o loop ext3.img ext3.mnt
+( cd romfs.mnt; find . -print | cpio -pdum ../ext3.mnt )
+
+chmod -R go-w ext3.mnt
+chgrp -hR root ext3.mnt
+chown -hR root ext3.mnt
+
+# And finally write the lilo boot sector
+DEV=`mount | grep ext3.img | sed 's?.*loop=/dev/loop\([0-9]\).*$?\1?'`
+
+echo "#Device Bios    Sectors Heads   Cyls    Start" > disktab
+echo "0x70$DEV	0x80	$SECTORS	$HEADS	$CYLS 1" >> disktab
+
+./lilo -s /dev/null -C build.lilo.conf -f disktab
+
+umount romfs.mnt
+umount ext3.mnt
+sleep 1
+
+rm -rf romfs.mnt ext3.mnt
+rm -f disktab

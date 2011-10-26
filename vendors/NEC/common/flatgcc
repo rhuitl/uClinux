@@ -1,0 +1,104 @@
+#!/bin/sh
+# flatgcc -- Run gcc, and produce a flat executable instead of an ELF one
+#
+# Written by Miles Bader <miles@gnu.org>
+#
+# Also produces an elf executable under the same name with an `.elf' suffix
+#
+# In addition to normal gcc options/arguments, this script accepts:
+#   -T SCRIPT		Override the linker script we use
+#   -z			Produced a compressed flat file (from elf2flt)
+#   -s SIZE		Set size of stack in flat file to SIZE (from elf2flt)
+#
+# It will also add the of the environment variable FLTFLAGS at the
+# beginning of the elf2flt command-line.
+#
+
+# Architecture to use (only used to construct default compiler name)
+ARCH="${ARCH-v850}"
+# Compiler that this wrapper invokes
+FLATGCC_CC="${FLATGCC_CC-${ARCH}-uclibc-gcc}"
+# Program to convert an elf executable to `flat' format
+ELF2FLT="${ELF2FLT-elf2flt} -a"
+
+# Linker script we use to produce output suitable for elf2flt.
+# Overridden by -T arg(s).
+ELF2FLT_LINKER_SCRIPT="${ELF2FLT_LINKER_SCRIPT-elf2flt.ld}"
+
+# Tell the linker to keep relocation entries in the final executable;
+# elf2flt uses them (this particular usage is specific to the v850; it
+# may or may not work for other platforms).  Requires a non-ancient `ld'.
+EXTRA_LDOPTS="-Wl,-q"
+
+me="`basename $0`"
+if test x"$me" = x"$0"; then
+  binpfx=""
+else
+  binpfx="`dirname $0`"
+fi
+
+# Re-parse args.  We add single quotes around anything we don't know the
+# format of when we add it to $args, and use the `eval' command below to
+# unquote everything; this correctly preserves arguments containing spaces and
+# most shell meta-characters (it will fail on arguments containing single
+# quotes, but oh well).  Note that we use `shift; shift' instead of `shift 2'
+# because it works when there's a missing argument.
+args=""
+link=yes
+while :; do
+  case "$1" in
+    -[EcS]|-M*|-dump*|-print-*|--dump*|--print-*)
+      link=no; args="$args $1"
+      shift;;
+    -o)
+      dst="$2"; args="$args $1 \"\$dst\""
+      shift; shift;;
+    -x|-include|-imacros|-idirafter|-iprefix|-iwithprefix|-iwithwithprefixbefore|-isystem|-Xlinker|-u|-b|-V)
+      args="$args $1 '$2'"
+      shift; shift;;
+    -z)
+      ELF2FLT="$ELF2FLT $1"
+      shift;;
+    -s)
+      # For compatibility, we accept two sorts of `-s' options:
+      #   -s NUMBER	sets the stack size, and
+      #   -s		is ignored (it means `strip' for elf, but that's
+      #			meaningless for flat files, and we need the
+      #			symbols in the intermediate .elf file) 
+      case "$2" in
+        [0-9]*[0-9])
+	  ELF2FLT="$ELF2FLT $1 $2"
+	  shift; shift;;
+        *)
+	  shift;;
+      esac;;
+    -T)
+      EXTRA_LDOPTS="$EXTRA_LDOPTS '-Wl,-T$2'"
+      unset ELF2FLT_LINKER_SCRIPT
+      shift; shift;;
+    -T*)
+      EXTRA_LDOPTS="$EXTRA_LDOPTS '-Wl,$1'"
+      unset ELF2FLT_LINKER_SCRIPT
+      shift;;
+    "")
+      break;;
+    *)
+      args="$args '$1'"
+      shift;;
+  esac
+done
+
+if test "$link" = yes; then
+  # Run normal compiler, and then elf2flt
+  if test x"$dst" = x; then
+    dst="a.out"
+    args="-o \"\$dst\" $args"
+  fi
+  realdst="$dst"
+  dst="$dst.elf"
+  test "$ELF2FLT_LINKER_SCRIPT" && EXTRA_LDOPTS="$EXTRA_LDOPTS \"-Wl,-T$ELF2FLT_LINKER_SCRIPT\""
+  eval "$FLATGCC_CC $EXTRA_LDOPTS $args" && $ELF2FLT $FLTFLAGS -o "$realdst" "$dst"
+else
+  # Not linking, so just run compiler
+  eval "$FLATGCC_CC $args"
+fi

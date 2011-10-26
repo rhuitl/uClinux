@@ -1,0 +1,35 @@
+ATARI-ARAnyM
+------------
+
+The Atari/Atari vendor/target is setup to run on the ARAnyM (Atari
+Running on ANY Machine) emulator (see http://aranym.org).
+
+I just used the standard Ubuntu package install of aranym, which is
+version 0.9.9 as of this writing. You need an appropriate config file,
+and then you simply run something like:
+
+  aranym-mmu -l -c /tmp/config
+
+
+And that config file contains something like:
+
+	[GLOBAL]
+	FastRAM = 196
+	AutoGrabMouse = No
+
+	[LILO]
+	Kernel = /home/gerg/uClinux-dist/images/vmlinux.gz
+	Args = root=/dev/ram load_ramdisk=1 ramdisk_size=4096 video=atafb:tthigh console=tty0 debug stram_swap=0
+	Ramdisk = /home/gerg/uClinux-dist/images/ramdisk
+
+	[ETH0]
+	Type = bridge
+	Tunnel = tap0
+
+	[STARTUP]
+	GrabMouse = No
+	Debugger = No
+
+
+The target is a very small and simple configuration, nothing fancy.
+

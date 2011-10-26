@@ -1,0 +1,44 @@
+echo "/etc/rc processing ..."
+echo "Starting watchdog ..."
+watchdog /dev/watchdog
+hostname SE4500
+echo "Making Filesystems ..."
+expand /etc/ramfs.img /dev/ram2
+echo "Mounting Filesystems ..."
+mount -t proc proc /proc
+echo 2 > /proc/cpu/alignment
+mount -t devpts devpts /dev/pts
+mount -t tmpfs -o size=33m tmpfs /var
+mount -t ext2 /dev/ram2 /etc/config
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+mkdir /var/mnt
+echo "Processing Config Filesystem ..."
+flatfsd -r
+logd boot
+echo "Loading network drivers."
+insmod ixp400
+insmod ixp425_npe
+rmmod ixp425_npe
+insmod ixp425_eth
+setmac -n 2 -m "RedBoot config" -r "npe_eth%d_esa"
+insmod ipsec
+echo "Loading WiFi drivers."
+insmod hostap_crypt
+insmod hostap_crypt_wep
+insmod hostap
+insmod hostap_pci
+echo "Loading USB drivers."
+insmod usbcore
+insmod ehci-hcd
+insmod usb-ohci
+insmod crc32
+insmod mii
+mount -t usbdevfs none /proc/bus/usb
+initconf -v
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 netmask 255.0.0.0 lo
+echo "/etc/rc complete."

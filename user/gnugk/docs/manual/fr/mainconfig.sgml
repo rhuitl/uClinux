@@ -1,0 +1,424 @@
+<!-- French translation from mainconfig.sgml v1.5 -->
+
+<sect1>Fichier de Configuration
+<label id="config">
+<p>
+Le fichier de configuration est un fichier texte normal. Le format de base est:
+
+<tscreen><verb>
+[Section String]
+Key Name=Value String
+</verb></tscreen>
+
+Les commentaires sont marqu&#233;s avec un di&#232;se (<tt/#/) ou un point virgule
+(<tt/;/) au d&#233;but de la ligne.
+
+Le fichier <tt/complete.ini/ contient toutes les sections disponibles pour GnuGk.
+Dans la plupart des cas, il n'est pas n&#233;cessaire de tous les utiliser.
+Ce fichier est juste une collection d'exemples pour beaucoup de r&#233;glages.
+
+Le fichier de configuration peut &#234;tre modifi&#233; pendant l'ex&#233;cution.
+Une fois que le fichier de configuration est modifi&#233;, vous pouvez envoyer une
+command <tt/reload/ par le port d'&#233;tat, ou envoyer un signal <tt/HUP/ au
+processus du gatekeeper sous Unix.
+Par exemple,
+<tscreen><verb>
+kill -HUP `cat /var/run/gnugk.pid`
+</verb></tscreen>
+
+<sect2>Section &lsqb;Gatekeeper::Main&rsqb;
+<p>
+<itemize>
+<item><tt/Fortytwo=42/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Ce param&#232;tre est utilis&#233; pour tester la pr&#233;sence du fichier de
+configuration. Si il n'est pas trouv&#233;, un avertissement est &#233;mis.
+Assurez-vous qu'il soit dans tous vos fichiers de configuration.
+
+<item><tt/Name=OpenH323GK/<newline>
+D&#233;faut: <tt/OpenH323GK/
+<p>
+Identifiant Gatekeeper de ce gatekeeper. Le gatekeeper r&#233;pondra uniquement aux
+GRQs pour cet ID et l'utilisera dans un certain nombre de messages &#224; ces
+terminaux.
+
+<item><tt/Home=192.168.1.1/<newline>
+D&#233;faut: <tt/0.0.0.0/
+<p>
+Le gatekeeper &#233;couter les requ&#234;tes sur ce num&#233;ro IP.
+Par d&#233;faut, le gatekeeper &#233;coute toutes les interfaces de votre hote.
+Vous devriez renoncer &#224; cette option, &#224 moins que vous ne souhaitiez que
+le gatekeeper ne s'attache qu'&#224; une IP sp&#233;cifique. Des adresses
+multiples Home peuvent &#234;tre utilis&#233;es et doivent &#234;tre
+s&#233;par&#233;res par un point-virgule (;) ou une virgule (,).
+
+<item><tt>NetworkInterfaces=192.168.1.1/24,10.0.0.1/0</tt><newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Indique les interfaces r&#233;seau du gatekeeper. Par d&#233;faut le gatekeeper
+d&#233;tectera les interfaces de vote hote automatiquement. Il y a deux situations
+o&#249; vous voudriez utiliser cette option. La premi&#232;re est que la
+d&#233;tection automatique a &#233;chou&#233;, l'autre est que le gatekeeper soit
+derri&#232;re un routeur et autorise les terminaux avec des IPs publiques &#224;
+s'enregistrer.
+
+<item><tt/EndpointIDSuffix=_gk1/<newline>
+D&#233;faut: <tt/_endp/
+<p>
+Le gatekeeper assignera un identifiant unique &#224; chaque terminal enregistr&#233;.
+Cette option peut &#234;tre utilis&#233;e pour pr&#233;ciser un suffixe &#224;
+ajouter &#224; l'identifiant du terminal. Ceci est seulement utile quand vous utilisez
+plus d'un gatekeeper.
+
+<item><label id="ttl"><tt/TimeToLive=300/<newline>
+D&#233;faut: <tt/-1/
+<p>
+L'enregistrement d'un terminal avec un gatekeeper peut avoir une dur&#233;e de vie
+limit&#233;e. Le gatekeeper pr&#233;cise la dur&#233;e de l'enregistrement d'un
+terminal en incluant un champ <bf/timeToLive/ dans le message RCF.
+Apr&#232;s le temps indiqu&#233;, l'enregistrement a expir&#233;.
+Le terminal devrait p&#233;riodiquement envoyer un RRQ ayant le bit <bf/keepAlive/
+positionn&#233; avant l'expiration. Un tel message peut inclure une quantit&#233;
+minimum d'informations comme d&#233;crit dans H.225.0.
+Ceci est appel&#233; un RRQ l&#233;ger.
+
+Ce param&#232;tre de configuration indique la minuterie en secondes du temps &#224;
+vivre avant que l'enregistrement se termine.
+Il faut noter que le terminal peut demander un <bf/timeToLive/ plus court dans le
+message RRQ au gatekeeper.
+Pour &#233;viter une surcharge de messages RRQ, le gatekeeper ajuste automatiquement
+cette minuterie &#224; 60 secondes si vous indiquez une valeur inf&#233;rieure!
+
+Apr&#232;s l'expiration du d&#233;lai, le gatekeeper enverra par la suite deux messages
+IRQ pour demander si le terminal est encore vivant. Si le terminal r&#233;pond avec
+un IRR, l'enregistrement sera &#233;tendu. Autrement le gatekeeper enverra un URQ
+avec la raison <bf/ttlExpired/ au terminal.
+Le terminal doit alors se r&#233;-enregistrer aupr&#232;s du gatekeeper en utilisant
+un message RRQ complet.
+
+Pour d&#233;sactiver cette fonction, lui donner la valeur <tt/-1/.
+
+<item><tt/TotalBandwidth=100000/<newline>
+D&#233;faut: <tt/-1/
+<p>
+La bande passante totale disponible &#224; donner aux terminaux.
+Par d&#233;faut cette fonction est d&#233;sactiv&#233;e. Fa&#238;tes attention quand
+vous l'utilisez car beaucoup de terminaux ont des impl&#233;mentations erron&#233;es.
+
+<item><tt/RedirectGK=Endpoints > 100 || Calls > 50/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Cette option vous permet de rediriger des terminaux vers des gatekeepers alternatifs
+quand le gatekeeper est surcharg&#233;.
+Par exemple, avec le param&#232;tre ci-dessus le gatekeeper rejettera un RRQ si le
+nombre de terminaux enregistr&#233;s exc&#232;de 100, ou rejettera un ARQ si les
+appels concurrents exc&#232;dent 50.
+
+De plus, vous pouvez explicitement rediriger tous les terminaux en positionnant cette
+option &#224; <tt/temporary/ ou <tt/permanent/.
+Le gatekeeper retournera un message de rejet RAS avec une liste de gatekeepers
+alternatifs d&#233;finis dans <tt/AlternateGKs/.
+Il faut noter que la redirection <tt/permanent/ signifie que les terminaux
+redirig&#233;s ne s'enregistreront plus avec ce gatekeeper.
+Veuillez aussi noter que la fonction entre en vigueur avec les terminaux respectant
+la version 4 de H.323.
+
+<item><tt/AlternateGKs=1.2.3.4:1719:false:120:OpenH323GK/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Nous autorisons l'existence d'un autre gatekeeper pour fournir de la redondance.
+Ceci est impl&#233;ment&#233; de mani&#232;re active-active. En r&#233;alit&#233;,
+vous pouvez vous retrouver dans une situation (valide!) o&#249; certains terminaux
+sont enregistr&#233;s avec le premier gatekeeper et d'autres sont enregistr&#233;s
+avec le second.
+Vous pourriez m&#234;me utiliser les deux gatekeepers d'une mani&#232;re round_robin(?)
+pour le partage de charge (ce n'est pas test&#233 :-)).
+Si vous continuez &#224; lire, "GK primaire" indique le gatekeeper que vous &#234;tes
+en train de configurer and "GK alternatif" indique l'autre.
+The GK primaire inclut un champ dans le RCF pour indiquer aux terminaux quels IP
+et gatekeeper alternatifs utiliser.
+Mais le GK alternatif doit conna&#238;tre chaque enregistrement avec le GK primaire
+ou il rejetterait les appels.
+Donc notre gatekeeper peut transmettre chaque RRQ &#224; l'adresse IP alternative.
+
+L'option de configuration AlternateGKs indique les champs contenus dans le RCF du
+GK primaire. Le premier et le deuxi&#232;me champ de cette cha&#238;ne indique o&#249;
+transmettre (IP, port).
+Le troisi&#232;me indique aux terminaux si ils doivent s'enregistrer aupr&#232;s du
+GK alternatif avant de passer des appels. Il n'ont g&#233;n&#233;ralement pas besoin
+car nous transmettons leurs RRQs, ils sont donc enregistr&#233;s aupr&#232;s du
+GK alternatif.
+Le quatri&#232;me champ indique la priorit&#233; pour ce GK.
+Plus bas est mieux, en g&#233;n&#233; ral on consid&#232;re que le GK primaire a une
+priorit&#233; de 1.
+Le dernier champ indique l'identifiant du gatekeeper alternatif.
+
+<item><tt/SendTo=1.2.3.4:1719/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Bien que cette information soit contenue dans AlternateGKs, vous devez quand m&#234;me
+indiquer &#224; quelle adresse transmettre les RRQs. Ceci peut &#234;tre diff&#233;rent
+de l'adresse de AlternateGK, il s'agit donc d'une option de configuration
+s&#233;par&#233;e (penser aux machines &#224; plusieurs adresses).
+
+<item><tt/SkipForwards=1.2.3.4,5.6.7.8/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Pour &#233;viter les transmissions circulaires, vous ne devez pas transmettres les RRQs
+que vous recevez de l'autre GK (cette d&#233;claration est valable pour les deux, GK
+primaire et alternatif).
+Deux m&#233;canismes sont utilis&#233;s pour identifier si une requ&#234;te doit
+&#234;tre transmise.
+Le premier cherche un drapeau dans le RRQ. Comme peu de terminaux impl&#233;mentent
+ceci, nous avons besoin d'une deuxi&#232;me fa&#231;on plus fiable.
+Indiquez l'IP de l'autre gatekeeper dans cette liste.
+
+<item><tt/StatusPort=7000/<newline>
+D&#233;faut: <tt/7000/
+<p>
+Port d'&#233;tat pour surveiller le gatekeeper.
+Se reporter &#224; <ref id="monitor" name="cette section"> pour plus de d&#233;tails.
+
+<item><tt/SignalCallId=1/<newline>
+D&#233;faut: <tt/0/
+<p>
+IDs du signal d'appel dans les messages ACF/ARJ/DCF/DRJ/RouteRequest sur le port d'&#233;tat.
+Se reporter &#244; <ref id="monitor" name="cette section"> pour plus de d&#233;tails.
+
+<item><tt/StatusTraceLevel=2/<newline>
+D&#233;faut: <tt/2/
+<p>
+Niveau de trace par d&#233;faut pour les clients de la nouvelle interface d'&#233;tat.
+Se reporter &#224; <ref id="monitor" name="cette section"> pour plus de d&#233;tails.
+
+<item><tt/TimestampFormat=ISO8601/<newline>
+D&#233;faut: <tt/Cisco/
+<p>
+Contr&#244;le le format par d&#233;faut des cha&#238;nes horodate
+g&#233;n&#233;r&#233;es par le gatekeeper.
+Cette option affecte <ref id="sqlacct" name="[SqlAcct]">, 
+<ref id="radacct" name="[RadAcct]">, <ref id="fileacct" name="[FileAcct]">
+et d'autres modules, sauf <ref id="calltable" name="[CallTable]">.
+Vous pouvez adapter encore plus le formatage des horodates par module en configurant
+le param&#232;tre <tt/TimestampFormat/ par module.
+<p>
+Il y a quatre formats pr&#233;d&#233;finis:
+<itemize>
+<item><tt/RFC822/ - un format par d&#233;faut utilis&#233 par le gatekeeper (exemple: Wed, 10 Nov 2004 16:02:01 +0100)
+<item><tt/ISO8601/ - format standard ISO (exemple: 2004-11-10 T 16:02:01 +0100)
+<item><tt/Cisco/ - format utilis&#233; par un &#233;quipement Cisco (exemple: 16:02:01.534 CET Wed Nov 10 2004)
+<item><tt/MySQL/ - format simple que MySQL peut comprendre (exemple: 2004-11-10 16:02:01)
+</itemize>
+<p>
+Si vous avez besoin d'un autre format, vous pouvez construire votre propre cha&#238;ne
+de format, en utilisant des r&#232;gles tir&#233;es de la fonction C <tt/strftime/
+(voir man strftime ou chercher sur MSDN pour strftime).
+En g&#233;n&#233;ral, la cha&#238;ne de format se compose de caract&#232;res normaux
+et de codes de formatage, pr&#233;c&#233;d&#233;s d'un signe pourcent. Exemple:
+"%Y-%m-%d et pourcent %%" donnera comme r&#233;sultat "2004-11-10 et pourcent %".
+Quelques codes de format habituels:
+<itemize>
+<item><tt/%a/ - nom abr&#233;g&#233; du jour de la semaine
+<item><tt/%A/ - nom complet du jour de la semaine
+<item><tt/%b/ - nom abr&#233;g&#233; du mois
+<item><tt/%B/ - nom complet du mois
+<item><tt/%d/ - jour du mois sous la forme d'un nombre
+<item><tt/%H/ - heure en format 24-heures
+<item><tt/%I/ - heure en format 12-heures
+<item><tt/%m/ - mois sous la forme d'un nombre
+<item><tt/%M/ - minute sous la forme d'un nombre
+<item><tt/%S/ - seconde sous la forme d'un nombre
+<item><tt/%y/ - ann&#233;e sans le si&#232;cle
+<item><tt/%Y/ - ann&#233;e avec le si&#232;cle
+<item><tt/%u/ - microsecondes sous la forme d'un nombre (<bf/extension GnuGk/)
+<item><tt/%z/ - abr&#233;viation du fuseau horaire (+0100)
+<item><tt/%Z/ - nom du fuseau horaire
+<item><tt/%%/ - signe pourcent
+</itemize>
+
+<item><tt/EncryptAllPasswords=1/<newline>
+D&#233;faut: <tt/0/
+<p>
+Active le chiffrage de tous les mots de passe dans la configuration (mots de passe
+SQL, RADIUS, [Password], [GkStatus::Auth]). Si c'est activ&#233; tous les mots de
+passe doivent &#234;tre crypt&#233;s en utilisant l'utilitaire <tt/addpasswd/.
+Autrement seuls les mots de passe de [Password] et [GkStatus::Auth] sont crypt&#233;s
+(ancien comportement).
+
+<item><tt/KeyFilled=0/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+D&#233;finit un octet de remplissage global &#224; utiliser pendant le cryptage/
+d&#233;cryptage de mot de passe. Il peut &#234;tre annul&#233; en positionnant
+<tt/KeyFilled/ dans une section de configuration particuli&#232;re.
+Habituellement, vous n'avez pas besoin de changer cette option.
+
+</itemize>
+
+La plupart des utilisateurs n'auront jamais besoin de modifier une des valeurs suivantes.
+Ils sont principalement utilis&#233;s pour les tests ou pour des applications tr&#232;
+sophistiqu&#233;es.
+
+<itemize>
+<item><tt/UseBroadcastListener=0/<newline>
+D&#233;faut: <tt/1/
+<p>
+Indique si on doit &#233;couter au requ&#234;tes RAS diffus&#233;es. Ceci implique de
+s'attacher &#224; toutes les interfaces sur la machine, donc si vous voulez lancer
+plusieurs instances de gatekeepers sur la m&#234;me machine, vous devriez
+d&#233;sactiver cette option.
+
+<item><tt/UnicastRasPort=1719/<newline>
+D&#233;faut: <tt/1719/
+<p>
+L'identifiant TSAP du canal RAS pour unicast(?).
+
+<item><tt/MulticastPort=1718/<newline>
+D&#233;faut: <tt/1718/
+<p>
+L'identifiant TSAP du canal RAS pour multicast.
+
+<item><tt/MulticastGroup=224.0.1.41/<newline>
+D&#233;faut: <tt/224.0.1.41/
+<p>
+Le groupe de multicast pour le canal RAS.
+
+<item><tt/EndpointSignalPort=1720/<newline>
+D&#233;faut: <tt/1720/
+<p>
+Default port for call signalling channel of endpoints.
+
+<item><tt/ListenQueueLength=1024/<newline>
+D&#233;faut: <tt/1024/
+<p>
+Longueur de la queue pour les connections entrantes TCP.
+
+<item><tt/SignalReadTimeout=1000/<newline>
+D&#233;faut: <tt/1000/
+<p>
+Temps en millisecondes pour le timeout de lecture sur les canaux de signal d'appel (Q931).
+
+<item><tt/StatusReadTimeout=3000/<newline>
+D&#233;faut: <tt/3000/
+<p>
+Temps en millisecondes pour le timeout de lecture sur le canal d'&#233;tat.
+
+<item><tt/StatusWriteTimeout=5000/<newline>
+D&#233;faut: <tt/5000/
+<p>
+Temps en millisecondes pour le timeout d'&#233;criture sur le canal d'&#233;tat.
+</itemize>
+
+
+<sect2>Section &lsqb;GkStatus::Auth&rsqb;
+<p>
+D&#233;finit un nombre de r&#232;gles pour indiquer qui est autoris&#233; &#224; se
+connecter au port d'&#233;tat.
+Chacun ayant acc&#232;s au port d'&#233;tat a le contr&#244;le total sur votre
+gatekeeper. Assurez vous de le d&#233;finir correctement.
+<itemize>
+<item><tt/rule=allow/<newline>
+D&#233;faut: <tt/forbid/
+<p>
+Les valeurs possibles sont
+<itemize>
+<item><tt/forbid/ - interdit toute connexion.
+<item><tt/allow/ - autorise toute connexion.
+<item><tt/explicit/ - lit le param&#232;tre <tt>ip=value</tt>
+o&#249; <tt/ip/ est l'adresse IP i du client observateur,
+<tt/value/ est <tt/1,0/ ou <tt/allow,forbid/ ou <tt/yes,no/.
+Si <tt/ip/ n'est pas list&#233;e le param&#232;tre <tt/default/ est utilis&#233;.
+<item><tt/regex/ - l'IP du client est compar&#233;e &#224; l'expression
+r&#233;guli&#232;re.
+<p><descrip>
+<tag/Exemple:/
+Pour autoriser les clients de 195.71.129.0/24 et 195.71.131.0/24:
+<quote><tt>regex=^195\.71\.(129|131)\.[0-9]+$</tt></quote>
+</descrip>
+<item><tt/password/ - l'utilisateur doit saisir le nom d'utilisateur et le mot de passe
+appropri&#233;s pour se connecter. Le format. Le format de username/password est le
+m&#234;me que pour la section <ref id="password" name="[SimplePasswordAuth]">.
+
+</itemize>
+
+De plus, ces r&#232;gles peuvent &#234;tre combin&#233;es avec "|" ou "&amp;".
+Par exemple,
+<itemize>
+<item><tt>rule=explicit | regex</tt><newline>
+L'IP du client doit correspondre &#224; la r&#232;gle <tt/explicit/ <bf/ou/ <tt/regex/.
+<p>
+<item><tt>rule=regex & password</tt><newline>
+L'IP du client doit correspondre &#224; la r&#232;gle <tt/regex/, <bf/et/ l'utilisateur
+doit saisir son nom d'utilisateur et son mot de passe.
+</itemize>
+
+<item><tt/default=allow/<newline>
+D&#233;faut: <tt/forbid/
+<p>
+Utilis&#233; uniquement quand <tt/rule=explicit/.
+
+<item><tt/Shutdown=forbid/<newline>
+D&#233;faut: <tt/allow/
+<p>
+Indique si on peut arr&#234;ter le gatekeeper par le port d'&#233;tat.
+
+<item><tt/DelayReject=5/<newline>
+D&#233;faut: <tt/0/
+<p>
+Combien de temps (en secondes) avant de rejeter un usernam/password invalide pour
+l'acc&#232;s &#224; la ligne d'&#233;tat.
+</itemize>
+
+
+<sect2>Section &lsqb;LogFile&rsqb;
+<label id="logfile">
+<p>
+Cette section d&#233;finit les param&#232;tres li&#233;s aux fichiers de log.
+Actuellement, ceci permet aux utilisateurs de pr&#233;ciser les options de rotation
+des fichiers de log.
+
+<itemize>
+<item><tt/Rotate=Hourly | Daily | Weekly | Monthly/<newline>
+D&#233;faut: <tt>N/A</tt>
+<p>
+Si pr&#233;cis&#233;, le fichier de log tournera en se basant sur ce param&#232;tre.
+La rotation Hourly effectue une rotation par heure, daily - un par jour, weekly - une
+par semaine et monthly - une par mois. Le moment pr&#233;cis de rotation est
+d&#233;fini par une combinaison des variables <tt/RotateDay/ et <tt/RotateTime/.
+Pendant la rotation, un fichier existant est renomm&#233; en
+CURRENT_FILENAME.YYYYMMDD-HHMMSS, o&#249; YYYYMMDD-HHMMSS est remplac&#233; par
+l'horodate courant, et les nouvelles lignes sont &#233;crites dans un fichier vide.
+Pour d&#233;sactiver cette rotation, ne pr&#233;cisez pas ce param&#232;tre ou fixez
+le &#224; 0.
+
+<descrip>
+<tag/Exemple 1 - rotation chaque heure (00:45, 01:45, ..., 23:45):/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Hourly</tt><newline>
+<tt>RotateTime=45</tt><newline>
+</descrip>
+
+<descrip>
+<tag/Exemple 2 - rotation chaque jour &#224; 23:00 (11PM):/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Daily</tt><newline>
+<tt>RotateTime=23:00</tt><newline>
+</descrip>
+
+<descrip>
+<tag/Exemple 3 - rotation chaque Dimanche &#224; 00:59:/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Weekly</tt><newline>
+<tt>RotateDay=Sun</tt><newline>
+<tt>RotateTime=00:59</tt><newline>
+</descrip>
+
+<descrip>
+<tag/Exemple 4 - rotation le dernier jour de chaque mois:/
+<tt/&lsqb;LogFile&rsqb;/<newline>
+<tt>Rotate=Monthly</tt><newline>
+<tt>RotateDay=31</tt><newline>
+<tt>RotateTime=23:00</tt><newline>
+</descrip>
+</itemize>

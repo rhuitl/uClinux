@@ -1,0 +1,116 @@
+
+Version 2.0.0-beta2
+- -----------------
+
+  * Added `-o <statdir>', `-ee <default server>'.
+
+  * Virus scanning quarantine mode with `-zz <directory>'.
+
+  * Environment variables start now with `POP3_', not with
+    `PROXY_'.
+
+  * Added support for redirected connections: `-r <mode>'.
+
+
+Version 1.3.0
+- -----------
+
+  This release is a major rewrite (with copy-and-paste from smtp.proxy)
+  of the five years old source code.
+
+  * Removed support for "local POP3 server".  This was never implemented
+    and I removed it from the source now.
+
+  * Added support for clamav virus scanner.
+
+  * Added daemon mode.
+
+  Special thanks to Andreas Schoenberg <asg@compucation.de> for providing
+  debug and test data.
+
+    
+Version 1.2.6 -- 16APR04wzk
+- -------------------------
+
+  * Added -V switch to print pop3.proxy's version number.
+
+
+Version 1.2.5 -- 08DEC03asg
+- -------------------------
+
+  * Fixed error in proxy_request. Now NOOP will work again.
+
+  * Changed syslog entry for succesful logins to have username and ip 
+    in one line. Good for pop before smtp software.
+
+
+Version 1.2.4 -- 16AUG01asg
+- -------------------------
+
+  * Fixed dumb program error by wzk: the `-e' option wasn't really
+    handled in the startup code in main().
+
+
+Version 1.2.0
+- -----------
+
+  * pop3.proxy will now read the client login before trying to connect
+    to the POP3 server.  This was different in the previous version.
+
+  * Introduced external access control programs, can be set with -a option.
+
+  * The user/servername delimeter can be changed with the -c option.
+
+  * Corrected the manual page.
+
+
+Version 1.1.0
+- -----------
+
+  * What is pop3.proxy?
+
+    pop3.proxy is an application level gateway for the POP3 protocol.
+    Unlike generic TCP proxys (like tcpproxy) it looks into the data
+    stream watching that client and server fullfill the protocol
+    specification.  pop3.proxy is based on RFC 1939.
+
+
+  * Installation and usage
+
+    pop3proxy must be started from a superserver like inetd or tcpproxy,
+    it can't bind to a port on it's own.  You must at least specify
+    the name of the real POP3 server that will handle the client request.
+    This is typically the name of an internal (located behind some kind
+    of firewall) POP3 server to which you want to grant access to outside
+    users.  In the case of an inetd based configuration it might look
+    like
+
+      pop3  stream  tcp  nowait  nobody  /usr/sbin/tcpd  \
+        /usr/local/sbin/pop3.proxy pop3.domain.com
+
+    A sample configuration for tcpproxy would be:
+
+      port 110
+        interface 192.7.100.47
+	  exec /usr/local/sbin/pop3.proxy pop3.domain.com
+
+    assuming that 192.7.100.47 is the ip number of your external network
+    interface.
+
+    Both configurations forward any POP3 request from this machine (think
+    of an Internet or intranet access server) to the real server (in this
+    setup pop3.domain.com).  All in all the POP3 server appears to run
+    on the access system.
+
+
+  * What is server selection?
+
+    This means that (if enabled) the user on the client side might give
+    a username like `joe.smith@pop-server.somewhere.com'.  pop3.proxy
+    will then use the host `pop-server.somewhere.com' as POP3 server
+    and not the machine given on it's command line.  Server selection
+    can be restricted to a set of hosts.
+
+    Server selection is useful when you are behind an Internet access
+    system and you want to access different POP3 server on the outside.
+

@@ -1,0 +1,123 @@
+This is a patch for current (Fri Nov 28 16:57:59 PST 2003) Xsupplicant CVS
+version to enable sending PMK from EAP negotiation to wpa_supplicant over
+a UNIX domain socket. A new command line option, '-W', must be used to
+enable this functionality.
+
+
+Index: src/eap.c
+===================================================================
+RCS file: /home/jm/cvsroot/xsupplicant/src/eap.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -u -p -r1.1.1.1 -r1.2
+--- src/eap.c	29 Nov 2003 00:49:36 -0000	1.1.1.1
++++ src/eap.c	29 Nov 2003 00:56:02 -0000	1.2
+@@ -88,6 +88,10 @@
+ 
+ #include <netinet/in.h>
+ #include <string.h>
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <unistd.h>
+ 
+ #include "eap.h"
+ #include "frame_structs.h"
+@@ -168,6 +172,43 @@ void eap_cleanup(struct interface_data *
+     }
+ }
+ 
++
++extern int wpa_keying;
++
++static int wpa_keying_material(struct interface_data *thisint)
++{
++	int s, ret = 0;
++	struct sockaddr_un addr;
++
++	if (!wpa_keying)
++		return 0;
++
++	if (thisint->keyingMaterial == NULL)
++		return -1;
++
++	s = socket(AF_LOCAL, SOCK_DGRAM, 0);
++	if (s < 0) {
++		perror("socket");
++		return -1;
++	}
++
++	debug_printf(DEBUG_NORMAL, "Sending master key to wpa_supplicant.\n");
++
++	memset(&addr, 0, sizeof(addr));
++	addr.sun_family = AF_LOCAL;
++	addr.sun_path[0] = '\0';
++	snprintf(addr.sun_path + 1, sizeof(addr.sun_path) - 1,
++		 "wpa_supplicant");
++	if (sendto(s, thisint->keyingMaterial, 32, 0,
++		   (struct sockaddr *) &addr, sizeof(addr)) < 0) {
++		perror("send");
++		ret = -1;
++	}
++	close(s);
++
++	return ret;
++}
++
+ /*******************************************
+  *
+  * Process the EAP piece of the packet, determine what type of EAP packet it is
+@@ -227,6 +268,7 @@ void eap_process_header(struct interface
+       } else {
+ 	debug_printf(DEBUG_NORMAL, "Authenticated!\n");
+ 	thisint->statemachine->eapSuccess = TRUE;
++	wpa_keying_material(thisint);
+       }
+       break;
+ 
+Index: src/xsup_driver.c
+===================================================================
+RCS file: /home/jm/cvsroot/xsupplicant/src/xsup_driver.c,v
+retrieving revision 1.1.1.1
+retrieving revision 1.2
+diff -u -p -r1.1.1.1 -r1.2
+--- src/xsup_driver.c	29 Nov 2003 00:49:36 -0000	1.1.1.1
++++ src/xsup_driver.c	29 Nov 2003 00:56:02 -0000	1.2
+@@ -93,6 +93,7 @@
+ char *dstAddr = NULL, *config = NULL, *device = NULL, *netid = NULL;
+ char *username = NULL, *password = NULL, *auth_method = NULL;
+ int xdaemon = 0, new_debug = 0;
++int wpa_keying = 0;
+ 
+ struct interface_data *int_list;
+ 
+@@ -171,6 +172,7 @@ void usage(char *prog)
+ {
+   debug_printf(DEBUG_NORMAL, "Usage: %s "
+ 	       "[-w] "
++	       "[-W] "
+ 	       "[-a authenticator_MAC_address] "
+ 	       "[-c config file] "
+ 	       "[-i device] "
+@@ -193,7 +195,7 @@ void usage(char *prog)
+ int main(int argc, char *argv[])
+ {
+   int op;
+-  char *theOpts = "m:p:u:a:c:i:n:d:Dw";
++  char *theOpts = "m:p:u:a:c:i:n:d:DwW";
+ 
+   // We should have at least one argument passed in!
+   if (argc<2)
+@@ -255,6 +257,12 @@ int main(int argc, char *argv[])
+ 	case 'w':
+ 	  // Force a wired connection.
+ 	  break;
++
++	case 'W':
++	  // Provide WPA keying material (PMK) to wpa_supplicant.
++	  wpa_keying = 1;
++	  break;
++
+ 	  // added by npetroni, need to do something with bad options.
+ 	  // for now, I say exit.
+ 	default:

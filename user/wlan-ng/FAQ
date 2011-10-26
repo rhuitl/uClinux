@@ -1,0 +1,526 @@
+********************** Linux-wlan-ng FAQ **************************
+For additions, corrections, and clarifications, send mail to
+solomon@linux-wlan.com with FAQ in the subject.
+*******************************************************************
+
+Q: What devices does the linux-wlan-ng driver support?
+
+	Currently, the linux-wlan-ng driver supports the Intersil
+	Prism2/2.5/3 chipsets.  These chipsets are used in a wide
+	variety of PCMCIA, PCI, and USB products.  If it has a Prism
+	chip in it, linux-wlan-ng should support it.
+
+Q: Will linux-wlan-ng support some feature or funkiness in
+   the <pick one> Linux distribution?
+ 
+	Our development target always consists of stock kernels from
+	kernel.org and stock pcmcia_cs.  If a given distribution
+	chooses to do something funky, we rely on users of that
+	distribution to contribute patches to deal with their
+	funkiness.
+
+	The quickest way to get some action on this kind of item is to
+	communicate with any users of the same distribution that you
+	can find on the linux-wlan-[devel|user] lists about working up
+	a patch.  If it's reasonably sane and doesn't break things for
+	our development environment or for other distributions, we'll
+	be more than happy to roll that patch into the next release.  
+
+Q: What does "resultcode=implementation_failure" mean?
+
+	Complicated Answer: 
+	Each command that can be issued with wlanctl-ng returns a status
+	called "resultcode".  Resultcode is something that we picked up
+	from the 802.11 MLME definition.  In the standard, resultcode
+	is an enumeration with a fixed set of values.  To be able to
+	report failures that a driver detects that are outside the
+	context of the 802.11 standard set of resultcode values, we 
+	invented the "implementation_failure" value.
+
+	Simple Answer:
+	Go look in your kernel log for more detailed error information.
+
+Q: I'm trying to use the HostAP/orinoco/aironet/wvlan driver and it
+   won't work!
+
+	That has nothing to do with the linux-wlan-ng driver.  Go ask
+	those responsible for those drivers.
+
+Q: Can I get Debian packages of linux-wlan-ng?
+ 
+A: Packages of linux-wlan-ng are available in the Debian unstable
+   and testing trees now, and will eventually be shipped with a stable
+   Debian release. The Debian packages include support for configuring
+   linux-wlan-ng interfaces via /etc/network/interfaces, amoung other
+   things. Complete details about the Debian-specific parts of these
+   packages, including instructions for building a linux-wlan-ng modules
+   package for your kernel can be found in the file
+
+   /usr/share/doc/linux-wlang-ng/README.Debian.gz
+
+Q: Where do I find some RPMS for linux-wlan-ng? The ones on
+    the ftp are dreadfully out of date!
+
+	http://prism2.unixguru.raleigh.nc.us/
+
+	(Maintained by Tim Miller)
+
+Q: I installed the RPMs/compiled the driver and installed it and it
+   won't work when I try to run 'ifup wlan0' or whatnot.
+
+	First, ensure you're running the most up-to-date version of
+	the driver.  Many problems have been fixed in newer releases.
+
+	802.11 wireless networks are much more complex than wired
+	ethernet networks.  They require much more configuration than
+        an ip address.   If you are using pcmcia, edit the file 
+        /etc/pcmcia/wlan-ng.opts to set the network parameters.  For
+        PCI, PLX, or USB adapters, you need to edit /etc/wlan.conf.
+	
+	You also need to make sure you have the correct settings in
+	/etc/modules.conf (alias wlan0 prism2_usb). 
+
+	Might we suggest you read the README file?
+
+Q: When I try to load the driver, I get a whole bunch of errors about
+   unresolved symbols.
+
+	The running kernel does not match the kernel the driver was
+	compiled for.  If you downloaded a RPM, make sure you
+        downloaded the correct version for your kernel.  This should not
+        happen if you compiled the driver from source -- if it does, the
+        kernel configuration you compiled against does not match the
+        running kernel.  Probably a screwed-up distro kernel.
+
+Q: I have a DWL-520 and it won't work!
+
+	The DWL-520 claims to require a PCI 2.2 compliant motherboard.
+        Only fairly new machines support this.  Yes, the box lies.  :)
+        Check the documentation for your system and/or motherboard to see if 
+	it is PCI 2.2 compliant.  
+
+	NOTE:  We have some reports of the DWL-520 working on PCI 2.1
+	motherboards; your mileage may vary.  See the following URL:
+
+		http://www.personaltelco.net/index.cgi/DlinkDwl520
+
+        NOTE:  The Linksys WMP11 v2.7 is NOT prism-based, and
+	thus not supported by this driver.  The Actiontec PCI board is
+	still known to be prism based; you may want to try that instead.
+
+Q: All I see is "Tx attempt prior to association, frame dropped"
+
+	You are not associated with an access point.  Double-check the
+        settings in /etc/wlan.conf (USB, PCI, PLX) or /etc/pcmcia/wlan-ng.opts
+        (for PCMCIA users).    If all of these settings are correct (you
+        did check with your admin, right?) make sure the access point
+        doesn't have a MAC filter installed or has different WEP settings.
+
+	If all of this is verified correct, and are using a PCMCIA
+	card, try setting the "irq_mode=0" option.  See the
+	documentaiton in the pcmcia-cs sources.
+
+Q: I installed the modules, performed a 'wlanctl-ng wlan0 lnxreq_autojoin'
+   command, and it still won't work!
+
+	You did read the README, didn't you?  You need to perform a 
+	"wlanctl-ng wlan0 lnxreq_ifstate ifstate=enable" in order to
+        torn on the radio.  The pcmcia scripts and the /etc/init.d/wlan
+        script do this for you.
+
+Q: I have a XXX USB 802.11b device, will it work with this driver?
+
+	Most 802.11b USB devices use the ATMEL AT76C503A chipset, which
+        is not supported by the linux-wlan-ng project.  However, there
+	are some prism2.5-based USB adapters, most notably the Linksys
+	WUSB v2.5.  The other versions (1.0, 2.6, 3.0) are based on
+        ATMEL chipsets.  Another supported USB device is the Actiontec
+	802UI3.
+
+Q: The wlan-ng driver says my ATMEL AT76C503A device is unsupported!
+
+ 
+	Atmel has placed the source code of the Linux driver for the 
+	AT76C503A (and 501 or 502 - the PCMCIA variant) under the GPL 
+	in July 2002. The project can be found under
+
+	http://www.sourceforge.net/projects/atmelwlandriver
+
+	http://at76c503a.berlios.de/devices.html
+
+	and it is in a rather usable state.  The mailing list
+
+	http://iprserv.jura.uni-leipzig.de/mailman/listinfo/atmel-wlan-usb
+
+	still has many useful postings.
+
+Q: My prism2.5-based USB adapter won't work!
+
+	An excellent guide can be found at:
+
+	http://www.fuw.edu.pl/~pliszka/hints/prism2.html
+	
+Q: My prism2.5-based USB adapter won't come up if it's plugged in at boot! 
+
+	Thanks to buggy firmware, it is often necessary to perform a
+        device reset on initialization.  You can perform this by adding
+        "options prism2_usb prism2_doreset=1" in your /etc/modules.conf
+
+	Intersil has released Primary firmware 1.1.2, which seems to
+	have resolved this problem, at least on our test machines.
+
+Q: My PC crashes when the USB device is plugged in!
+
+	This is a result of the port reset necessitated by buggy firmware.
+
+	You are probably using the 'usb-uhci' driver with an intel
+        chipset.  Unfortunately, the crashes happen deep within the USB
+        core, so there's nothing the linux-wlan-ng driver can do.
+
+	In the mean time, try using the 'uhci' host controller driver
+        instead ("alias usb-controller uhci" in /etc/modules.conf), or
+        plug the USB device into a hub.
+
+	Linux kernel 2.4.19 is known to improve the situation somewhat,
+	but the right way to fix it is to turn off the port reset
+	(options prism2_usb prism2_doreset=0).  The current firmware
+	from Intersil alleviates the need to perform the reset.
+
+	UPDATE:  if you're using linux-wlan-ng 0.2.1-pre6 or newer and 
+        kernel < 2.4.22-pre, the 'uhci' driver will NOT work without a 
+        kernel patch! See:
+
+	http://lists.linux-wlan.com/pipermail/linux-wlan-devel/2003-May/002369.html
+
+Q: My PC crashes when the USB device is unplugged!
+
+	0.1.16-pre3 included some fixes that should eliminate the race
+	condition that caused the oops-on-unload.
+
+Q: What's with these "Called from within soft interrupt context" messages?
+
+	This is the result of a workaround to avoid a kernel oops in
+	the USB driver code.  You can ignore them.  
+
+	As of 0.1.15-pre5, a different workaround is in place.
+
+Q: Why doesn't promiscuous mode or monitor mode work under USB?
+
+	Promiscuous mode works just fine, as of 0.1.15-pre5.
+
+	Monitor mode also works, as of 0.1.15-pre6.
+
+	Both modes are likely to be quite unreliable, especially under
+	higher loads thanks to fundamental bandwidth limitations of the
+	USB interface.  
+
+Q: How come I can't transmit when in monitor mode?
+
+	You can't.  It's a fundamental "feature" of the hardware.
+
+Q: How come the /proc/net/wireless info isn't updated when in monitor mode?
+
+	The definition of "signal quality" refers to the quality of the
+	link to the associated access point.  When you're in monitor
+	mode, you're not associated, so this information is by defintion 
+	irrelevant.
+
+	And regardless, the hardware doesn't update the registers we poll to
+	obtain this information while in monitor mode.
+
+Q: What do the various monitor mode options do?
+
+	enable=[true/false]           Turn it on and off.  required.
+	channel=[1-14]                Sniff channel.  required.
+	prismheader=[true/false]      Optionally preppend a special
+                                      radio header on the packet.
+				      Defaults to off.
+	keepwepflags=[true/false]     If you had WEP configured correctly
+				      the card will perform WEP decoding.
+				      Defaults to off.
+	stripfcs=[true/false]         When true, the 802.11 FCS is not
+				      stripped from incoming packets.
+				      Defaults off.
+	truncate=[number]             Truncates the captured frame.  
+
+Q: How come iwconfig/iwspy/[random other wireless tool] doesn't work?
+	
+	linux-wlan-ng only supports a subset of the wireless
+	extensions; generally read-only things.  However, you won't
+	need any of those tools as wlan-ng comes with its own set of
+	tools that closely mirror the 802.11 spec.  Have a look
+	through the documentation and supplied scripts.
+
+	That said, if more complete (ie read/write) wireless extension
+	support is really important to you, you're more than welcome to
+	implement it and submit a patch.  
+
+	As of 0.1.16-pre1, the wireless extension plumbing has been
+	re-written, and further support is much easier now.  And many
+	more bits are hooked up now than before.
+
+Q: How do I know exactly what prism variant is on my card?
+
+	When you load the driver, you see a line which reads like:
+
+		ident: nic h/w id=0x8008 1.0.0
+                                         
+	1.0.0 is the hardware revision.  Below is a (partial) list of IDs.
+
+		0x8003, 0x8008 :  Prism2 PCMCIA
+
+		0x800b, 0x800c :  Prism2.5 PCMCIA
+		0x8012, 0x8013 :  Prism2.5 PCI
+		0x801a, 0x801b :  Prism3 PCMCIA
+		0x8021, 0x8022 :  Prism3 PCI
+		
+		0x800f, 0x8010 :  Prism2.5 USB  (3863)
+		0x801e, 0x801f :  Prism2.5 USB  (3861B)
+		0x8025, 0x8026 :  Prism3 USB
+
+Q: How do I know what firmware my card has?
+
+	After the driver is loaded and brought into ifstate=enable, you
+	will see the following lines in the kernel log: (eg dmesg |grep ident)
+
+	ident: pri f/w: id=0x15 0.3.0
+	ident: sta f/w: id=0x1f 1.7.1
+
+	In this case, the card has primary firmware 0.3.0 and secondary
+	firmware 1.7.1.  
+	
+	Or, if you are using 0.2.1-pre17 or newer:
+	'cat /proc/net/p80211/wlan0/nsd' with the card running.
+
+Q: How can I update my firmware under Linux?
+
+	Use the 'prism2dl' utility.  While it does its utmost to ensure 
+	you don't fry your card, use it at your own risk.  Even the 
+	Intersil-supplied tools fail occasionally.
+
+Q: Where can I download updated firmware for my Prism2/2.5/3-based card?
+
+	As of linux-wlan-ng 0.2.1-pre21, the ram download firmware for 
+	all supported card types is bundled with the driver.  These 
+	images cannot be flashed.
+
+	A general FAQ on firmware updating is here:
+		http://linux.junsun.net/intersil-prism
+
+	It includes links to some sites with firmware images.
+
+	We strongly recommend against flashing a new image, instead one 
+	should use the ram-download images that are loaded when the
+	driver starts, much like the Windows drivers do.
+
+	See the instructions below for getting this to work.
+
+Q: What's this about "ram downloading"?
+
+	This means the driver loads up a firmware images directly into
+	card RAM, instead of using the firmware stored in the card's 
+	flash ROM.  This lets us ensure we are using the lastest available
+	code without risking ruining the hardware due to a bad flashing.
+
+	linux-wlan-ng will automatically perform a RAM download if you have
+	the necessary firmware images.
+
+Q: Okay, I have new ram download firmware images, where do I put them?
+
+	copy the *hex files into linux-wlan-ng-XXXX/src/prism2/
+	then build and install the driver per usual.
+
+Q: Can I use my 802.11b card as an AP under Linux?
+
+	Yes, and in the true free software fashion, there are several
+	ways:
+
+	a) linux-wlan-ng supports AP operation by using special tertiary
+	   firmware on prism devices.  This firmware is not generally
+	   available, however.   Contact Intersil for licensing terms.
+
+	b) The Prism2 HostAP driver uses the special HostAP mode of the
+           prism chipsets.            http://people.ssh.com/jkm/Prism2/
+
+Q: After a few minutes of use, my card stops responding!  I'm using WEP.
+
+	There seems to be card lockup problems with newer cards (new
+	DWL-650 cards, linksys WPC11v3) when WEP is turned on.  Since
+	WEP is done in hardware, there is nothing the driver can do to
+	resolve this.  We suggest you pester your vendor for a firmware
+	update.
+
+	Prism2.5 boards are also known to lock up under heavy use; this
+	is due to bugs in the WEP engine.  Even if you perform a card
+	reset, the WEP engine remains stuck.  
+
+	As an alternative, you can try out the host-based WEP present in
+	0.1.15-pre1 and newer.  It is still considered experimental,
+	but the person typing this uses it on a daily basis.
+
+	Intersil claims to have fixed this in firmware 1.4.0:
+
+	"Fixed a hang condidion seen on certian hardware designs when
+          using firmware WEP"
+
+	Note there are other bugs in the firmware; as recently as 1.4.5
+	Intersil included a fix that would "Correct an error that could 
+	cause the driver to no longer be able to communicate with the
+	firmware"
+
+	Contact your vendor and ask them to release updated firmware.
+
+Q: When using host-based WEP I get these strange intermittent connection
+   lockups.
+
+	This should be fixed in 0.1.15-pre3.  If you are sill having
+	problems, send a detailed message to the linux-wlan-devel
+	mailing list.
+
+Q: When using the wlan-ng driver on a multiprocessor machine, I get
+   packet corruption or random crashes/lockups.
+
+	0.1.15-pre2 is the culmination of a major restructuring of
+	internal driver locking..  Please give it (or newer) a shot
+	if you're using a SMP system; we expect it to be much improved
+	even on uniprocessor systems as we lock out system interrupts for 
+	far less time now.
+
+	0.1.16-pre3 included a fix for a subtle SMP deadlock that was
+	missed in 0.1.15-pre2 and earlier.
+
+	0.1.16-pre4 included workarounds for PrismPCI hardware errata
+	that would also manfest themselves as SMP problems, but could
+	also affect uniprocessor machines in rare circumstanes.
+
+Q: I have a PCI adapter, and upon resuming from a suspend, the device is not
+   responsive.  
+
+	Much like you need to run some commands to bring the card to life 
+	when the PC is first booted, you also need to perform similar 
+	steps when the card comes out of suspend.   Run '/etc/init.d/wlan start'
+	and all should be well.
+
+	You'll need to be running 0.1.15-pre3 or newer for this to work
+        properly.
+
+	The prism2.5/3 chipsets do not support PCI power management, so
+	this is the best we can realistically do.
+
+Q: I have a Linksys WMP11, and under moderate to heavy traffic, I get
+   errors like "unknown port number" and "invalid frame type"
+
+	Make sure you're using the latest firmware avaliable from
+	Linksys's web site.  According to the firmware release notes:
+	
+	 "Changes were made to prevent erroneous data from being 
+          transferred over the PCI bus"
+
+	Note that this problem has also beeen confirmed on the D-Link
+	DWL-520.  You will need firmware 1.3.5 or newer to resolve this.
+
+Q:  I have a D-Link DWL-650/650+/520+ card, why doesn't it work with
+    this driver?
+
+	The DWL-650 comes in three flavors; older ones have grey
+	antennae, with no revision number on the back.  
+	Second-generation  has a black antenna and the back reads 
+	"H/W J3 F/W 1.x.x". Both of these will work.  The third-
+	generation, with a grey antenna, has "H/W A1, F/W x.x", and
+	will NOT work;  It has the same hardware as the "plus" series
+	of cards.
+
+	The "plus" series of cards from D-Link use the Texas Instruments 
+	ACX100/TNETW1100 chipset.  TI has not been forthcoming with 
+	programming information.  Politely ask TI and D-Link for Linux
+	drivers and/or docs.
+
+	We've been told that TI will be releasing binary-only Linux
+	drivers sometime in December.  In the mean time, return the
+	card and buy one that works with Linux.
+	
+Q: I have a Linksys WMP11 v2.7 card; why doesn't it work with this driver?
+
+	Linksys, in their grand tradition, likes to introduce completely
+	new cards but re-use the model number.  The WMP11 v2.7 utilizes the
+	Broadcomm chipset, and is not supported by linux-wlan-ng.  Politely
+	ask Linksys and/or Broadcomm for Linux drivers and/or docs.
+
+Q: What other resources are there for Wireless LANs under Linux?
+
+	http://www.fuw.edu.pl/~pliszka/hints/wireless.html
+
+	http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Linux.Wireless.drivers.html
+
+Q: I'm using RedHat 8.x, and I get this error when trying to ifup wlan0:
+
+	Error for wireless request "Set Encode" (8B2A) :
+	    SET failed on device wlan0 ; Function not implemented.
+	Error for wireless request "Set ESSID" (8B1A) :
+	    SET failed on device wlan0 ; Function not implemented.
+
+	
+	You can safely ignore this; it is there because linux-wlan-ng
+	does not currently use the wireless extension commands for
+	configuration.
+
+Q: When the prism2_cs module loads, I see the message "RequestIRQ:
+   Resource in use" and the load fails! What's going on?
+
+   Is your card a 16-bit PCMCIA card? If it is, you may need to
+   recompile your kernel with ISA bus support enabled (CONFIG_ISA=y).
+   The PCMCIA core uses ISA bus support to help determine what IRQs
+   are available for the card. Without it, the PCMCIA core may not be
+   able to select an IRQ.
+
+Q: After installing linux-wlan-ng on my RedHat 9 system, pcmcia no 
+   longer works!
+
+	This is due to a bug in the RedHat 9 pcmcia startup scripts.
+	On or about line 105 in /etc/init.d/pcmcia, remove all of the
+	'.o' suffixes on the modprobe command lines.  It should read 
+	something like this:
+
+            if [ -d $PC ] ; then
+                echo -n " modules"
+                /sbin/modprobe pcmcia_core $CORE_OPTS
+                /sbin/modprobe $PCIC $PCIC_OPTS
+                /sbin/modprobe ds
+            elif [ -d $KD ] ; then
+                /sbin/modprobe pcmcia_core
+                /sbin/modprobe $PCIC
+                /sbin/modprobe ds
+            else
+
+Q: When starting the device, I get the following error:
+    '/sbin/prism2dl not found'
+
+	This is just a warning; the intialization sequence will 
+	continue on just fine. linux-wlan-ng supports the ram-download 
+	of firmware images into the card.   Linux-wlan-ng 0.2.1-pre17 or
+	newer includes the downloader, rendering this moot.
+
+Q: I found a copy of prism2dl on the net, installed it and now I get the 
+   following error on startup:
+    'prism2dl: Failed to read prism2_XX.hex, exiting.'
+
+	This means it didn't find the necessary firmware file to perform
+	a RAM download.  As distributed by Intersil (and most vendors) the 
+	filenames use the following convention:  rf010409.hex
+        'rf' is image name, while '010409' refers to v1.4.9.
+	copy all the images you have to the src/prism2 directory, and 
+	run 'make install'.  the images will be renamed and copied to 
+	the appropriate place and everything will be happy.
+	
+	Note that the filename needs to be lowercase.
+
+Q: I have a D-Link DWL-650P or a DWL-520E, why doesn't it work?
+
+	These cards are the first generally-available ones that use a 
+	short serial flash, or SSF.  In layspeek, it means that there
+	is no onboard firmware, and thus need the firmware loaded
+	into the card on startup.
+
+	linux-wlan-ng 0.2.1-pre17 supports SSF hardware, and -pre21 
+	includes firmware files with it.
+

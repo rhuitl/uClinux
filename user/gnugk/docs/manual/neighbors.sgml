@@ -1,0 +1,240 @@
+<sect>Neighbor Configuration
+<p>
+<sect1>Section &lsqb;RasSrv::Neighbors&rsqb;
+<label id="neighbor">
+<p>
+If the destination of an ARQ is unknown, the gatekeeper sends LRQs to
+its neighbors to ask if they have the destination endpoint.
+A neighbor is selected if one of its prefixes matches the destination
+or it has ``<tt/*/'' prefix. More than one prefix can be specified.
+You can use special characters ``<tt/./'' and ``<tt/!/'' to do wildcard
+matching and disable a specific prefix.
+
+Conversely, the gatekeeper will only reply to LRQs sent from neighbors
+defined in this section.
+If you specify an empty prefix, no LRQ will be sent to that neighbor,
+but the gatekeeper will accept LRQs from it. By the empty prefix it is meant
+a single semicolon appended to the neighbor entry. Example:<newline>
+<newline>
+<tt/	GK1=192.168.0.5;/<newline>
+<newline>
+If you skip the semicolon, LRQs will be always sent to this neighbor.
+
+The <tt/password/ field is used to authenticate LRQs from that neighbor.
+See section <ref id="gkauth" name="[Gatekeeper::Auth]"> for details.
+
+If a call from a neighbor is accepted also depends on the AcceptNeighborsCalls switch in the <ref id="routed" name="[RoutedMode]"> section.
+
+Neighbor handling has changed significantly from version 2.0 to version 2.2.
+Neighbors can be specified now the old or the new way.
+
+<descrip>
+<tag/Entry in the old format:/
+<tt>GKID=ip[:port;prefixes;password;dynamic]</tt>
+<p>
+<tag/Example:/
+<tt/GK1=192.168.0.5;*/<newline>
+<tt/GK2=10.0.1.1:1719;035,036;gk2/<newline>
+<tt/GK3=gk.citron.com.tw;;gk3;1/
+</descrip>
+
+<descrip>
+<tag/Entry in the new format:/
+<tt>GKID="GnuGK" | "CiscoGK" | "ClarentGK" | "GlonetGK"</tt>
+<p>
+<tag/Example:/
+<tt/[RasSrv::Neighbors]/<newline>
+<tt/GK1=CiscoGK/<newline>
+<tt/GK2=GnuGK/<newline>
+<newline>
+<tt/[Neighbor::GK1]/<newline>
+<tt/GatekeeperIdentifier=GK1/<newline>
+<tt/Host=192.168.1.1/<newline>
+<tt/SendPrefixes=02/<newline>
+<tt/AcceptPrefixes=*/<newline>
+<tt/ForwardLRQ=always/<newline>
+<newline>
+<tt/[Neighbor::GK2]/<newline>
+<tt/GatekeeperIdentifier=GK2/<newline>
+<tt/Host=192.168.1.2/<newline>
+<tt/SendPrefixes=03,0048/<newline>
+<tt/AcceptPrefixes=0049,001/<newline>
+<tt/ForwardHopCount=2/<newline>
+<tt/ForwardLRQ=depends/<newline>
+<newline>
+</descrip>
+
+The new format specifies in the <tt/[RasSrv::Neighbors]/ section only the gatekeeper types. The configuration for each neighbor is placed in a separate section.
+
+
+<sect1>Section &lsqb;RasSrv::LRQFeatures&rsqb;
+<p>
+Defines some features of LRQ and LCF.
+<itemize>
+<item><tt/NeighborTimeout=1/<newline>
+Default: <tt/2/<newline>
+<p>
+Timeout value in seconds to wait responses from neighbors.
+If no response from all neighbors after timeout, the gatekeeper will
+reply an ARJ to the endpoint sending the ARQ.
+
+<item><tt/SendRetries=4/<newline>
+Default: <tt/2/<newline>
+<p>
+Number of tries to send LRQ to neighbors.
+If no response from neighbors after retries timeout, the gatekeeper will
+reply an LRJ to the endpoint sending the LRQ.
+
+<item><tt/ForwardHopCount=2/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If the gatekeeper receives an LRQ that the destination is either unknown,
+it may forward this message to its neighbors.
+When the gatekeeper receives an LRQ and decides that the message
+should be forwarded on to another gatekeeper, it first decrements
+<bf/hopCount/ field of the LRQ.
+If <bf/hopCount/ has reached 0, the gatekeeper shall not forward the message.
+This options defines the number of gatekeepers through which an LRQ
+may propagate. Note it only affects the sender of LRQ, not the forwarder.
+This setting can be overridden with configuration of a particular neighbor.
+
+<item><tt/AlwaysForwardLRQ=1/<newline>
+Default: <tt>0</tt><newline>
+<p>
+Force the gatekeeper to forward an LRQ even if there is no <bf/hopCount/
+in the LRQ. To avoid LRQ loops, you should use this option very carefully.
+This option is used only for an old-style (2.0) neighbor configuration,
+the new one reads the settings from a neighbor-specific config section.
+
+<item><tt/AcceptForwardedLRQ=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Whether to accept an LRQ forwarded from neighbors.
+This setting can be overridden with configuration
+of a particular neighbor.
+
+<item><tt/ForwardResponse=0/<newline>
+Default: <tt/0/<newline>
+<p>
+If the gatekeeper forwards received LRQ message it can decide either
+to receive the LCF response or to let it travel back directly to the LRQ
+originator. Set this option to 1, if the gatekeeper needs to receive LCF
+messages for forwarded LRQs. This setting can be overridden with configuration
+of a particular neighbor.
+
+<item><tt/ForwardLRQ=always | never | depends/<newline>
+Default: <tt/depends/<newline>
+<p>
+This settings determines whether the received LRQ should be forwarded
+or not. <tt/always/ forwards LRQ unconditionally, <tt/never/ blocks LRQ
+forwarding, <tt/depends/ tells the gatekeeper to forward LRQ only if its
+hop count is greater than 1. This setting can be overridden with configuration
+of a particular neighbor.
+
+<item><tt/AcceptNonNeighborLRQ=1/<newline>
+Default: <tt/0/<newline>
+<p>
+Whether to accept an LRQ forwarded from parties not defined as Neighbors.
+This can be used with SRV routing policy to place calls to third party GKs.
+This should be used in conjuction with a LRQ Authentication policy.
+
+<item><tt/AcceptNonNeighborLCF=1/<newline>
+Default: <tt/0/<newline>
+<p>
+This setting disables matching of the LRQ responder's IP address and
+specified neighbor IP addresses in order to accept LCF message responses
+from any IP address. This has primary importance when a
+multiple level gatekeeper hierarchy is used without routed Q.931 signaling.
+As a minimal security, only LRQ/LCF sequence numbers will be checked accordingly. This feature is required by the
+national gatekeepers connected to the Global Dialing Scheme (GDS), see
+http://commons.internet2.edu/gds.html for more information.
+WARNING: Enabling receiving LCF from other than the LRQ destination IP is a significant security risk. 
+Use this setting with extreme caution.
+</itemize>
+
+
+
+<sect2>Section &lsqb;Neighbor::...&rsqb;
+<p>
+Sections starting with <tt/[Neighbor::/ are for neighbor specific configuration.
+
+<itemize>
+<item><tt/GatekeeperIdentifier=GKID/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+Gatekeeper identifier for this neighbor. If this options is not specified,
+the identifier is taken from the second part of this <tt/Neighbor::/ section name.
+
+<item><tt/Host=192.168.1.1/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+An IP address for this neighbor.
+
+<item><tt/Password=secret/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+A password to be used to validate crypto tokens received from incoming LRQs.
+<tt/It is not yet implemented/.
+
+<item><tt/Dynamic=0/<newline>
+Default: <tt>0</tt><newline>
+<p>
+1 means that the IP address for this neighbor can change.
+
+<item><tt/SendPrefixes=004,002:=1,001:=2/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+A list of prefixes that this neighbor expects LRQs to receive for.
+If '*' is specified, LRQs will always be sent to this neighbor.
+A priority can be given to each prefix for each neighbor (using := syntax),
+so in case of multiple LCF received from multiple neighbor, the one
+with the highest priority will be selected to route the call.
+One can also direct the gatekeeper to send LRQ to this neighbor
+based on an alias type:<newline>
+SendPrefixes=h323_ID,dialedDigits,001<newline>
+
+<item><tt/AcceptPrefixes=*/<newline>
+Default: <tt>*</tt><newline>
+<p>
+A list of prefixes that the gatekeeper will accept in LRQs received
+from this neighbor. If '*' is specified, all LRQs will be accepted from this neighbor.
+One can also direct the gatekeeper to accept LRQ from this neighbor
+based on an alias type:<newline>
+AcceptPrefixes=dialedDigits<newline>
+
+<item><tt/ForwardHopCount=2/<newline>
+Default: <tt>N/A</tt><newline>
+<p>
+If the gatekeeper receives an LRQ that the destination is either unknown,
+it may forward this message to its neighbors.
+When the gatekeeper receives an LRQ and decides that the message
+should be forwarded on to another gatekeeper, it first decrements
+<bf/hopCount/ field of the LRQ.
+If <bf/hopCount/ has reached 0, the gatekeeper shall not forward the message.
+This options defines the number of gatekeepers through which an LRQ
+may propagate. Note it only affects the sender of LRQ, not the forwarder.
+
+<item><tt/AcceptForwardedLRQ=1/<newline>
+Default: <tt/1/<newline>
+<p>
+Whether to accept an LRQ forwarded from this neighbor.
+
+<item><tt/ForwardResponse=0/<newline>
+Default: <tt/0/<newline>
+<p>
+If the gatekeeper forwards received LRQ message it can decide either
+to receive the LCF response or to let it travel back directly to the LRQ
+originator. Set this option to 1, if the gatekeeper needs to receive LCF
+messages for forwarded LRQs.
+
+<item><tt/ForwardLRQ=always | never | depends/<newline>
+Default: <tt/depends/<newline>
+<p>
+This settings determines whether the received LRQ should be forwarded
+or not. <tt/always/ forwards LRQ unconditionally, <tt/never/ blocks LRQ
+forwarding, <tt/depends/ tells the gatekeeper to forward LRQ only if its
+hop count is greater than 1. This setting can be overridden with configuration
+of a particular neighbor.
+
+</itemize>
+

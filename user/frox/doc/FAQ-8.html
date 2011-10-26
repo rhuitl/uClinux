@@ -1,0 +1,106 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 0.9.21">
+ <TITLE>Frox FAQ: Network problems</TITLE>
+ <LINK HREF="FAQ-9.html" REL=next>
+ <LINK HREF="FAQ-7.html" REL=previous>
+ <LINK HREF="FAQ.html#toc8" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="FAQ-9.html">Next</A>
+<A HREF="FAQ-7.html">Previous</A>
+<A HREF="FAQ.html#toc8">Contents</A>
+<HR>
+<H2><A NAME="networking"></A> <A NAME="s8">8.</A> <A HREF="FAQ.html#toc8">Network problems</A></H2>
+
+<H2><A NAME="ss8.1">8.1</A> <A HREF="FAQ.html#toc8.1">General</A>
+</H2>
+
+<P>If you are running frox on a machine on your default route,
+and with little or no firewalling between it and either the
+outside world or your internal network you should not have
+network problems. Because of the nature of the ftp protocol
+though, if your setup is more complicated than this then you
+may run into difficulties.</P>
+<P>The easiest way of checking that your network setup isn't
+what is causing the problems is to (temporarily if you wish)
+run an ftp server on the machine which runs frox. If you can't
+ftp from your clients to this server and retrieve files O.K. 
+then your clients won't be able to ftp to frox either. Also
+try running an ftp client on the frox machine and connecting
+to a server in the outside world. If this doesn't work then
+frox obviously won't be able to do this either.</P>
+<H2><A NAME="ss8.2">8.2</A> <A HREF="FAQ.html#toc8.2">Control connection problems</A>
+</H2>
+
+<P>With a control connection problem your clients will not be
+able to connect to ftp servers through frox at all. If
+transparently proxying then check that
+outgoing tcp traffic is being redirected to frox without
+changing the destination address (ie. you must route it there,
+not use DNAT), and that the machine running frox can make a
+tcp connection to the outside world successfully</P>
+<H2><A NAME="ss8.3">8.3</A> <A HREF="FAQ.html#toc8.3">Data connection problems</A>
+</H2>
+
+<P>If the problem is with the data connection then your
+clients will be able to connect to the ftp server, login, and
+do things like print the current working directory. File
+retrievals and directory listings will fail, though you may
+find that passive mode ftp works and active doesn't, or visa
+versa.</P>
+<P>If you are having these problems I strongly reccomend that
+you set <CODE>TransparentData</CODE> to <CODE>no</CODE>, and
+<CODE>ApConv</CODE> to <CODE>yes</CODE> in the config file. The frox
+machine must be able to make tcp connections on any port to
+the outside world. It should also be possible to establish tcp
+connections in either direction between the frox machine and
+the client machines, and with no NAT being performed on these
+connections. With this setup you shouldn't have any
+problems.</P>
+<P>The above suggestions aren't strictly necessary, but things
+get more complicated without them.
+<UL>
+<LI><CODE>ApConv</CODE> = <CODE>no</CODE>: Either incoming tcp
+connections must be allowed from the outside world to the
+machine running frox, or they must be prevented only by a
+NATed (IP masquerading) firewall which is configured to
+allow ftp connections (eg. linux + ipt_nat_ftp.o
+module)</LI>
+<LI>If frox cannot make tcp connections to the client then
+clients are limited to passive mode ftp.</LI>
+<LI>If clients cannot make arbitrary tcp connections to
+frox then they are limited to active mode ftp.</LI>
+<LI>NAT between client and frox: If DNAT occurs when the
+client connects to frox (ie. the client makes the connection
+to a different IP to that which the packets frox eventually
+receives are addressed to then you should set
+<CODE>PASVAddress</CODE> to the IP which the clients should use. 
+NB. This option doesn't actually exist yet, but let me know
+if you need it and I'll consider adding it.</LI>
+<LI><CODE>TransparentData</CODE> = <CODE>yes</CODE>: This can make
+things really unpleasant. Are you <EM>sure</EM> you need
+it? These are the problems which spring to mind...
+<UL>
+<LI>Frox should be in your default route for outgoing
+tcp traffic. If you are using policy based routing to
+route only port 21 tcp traffic to frox then
+TransparentData will not work.</LI>
+<LI>Beware that frox will make connections to your
+clients that purport to be from arbitrary hosts outside
+your network. If there is a firewall/router between your
+frox and your clients with IP spoofing protection it must
+let these packets through.</LI>
+<LI>Have another read of SECURITY to remind yourself of
+the extra risks you are taking.</LI>
+</UL>
+</LI>
+</UL>
+</P>
+<HR>
+<A HREF="FAQ-9.html">Next</A>
+<A HREF="FAQ-7.html">Previous</A>
+<A HREF="FAQ.html#toc8">Contents</A>
+</BODY>
+</HTML>

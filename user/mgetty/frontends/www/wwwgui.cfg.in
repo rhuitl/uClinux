@@ -1,0 +1,130 @@
+#
+# This is a sample configuration file for the WWW gui tools for mgetty+sendfax
+#
+# The file will be read ('require wwwgui.cf') from PERL files, so it has
+# to be valid Perl5 syntax.  If you don't know perl, just do not modify
+# things that are not between quotation marks!
+#
+# RCS: $Id: wwwgui.cfg.in,v 1.7 2004/11/17 15:06:50 gert Exp $
+#
+
+#
+# ---- Generic stuff ----
+#
+
+# This is where incoming faxes can be found
+$fax_incoming = '@FAX_SPOOL_IN@';
+
+# This is where the outgoing fax queue lives
+$fax_outgoing = '@FAX_SPOOL_OUT@';
+
+# Logo to put on top of each generated WWW page
+# (this can be arbitrary HTML code, but usually is just an image and link)
+#
+$www_logo = '<a href="http://www.medat.de/"><img align="left" src="/quickfax-icons/medat-mini.gif" width=100 height=40 border="0"></a>';
+
+# do we want people to delete faxes?
+# 0 = no, 1 = yes
+# $allow_delete = 1;
+$allow_delete = 0;
+
+
+#
+# ---- Path names for the WWW stuff ----
+#
+
+# All programs have a "back to main page" link at the bottom.  This is
+# where (in the WWW tree!) this page is located, used in "<a href=...>".
+#
+$indexpage="/quickfax";
+
+#
+# ---- possible sizes and page# threshold for viewfax/givgif.cgi ---
+#
+%maxpages = ( 10 => 20, 30 => 10, 60 => 5, 100 => 1 );
+
+# what should be the default size for images if nothing is specified? 
+# (percent values)
+$defaultsize=100;
+
+#
+# ---- Helper programs for viewfax/givgif.cgi ---
+#
+
+# convert G3 image to PBM
+$g3topbm='@BINDIR@/g32pbm';
+
+# convert PBM image to GIF (could be "ppmtogif" or "pnmtogif")
+$ppmtogif='@BINDIR@/ppmtogif';
+
+# ppmquant: reduce the colors in a portable pixmap down to 256
+#
+# on some platforms, "ppmquant" seems to be hopelessly broken, so either use
+# pgmtopbm here (b/w images) or simplequant.pl (256 grey levels).
+# you might try both to see which one gives better quality for you...
+#
+$ppmquant='@BINDIR@/ppmquant 256';
+#$ppmquant='@BINDIR@/pgmtoppm';
+#$ppmquant='@LIBDIR@/simplequant.pl';
+
+# scale image to desired percentage
+$pnmscale='@BINDIR@/pnmscale';
+
+# flip image 90, 180 or 270 degrees, if necessary
+$pnmflip='@BINDIR@/pnmflip';
+
+#
+# ---- paths for temporary image files for "nph-vf-gif.cgi"
+#
+
+# this is the "real" path for the temporary images in the Unix tree.
+#
+# Make sure the user ID used for CGI-Binaries on your system has 
+# write access to this directory.
+#
+# Make sure that the images stored in this path can be reached by normal
+# WWW requests (so don't use "/tmp" etc.), also make sure that nobody
+# else uses this directory, for security reasons.
+#
+$webtmpabs="/dtmp/html";
+
+# when accessing the images from inside the WWW pages, which path
+# name should be used in the HTML text (image references) for $webtempabs?
+#
+# Usually, this is something like "/fax/tmp" or "/images/tmp" or so.
+#
+$webtmprel="/dtmp/html";
+
+#
+# Navigation 'items'
+#
+# for turning images in nph-vf-gif.cig, you can provide <img> links
+# here, or text only versions if you don't like the images.
+#
+# image version - adapt the path names!
+$turn_left='<img src="/quickfax-icons/pfeill.gif" alt="turn left" border="0">';
+$turn_right='<img src="/quickfax-icons/pfeilr.gif" alt="turn right" border="0">';
+$turn_updown='<img src="/quickfax-icons/pfeild.gif" alt="upside down" border="0">';
+$delete='<img src="/quickfax-icons/delete.gif" alt="delete" border="0">';
+#
+#
+# text only version
+#$turn_left='<';
+#$turn_right='>';
+#$turn_updown='^';
+
+#
+# Documents to choose for faxsend.cgi
+#
+# faxsend.cgi will present a list of pre-made documents to be faxed
+# easily without entering the full file name.  This list specifies the
+# files that you want to offer - the first part is the name the document
+# is listed under on the web page, the second part is the file name
+# (multiple names allowed, separate with a space).
+#
+@documents=( "Wegbeschreibung"  => "/usr/local/docs/wegbeschreibung.ps",
+             "Produkt-Liste" => "/usr/vertrieb/products.ps",
+	     "Preisliste-A" => "/usr/vertrieb/preisa.ps",
+	     "Preisliste-B" => "/usr/vertrieb/preisb.ps"
+           );
+

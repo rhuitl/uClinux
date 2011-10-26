@@ -1,0 +1,508 @@
+
+uClinux/ColdFire -- HOWTO
+-------------------------
+
+This file contains notes on specific details of uClinux/ColdFire.
+It is written in an FAQ style. The section headers are:
+
+1. Supported targets?
+2. Application set?
+3. Ethernet?
+4. Serial ports?
+5. Console baud rate?
+6. Using PPP?
+7. Using NFS?
+8. Using SMB mounted file-systems?
+9. Using hard disks with uClinux/ColdFire?
+10. Creating new RAM disk images?
+11. Customizing files on the root file-system?
+12. Generating system images?
+13. What about the web server?
+14. Hooking up to Linux serial ports?
+15. Porting apps to uClinux/ColdFire?
+16. Kernel debugging with gdb/BDM?
+17. Debugging applications?
+18. Kernel boot arguments?
+19. Kernel profiling?
+20. PCI bus support?
+21. Crypto code?
+22. uClinux/ColdFire online resource centre?
+
+
+
+OK, here we go...
+
+
+1. Supported targets?
+
+Currently the supported platforms are:
+
+. Arcturus uC5272 board (http://www.arcturusnetworks.com)
+. Arnewsh 5206 eval board
+. Arnewsh 5307 eval board
+. ESPD CF5272 EVB eval board
+. Motorola m5206eLITE eval board
+. Motorola M5206eC3 eval board
+. Motorola M5249C3 eval board
+. Motorola M5272C3 eval board
+. Motorola M5282EVB eval board
+. Motorola M5307C3 eval board
+. Motorola M5407C3 eval board
+. Netburner 5206e board (http://www.netburner.com)
+. SnapGear NETtel/SecureEdge routers (http://www.snapgear.com)
+. Telos Omnia ToolVox (5206e)
+
+There is probably others I am forgetting here, there is quite a
+large number of supported boards now. It would be fairly easy to
+support others too.
+
+
+2. Application set?
+
+The application set is generated and placed into the ROM file-system when
+compiling. It is dependant on the target platform you select during the
+"make config" step.
+
+It is easy to modify what is added to the ROMfs during compilation. Simply
+use "make config" and choose to modify the application set.
+
+
+3. Ethernet?
+
+On most boards that have ethernet hardware it is supported. This includes the
+NE2000 ethernet of the Arnewsh and Motorola eval boards, the SMC9196 of the
+NETtel, SecureEdge and eLIA platforms and the FEC built-in ethernet on the
+5272 based boards. On startup a DHCP client is started to try and fetch the
+IP address of the unit. If you don't have DHCP or bootp setup on your network
+then you will need to configure the units IP address manually.
+
+To manually configure the IP address use the usual ifconfig and route
+commands. Something like the following will be required:
+
+    ifconfig eth0 192.168.0.232
+    route add -net 192.168.0.0 netmask 255.255.255.0
+
+Where the units IP address is set to 192.168.0.232 on a network address of
+192.168.0.0, and setting the netmask to be 255.255.255.0. You may also
+want to setup a default gateway if you have a local router:
+
+    route add default gw 192.168.0.1
+
+This will set up the default route as IP address 192.168.0.1.
+Issue these commonds from the console command line.
+
+You can also setup the /etc/resolv.conf file to point to a local name server
+if you have DNS running on your network. You will need to re-compile your
+image to do this, since /etc is in a ROM file-system.  If you are using the
+NETtel/SecureEdge/SnapGear platform then you can create the resolv.conf file
+in the /etc/config directory as well - which is a non-volatile storage area.
+
+Once the IP address is set the ethernet should be going. Use ping to verify.
+By default you will also have telnetd and httpd listening. You can telnet
+into uClinux/ColdFire, or get web pages from it.
+
+
+4. Serial ports?
+
+The mcfserial.c driver supports both internal UARTs of the ColdFire
+processors. Baud rates up to at least 115200 can be generated. You should
+also be able to use any parity, data bit and stop bit combinations.
+
+Note that on the Arnewsh 5206 board the baud rate of 115200 is un-usable -
+since its 25MHz system clock cannot be nicely divided to make an accurate
+115200 baud rate. I suggest a maximum of 57600 baud, which seems to work
+quite well. Other platforms should be able to do 115200 ok.
+
+There is a simple callout program for manual serial port use, called "tip".
+It is similar to cu or the usual tip, only cut down a little. You can talk
+directly to attached modems with something like:
+
+    tip -s 57600 /dev/cua1
+
+
+5. Console baud rate?
+
+The default baud rate of the serial console depends on the board type you
+are using. Generally the dBUG based boards (Arnewsh, Cadre3 and Motorola) 
+default to 19200 baud. NETtel/SecureEdge/SnapGear default to 9600.
+
+If you want some other baud rate as the console default then modify the
+CONSOLE_BAUD_RATE define in the vendors/<Vendor>/<Product>/config.arch
+script,  or after configuration,  in the config.arch in the top directory
+of the source.
+
+
+6. Using PPP?
+
+PPP works, and chat scripting is supported. At the moment I start PPP by
+hand from a shell command line, with something like:
+
+    pppd /dev/cua1 57600 file /etc/config/cua1
+
+I have a modem connected to the second serial port. You may need to edit
+the setup files for this: /etc/config/cua1 and /etc/config/chat.cua1 for
+your configuration. Currently this setup expects the system you are
+dialing to assign uClinux/ColdFire an IP address.
+
+Be warned there is no DTR/DCD signals on the ColdFire UART's, so pppd
+probably won't be able to tell when the modem has hung up...
+
+The dialer daemon diald also works with PPP. The setup is a little
+more complex, consult the diald documentation for how to do this.
+
+
+7. Using NFS?
+
+It is really nice being able to mount your development systems files,
+and run new binaries directly after compiling!
+
+NFS is configured into the kernel by default on most true eval boards.
+To mount NFS filesystems from the network, just do something like:
+
+    mount X.X.X.X:/YYYY /mnt
+
+You will need an NFS aware mount to do this, the sash shell builtin
+mount program can not mount NFS volumes. You can use the stand-alone
+mount program if using a uClinux 2.0.x kernel.
+
+If using a 2.4.x based kernel there is a couple of additional things
+to keep in mind. You will need to start the "portmap" daemon before
+trying to mount an NFS filesystem:
+
+    portmap &
+
+And you will also have to use the busybox builtin mount/umount.
+The stand-alone mount application does not work (or even compile)
+when using a 2.4.x uClinux kernel.
+
+Also there seems to be some problem with fragmented packets and NFS.
+You will need to limit the buffer size to around 1k when mounting:
+
+    mount -orsize=1024,wsize=1024 X.X.X.X:/YYYY /mnt
+
+That should be good on 2.4.x uClinux systems.
+
+
+8. Using SMB mounted file-systems?
+
+The SMB file-system is configured into the kernel by default on most
+true eval boards. To mount a file share then you would use something
+like:
+
+    /bin/smbmount //MACHINE/SHARENAME /mnt -n -c MACHINE -I X.X.X.X
+        -U username -P passwd
+
+where MACHINE is the system that you want to mount from, SHARENAME is
+the name of an exported share from the machine, X.X.X.X is the IP
+address of the MACHINE system, and username/passwd is an authorized
+network user.
+
+This is what I use, it may or may not work on your windows network...
+There seems to be a lot of black magic involved in getting this
+going :-)
+
+
+9. Using hard disks with uClinux/ColdFire?
+
+With the right hardware you can use hard drives with uClinux/ColdFire.
+There are at least 3 platforms that have IDE interfaces, the Lineo eLIA,
+SnapGear MP3 player and the Motorola M5249C3 board. You can always build
+your own, if you feel up to it :-)
+
+The tools used are the same as for standard PC Linux. The uClinux/ColdFire
+user sources contain a port of the e2fsprogs tools for creating and fixing
+ext2 file-systems. The usefull ones are:
+
+    mke2fs  --  make an empty ext2 file-system on a device
+    e2fsck  --  repair a (possibly) damaged ext2 file-system
+
+You will also need the usual device nodes to exists in the /dev directory
+of your ROM file-system. For example you will most likely want:
+
+    /dev/hda  --  block device major=3 minor=0
+    /dev/hdb  --  block device major=4 minor=64
+
+In theory it would be possible to actually boot uClinux/ColdFire from a
+hard disk. You would need to write a boot loader for your ROM/FLASH that
+was smart enough to load an image from the hard drive though.
+
+
+10. Creating new RAM disk images?
+
+You can create your RAM disks, of any size (given RAM limits). Follow
+the directions for creating a RAM disk from the kernel documentation,
+should be /usr/src/linux/Documentation/ramdisk.txt on your host Linux
+system. Once you have a raw image you need to run a simple compressor
+over it... Do the following:
+
+    cd user/ramimage
+    gcc -O -o holes holes.c
+    ./holes ramdisk-image > ../../romfs/etc/ramfs.img
+
+Where "ramdisk-image" is the image file that you generated above.
+
+I would suggest also doing a tune2fs on the file-system, and setting
+the "interval-between-checks" to 0, so that you don't get any annoying
+"should fsck this file-system" messages when it is mounted.
+
+You may also want to think carefully about how many files you think
+you may want to create in that file-system. Adjust the number of inodes
+accordingly.
+
+There are some samples of size 64k, 128k, 256k, 512k, 1024k and 2048k
+in the user/ramimage directory...
+
+
+11. Customizing files on the root file-system?
+
+The romfs directory is the tree that is made into the root ROM file-system.
+So if you want to put files onto / then just put them under romfs, and they
+will be built into the root file system.
+
+You can configure what applications are built into the ROM file-system using
+the "make config" step.
+
+
+12. Generating system images?
+
+By default the build process generates a raw binary image that contains the
+uClinux kernel and a ROM file-system. This is suitable for loading on many
+targets "as is".
+
+However some targets may only be able to take "packaged" images. Typically
+they require either an ELF format binary, or an S-RECORD format image.
+
+The "make" process generates an ELF image file, image.elf,  that contains
+the kernel and ROM file-system and places it into the "images" directory.
+
+This build process uses objcopy to add a new segment and patch its
+load address appropriately.
+
+You can also create S-RECORD images quite easily by running:
+
+	m68k-elf-objcopy --input-target=binary --output-target=srec \
+	      images/image.bin images/image.srec
+
+
+13. What about the web server?
+
+There are currently 3 different web servers ported to uClinux/ColdFire. 
+
+The simplest is the uClinux web server, httpd. It can only deliver static
+pages. 
+
+The Boa web server is a light weight nearly full featured web server.
+It has cgi-bin and authentication support. It is also single tasking -
+not spawning of multiple processes to handle similtaneous requests.
+Boa's memory footprint is extremely small (about 85k when running).
+I highly recommend using this one. 
+
+The thttpd web server has also been ported to uClinux/ColdFire. It also
+has cgi-bin and authentication support. It does however spawn off multiple
+processes to support multiple connections, and it has a much larger memory
+foot print (about 150k when running). 
+
+
+14. Hooking up to Linux serial ports?
+
+The easiest way to set up a ColdFire evaluation board is to cable its serial
+port (or ports) back to the PC COM port(s). Under Linux the "cu" command is
+the most convenient to use for talking with the serial ports. 
+
+From the command line do something like:
+
+    cu -l cua0 -s 19200
+
+to connect to the serial port. The "-s 19200" sets the port up at 19200 baud.
+
+Note that the primary baud rate on many eval boards is 19200. But check what
+baud rate you will need to use to connect to your board. The default baud rate
+of uClinux/ColdFire serial console depends on your board.
+
+
+15. Porting apps to uClinux/ColdFire?
+
+There are a few issues that you will come across when porting existing
+Linux applications to uClinux/ColdFire. In no particular order some of
+them are:
+
+    no fork()     -- use vfork(), check semantics still OK.
+    limited libc  -- either add more to libc, or remove some functionality.
+    stack usage   -- currently apps are setup to have a fixed 4k stack.
+                     You can increase this using the "-s" option of elf2flt.
+
+Most source I have tried so far, hasn't been too bad to port. True services
+(eg apache, samba) can be a problem due to the way they use fork.
+
+
+16. Kernel debugging with gdb/BDM?
+
+You can use the Background Debugger Module (BDM) of the ColdFire with
+gdb on a local system for debugging. You get the full gdb feature set
+over the BDM cable, so this is a powerfull debugging tool. You will
+need the following to do this:
+
+    . Linux driver for BDM
+    . Patched gdb with BDM support
+    . gdb init script
+
+You can find the most recent Linux BDM driver at:
+
+    ftp://www.cybertec.com.au/pub/bdm/src/gdb-bdm-20020210.tar.gz
+
+A modified gdb is included in the binary tools package of the uClinux/ColdFire
+distribution, m68k-elf-gdb. It is ready for use with the BDM driver.
+
+Lastly you really need an appropriate .gdbinit script to use with gdb.
+You can find many sample ones in the uClinux/ColdFire binary tools package,
+under tools/misc. There is some introductory documentation on using gdb with
+the BDM driver in the file tools/misc/gdb.txt.
+
+To get full source level debugging with gdb you should turn on
+"Full Symbolic/Source level debugging" under "Kernel Hacking" in the config.
+This enables the "-g" flag and removes the "-fomit-frame-pointer" flag from
+all kernel compiles. This gives source level debugging and improves stack
+backtraces.
+
+
+17. Debugging applications?
+
+A gdbserver port exists now for debugging user applications over the network.
+You will need a cross gdb for debugging with this setup. The one included
+in the tools directory is suitable for this. If you wish to configure your
+own gdb,  you need to configure it with a target of "m68k-elf" on your host
+Linux PC system (ie. ./configure --target=m68k-elf).
+
+To debug an application remotely:
+
+    1. On uClinux/ColdFire "gdbserver :3000 app"
+    2. On host system "gdb app.gdb"
+    3. At gdb command prompt enter "target remote <IP>:3000"
+
+This procedure uses port TCP port 3000, you can use any un-used port you like.
+<IP> is the IP address of the uClinux/ColdFire hardware.
+
+Providing the application was compiled with debugging enabled (gcc -g option)
+you will get full symbolic and source level debugging. This is enabled
+automatically if the kernel "Full Symbolic/Source level debugging" flag
+is enabled in the "Kernel Hacking" section of the config.
+
+
+18. Kernel boot arguments?
+
+The uClinux kernel can accept boot time arguments in the same way that the
+standard Linux kernel can. How these can be setup varies depending on the
+exact hardware platform.
+
+The Lineo ColdFire platforms supply boot arguments that are stored in
+FLASH memory. These are typically stored in the /dev/rom2 device (this is
+on the NETtel and eLIA platforms). You can see what is currently set using
+hexdump:
+
+    hexdump /dev/rom2
+
+It should give you a dump that looks something like:
+
+   0: 43 4F 4E 53 4F 4C 45 3D-2F 64 65 76 2F 74 74 79 CONSOLE=/dev/tty
+  10: 53 30 20 00 FF FF FF FF-FF FF FF FF FF FF FF FF S0 .............
+  20: FF FF FF FF FF FF FF FF-FF FF FF FF FF FF FF FF ................
+  30: FF FF FF FF FF FF FF FF-FF FF FF FF FF FF FF FF ................
+  40: FF FF FF FF FF FF FF FF-FF FF FF FF FF FF FF FF ................
+  50: FF FF FF FF FF FF FF FF-FF FF FF FF FF FF FF FF ................
+  60: FF FF FF FF FF FF FF FF-FF FF FF FF FF FF FF FF ................
+  70: FF FF FF FF FF FF FF FF-FF FF FF FF FF FF FF FF ................
+
+You can set arguments in this region using the "flashw" command. For example
+if you wanted to add a profiling argument you would do something like:
+
+    flashw CONSOLE=/dev/ttyS0 profile=2 /dev/rom2
+
+Not all uClinux platforms support mechanisms for setting up boot arguments
+
+
+19. Kernel profiling?
+
+It is possible, and quite simple, to use kernel profiling support. There are
+two things that you will need. Firstly you need to have the Profiling
+configuration option enabled in the kernel build. Secondly you need to use
+the "readprofile" application (a port exists in the "user" directory).
+
+When running with kernel profiling enabled then you simply run the readprofile
+command, and it will report profiling information. Example output would look
+like:
+
+ 19%     25 printk                                      0.0675
+  7%      9 try_to_free_buffer                          0.0147
+  6%      8 bdflush                                     0.0121
+  7%      9 generic_file_read                           0.0061
+  9%     12 memset                                      0.3529
+ 15%     20 memcpy                                      0.5555
+  1%      2 memmove                                     0.0285
+---------------------------------------------------------------------------
+        126 total                                       0.0003
+
+If you want to clear the profiling buffer (reset it to 0) then use the "-r"
+switch of readprofile.
+
+If you just want a report on current (or average) CPU utilization then you
+need only look at the information in /proc/stat. You can use the "cpu" program
+to report this in a nice way.
+
+
+20. PCI bus support?
+
+Some ColdFire boards have PCI buses on them. The two I have worked with are
+the Lineo eLIA and the Motorola M5407C3 eval boards. uClinux/ColdFire supports
+the PCI buses on both these boards, simply enable the "PCI bus support"
+option when configuring your kernel build.
+
+The kernel PCI support will scan the PCI bus at system startup, and will
+find any PCI devices present. The kernel will also assign memory and
+interrupt resources to the found devices.
+
+To find out what the system has found and assigned on the PCI bus use the
+/proc/pci device. Simply do "cat /proc/pci", you should get output something
+like:
+
+    PCI devices found:
+      Bus  0, device  14, function  0:
+        Serial controller: Unknown vendor Unknown device (rev 1).
+          Vendor id=15aa. Device id=2000.
+          Medium devsel.  Fast back-to-back capable.  IRQ 25.  
+          Non-prefetchable 32 bit memory at 0x10000.
+          I/O at 0x100.
+          I/O at 0x200.
+          I/O at 0x300.
+
+For any PCI device then you will need a driver that actually knows how to
+deal with the device hardware. So far I have used the following boards
+successfully on the PCI bus:
+
+1.  RAStel multi-modem board (serial.c driver)
+2.  NE2000 compatible PCI 10Mb ethernet board (ne2k-pci.c driver)
+3.  Macronix 10/100 Mb ethernet board (tulip.c driver)
+
+Note that PC drivers don't work "as is". You will have to do some changes to the
+code to get them to work. For simple boards with simple programmed IO and
+interrupts the changes are generally quite simple. For devices that are PCI
+bus masters the changes are quite involved and complicated.
+
+
+21. Crypto code?
+
+No cryptographic code is shipped with uClinux/ColdFire. This is simply to
+avoid any problems with differing country regulations on export.
+
+The source tree (and makefiles) are setup to work with libdes, libssl and RC4.
+But you will have to get this source code and put it in the tree yourself.
+
+
+22. uClinux/ColdFire online resource centre?
+
+For the most upto date information on uClinux goto http://www.uclinux.org.
+
+For the latest uClinux/ColdFire information visit our online web pages at
+http://www.uclinux.org/ports/coldfire
+
+There is a portal site for uClinux at http://www.ucdot.org, too.
+

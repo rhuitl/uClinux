@@ -1,0 +1,82 @@
+# Example configuration for ulogd
+# $Id: ulogd.conf.in 714 2005-02-19 21:33:43Z laforge $
+#
+
+[global]
+######################################################################
+# GLOBAL OPTIONS
+######################################################################
+
+# netlink multicast group (the same as the iptables --ulog-nlgroup param)
+nlgroup=1
+
+# logfile for status messages
+logfile="/var/log/ulogd.log"
+
+# loglevel: debug(1), info(3), notice(5), error(7) or fatal(8)
+loglevel=5
+
+# socket receive buffer size (should be at least the size of the
+# in-kernel buffer (ipt_ULOG.o 'nlbufsiz' parameter)
+rmem=131071
+
+# libipulog/ulogd receive buffer size, should be > rmem
+bufsize=150000
+
+######################################################################
+# PLUGIN OPTIONS
+######################################################################
+
+# We have to configure and load all the plugins we want to use
+
+# general rules:
+# 1. load the plugins _first_ from the global section
+# 2. options for each plugin in seperate section below
+
+
+#
+# ulogd_BASE.so - interpreter plugin for basic IPv4 header fields
+# 		  you will always need this
+plugin="@libdir@/ulogd_BASE.so"
+
+
+# output plugins. 
+plugin="@libdir@/ulogd_LOGEMU.so"
+#plugin="@libdir@/ulogd_OPRINT.so"
+#plugin="@libdir@/ulogd_MYSQL.so"
+#plugin="@libdir@/ulogd_PGSQL.so"
+#plugin="@libdir@/ulogd_SQLITE3.so"
+#plugin="@libdir@/ulogd_PCAP.so"
+
+
+[LOGEMU]
+file="/var/log/ulogd.syslogemu"
+sync=1
+
+[OPRINT]
+file="/var/log/ulogd.pktlog"
+
+[MYSQL]
+table="ulog"
+pass="changeme"
+user="laforge"
+db="ulogd"
+host="localhost"
+
+[PGSQL]
+table="ulog"
+schema="public"
+pass="changeme"
+user="postgres"
+db="ulogd"
+host="localhost"
+
+[SQLITE3]
+table="ulog"
+db="/path/to/sqlite/db"
+buffer=200
+
+[PCAP]
+file="/var/log/ulogd.pcap"
+sync=1
+

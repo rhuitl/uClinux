@@ -1,0 +1,49 @@
+# Author   : Benoit PAPILLAULT <benoit.papillault@free.fr>
+# Creation : 22/04/2004
+# License  : GPL
+
+rootdir=@PWD@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+sysconfdir=@sysconfdir@
+libdir=@libdir@
+
+# Driver version
+VERSION=@VERSION@
+
+INSTALL=@INSTALL@
+installuser=@installuser@
+
+DIST_FILES = Makefile.in speedtouch.in speedtouch.usermap
+
+install:
+	if [ -d /etc/hotplug ]; then \
+		$(INSTALL)                        -d "$(sysconfdir)/hotplug/usb/"   ;\
+	  $(INSTALL) -m 755 speedtouch         "$(sysconfdir)/hotplug/usb/"   ;\
+		$(INSTALL) -m 644 speedtouch.usermap "$(sysconfdir)/hotplug/usb/"   ;\
+	fi
+
+# on very old system (update hotplug!), you might need to do:
+#	    cat speedtouch.usermap >> $(sysconfdir)/hotplug/usb.usermap;\
+# on others:
+#	  if [ -x /usr/sbin/update-usb.usermap ]; then                \
+#	    $(INSTALL) -d                 $(libdir)/hotplug/speedtouch/ ;\
+#	    $(INSTALL) speedtouch.usermap $(libdir)/hotplug/speedtouch/ ;\
+#	    /usr/sbin/update-usb.usermap                                ;\
+#		fi \
+
+uninstall:
+	if [ -d /etc/hotplug ]; then \
+		$(RM) "$(sysconfdir)/hotplug/usb/speedtouch"; \
+		$(RM) "$(sysconfdir)/hotplug/usb/speedtouch.usermap"; \
+	fi
+
+clean:
+
+dist:
+	mkdir "$(rootdir)/speedtouch-$(VERSION)/hotplug"
+	cp -f $(DIST_FILES) "$(rootdir)/speedtouch-$(VERSION)/hotplug"
+
+distclean:
+	$(RM) Makefile

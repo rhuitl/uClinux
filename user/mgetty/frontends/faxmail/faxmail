@@ -1,0 +1,142 @@
+#!/bin/sh
+#
+# mail->fax gateway
+#
+#
+# limited usability: only exactly one person, pete@54.rahul.net,
+# may use it.
+#
+
+# get phone number
+if [ $# -ne 1 ]
+then
+    echo "faxmail <faxnumber>" >&2
+    exit 1
+fi
+faxphone=$1
+
+#
+# copy mail (on stdin) to separate files for header and body,
+# extracting "From:" and "Reply-To:" headers on the way
+#
+head=/tmp/mf$$.head
+body=/tmp/mf$$.body
+fax=/tmp/mf$$.fax
+tmp=/tmp/mf$$.tmp
+#
+eval `awk ' function getaddr(line) {
+		b = index( line, "<" );
+		if ( b != 0 )
+		{
+		    f=substr( line, b+1 );
+		    return substr( f, 1, index( f, ">" ) -1 );
+		}
+		split( line, broken );
+		return broken[2];
+	    }
+	    BEGIN { header=1; from=""; replyto=""; subject=""; fullfrom="" }
+	    NF == 0 { if ( header ) { header = 0; next; } }
+	            { if ( header ) print >> "'$head'";
+                               else print >> "'$body'" }
+	    /^From:[ \t]/ \
+                    { if ( header ) from=getaddr($0); }
+	    /^Reply-To:[ \t]/ \
+                    { if ( header ) replyto=getaddr($0); }
+	    /^Subject:[ \t]/ \
+                    { if ( header ) subject=substr($0, 10); }
+	    /^From:[ \t]/ \
+                    { if ( header ) fullfrom=substr($0, 7); }
+	    END { printf "subject=\"%s\"; from=\"%s\"; replyto=\"%s\"; fullfrom=\"%s\"\n", \
+			 subject, from, replyto, fullfrom }
+           ' - `
+
+# determine reply address
+mailto=${replyto:-$from}
+
+test -w /tmp/mf.adrlog && echo "$from $replyto -> $mailto" >>/tmp/mf.adrlog
+
+# which is my host???
+whoami=`hostname 2>/dev/null` || whoami=`uname -n`
+
+# authentication: base on $from and $faxphone
+
+# very simple, for now
+if expr "$from" : "gert@.*.muc.de" >/dev/null || \
+   expr "$from" : ".*@RockyMountain.rahul.net" >/dev/null
+#if expr "$from" : "gert@.*.muc.de" >/dev/null 
+then
+#
+# ok. Authentication granted. Queue fax.
+#
+    echo "faxspool -f $mailto $faxphone $body" >>/tmp/mf.test
+
+    cat <<EOF >$fax
+
+    FAX FROM: $fullfrom
+          TO: $faxphone
+     SUBJECT: $subject
+
+    This fax was converted automatically from an electronic mail, so 
+    please don't wonder too much about the unusual form. Thanks.
+
+    If you have any questions about it, contact Gert Doering, Muenchen,
+    telephone ++49-89-3243228.
+
+
+    --- original message text follows ---
+
+EOF
+    cat $body >>$fax
+
+    faxspool -f "$mailto" -F "Electronic Mail Gateway" $faxphone $fax >$tmp 2>&1
+
+    ( cat <<EOF
+To: $mailto
+Cc: postmaster
+From: root@$whoami (The Automatic Fax Robot)
+Subject: Your fax to $faxphone
+
+Dear user,
+
+your fax to $faxphone has been queued. Upon delivery (or failure)
+you will be notified.
+
+regards,
+	your fax daemon
+
+--- queue log: ---
+EOF
+    cat $tmp
+    ) | /usr/lib/sendmail -t
+else
+#
+# fax denied
+#
+    ( cat <<EOF
+To: $mailto
+CC: postmaster
+From: root@$whoami (The Automatic Fax Robot)
+Subject: Your fax to $faxphone
+
+Dear user,
+
+you are not authorized to use greenie's mail-to-fax gateway service.
+
+If you want to use it, please contact the system administrator,
+root@$whoami.
+
+Thanks,
+	your fax robot
+
+------ your mail follows -------
+EOF
+    cat $head
+    echo ""
+    head -50 $body
+    ) | /usr/lib/sendmail -t
+fi
+
+# clean up
+rm -f $head $body $fax $tmp
+
+exit 0

@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Do not configure this file. Edit /etc/default/dropbear instead!
+#
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/dropbear
+NAME=dropbear
+DESC="Dropbear SSH server"
+
+DROPBEAR_PORT=22
+DROPBEAR_EXTRA_ARGS=
+NO_START=0
+
+set -e
+
+test ! -r /etc/default/dropbear || . /etc/default/dropbear
+test "$NO_START" = "0" || exit 0
+test -x "$DAEMON" || exit 0
+test ! -h /var/service/dropbear || exit 0
+
+test -z "$DROPBEAR_BANNER" || \
+  DROPBEAR_EXTRA_ARGS="$DROPBEAR_EXTRA_ARGS -b $DROPBEAR_BANNER"
+test -n "$DROPBEAR_RSAKEY" || \
+  DROPBEAR_RSAKEY="/etc/dropbear/dropbear_rsa_host_key"
+test -n "$DROPBEAR_DSSKEY" || \
+  DROPBEAR_DSSKEY="/etc/dropbear/dropbear_dss_host_key"
+
+case "$1" in
+  start)
+	echo -n "Starting $DESC: "
+	start-stop-daemon --start --quiet --pidfile /var/run/"$NAME".pid \
+	  --exec "$DAEMON" -- -d "$DROPBEAR_DSSKEY" -r "$DROPBEAR_RSAKEY" \
+	    -p "$DROPBEAR_PORT" $DROPBEAR_EXTRA_ARGS
+	echo "$NAME."
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+	start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/"$NAME".pid
+	echo "$NAME."
+	;;
+  restart|force-reload)
+	echo -n "Restarting $DESC: "
+	start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/"$NAME".pid
+	sleep 1
+	start-stop-daemon --start --quiet --pidfile /var/run/"$NAME".pid \
+	  --exec "$DAEMON" -- -d "$DROPBEAR_DSSKEY" -r "$DROPBEAR_RSAKEY" \
+	    -p "$DROPBEAR_PORT" $DROPBEAR_EXTRA_ARGS
+	echo "$NAME."
+	;;
+  *)
+	N=/etc/init.d/$NAME
+	echo "Usage: $N {start|stop|restart|force-reload}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

@@ -1,0 +1,61 @@
+This adds the ability to put rules into a filter/include/exclude file
+in last-match-wins order.  All you need to do is to start the file with
+this line:
+
+[last-match]
+
+--- orig/exclude.c	2005-07-07 19:49:14
++++ exclude.c	2005-02-26 03:22:20
+@@ -73,6 +73,7 @@ static BOOL parent_dirscan = False;
+ static struct filter_struct **mergelist_parents;
+ static int mergelist_cnt = 0;
+ static int mergelist_size = 0;
++static int reversing_rules = 0;
+ 
+ /* Each filter_list_struct describes a singly-linked list by keeping track
+  * of both the head and tail pointers.  The list is slightly unusual in that
+@@ -231,6 +232,9 @@ static void add_rule(struct filter_list_
+ 	if (!listp->tail) {
+ 		ret->next = listp->head;
+ 		listp->head = listp->tail = ret;
++	} else if (reversing_rules) {
++		ret->next = listp->head;
++		listp->head = ret;
+ 	} else {
+ 		ret->next = listp->tail->next;
+ 		listp->tail->next = ret;
+@@ -957,6 +961,7 @@ void parse_filter_file(struct filter_lis
+ 	char line[MAXPATHLEN+MAX_RULE_PREFIX+1]; /* +1 for trailing slash. */
+ 	char *eob = line + sizeof line - 1;
+ 	int word_split = mflags & MATCHFLG_WORD_SPLIT;
++	int save_reversing_rules = reversing_rules;
+ 
+ 	if (!fname || !*fname)
+ 		return;
+@@ -992,6 +997,7 @@ void parse_filter_file(struct filter_lis
+ 	}
+ 	dirbuf[dirbuf_len] = '\0';
+ 
++	reversing_rules = 0;
+ 	while (1) {
+ 		char *s = line;
+ 		int ch, overflow = 0;
+@@ -1015,6 +1021,10 @@ void parse_filter_file(struct filter_lis
+ 			s = line;
+ 		}
+ 		*s = '\0';
++		if (*line == '[' && strcmp(line+1, "last-match]") == 0) {
++			reversing_rules = 1;
++			continue;
++		}
+ 		/* Skip an empty token and (when line parsing) comments. */
+ 		if (*line && (word_split || (*line != ';' && *line != '#')))
+ 			parse_rule(listp, line, mflags, xflags);
+@@ -1022,6 +1032,7 @@ void parse_filter_file(struct filter_lis
+ 			break;
+ 	}
+ 	fclose(fp);
++	reversing_rules = save_reversing_rules;
+ }
+ 
+ /* If the "for_xfer" flag is set, the prefix is made compatible with the

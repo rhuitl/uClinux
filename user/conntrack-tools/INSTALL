@@ -1,0 +1,196 @@
+Copyright (C) 2005-2007 Pablo Neira Ayuso <pablo netfilter org>
+
+0.Introduction
+==============
+
+ The conntrack-tools package contains two programs:
+
+  - conntrack:	the command line interface to interact with the connection 
+		tracking system.
+
+  - conntrackd: the connection tracking userspace daemon that can be used to
+  		deploy highly available GNU/Linux firewalls and collect 
+		statistics of the firewall use.
+
+1. Requirements
+===============
+
+ You have to install the following software in order to get the conntrack-tools
+ working, make sure that you have installed them correctly before going forward:
+
+ o linux kernel version >= 2.6.18 (http://www.kernel.org) with support for:
+     - connection tracking system (quite obvious ;)
+     - nfnetlink
+     - ctnetlink (ip_conntrack_netlink)
+     - connection tracking event notification API
+     	(To check that the event API is enabled in the kernel, make sure
+	 you have loaded nf_netlink_conntrack module, run conntrack -E and 
+	 generate traffic, you should see network events)
+
+ o libnfnetlink: the netfilter netlink library available at:
+
+     <http://www.netfilter.org/projects/libnfnetlink/files/>
+
+ o libnetfilter_conntrack: the netfilter conntrack library available at:
+
+     <http://www.netfilter.org/projects/libnetfilter_conntrack/files/>
+
+2.Basic Installation
+====================
+
+ To compile and install conntrack-tools just follow the classical steps:
+
+	$ ./configure
+	$ make
+	# make install
+
+ Up to this point, the command line interface `conntrack' is ready for use,
+ see man conntrack(8). However, the userspace daemon so-called `conntrackd' 
+ requires some magic spells to get it working.
+
+3.Setting up conntrackd
+=======================
+
+ conntrackd currently have two working modes: statistics and synchronization
+ modes, both details here below.
+
+3.1. Synchronization Mode
+=========================
+
+ Conntrackd can replicate the status of the connections that are currently
+ being processed by your stateful firewall based on Linux. This section
+ describes how to setup the daemon in synchronization mode:
+
+
+ o Keepalived version 1.x (http://www.keepalived.org)
+     check if your distribution comes with a recent version
+
+3.1.2. Configuration
+
+ 1) Setting up keepalived
+
+    There is an example file available inside the conntrackd tarball:
+
+    For node 1: conntrackd-x.x.x/examples/sync/_type_/node1/keepalived.conf
+    For node 2: conntrackd-x.x.x/examples/sync/_type_/node2/keepalived.conf
+
+    These files can be used to set up a simple VRRP cluster composed of
+    two machines that hold the virtual IPs 192.168.0.100 on eth0 and
+    192.168.1.100 on eth1.
+
+    If you are not familiar with keepalived, please read the official
+    docs available at http://www.keepalived.org
+
+    Please, make sure that keepalived is correctly working before passing
+    to step 2)
+
+ 2) Setting up conntrackd
+
+    To setup 'conntrackd' in synchronization mode, you have to put the
+    configuration file in the directory /etc/conntrackd.
+
+    On node 1:
+	# cp examples/sync/_type_/node1/conntrackd.conf /etc/conntrackd.conf
+
+    On node 2:
+        # cp examples/sync/_type_/node1/conntrackd.conf /etc/conntrackd.conf
+
+    Where _type_ is the synchronization type selected, currently there are
+    two: the persistent mode and the NACK mode. The persistent mode consumes
+    more resources than the NACK mode but resolves synchronization issues 
+    better. On the other the NACK mode reduces resource consumption. I'll
+    provide more information on both approaches soon.
+
+    Do not forget to edit the files in order to adapt them to the
+    setting that you are deploying.
+
+    Note: If you don't want to put the config file under /etc/conntrackd,
+    just tell conntrackd where to find it passing the option -C
+
+ 3) Running conntrackd
+
+    Conntrackd can run in console mode, in that case just type 'conntrackd',
+    otherwise, if you want to run it in daemon mode the type 'conntrackd -d'.
+
+ 4) Checking that conntrackd is working fine
+
+    Conntrackd comes with several facilities to check its status:
+
+    - Dump the cache of connections that are currently being processed by
+      this node (aka. internal cache):
+
+    # conntrackd -i
+
+    - Dump the cache of connections that has been transfered from
+      others active nodes in the network (aka. external cache)
+
+    # conntrackd -e
+
+    - Dump statistics collected by the replication daemon:
+
+    # conntrackd -s
+
+ 5) Setting up interaction with keepalived
+
+    If keepalived detects the failure of the active node, then it designates
+    a candidate node that will replace the failing active. On such event,
+    the external cache, eg. the cache that contains the connections processed
+    by other nodes, must be commited. To commit the external cache, just type:
+
+    # conntrackd -c
+
+    See that keepalived provides a shell script interface to interact with
+    other programs, so we can automate the process of commiting the external
+    cache by introducing the following line in the keepalived file:
+
+    notify_master /etc/conntrackd/script_master.sh
+
+    The script 'script_master.sh' just the following:
+
+    #!/bin/sh
+    /usr/sbin/conntrackd -c
+
+    Therefore, on failure event, the candidate node takes over the virtual
+    IPs and the connections that the failing active was processing. Observe
+    that this file differs for the NACK mode.
+
+ 6) Disable TCP window tracking
+
+ Until the appropiate patches don't go into kernel mainline, you will have
+ to disable TCP window tracking, consider this as a temporary solution:
+
+    # echo 1 > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_be_liberal
+
+3.2. Statistics mode
+====================
+
+ Conntrackd can also run as statistics daemon, if you are not interested in
+ this mode, just skip it. It is not required in order to get the
+ synchronization mode working. This section details how to setup the daemon
+ in statistics mode:
+
+3.2.1. Requirements
+
+ No extra requirements to set up the statistics mode apart from those detailed
+ in section 1.
+
+3.2.2. Configuration
+
+ Setting up conntrackd in statistics mode is rather easy. Just copy the
+ configuration file
+
+    # cp examples/stats/conntrackd.conf /etc/conntrackd.conf
+
+3.2.3. Running conntrackd in statistics mode
+
+ To run conntrackd in statistics mode:
+
+    # conntrackd -S
+
+ Alternatively, you can run conntrackd in daemon mode:
+
+    # conntrackd -S -d
+
+ In order to dump the statistics, just type:
+
+    # conntrackd -s

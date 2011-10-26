@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+#From: klaus@snarc.greenie.muc.de (Klaus Weidner)
+#Subject: new_fax fuer lj
+#To: gert@greenie.muc.de (Gert Doering)
+#Date: Thu, 10 Mar 1994 09:49:16 +0100 (MET)
+#
+# sample script to auto-print incoming faxes on a HP laserjet
+# (FAX_NOTIFY_PROGRAM in policy.h)
+#
+
+# make sure $PATH includes the pbm tools!
+PATH=/usr/bin:/bin:/usr/local/bin
+
+HUP="$1"
+SENDER="$2"
+PAGES="$3"
+
+G3TOPBM=/usr/local/bin/g32pbm
+shift 3
+P=1
+
+while [ $P -le $PAGES ]
+do
+	FAX=$1
+	RES=`basename $FAX | sed 's/.\(.\).*/\1/'`
+
+	if [ "$RES" = "n" ]
+	then
+		STRETCH="-s"
+	else
+		STRETCH=""
+	fi
+
+	$G3TOPBM $STRETCH $FAX \
+	| pnmscale -xysize 2479 3508 \
+	| pgmtopbm -fs \
+	| pbmtolj -resolution 300 \
+	| lpr
+
+	shift
+	P=`expr $P + 1`
+done
+
+exit 0
+#-- 
+#\ klaus@snarc.greenie.muc.de--kweidner@physik.tu-muenchen.de--2:246/55.4
+#\ .signature error -- quote dumped
+

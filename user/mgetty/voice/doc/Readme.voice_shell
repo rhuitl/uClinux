@@ -1,0 +1,577 @@
+
+                           vgetty voice shell commands
+                          -----------------------------
+
+              The voice extensions for the mgetty package
+
+                    Copyright (C) 1995, 1997 Marc Eberhard.
+                    Many contributions by others, including
+                    Marc SCHAEFER <schaefer@alphanet.ch>, the
+                    current vgetty maintainer.
+                       http://www-internal.alphanet.ch/~schaefer/vgetty.html
+
+                          Voice shell command guide
+
+             Writen by Mizser Krisztian <christo@dundi.sch.bme.hu>
+           (please email me corrections, additional informations ...)
+
+
+
+ 1.) Introduction
+ 2.) Default behaviour of vgetty (if you don't specify "call_program"
+     in voice.conf)
+ 3.) Custom behaviour of vgetty (if you specify "call_program" in voice.conf)
+ 4.) The structure of "call_program" (and the other "*_programs" 's)
+  4.1) General things
+  4.2) Example script
+  4.3) Another script
+ 5.) Commands / answers to/from the voice library and explanation of them
+
+     All command interpretation is done in voice/libvoice/shell.c. The C
+     code might be a little bit more up-to-date than this documentation ;-)
+
+ 6.) Possible events, detected tones
+ 7.) Converting voice files to/from your modem's format
+ 8.) Logging
+
+
+
+ 1.) Introduction
+
+
+  Vgetty is a great tool for creating an answering machine or any other
+  system that uses your voice modem's capabilities. It is fully
+  customizable, so you can create your own system with features you
+  would like.
+  Vgetty can play, record messages, can detect DTMF tones, data/fax
+  calling tones.
+  Vgetty works with mgetty closely, so it calls mgetty when data or fax
+  connection is needed to establish.
+
+  You can control the behaviour of vgetty in voice.conf. The options
+  are well explained in voice.conf, please read them to have an idea
+  what vgetty can do and how it does them.
+
+
+
+ 2.) Default behaviour of vgetty (if you don't specify "call_program"
+     in voice.conf):
+
+
+  NOTE: Stuff within double quotes "" refers to variables in voice.conf
+
+  Vgetty answers the phone after "rings" rings, then plays the greeting
+  message specified in "message_list" (if specified). During playing the
+  modem reports detected DTMF tones, vgetty handles these as follows:
+  A DTMF command is in the form of *numbers# , if vgetty detects such a
+  sequence, it stops playing, then executes "dtmf_program" if specified
+  with 'numbers' as argument (without * and #).
+  If vgetty detects a single number only, it stops playing, then tries to
+  make a data connection with the remote end, if it doesn't succeed, then
+  it tries a fax connection with the remote end.
+  If vgetty detects an empty # character (without *numbers  before it), then
+  it simply hangs up the phone.
+  If no DTMF was received during playing, vgetty issues a beep command, then
+  it switches to recording mode, when the remote end can say the message to
+  be recorded. Recording ends if DTMF tones detected as described above (in
+  this case vgetty removes the recorded message),
+  or if "record_max_len" time exceeded, or if the remote end hangs up.
+  When finished, vgetty executes "message_program" if specified with the
+  recorded filename as argument.
+
+  NOTE: In this case vgetty gives different names to the recorded messages,
+        you don't need to bother with this question.
+
+
+ 3.) Custom behaviour of vgetty (if you specify "call_program" in voice.conf):
+
+
+  Vgetty answers the phone after "rings" rings, then executes the shell script
+  defined by "call_program". After the "call_program" terminates, vgetty does
+  different actions depending on the exit code as follows:
+     Exit code 1: vgetty tries to make a DATA connection with the remote end
+     Exit code 2: vgetty tries to make a FAX connection with the remote end
+     Exit code 3: vgetty first tries to make a DATA, then in case of
+                  unsuccess a FAX connection with the remote end
+     If none of
+     the above  : vgetty closes the device and exits.
+
+  NOTE: All the above mentioned programs (call_program, dtmf_program,
+        message_program, button_program) are standard shell scripts executed
+        by /bin/sh (Marc, is it true?)
+  NOTE: In this case, you have to give different names to your recorded
+        messages, vgetty cannot do this for you since you control everything
+        in your script.
+
+
+ 4.) The structure of "call_program" (and the other "*_programs" 's:
+
+ 4.1) General things
+
+  Most of you who want to do something else than vgetty's default behaviour
+  will have to define "call_program" in voice.conf and write a nice shell
+  script that handles everything after the modem picks up the phone.
+  The principles: A shell script communicates with the voice library through
+  unique file descriptors ($VOICE_INPUT and $VOICE_OUTPUT). See the two basic
+  function 'receive' and 'send' in scripts/demo.sh . Just define these two
+  functions in each of your scripts, and you don't have to deal with them
+  anymore. So what do these two functions do?
+  Receive: It reads one message from the voice library.
+  Send   : It passes one message (command) to the voice library.
+   (The voice library is just the interface between your shell script and the
+    modem. It translates the modem's messages to normal, human readable strings
+    and vice versa.)
+  You can consider the messages from the voice_library as members in a FIFO
+  (first-in first-out) queue. You can read one message from the queue using
+  the receive function (it will return the oldest message in the queue).
+  Every time your modem detects something or just executes your commands, it
+  adds a message to the queue (for example: PLAYING, DTMF_DETECTED, READY, etc.)
+
+
+
+  4.2) Example script
+
+
+   Now that you understand the basic behaviour of the system, let's see an
+   example (scripts/dtmf.sh):
+
+     function receive :
+     function send    : we discussed these two functions above
+
+     ANSWER=`receive`
+
+    // Executes the "receive" function and puts the returned message in a
+    // variable named ANSWER
+
+     if [ "$ANSWER" != "HELLO SHELL" ]; then
+          echo "$0: voice library not answering" >&2
+          exit 1
+     fi
+
+    // If the message contained in ANSWER is not "HELLO SHELL" then exit,
+    // because something's wrong.
+
+     send "HELLO VOICE PROGRAM"
+
+    // Executes the "send" function that passes the "HELLO VOICE PROGRAM" to the
+    // voice library
+
+     ANSWER=`receive`
+
+     if [ "$ANSWER" != "READY" ]; then
+          echo "$0: initialization failed" >&2
+          exit 1
+     fi
+
+    // If the ANSWER wasn't "READY" then exit, something's wrong.
+    // So far nothing happened, we just made sure that the communication between
+    // our script and the voice library is OK. You have to start every script
+    // like this one.
+
+
+     send "DEVICE DIALUP_LINE"
+     ANSWER=`receive`
+     if [ "$ANSWER" != "READY" ]; then
+          echo "$0: could not set output device" >&2
+          exit 1
+     fi
+
+    // Sets the output device to dialup line.
+
+     if [ -f demo.rmd ]; then
+          send "PLAY demo.rmd"
+
+    // Let's play demo.rmd
+
+          ANSWER=`receive`
+
+          if [ "$ANSWER" != "PLAYING" ]; then
+               echo "$0: could not start playing" >&2
+               exit 1
+          fi
+
+    // After the PLAY command, voice library should return "PLAYING"
+
+          ANSWER=`receive`
+
+          if [ "$ANSWER" != "READY" ]; then
+               echo "$0: something went wrong on playing" >&2
+               exit 1
+          fi
+
+    // When the playing is finished, we get "READY"
+    // If no events occur during playing, the script just waits until
+    // playing is finished (e.g. READY)
+    // Function 'receive' won't return until an event happens.
+
+     fi
+
+          send "BEEP"
+          ANSWER=`receive`
+
+          if [ "$ANSWER" != "BEEPING" ]; then
+               echo "$0: could not send a beep" >&2
+               exit 1
+          fi
+
+          ANSWER=`receive`
+
+          if [ "$ANSWER" != "READY" ]; then
+               echo "$0: could not send a beep" >&2
+               exit 1
+          fi
+
+    // Send out a BEEP, wait for answer (BEEPING, when finished: READY)
+
+          send "RECORD demo.rmd"
+          ANSWER=`receive`
+
+          if [ "$ANSWER" != "RECORDING" ]; then
+               echo "$0: could not start recording" >&2
+               exit 1
+          fi
+
+          ANSWER=`receive`
+
+          if [ "$ANSWER" != "READY" ]; then
+               echo "$0: something went wrong on recording" >&2
+               exit 1
+          fi
+
+    // Send a RECORD command, wait for answer (RECORDING, when finished: READY)
+
+     send "GOODBYE"
+     ANSWER=`receive`
+
+     if [ "$ANSWER" != "GOODBYE SHELL" ]; then
+          echo "$0: could not say goodbye to the voice library" >&2
+          exit 1
+     fi
+
+    // We don't want to do anything else, send a GOODBYE to the voice library
+    // If the answer is "GOODBYE SHELL", then the library got our request, and
+    // stops communicating with us.
+
+     exit 0
+
+    // Leave the shell script with exit code 0 .
+
+
+    It was a very simple script, it just played a greeting message, then sent
+    a beep to the line, then recorded a message.
+
+ 4.3) Another script
+
+    Let's see a more complicated example, where we want to handle the events
+    during playing the greeting message.
+
+
+        send "ENABLE EVENTS"
+        ANSWER=`receive`
+        if [ "$ANSWER" != "READY" ]; then
+              echo "$0: something's wrong" >&2
+              exit 1
+        fi
+
+    // This command enabled events reporting to the script. You need this if
+    // you want to detect and handle events (dtmf codes, calling tones)
+
+     if [ -f demo.rmd ]; then
+          send "PLAY demo.rmd"
+     fi
+
+     while true; do
+          ANSWER=`receive`
+
+          case $ANSWER in
+               PLAYING)
+                    ANSWER=`receive`
+                    case $ANSWER in
+                         READY)            send "PLAY demo.rmd";;
+                         RECEIVED_DTMF)    send "STOP"; proc_dtmf;;
+                         LOOP_BREAK|BUSY_TONE) send "STOP"; receive; send "GOODBYE";
+                                           receive; exit 0;;
+                         FAX_CALLING_TONE) send "STOP"; receive;
+                                           send "GOODBYE"; receive; exit 2;;
+                    esac;;
+          esac
+     done
+
+  In this example we play the greeting message in an infinite loop. During
+  playing we can check what the modem reports. If we get a dtmf code
+  (RECEIVED_DTMF), then we call our dtmf handling function (proc_dmtf). If
+  the remote end hangs up (at my place it manifests in BUSY_TONE, but
+  normally it should be LOOP_BREAK, signalling remote hangup), then we
+  stop playing, say GOODBYE to the voice library, then exit with code 0.
+  If the modem detects a fax calling tone (FAX_CALLING_TONE), then we stop
+  playing and exit with code 2 (which means that mgetty tries to make a fax
+  connection with the remote end). You can see that there is a 'receive' after
+  STOP and GOODBYE, they are for getting the READY and "GOODBYE SHELL" answers.
+  (in fact we should check if another event happened after issuing STOP)
+  It is that simple. We just have to make sure we read all messages from the
+  voice library. In order to do that, we need to know the possible answers
+  to our commands, and the possible messages, events from the voice library.
+  (For a more complicated example see scripts/voice_mail.sh )
+
+
+
+ 5.) Commands and answers to/from the voice library and explanation of them
+
+
+  In the following table you can see all the commands and the possible answers
+  for that particular command.
+
+
+ Command:       ""
+ Answers:       "HELLO SHELL"
+ Explanation:   After the very first 'receive' in your script, you should
+                get this answer from the voice library. It means that the
+                voice lib is ready for your commands.
+
+ Command:       "HELLO VOICE PROGRAM"
+ Explanation:   This should be the first command you issue, it will start
+                the conversation between your script and the voice lib.
+ Answers:       "READY": If everything's ok, voice lib will return this.
+
+ Command:       "ENABLE EVENTS"
+ Explanation:   Enables event reporting to the shell (dtmf codes, data/fax
+                calling tones, silence, quiet)
+ Answers:       "READY": Voice lib got your request.
+
+ Command:       "DISABLE EVENTS"
+ Explanation:   Disables event reporting to the shell.
+ Answers:       "READY": Voice lib got your request.
+
+ Command:       "DEVICE argument"
+ Possible Args: NO_DEVICE, DIALUP_LINE, INTERNAL_MICROPHONE, 
+                EXTERNAL_MICROPHONE, INTERNAL_SPEAKER,
+                LOCAL_HANDSET, EXTERNAL_SPEAKER,
+                DIALUP_WITH_INT_SPEAKER, DIALUP_WITH_EXT_SPEAKER, 
+                DIALUP_WITH_INTERNAL_MIC_AND_SPEAKER, 
+                DIALUP_WITH_EXTERNAL_MIC_AND_SPEAKER, 
+                DIALUP_WITH_LOCAL_HANDSET
+ Explanation:   This command sets the device that vgetty will use.
+ Answers:       "READY": Device is set
+                "DEVICE_NOT_AVAILABLE": Device Setting not supported
+                "ERROR": Error
+
+ Command:       "BEEP [frequency [length]]"
+ Explanation:   Sends a beep through the chosen device (if frequency or
+                length are not given, the defaults from voice.conf are used)
+ Answers:       "BEEPING": Beeping is executed right now.
+                "ERROR": Beeping failed.
+                "READY": Beeping ended.
+
+ Command:       "DIAL number"
+ Explanation:   Dials the given number.
+ Answers:       "DIALING": Current action is dialing.
+                "ERROR": Error, dialing aborted.
+                "READY": Dialing ended.
+
+ Command:       "GET TTY"
+ Explanation:   Returns the modem device currently in use.
+ Answers:       "READY" after <Device id>
+
+ Command:       "GET MODEM"
+ Explanation:   Returns the voice modem driver name, for example
+                "US Robotics", see ../libvoice/*.c, at the end
+                of the file (the big structure). Then returns "READY".
+                The goal of this function is to for example choose the
+                right RMD file format to pass for PLAY.
+ Answers:       "READY" after <voice driver name>
+
+ Command:       "AUTOSTOP argument"
+ Possible Args: ON, OFF
+ Explanation:   With AUTOSTOP on, the voicelib will automatically abort a
+                play in progress and return READY. This is useful for faster
+                reaction times for voice menus.
+ Answers:       "READY": Voicelib ready again.
+
+ Command:       "GOODBYE"
+ Explanation:   Stops conversation with the voice lib.
+ Answers:       "GOODBYE SHELL": Voice lib stops conversation.
+
+ Command:       "PLAY filename" or "PLAY filename number"
+ Explanation:   Plays filename through the chosen device (the file must be in
+                your modem's format!!! See section 7)
+ Answers:       "PLAYING": 'filename' is being played.
+                "READY": Playing of 'filename' has ended.
+                "ERROR": An Error occured
+ Notes: if you specify an optional non zero third numerical argument, this
+        changes the DTMF semantic: it will make the multi-DTMF detection more
+        reliable when used with ``AUTOSTOP''. For details, please look
+        at Al Borcher's perl vgetty shell script.
+
+ Command:       "RECORD filename"
+ Explanation:   Records filename from the chosen device (recorded file will be
+                in your modem's format! See section 7)
+ Answers:       "READY" after "RECORDING": 'filename' was recorded.
+                "READY" after "ERROR" after "RECORDING":
+                       Recording of 'filename' has failed.
+
+ Command:       "WAIT seconds"
+ Explanation:   Waits for 'seconds' seconds. During waiting, events will be
+                detected and reported!
+ Answers:       "READY" after "WAITING": Waiting is over.
+                "READY" after "ERROR" after "WAITING": Waiting failed. 
+                (Note, that after READY events will NOT be 
+                 reported to the shell!)
+
+
+ Command:       "STOP"
+ Explanation:   Stops current action (DIALING, PLAYING, RECORDING or WAITING)
+                Current state will be IDLE. ( Please note, that events will NOT
+                be reported after "STOP" . If you don't want to do anything
+                but to detect events, then try the WAIT command.
+ Answers:       "READY": Current action successfully stopped.
+
+
+ Command:       "DTMF number"
+ Explanation:   Contributed by <cadams@ro.com>, this adds support for sending
+                DTMFs over the voice modem from the voice shell.
+                The argument is the DTMFs to dial. This can be used for
+                example to use vgetty as a voice-mailbox poller.
+ Answers        "READY" after "DTMFING": DTMF signals send
+               "READY" after "ERROR" after "DTMFING": Operation failed
+
+ Command:       "QUOTE"
+ Explanation:   Contributed by <gonz@ratloop.com>, this adds support for
+                sending modem-specific raw AT commands to the voice modem
+                from the voice shell. The argument is the command to issue.
+                Please do not use this lightly since it makes your voice
+                shell script modem dependant.
+ Answers        "ERROR": Modem reported an error.
+               "READY": Command executed.
+
+ Command:       "GETFAX"
+ Explanation:   For receiving a FAX.
+ Answers        "RECEIVING", then "READY".
+
+ Command:       "SENDFAX parameter(s)r"
+ Explanation:   For sending a FAX.
+ Answers        "READY": Sending finished.
+                "ERROR": Error
+
+ If something fails, you get "ERROR" as answer. That can mean two things,
+ either you tried to issue multiple commands, e.g. a second PLAY command
+ before stopping the first (vgetty will complain about this, saying
+ "Nested command in shell script"), or something's really broken (hardware,
+ software).
+
+
+ 6.) Possible events, detected tones
+
+
+ Please note, that events will only be reported if you issue an "ENABLE EVENTS"
+ command, and current action is either PLAYING, RECORDING, WAITING or
+ DIALING. After finishing these actions ("READY"), events won't be reported.
+ (Use WAIT if you don't want to do anything but get events)
+
+
+ Event:        BONG_TONE
+ Description:  The modem detected a bong tone on the line.
+
+ Event:        BUSY_TONE
+ Description:  The modem detected busy tone on the line. Note that the
+               proper IS-101 way to signal remote hangup is
+               LOOP_BREAK.
+
+ Event:        CALL_WAITING
+ Description:  Defined in IS-101.
+
+ Event:        DIAL_TONE
+ Description:  The modem detected dial tone on the line.
+
+ Event:        DATA_CALLING_TONE
+ Description:  The modem detected data calling tone on the line.
+
+ Event:        DATA_OR_FAX_DETECTED
+ Description:  The modem detected data or fax calling tones on the line.
+
+ Event:        FAX_CALLING_TONE
+ Description:  The modem detected fax calling tone on the line.
+
+ Event:        HANDSET_ON_HOOK
+ Description:  Locally connected handset went on hook.
+
+ Event:        HANDSET_OFF_HOOK
+ Description:  Locally connected handset went off hook.
+
+ Event:        LOOP_BREAK
+ Description:  Defined in IS-101. This usually is for remote hangup.
+
+ Event:        LOOP_POLARITY_CHANGE
+ Description:  Defined in IS-101.
+
+ Event:        NO_ANSWER
+ Description:  After dialing the modem didn't detect answer for the time
+               give in dial_timeout in voice.conf.
+
+ Event:        NO_CARRIER
+ Description:  The caller has hung up. For now, this event is detected only
+               by the ISDN4Linux driver.
+
+ Event:        NO_DIAL_TONE
+ Description:  The modem didn't detect dial tone (make sure your modem is
+               connected properly to your telephone company's line, or check
+               the ATX command if dial tone in your system differs from
+               the standard)
+
+ Event:        NO_VOICE_ENERGY
+ Description:  It means that the modem detected voice energy at the
+               beginning of the session, but after that there was a
+               period of XXX seconds of silence (XXX can be set with
+               the AT+VSD command...at least on ZyXELs)
+
+ Event:        RING_DETECTED
+ Description:  The modem detected an incoming ring.
+
+ Event:        RINGBACK_DETECTED
+ Description:  The modem detected a ringback condition on the line.
+
+ Event:        RECEIVE_DTMF
+ Description:  The modem detected a dtmf code, you can get the code with an
+               additional 'receive' command.
+
+ Event:        SILENCE_DETECTED
+ Description:  The modem detected that there was no voice energy at the
+               beginning of the session and after that for XXX seconds.
+               (XXX can be set with the AT+VSD command...at least on ZyXELs)
+
+ Event:        SIT_TONE
+ Description:  Defined in IS-101.
+
+ Event:        TDD_DETECTED
+ Description:  Defined in IS-101.
+
+ Event:        VOICE_DETECTED
+ Description:  The modem detected a voice signal on the line. IS-101 does
+               not define, how the modem makes this decision, so be careful.
+
+ Event:        UNKNOWN_EVENT
+ Description:  None of the above :)
+
+
+
+ 7.)  Converting voice files to/from your modem's format
+
+
+   Under directory 'pvftools' there are a number of useful utilities that
+   can be used to convert voice files. Vgetty can only handle voice files
+   converted to your modem's format. After recording, recorded files are
+   in your modem's format. Converting a voice file (say 'wav') to rmd
+   (raw modem format, that is the format your modem accepts data) takes
+   two steps. First you have to convert your file to pvf (portable voice
+   format) with ??topvf (?? = wav in our case), then use pvftormd with
+   the proper arguments (see pvtormd -h for a help).
+   The other way is similar (rmdtopvf , pvfto??).
+   Browse through pvftools, there are other useful utilities there, too.
+
+
+
+ 8.) Logging
+
+   You can set the desired log level in voice.conf, log path can be set
+   in voice/include/paths.c (It defaults to /var/log).
+
+

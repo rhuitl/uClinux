@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# make.coverpg -- simple version, use pbmtext (crude, but good example)
+#
+# Author: gert@greenie.muc.de
+#
+# Syntax:
+#	make.coverpg   <pages>  <sender-ID>   <sender-NAME>   <receiver-ID>
+#	<receiver-NAME> <date> <time>
+#
+
+#
+# if called with "-m <memo-file>", put that file on cover page:
+MEMO=""
+if [ X$1 = X-m ] ; then
+    MEMO=$2
+    shift ; shift
+fi
+
+#
+# select font according to resolution
+if [ X$normal_res = X ]
+then
+    font=/usr/local/lib/mgetty+sendfax/cour25.pbm
+else
+    font=/usr/local/lib/mgetty+sendfax/cour25n.pbm
+fi
+
+tmp=/tmp/coverpg.$$
+
+#
+# standard part of page
+#
+cat << EOF >$tmp
+
+
+
+      +----------------------------------------+
+      |  T E L E F A X   ----   M E S S A G E  |
+      +----------------------------------------+
+
+
+      Sender:  $3
+	 Fax:  $2
+
+
+      Receipient:  $5
+	     Fax:  $4
+
+      Pages (incl. cover page):  $1
+
+
+      Date fax created: $6  $7
+
+
+
+
+      Fax-Software used: mgetty+sendfax 1.1.10
+
+
+
+EOF
+
+#
+# if desired, attach MEMO file
+#
+if [ ! -z "$MEMO" ] ; then
+    echo "    Message:" >>$tmp
+    echo "" >>$tmp
+    sed -e 's/^/       /' -e '40,$d' $MEMO >>$tmp 
+fi
+
+#
+# now make G3 file -> stdout
+#
+cat $tmp | pbmtext -font $font | pbmtog3
+rm -f $tmp

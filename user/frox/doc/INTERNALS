@@ -1,0 +1,79 @@
+Source code Files
+~~~~~~~~~~~~~~~~~
+Always compiled:
+  main.c      - General setup. Listen for and fork new sessions.
+  data.c      - Data connection forwarding.
+  control.c   - Session startup. Control session parsing commands.
+  ftp-cmds.c  - List of ftp commands and functions to act on them.
+  misc.c      - Miscellaneous functions, mainly socket stuff.
+  configs.c   - Config file parsing, and carrying out some config file options.
+  str.c       - Safe (?) buffer handling code.
+
+Conditionally compiled:
+  ntp.c       - Non transparent proxy support. (default on)
+ (linux|bsd).c - Data connection NAT stuff.
+  cache.c     - Generic cache code.
+  httpcache.c - Cache module to route requests through an HTTP proxy.
+ localcache.c - Local caching module.
+  cachemgr.c  - Cache manager code for local cache.
+  vscan.c     - Virus scanning for local cache.
+  transdata.c - Client/server stuff for transparent proxied data connections.
+  ssl.c       - ssl connections between frox and the ftp server
+
+Important Functions
+~~~~~~~~~~~~~~~~~~~
+The main loop is run_daemon() in main.c - it forks a new process for
+each new connection and only terminates when sent a SIGKILL/SIGSTOP.
+
+Each new connection starts in init_session() which gets a USER command
+for ntp if necessary, makes the connection to the remote host, and
+initialises the cache if this is an anonymous session.
+
+run_loop() is the main loop for each session. It just loops calling
+get_control_line() and {client,data}_control_forward().
+
+get_control_line() selects on the necessary fds. It deals with
+accepting and forwarding data connections as necessary, and only
+returns once it has the control line it was asked for. If it was asked
+for a control line from one of the client/server and data arrives on
+the other it is buffered.
+
+extract_{server,client}_cmd() are the functions which do the initial
+reading and parsing of the raw control streams.
+
+parse_client_cmd() decides what to do with the ftp commands. There are
+a number of arrays that match commands to functions to process them.
+The main one is in ftp_cmds.c, but there are also some in the caching
+code if it is compiled in. All these arrays are held in
+info->cmd_arrays, and parse_client_cmd() works through them until it
+finds a command that matches.
+
+We set a SIGALRM each time we receive some activity on a connection.
+If a write blocks or the session is quiet for too long it doesn't get
+reset and we die.
+
+Caching
+~~~~~~~
+
+Caching code gets called at session initialisation and with a number
+of ftp commands so it can follow what is going on. It gets called for
+a file retrieve and can either forward it on or return a file
+descriptor the file can be read from. During file retrieval each read
+buffer is sent to cache_inc_data() which has the chance to read or
+edit it.
+
+Local caching is almost all implemented in the cachemgr.c file which
+runs in a separate process. It sends back file descriptors to the
+other processes - for cached files a file descriptor to read the file
+from, and for uncached ones one to write to.
+
+Transparent proxying of data Connections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Transparently proxying data connections requires doing NAT both on
+connections we make and to intercept other connections. This requires
+root priveliges which are retained by a separate process forked off at
+startup. This process is communicated with over a socket - requests
+are sent, and file descriptors passed back.
+
+

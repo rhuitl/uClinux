@@ -1,0 +1,383 @@
+/**@name Portable Windows Libaray
+
+	A multi-platform operating system and GUI abstraction system for
+	application development.
+
+@memo	A Portable Text and GUI C/C++ Class Libarary.
+@version	1.2.0
+@author	Equivalence Pty. Ltd.
+*/
+ 
+//@{
+
+/**@name Introduction
+\begin{center}
+ 	{\Large{\bf Welcome to the wonderful world of PWLib}}
+\end{center}
+
+PWLib is a moderately large class library that has its genesis many years ago as
+a method to product applications to run on both Microsoft Windows and Unix
+X-Windows systems. It also was to have a Macintosh port as well but this never
+eventuated.
+
+Since then the system has grown to having quite good application to areas other
+than mere Windows GUI portability. Classes for I/O portability, multi-threading
+portability, aid in producing unix daemons and NT services portably and all
+sorts of internet protocols were added over the years.
+
+All this over and above basic "container" classes such as arrays, linear lists,
+sorted lists (RB Tree) and dictionaries (hash tables) which were all created
+before STL became the answer to all our prayers. Unfortunately, due to intertia
+and the GNU C++ inadequate support of templates, this library will probably not
+be ported to STL in the near future.
+
+The library was used extensively for all our in-house products. Then we decided
+to support the open H323 project by throwing in some of the code written for
+one of our products. Thus, required PWLib so it got thrown into the open source
+world as well.
+
+ \begin{center}
+ 	{\Large{\bf Enjoy!}}
+ \end{center}
+*/
+ 
+/**@name	Using PWLib
+Detailed tutorials will almost certainly not be forthcoming. However,
+at least giving you an indication on how to start an application would
+be usefull, so here is the infamous "Hello world!" program.
+\begin{verbatim}
+// hello.cxx
+
+#include <ptlib.h>
+
+class Hello : public PProcess
+{
+  PCLASSINFO(Hello, PProcess)
+  public:
+	void Main();
+};
+
+PCREATE_PROCESS(Hello)
+
+void Hello::Main()
+{
+  cout << "Hello world!\n";
+}
+
+// End of hello.cxx
+\end{verbatim}
+
+The \Ref{CREATE_PROCESS} macro actually defines the #main()# function
+and creates an instance of Hello. This assures that everything is
+initialised in the correct order. C++ does initialisation of global
+statics badly (and destruction is even worse), so try to put
+everything into your PProcess descedent rather than globals.
+
+A GUI application is very similar but is descended off
+\Ref{PApplication} rather than \Ref{PProcess}, and would create a
+window as a descendent off the \Ref{PMainWindow} class.
+
+@memo	Brief examples.
+*/
+
+/**@name	Console Mode Classes
+		This as far as possible "normalises" different operating systems to
+                a single API so the same application can be compiled without modification.
+   @memo	Classes that embody operating system abstractions.
+  */
+    //@{
+	/**@name Base Object Class
+   	   @memo The base class for all other clasess in the system, plus some
+		 additional low level support classes/functions eg memory management.
+	  */
+	    //@{
+		//@Include: include/ptlib/object.h
+	    //@}
+	/**@name Container Classes
+   	   @memo Classes that contain other objects.
+	  */
+	    //@{
+		//@Include: include/ptlib/contain.h
+		//@Include: include/ptlib/array.h
+		//@Include: include/ptlib/lists.h
+		//@Include: include/ptlib/dict.h
+		//@Include: include/ptlib/pstring.h
+	    //@}
+	/**@name I/O Channel Classes
+   	   @memo Classes that perform general I/O
+	  */
+	    //@{
+		//@Include: include/ptlib/channel.h
+		//@Include: include/ptlib/indchan.h
+		//@Include: include/ptlib/conchan.h
+		//@Include: include/ptlib/pipechan.h
+		//@Include: include/ptlib/serchan.h
+		//@Include: include/ptlib/file.h
+		//@Include: include/ptlib/textfile.h
+		//@Include: include/ptlib/sfile.h
+		//@Include: include/ptlib/filepath.h
+		//@Include: include/ptlib/pdirect.h
+		//@Include: include/ptlib/vconvert.h
+	    //@}
+	/**@name Socket Classes
+   	   @memo Classes that perform Berkely Sockets I/O
+	  */
+	    //@{
+		//@Include: include/ptlib/socket.h
+		//@Include: include/ptlib/ipsock.h
+		//@Include: include/ptlib/ipdsock.h
+		//@Include: include/ptlib/udpsock.h
+		//@Include: include/ptlib/tcpsock.h
+		//@Include: include/ptlib/icmpsock.h
+		//@Include: include/ptlib/ipxsock.h
+		//@Include: include/ptlib/spxsock.h
+		//@Include: include/ptlib/ethsock.h
+	    //@}
+	/**@name Process and Thread Classes
+   	   @memo Classes that handle processes, multi-threading and synchronsiation.
+	  */
+	    //@{
+		//@Include: include/ptlib/pprocess.h
+		//@Include: include/ptlib/svcproc.h
+		//@Include: include/ptlib/thread.h
+		//@Include: include/ptlib/semaphor.h
+		//@Include: include/ptlib/mutex.h
+		//@Include: include/ptlib/syncpoint.h
+		//@Include: include/ptlib/syncthrd.h
+	    //@}
+	/**@name Miscellaneous Classes
+	  */
+	    //@{
+		//@Include: include/ptlib/args.h
+		//@Include: include/ptlib/config.h
+		//@Include: include/ptlib/ptime.h
+		//@Include: include/ptlib/timeint.h
+		//@Include: include/ptlib/timer.h
+		//@Include: include/ptlib/dynalink.h
+		//@Include: include/ptlib/sound.h
+                //@Include: include/ptlib/video.h
+                //@Include: include/ptlib/videoio.h
+		//@Include: include/ptlib/remconn.h
+		//@Include: include/ptlib/mail.h
+	    //@}
+    //@}
+
+/**@name	Console Mode Components
+
+		These classes provide a large amount of higher level functionality
+		that is built on the basic Console Classes which provides the
+		Operating System abstractions.
+
+   @memo	Non-operating system specific classes that may be used as
+		components in applications.
+  */
+    //@{
+	/**@name Internet Protocol Classes
+	  */
+	    //@{
+		//@Include: include/ptclib/inetprot.h
+		//@Include: include/ptclib/inetmail.h
+		//@Include: include/ptclib/mime.h
+		//@Include: include/ptclib/ftp.h
+		//@Include: include/ptclib/telnet.h
+		//@Include: include/ptclib/socks.h
+	    //@}
+	/**@name HTTP Classes
+	  */
+	    //@{
+		//@Include: include/ptclib/http.h
+		//@Include: include/ptclib/url.h
+		//@Include: include/ptclib/html.h
+		//@Include: include/ptclib/httpform.h
+		//@Include: include/ptclib/httpsvc.h
+	    //@}
+	/**@name ASN.1 Support Classes
+	  */
+	    //@{
+		//@Include: include/ptclib/asner.h
+	    //@}
+	/**@name Miscellaneous Classes
+	  */
+	    //@{
+		//@Include: include/ptclib/modem.h
+		//@Include: include/ptclib/ipacl.h
+		//@Include: include/ptclib/random.h
+		//@Include: include/ptclib/cypher.h
+		//@Include: include/ptclib/pssl.h
+		//@Include: include/ptclib/pwavfile.h
+		//@Include: include/ptclib/dtmf.h
+	    //@}
+    //@}
+
+/**@name	GUI Mode Classes
+
+		These classes abstract Graphics User Interface elements for use
+		by multiple platforms. Each element is implemented in the native
+		manner for that platform eg X Windows/Motif.
+
+   @memo	Classes that embody windowing system abstractions.
+  */
+    //@{
+	/**@name Interactor Classes
+	  */
+	    //@{
+		//@Include: include/pwlib/interact.h
+		//@Include: include/pwlib/ilayout.h
+		//@Include: include/pwlib/titlewnd.h
+		//@Include: include/pwlib/toplwnd.h
+		//@Include: include/pwlib/mdidoc.h
+		//@Include: include/pwlib/mdiframe.h
+		//@Include: include/pwlib/scrollab.h
+		//@Include: include/pwlib/popup.h
+		//@Include: include/pwlib/balloon.h
+	    //@}
+	/**@name Menu Classes
+	  */
+	    //@{
+		//@Include: include/pwlib/menuent.h
+		//@Include: include/pwlib/rootmenu.h
+		//@Include: include/pwlib/submenu.h
+		//@Include: include/pwlib/menuitem.h
+		//@Include: include/pwlib/menusep.h
+	    //@}
+	/**@name Control Classes
+	  */
+	    //@{
+		//@Include: include/pwlib/control.h
+		//@Include: include/pwlib/ncontrol.h
+		//@Include: include/pwlib/pbutton.h
+		//@Include: include/pwlib/tbutton.h
+		//@Include: include/pwlib/ibutton.h
+		//@Include: include/pwlib/rbutton.h
+		//@Include: include/pwlib/checkbox.h
+		//@Include: include/pwlib/check3.h
+		//@Include: include/pwlib/choicbox.h
+		//@Include: include/pwlib/combobox.h
+		//@Include: include/pwlib/listbox.h
+		//@Include: include/pwlib/clistbox.h
+		//@Include: include/pwlib/slistbox.h
+		//@Include: include/pwlib/listview.h
+		//@Include: include/pwlib/editbox.h
+		//@Include: include/pwlib/meditbox.h
+		//@Include: include/pwlib/pwedbox.h
+		//@Include: include/pwlib/numedbox.h
+		//@Include: include/pwlib/intedit.h
+		//@Include: include/pwlib/realedit.h
+		//@Include: include/pwlib/scrollb.h
+		//@Include: include/pwlib/hscrollb.h
+		//@Include: include/pwlib/vscrollb.h
+		//@Include: include/pwlib/stattext.h
+		//@Include: include/pwlib/staticon.h
+		//@Include: include/pwlib/statrect.h
+		//@Include: include/pwlib/statbox.h
+	    //@}
+	/**@name Dialog Classes
+	  */
+	    //@{
+		//@Include: include/pwlib/dialog.h
+		//@Include: include/pwlib/modaldlg.h
+		//@Include: include/pwlib/floatdlg.h
+		//@Include: include/pwlib/simpdlg.h
+		//@Include: include/pwlib/opendlg.h
+		//@Include: include/pwlib/filedlg.h
+		//@Include: include/pwlib/savedlg.h
+		//@Include: include/pwlib/dirdlg.h
+		//@Include: include/pwlib/fontdlg.h
+		//@Include: include/pwlib/pclrdlg.h
+		//@Include: include/pwlib/printdlg.h
+		//@Include: include/pwlib/prjobdlg.h
+		//@Include: include/pwlib/prsetdlg.h
+	    //@}
+	/**@name Graphics Classes
+	  */
+	    //@{
+		//@Include: include/pwlib/point.h
+		//@Include: include/pwlib/dim.h
+		//@Include: include/pwlib/rect.h
+		//@Include: include/pwlib/region.h
+		//@Include: include/pwlib/colour.h
+		//@Include: include/pwlib/rcolour.h
+		//@Include: include/pwlib/font.h
+		//@Include: include/pwlib/rfont.h
+		//@Include: include/pwlib/fontfam.h
+		//@Include: include/pwlib/palette.h
+		//@Include: include/pwlib/pattern.h
+		//@Include: include/pwlib/canstate.h
+		//@Include: include/pwlib/canvas.h
+		//@Include: include/pwlib/icanvas.h
+		//@Include: include/pwlib/dcanvas.h
+		//@Include: include/pwlib/rcanvas.h
+		//@Include: include/pwlib/mcanvas.h
+		//@Include: include/pwlib/pcanvas.h
+		//@Include: include/pwlib/image.h
+		//@Include: include/pwlib/pict.h
+		//@Include: include/pwlib/pixels.h
+		//@Include: include/pwlib/pixels1.h
+		//@Include: include/pwlib/pixels2.h
+		//@Include: include/pwlib/pixels24.h
+		//@Include: include/pwlib/pixels32.h
+		//@Include: include/pwlib/pixels4.h
+		//@Include: include/pwlib/pixels8.h
+	    //@}
+	/**@name Miscellaneous Classes
+	  */
+	    //@{
+		//@Include: include/pwlib/applicat.h
+		//@Include: include/pwlib/stdresid.h
+		//@Include: include/pwlib/resdata.h
+		//@Include: include/pwlib/rstring.h
+		//@Include: include/pwlib/caret.h
+		//@Include: include/pwlib/cursor.h
+		//@Include: include/pwlib/icon.h
+		//@Include: include/pwlib/imgicon.h
+		//@Include: include/pwlib/clipbrd.h
+		//@Include: include/pwlib/keycode.h
+		//@Include: include/pwlib/prinfo.h
+		//@Include: include/pwlib/commands.h
+		//@Include: include/pwlib/mailgui.h
+	    //@}
+    //@}
+
+ /**@name	GUI Mode Components
+
+		These classes provide a large amount of higher level functionality
+		that is built on the basic GUI Classes which provides the
+		GUI system abstractions.
+
+    @memo	Non-windowing system specific classes that may be used as
+		components in applications.
+  */
+    //@{
+	/**@name Tool and Status Bars
+	  */
+	    //@{
+		//@Include: include/pwclib/toolbars.h
+	    //@}
+	/**@name Window Splitter Controls
+	  */
+	    //@{
+		//@Include: include/pwclib/splitter.h
+	    //@}
+	/**@name Wizard Dialog
+	  */
+	    //@{
+		//@Include: include/pwclib/wizard.h
+	    //@}
+	/**@name ANSI Terminal Control
+	  */
+	    //@{
+		//@Include: include/pwclib/ansiterm.h
+	    //@}
+	/**@name Geometric Shapes 
+	  */
+	    //@{
+		//@Include: include/pwclib/shapes.h
+	    //@}
+	/**@name Miscellaneous Classes
+	  */
+	    //@{
+		//@Include: include/pwclib/progress.h
+	    //@}
+    //@}
+
+//@}

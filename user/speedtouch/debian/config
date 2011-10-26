@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+. /usr/share/debconf/confmodule
+
+db_beginblock
+
+if ! grep -q usbdevfs$ /proc/filesystems && ! modprobe -q usbcore >/dev/null; then
+	db_reset speedtouch/no_usbdevfs
+	db_input medium speedtouch/no_usbdevfs
+fi
+
+if ! grep -q ^hdlc /proc/tty/ldiscs && ! modprobe -q n_hdlc >/dev/null; then
+	db_reset speedtouch/no_hdlc
+	db_input medium speedtouch/no_hdlc
+fi
+
+if ! grep -q ^pppsync /proc/tty/ldiscs && ! modprobe -q ppp_synctty >/dev/null; then
+	db_reset speedtouch/no_pppsync
+	db_input medium speedtouch/no_pppsync
+fi
+
+db_endblock
+db_go

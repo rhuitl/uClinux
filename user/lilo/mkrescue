@@ -1,0 +1,695 @@
+#!/bin/bash
+#
+# mkrescue
+#
+#	30-Oct-2001	original version 1.0
+#
+# Revision history:
+#	09-Apr-2002	John Coffman	modify for lilo 22.3   1.1
+#	09-Jun-2002	John Coffman	get keyboard translation table 1.2
+#					(suggested by Qing Liu)
+#	07-May-2003	John Coffman	add nowarn for lilo 22.5.2  1.3
+#	13-May-2003	John Coffman	use default image, add append=  1.4
+#	24-May-2003	John Coffman	specify ext2 params for xtra space
+#	26-May-2003	John Coffman	el-torito-bootable-CD   2.1
+#	30-May-2003	   "		add lilo version check  2.1
+#	07-Jul-2003	   "		determine loopback dynamically 2.3
+#	29-Aug-2004	   "		allow --root LABEL=lblname  2.4
+#	01-Sep-2004	   "		fix check for LILO version  2.4
+#	03-Oct-2004	   "		get root= from /etc/fstab   2.5
+#	15-Nov-2004	   "		support --iso --size HD	    3.0
+#	18-Aug-2005	   "		applied temp-file security patch 3.1
+#	25-Sep-2005	   "		log config file on --debug  3.2
+#	04-Oct-2005	   "		new 'master' determination  3.2
+#	07-Oct-2005	   "		add -v0 -w to usages of -I  3.2
+#
+
+debug=false
+#debug=true
+
+# set the version number on this command
+version=3.2
+
+# set the version of LILO required to run
+major=22
+minor=6
+revision=1
+
+log=$(pwd)/mkrescue.log
+clog=$(pwd)/mkrescue.conf.log
+
+
+usage () {
+    cat <<EOF
+
+usage:	`basename $0` [--help]
+	`basename $0` [--version]
+	`basename $0` [--device <device>] [--fast] [--fs ext2|msdos|minix]
+	    [--image <label>] [--install text|menu] [--keymap <keymap.ktl>] 
+	    [--initrd <file> --kernel <file>] [--append <string>]
+	    [--root <device>] [--nocompact] [--noformat]
+	    [--iso] [--size 1440|1200|2880|HD]
+
+  --device  is the floppy drive; e.g.,  /dev/fd0
+  --fast  specifies creation using a loopback device, which may be faster
+  --fs  is the filesystem to make on the device; e.g.,  ext2
+  --help  prints this helpfile
+  --iso  create a bootable ISO image to burn to a CD-R or CD-RW
+  --keymap  is the keyboard translation table; default to same as lilo.conf
+  --noformat  bypasses creation of a new filesystem on device
+  --nocompact  omits lilo map file compaction
+  --size  is assumed to be 1440 (1.44M), unless 1200 or 2880 is specified
+	HD may be specified for ISO images
+  --image  specifies the label of the kernel/initrd if not the default
+  --install  text is the default for floppies, menu for ISO images
+  --initrd and --kernel  are the initial ramdisk & kernel files
+  --append  is a string used to specify kernel options
+  --root  is the root filesystem for the boot floppy; e.g., current
+  --version  prints the version number of `basename $0`
+
+Used without any arguments, `basename $0` will use the default kernel in
+/etc/lilo.conf, the companion initrd (if any), and the specified root
+filesystem to make a bootable rescue floppy.
+
+EOF
+#
+# --install & --debug are undocumented above
+#
+#
+    exit $1
+}
+
+if [ $debug != false ]; then
+	lilo=$(pwd)/lilo
+	config=$(pwd)/lilo.conf
+else
+	lilo=/sbin/lilo
+	config=/etc/lilo.conf
+fi
+
+compact=-c
+device=/dev/fd0
+fs=ext2
+tmpbase=${TMPDIR:-/tmp}/mkrescue_$$
+mount=$tmpbase/mkrescue-flp
+mfile=$tmpbase/mkrescue-emu
+mtemp=$tmpbase/mkrescue-tmp
+loopback=loop0
+looppart=loop1
+install=text
+isoimage=no
+format=yes
+image=
+root=
+bios=0x00
+fast=slow
+size=0
+heads=2
+sectors=18
+cylinders=80
+hdsize=16384
+bootcmd=
+append=
+initrd=
+boot=/boot
+diag=no
+master=
+
+VERSION=$($lilo -V | sed "/version/s/.*n //" | sed "/,/s/,.*//" )
+
+NVERSION=$(echo $VERSION | sed "s/\\./ /g")
+
+DASH=$(echo $VERSION | sed "/-/s/.*-//" )
+if [ "$DASH" = "$VERSION" ]; then
+	DASH=0
+else
+	NVERSION=$(echo $NVERSION | sed "s/-.*//")
+fi
+MAJOR=$(echo $NVERSION | sed "s/ .*//")
+MINOR=$(echo $NVERSION | sed -e "s/$MAJOR //" -e "s/ .*//" )
+if [ "$MINOR" = "$NVERSION" ]; then
+	MINOR=0
+fi
+REVISION=$(echo $NVERSION | sed "s/$MAJOR $MINOR //")
+if [ "$REVISION" = "$NVERSION" ]; then
+	REVISION=0
+fi
+REVISION=$(echo $REVISION | sed "s/ .*//")
+if [ "$MINOR" -gt 49 ]; then MINOR=$(expr $MINOR % 10); fi
+
+if [ $debug = true ]; then
+echo ""
+echo VERSION $VERSION
+echo ""
+echo MAJOR $MAJOR
+echo MINOR $MINOR
+echo REVISION $REVISION
+echo DASH $DASH
+echo ""
+fi
+
+#if [ "$MAJOR" -lt "$major" \
+#	-o "$MINOR" -lt "$minor" \
+# 		-o $REVISION -lt "$revision" ]
+skip=false
+if [ "$REVISION" -lt "$revision" ]
+then
+skip=true
+#echo $REVISION lt $revision
+fi
+if [ "$MINOR" -gt "$minor" ]
+then
+skip=false
+#echo $MINOR gt $minor
+fi
+if [ "$MAJOR" -gt "$major" ]
+then
+skip=false
+#echo $MAJOR gt $major
+fi
+if [ "$skip" = "true" ]
+then
+    echo `basename $0` version $version
+    echo "LILO version $major.$minor.$revision (or newer) is required."
+    exit 0
+fi
+
+umount $mount 2>/dev/null
+rm -rf $tmpbase 2>/dev/null
+mkdir $tmpbase || {
+    echo "Could not create temporary directory."
+    exit 1
+}
+
+master=`mount | grep " / " | cut -d " " -f 1`
+master=`echo $master | sed "s/part[0-9]*$/disc/"`
+master=`echo $master | sed "s/[0-9]*$//"`
+if [ ! -b $master ]; then master=`echo $master | sed "s/p$//"`; fi
+if [ ! -b $master ]; then master=""  ; fi
+
+
+while [ $# -gt 0 ]; do
+    case $1 in
+	--append)
+	    shift
+	    append=$1
+	    ;;
+	--debug)
+	    debug=true
+	    ;;
+	--device)
+	    shift
+	    device=$1
+	    ;;
+	--fast)
+	    fast=fast
+	    ;;
+	--fs)
+	    shift
+	    fs=$1
+	    ;;
+	-h)
+	    usage 0
+	    ;;
+	--help)
+	    usage 0
+	    ;;
+	--image)
+	    shift
+	    image=$1
+	    ;;
+	--initrd)
+	    shift
+	    initrd=$1
+	    ;;
+	--install)
+	    shift
+	    install=$1
+	    ;;
+	--iso)
+	    isoimage=yes
+	    ;;
+	--kernel)
+	    shift
+	    kernel=$1
+	    ;;
+	--keymap)
+	    shift
+	    keymap=$1
+	    ;;
+	--nocompact)
+	    compact=
+	    ;;
+	--noformat)
+	    format=no
+	    ;;
+	--root)
+	    shift
+	    root=$1
+	    ;;
+	--size)
+	    shift
+	    size=$1
+	    ;;
+	--version)
+	    echo `basename $0` version $version
+	    exit 0
+	    ;;
+	*)
+	    echo "unrecognized argument: " $1
+	    usage 1
+	    ;;
+    esac
+
+    shift
+done
+
+if [ -z $image ]; then
+#	image=`cat /proc/cmdline | sed "s/.*BOOT_IMAGE=//" | sed "s/ .*//"`
+	image=`$lilo -C $config -v0 -w -I " " D`
+fi
+
+if [ -z $kernel ]; then
+	kernel=`$lilo -C $config -v0 -w -I $image i`
+	if [ "$kernel" = "" ]; then exit 1;
+	elif [ $debug = "true" ]; then echo kernel = "$kernel";
+	fi
+fi
+
+if [ -z $root ]; then
+	root=`$lilo -C $config -v0 -w -I $image R`
+	if [ "$root" = "No root specified" ]; then
+		root=`grep </etc/fstab -v "^[ \t]*#" |
+			grep "[[:space:]]/[[:space:]]" | \
+				sed -e "s/^[ \t]*//" -e "s/[ \t].*//"`
+		if [ -z $root ]; then
+			root=`mount | grep " on / type" | sed "s/ .*//"`
+		fi
+		if [ -z $root ]; then
+			echo "Cannot find mounted root partition"
+			echo "Using current root"
+			root=current
+		fi
+	fi
+	if [ $debug = true ]; then echo root = "$root";
+	fi
+fi
+
+if [ -z $initrd ]; then
+	initrd=`$lilo -C $config -v0 -w -I $image r`
+	if [ "$initrd" = "" ]; then exit 1;
+	elif [ $debug = "true" ]; then echo initrd = "$initrd";
+	fi
+fi
+if [ "$initrd" = "No initial ramdisk specified" ]; then initrd= ; fi
+
+if [ -z $append ]; then
+	append=`$lilo -C $config -v0 -w -I $image a`
+	if [ "$append" = "" ]; then exit 1;
+	elif [ $debug = "true" ]; then echo append = \"$append\";
+	fi
+fi
+if [ "$append" = "No append= was specified" ]; then append= ; fi
+
+if [ -z $keymap ]; then
+	keymap=`$lilo -C $config -v0 -w -I $image k`
+	if [ "$keymap" = "" ]; then exit 1;
+	elif [ $debug = "true" ]; then echo keymap = "$keymap";
+	fi
+fi
+
+if [ $isoimage = yes ]; then
+    fast=fast
+    if [ $size = 0 ]; then
+	size=2880
+    elif [ $size = HD -o $size = hd ]; then
+	size=$hdsize
+    fi
+    if [ $device = "/dev/fd0" ]; then
+	device=rescue.iso
+    fi
+else
+	umount $device 2>/dev/null 1>/dev/null
+fi
+
+if [ $size = 0 ]; then
+    size=1440
+fi
+
+if [ $size = 1200 ]; then
+    sectors=15
+elif [ $size = 1440 ]; then
+    sectors=18
+elif [ $size = 2880 ]; then
+    sectors=36
+    install=menu
+    if [ -f $boot/diag1.img -a -f $boot/diag2.img ]; then
+	diag=yes
+    fi
+elif [ $size = $hdsize ]; then
+    sectors=32
+    heads=8
+    cylinders=$(($size/$sectors/$heads*2))
+    if [ $size != $(($sectors*$heads*$cylinders/2)) ]; then
+	echo Internal error in HDsize
+	exit 1
+    fi
+    install=menu
+    if [ -f $boot/diag1.img -a -f $boot/diag2.img ]; then
+	diag=yes
+    fi
+elif [ $size = HD -o $size = hd ]; then
+    echo "--size $size  may only be used with the  --iso  option."
+    exit 1
+else
+    echo "--size must be 1200 or 1440; --size 1440 assumed."
+    sectors=18
+    size=1440
+fi
+
+if [ $fs != msdos -a $fs != ext2 -a $fs != minix ]; then
+    echo "illegal option:  --fs" $fs
+    echo "   must be either  msdos  or  ext2  or  minix"
+    exit 1
+fi
+
+if [ $fs = msdos ]; then
+	mountconfig=$mount/lilo.cnf
+else
+	mountconfig=$mount/lilo.conf
+fi
+
+if [ $debug = "true" ]; then
+	umount $mfile
+
+	echo ""
+
+	echo lilo = $lilo
+	echo device = $device
+	echo image = $image
+	echo kernel = $kernel
+	echo initrd = $initrd
+	echo append = \"$append\"
+	echo install = $install
+	echo format = $format
+	echo fs = $fs
+	echo size = $size
+	echo root = $root
+	echo compact = $compact
+	echo keymap = $keymap
+	echo isoimage = $isoimage
+	echo master = $master
+	echo ""
+	echo pause after parameter display
+	read aline
+fi
+
+if [ ! -f $kernel ]; then
+	echo "Kernel file " $kernel " does not exist"
+	exit 1
+fi
+
+if [ ! -z $initrd ]; then
+	if [ ! -f $initrd ]; then
+		echo "Initial ramdisk file " $initrd " does not exist"
+		exit 1
+	fi
+fi
+
+if [ $isoimage != yes ]; then
+	echo ""
+	echo "Insert a blank floppy into $device"
+	echo "All information on this floppy will be destroyed"
+	echo "Press [Enter] to proceed, ^C to abort"
+	read aline
+fi
+
+if [ "$fast" = fast ]; then
+
+	rm -rf $mount $mfile
+	mkdir $mount
+	dd bs=1024 count=$size of=$mfile if=/dev/zero
+	bsize=$size
+	mpart=$mfile
+	if [ $size = $hdsize ]; then
+	    bios=0x80
+	    bsize=$(($size-$sectors))
+	    cat > $mtemp <<EOF
+n
+p
+1
+
+
+a
+1
+w
+EOF
+	    echo Partitioning HD "file   (this will take a minute)"
+	    fdisk -b 512 -S $sectors -H $heads -C $cylinders \
+		$mfile < $mtemp > /dev/null 2> /dev/null
+	    rm -f $mtemp
+	    echo bsize = $bsize
+#read aline
+	    losetup -d /dev/$loopback 2>/dev/null
+            losetup -d /dev/$looppart 2>/dev/null
+            losetup /dev/$loopback $mfile
+	    losetup -o $(($sectors*512)) /dev/$looppart $mfile
+	    mpart=/dev/$looppart
+	fi
+	echo Making filesystem
+	if [ "$fs" = ext2 ]; then
+		echo y | mkfs.$fs -N 24 -b 1024 $mpart $bsize
+	else
+		echo y | mkfs.$fs $mpart
+	fi
+	echo Mounting filesystem
+#read aline
+	if [ $size != $hdsize ]; then
+	    mount -t $fs -o rw,loop $mfile $mount
+	    loopback=`mount | grep $mfile | sed -e "sX.*loop=/dev/XX" -e "s/).*//"`
+	else
+	    mount -t $fs -o rw $mpart $mount
+	fi
+	if [ $debug = true ]; then
+		mount
+	fi
+	disk="/dev/$loopback"
+	if [ $debug = true ]; then
+		echo "disk=$disk"
+	fi
+
+else
+
+	if [ "$format" = "yes" ]; then
+		echo Formatting $device with $fs filesystem...
+		dd of=$device if=/dev/zero bs=512 count=1
+		if [ "$fs" = ext2 ]; then
+			mkfs -t $fs -N 24 -b 1024 $device 1>/dev/null 2>/dev/null
+		else
+			mkfs -t $fs $device 1>/dev/null 2>/dev/null
+		fi
+		echo done.
+		echo ""
+	fi
+
+	rm -rf $mount
+	mkdir $mount
+	mount -t $fs -o rw $device $mount
+
+	rm -rf $mount/*
+	disk=$device
+
+fi
+
+cat > $mountconfig <<EOF
+#  Begin mkrescue $version configuration file
+install=$install
+boot=$device
+map=map
+backup=/dev/null
+message=message
+prompt
+timeout=150
+nowarn
+geometric
+disk=$disk bios=$bios
+  sectors=$sectors heads=$heads cylinders=$cylinders
+EOF
+if [ $size = $hdsize ]; then
+	echo "  max-partitions=7" >>$mountconfig
+	echo "  partition=/dev/$looppart  start=$sectors" >>$mountconfig
+	echo static-bios-codes >>$mountconfig
+	bios=0x81
+else
+	bios=0x80
+fi
+
+if [ "$master" != "" -a $isoimage = yes ]; then
+	echo "disk=$master" >>$mountconfig
+	echo "  bios=$bios" >>$mountconfig
+elif [ "$master" != "" -a $debug = true ]; then
+	echo "disk=$master" >>$mountconfig
+	echo "  bios=$bios" >>$mountconfig
+fi
+
+if [ $keymap != us.ktl ]; then 
+	echo "keytable=lang.ktl" >>$mountconfig
+fi
+
+if [ $isoimage = yes ]; then 
+	echo "el-torito-bootable-CD" >>$mountconfig
+fi
+
+echo " " >>$mountconfig
+echo "image=linux" >>$mountconfig
+
+if [ ! -z $initrd ]; then
+	echo "  initrd=initrd" >>$mountconfig
+fi
+
+if [ ! -z "$append" ]; then
+	echo "  append=\"$append\"" >>$mountconfig
+fi
+
+cat >> $mountconfig <<EOF
+  root="$root"
+  read-only
+EOF
+
+if [ "$master" != "" -a $isoimage = yes ]; then
+cat >> $mountconfig <<EOF
+other=$master
+  unsafe
+  label=hard_disk
+EOF
+fi
+
+if [ "$diag" = yes ]; then
+cp -pv $boot/diag1.img $mount
+cp -pv $boot/diag2.img $mount
+cat >> $mountconfig <<EOF
+image=diag1.img
+  label=diagnostic_1
+image=diag2.img
+  label=diagnostic_2
+EOF
+fi
+echo >>$mountconfig "#  End of mkrescue-generated configuration file"
+
+if [ $isoimage = yes ]; then
+	comment="El-Torito bootable-CD will boot at end of timeout"
+else
+	comment="floppy will boot in 15 seconds"
+fi
+
+rm -rf $mount/lost+found
+cat > $mount/message <<EOF
+
+MKRESCUE version $version $comment
+Use  "boot: linux <options>"  to enter kernel options
+The root device is currently configured as  root="$root"
+
+EOF
+echo `uname --sysname` `uname --release` > $mount/$(uname --release)
+
+sync
+
+if [ $debug = true ]; then
+	echo root=\"$root\"
+	echo ""
+	echo "pause after writing lilo.conf & message ..."
+	read aline
+fi
+
+echo "Copying files..."
+if [ $keymap != us.ktl ]; then 
+	cp -pv $keymap $mount/lang.ktl
+fi
+
+if [ ! -z $initrd ]; then
+	cp -pv $initrd $mount/initrd
+fi
+
+cp -pv $kernel $mount/linux
+sync
+
+echo "done."
+echo ""
+
+
+
+pushd $mount >/dev/null 2>/dev/null
+if [ "$fast" = fast ]; then
+	bootcmd="-b /dev/$loopback"
+fi
+
+echo Running $lilo ...
+if [ $debug = true ]; then
+
+cp -pvf $mountconfig $clog
+if [ -z $log ]; then
+ echo	$lilo -w+ -C $mountconfig $compact $bootcmd -v5
+	$lilo -w+ -C $mountconfig $compact $bootcmd -v5 || fast=error
+else
+ echo	$lilo -w+ -C $mountconfig $compact $bootcmd -v5 ">$log"
+	$lilo -w+ -C $mountconfig $compact $bootcmd -v5 >$log || fast=error
+fi
+
+else
+	$lilo -C $mountconfig $compact $bootcmd || fast=error
+fi
+popd >/dev/null 2>/dev/null
+if [ "$fast" = error ]; then
+	echo -n `$lilo -V`
+	echo " failure."
+else
+	echo done.
+fi
+echo ""
+
+umount $mount
+
+if [ $fast = error ]; then
+	rm -rf $mount
+	exit 1
+fi
+
+if [ $isoimage = yes ]; then
+	echo MKISOFS
+	out=$device
+	opt=
+	if [ $size = $hdsize ]; then
+	    losetup -d /dev/$looppart
+	    losetup -d /dev/$loopback
+	    opt=-hard-disk-boot
+	fi
+	mv $mfile $mount/boot.bin
+	mkisofs $opt -J -R -T \
+		-V LILO_BOOT -A "Linux Boot CD created by LILO mkrescue" \
+		-b boot.bin -c boot.cat -o $out $mount
+	cat <<EOF
+
+END MKISOFS:  output is in  '$device'
+
+
+The bootable CD can be burned with the 'cdrecord' utility
+using a command of the form:
+
+	cdrecord [<options>] [dev=<device>] $device
+
+EOF
+elif [ "$fast" = fast ]; then
+	if [ $debug = true ]; then
+		echo Pause before transfering to $device
+		read aline
+	fi
+	dd if=$mfile of=$device bs=1024
+fi
+
+if [ $debug != true ]; then 
+	rm -rf $tmpbase
+fi
+
+echo "All done."
+echo ""
+exit 0

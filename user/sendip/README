@@ -1,0 +1,131 @@
+SendIP
+Author:  Mike Ricketts <mike@earth.li>
+Web:     http://www.earth.li/projectpurple/progs/sendip.html
+Part of Project Purple. (http://www.earth.li/projectpurple/)
+
+1. Introduction
+
+   SendIP is a tool to send completely arbitrary packets out over the network.
+   In conjunction with PackPrint (see
+   http://www.earth.li/projectpurple/progs/packprint.html), this makes an
+   extremely powerful debugging tool for networks.
+
+1.1 Home page
+
+   All the latest news, documentation and versions of SendIP will be made
+   available from http://www.earth.li/projectpurple/ or directly from the
+   the author.
+
+   Please, if you find SendIP useful, consider visiting making a donation
+   at http://heaven.on.earth.li/donate.  The more donations I get the more
+   time I can afford to spend improving SendIP!
+
+2. Protocols
+
+   Here is a list of protocols that SendIP currently understands:
+   * IPv4 (but see below section 7)
+   *   TCP
+   *     BGP
+   *   ICMP
+   *   UDP
+   *     RIP
+   *     NTP
+   * IPv6 (except on solaris)
+   *   ICMPv6
+   *   TCP
+   *   UDP
+   *     RIPng
+   *     NTP?
+
+   Other protocols will be added in future versions, as and when I have time
+   to add them.
+
+   Of course, it is still possible to send packets using other protocols, but
+   you have to construct the packet data and headers entirely by hand.
+
+3. Usage instructions
+
+   SendIP can take a huge number of commandline parameters.  For this reason,
+   future versions may have some sort of user interface...
+
+	Please read the man page or sendip -h for details.  They are not documented
+	here because they change often between versions and I can't be bothered to
+	keep this up to date.
+
+4. Installation
+
+   make ; make install should work.
+   You MUST use GNU make.
+   On Solaris you need to use gcc-3.x or above, and GNU binutils.
+   On other platforms, you probably need gcc-2.x or above.
+
+   If you have install problems on Solaris, try:
+     make install INSTALL=/usr/ucb/install
+
+   If  you can't persuade it to compile or install, mail me with details of
+   what goes wrong, and what system you are trying to install it on.
+   By this I mean at least:
+   - output of make -k veryclean all install
+   - OS, including version
+   - version of make, gcc, etc
+   - version of sendip
+   - anything else you think might be relevant
+
+   You can change where it installs by changing BINDIR and/or PREFIX at the
+   top of the Makefile.
+
+	A .spec file is included to build RPMS, and source and binary RPMS are
+	also available from the web page.  Debian packages are also available, and
+	sendip is included in the FreeBSD ports collection.
+
+5. Problems, Bugs, and Comments
+
+   If you have any comments, suggestions, or bug reports, please email me.
+
+   Please, when sending bug reports include all the relevant information so
+   I have a hope of reproducing or fixing the bug.  I need at least:
+   - output of make -k veryclean all install (if you installed from source)
+   - OS, including version and platform
+   - glibc version if you are on linux
+   - sendip version
+   - exact command line that fails
+   - exact error messages, if any
+   - exactly what you expected to happen that didn't, or what didn't happen
+     that you expected
+   - anything else that might be relevant
+   Make sure you have read section 7 of this README first.
+
+   The email address I currently use is mike@earth.li
+
+   I am interested in any feedback in order to improve SendIP.
+
+6. License
+
+   SendIP is distributed under the GNU Public License a copy of which is
+   included in this archive as LICENSE.
+
+7. Note on IPv4 options
+
+   Many operating systems rewrite some or all of the IP header when sending
+   packets.  Exactly which headers get rewritten depends on the OS.  There is
+   no portable way to bypass this that I am aware of. so some IP options do not
+   work on some operating systems.  Listed below are the ones I know about.
+   This list is not by any means complete and what is here may not be accurate,
+   and I would welcome more information.
+
+   Linux, *BSD:
+   - IP source address is rewritten if it is zero.
+   - IP checksum is always rewritten to the correct value.
+   - IP packet ID is rewritten (to a randomish value) if it is zero.
+   - Total packet length is always rewritten to the number of bytes sent.
+   - All other headers work as expected.
+
+   Solaris:
+   - IP source address is rewritten if it is zero.
+   - IP header length works provided that the length given is not greater
+     than the number of bytes in the packet.  If it is, sendip will segfault.
+   - IP don't fragment flag always set, other IP flags always cleared.
+   - IP checksum is always rewritten to the correct value.
+   - IP packet ID is rewritten (to a randomish value) if it is zero.
+   - Total packet length is always rewritten to the number of bytes sent.
+   - All other headers work as expected.

@@ -1,0 +1,183 @@
+------------------------------------------------------------------------------
+                      Pppoa series documentation
+------------------------------------------------------------------------------
+
+SUMMARY
+
+* GENERAL DESCRIPTION FOR PPPOA2/2M/3 SERIES
+
+* DESCRIPTION FOR PPPOA2 SERIES
+  ** Running through a pppoa2 execution
+  ** Read/Write fatal errors handling
+  ** Signals handling
+  ** Difference between pppoa2 and pppoa2m (and birth of pppoa3)
+
+* DESCRIPTION OF PPPOA3
+  ** Changes between pppoa3 and pppoa2
+  ** Running through a pppoa3 execution
+  ** Signals handling
+
+
+------------------------------------------------------------------------------
+
+* GENERAL DESCRIPTION FOR PPPOA2/2M/3 SERIES
+
+
+  Adsl providers mostly use PPP over ATM. Under Linux and BSD, PPP layer is
+directly handled by kernel through ppp(d). Unfortunately ppp(d) doesn't know
+shit about USB or ATM. Thus it is not possible to simply use ppp(d) to
+communicate with the modem (thus your provider).
+
+  pppoax series solves this problem by providing a link between ppp(d) and the
+modem through ppp(d) daemon's pty option.
+
+Here's a simple graph showing ppoax's behavior:
+
+__________          __________                   _______
+|        |<---------|        |<---------------- /  ° °  \
+| ppp(d) |   pty    | pppoax |   USB bus       |  Modem  |  ADSL line<---->ISP 
+|________|--------->|________|----------------> \\     //   //
+          ppp packets    ^       atm cells        \   /____//
+                         |                         \_______/
+                         |
+                 encapsulate/expand
+               data in aal5 frames and 
+                then send/receive ATM
+                 cells through USB                
+
+*PPPOA2 SERIES DESCRIPTION
+
+  The first solution we found to handle IO streams was to write a piece of code
+which splits (by forking) in two parts at run time, one part for reading from
+USB, and the other one for writing to it.
+
+  ** Running through a (normal) pppoa2 execution
+
+   1 - pppoa2 starts and duplicates its standard file descriptors:
+       0 (stdin) and 1 (stdout)
+   2 - opening of the log  
+   3 - duplication of log's descriptor  in 0, 1, 2
+
+   From that point, nothing displays on the console anymore, all printf output
+   is logged
+
+   4 - N_HDLC line discipline set up on descriptors used to communicate with
+       ppp(d)
+   5 - search for USB modem
+   6 - Access requests for 0x07 (read) and 0x87 (write) endpoints
+   7 - Installation of signal handler to manage signals possibly sent by ppp(d)
+       (or even user)
+   8 - fork
+      +Child goes into infinite loop, doing always the same tasks:
+       read data sent by ppp(d), encapsulate aal5, split into atm cells,
+       send those cells to modem
+      +Parent keeps running
+   9 - Parent goes into infinite loop and;
+       Receives atm packets from modem, span aal5 frames, send those packets
+       to ppp(d)
+
+  ** Read/Write fatal error handling
+
+    In a perfect world, once pppoa is started it would run flawlessly
+  'ad vitam eternam' (thats 'forever' for those of you who managed to ditch
+  latin 101 in high school ). But life is hard and errors may occur. Here is
+  pppoa2's reaction when shit happens:
+
+    Child or parent process stops looping and sends TERM signal to the other
+  one.We then release USB devices and so on, in the most proper way possible.
+  Then we exit as cleanly as we can from both processes. Theoretically both
+  process are killed
+
+  ** signal handling
+
+    pppoa2 only catches SIGHUP under BSD environment and SIGTERM under Linux.
+  This is due to the fact that ppp(d) uses those signals to announce pty
+  closure to its slave.
+    If a signal is received by one of the two processes it sends it to the
+  other one on its turn.
+
+  ** difference between pppoa2 and pppoa2m
+
+     pppoa2 is functional but its design didn't offer any possibility of an
+  easy upgrade or new functionality. The code was not modular enough and any
+  little things that needed to be changed forced a massive code rewrite.
+  pppoa was rewritten in a way that allowed creation of small libraries for
+  crc, atm, aal5 on one side and pppoa using them on the other side.
+  Unfortunately, the design of pppoa2 was so poor that no part of it could
+  be easily re-used.
+
+    The new version of pppoa, pppoa3, was redesigned from the ground up.
+  Libraries were written but the pppoa3 main code was buggy. We then back
+  ported new code to pppoa2 which was functional and well tested. Then we
+  obtained pppoa2m, a pppoa2 merged with pppoa3.
+
+  In a few words:
+
+  pppoa2m = (pppoa2) - (dirty code) + (new aal5/atm/crc libs)
+
+    pppoa2m is better than pppoa2 because it takes advantage of new library
+  features and also a few things from pppoa3 (log system for example).
+
+NB: pppoa2m is a better choice than pppoa2
+
+------------------------------------------------------------------------------
+
+*PPPOA3 DESCRIPTION
+
+  It should be fairly obvious to anyone with a positive IQ that pppoa2 is the
+successor of pppoa3. It takes advantage of the new design. Some variants of
+BSD don't support threading directly, so we kept both the pppoa2 series and
+the new pppoa3 series. (Linux can run all of them).
+
+  Once more, pppoa2m is better than pppoa2.
+
+  ** Differences between pppoa2 and ppoa3
+
+    1 - pppoa3 uses threads instead of forking to allow simultaneous read/write
+        operations. This provides: 
+        + Lower latency when switching between read and write
+        + Decreased memory consumption
+        + Better control over scheduling ( finer granularity )
+        + Improved signal handling
+    2 - All of the code has been modularized 
+    3 - Better ATM and AAL5 management (CRC added, new checks)
+    4 - New log system that allows logging to syslogd
+
+  ** Run through of a normal pppoa3 execution
+
+    Main thread
+
+    1 - Program start 
+    2 - N_HDLC discipline setting
+    3 - Thread attributes initialization
+    4 - USB initialization (detection and request of 0x07 and 0x87 endpoints)
+    5 - Signal handler installation
+    6 - I/O thread creation
+    7 - Wait for a semaphore
+    8 - The semaphore happened this can mean 3 things:
+        + Read fatal error
+        + Write fatal error
+        + A signal was caught by the signal handler
+    9 - Resources cleanup, threads abortion  -> exit
+
+
+    I/O thread (created at step 5 in main thread)
+
+ 
+    1 - Abort validation
+    2 - Signals blocking (so that only main thread handles them)
+    3 - Infinite read/write loop: aal5 encapsulation/expanding , atm cells
+        creating/reading
+    4 - If an error occurs, we commit the semaphore so that main thread will
+        still function
+    5 - thread exit
+
+PS: log system is not started until a message is posted through report
+    function. This is why log creation doesn't appear in this resume.
+
+  ** Signal handling
+
+  Signals are handled only by the main thread. When a signal is caught, the
+signal handler broadcast the error semaphore in order to wake up the main
+thread. Atomicity of semaphore broadcasting guarantees that the program will
+terminate at the main thread level.

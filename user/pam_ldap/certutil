@@ -1,0 +1,263 @@
+#!/bin/sh
+#ident $Id: certutil,v 1.2 2002/04/14 14:16:16 lukeh Exp $
+#
+# certutil -- manage trusted X.509 certificates
+# inspired by Netscape PKCS #11 toolkit
+# contributed by Jarkko Turkulainen <jt@wapit.com>
+#
+#
+# INTRODUCTION
+#
+#    certutil can be used with various OpenSSL routines and tools
+#    that utilize OpenSSL. Example:
+#
+#    $ openssl s_client -CApath certdir
+#
+#    where certdir is a directory created by certutil. Other well known
+#    programs that use the same format are stunnel, sendmail and pam_ldap
+#
+#
+#
+# HOWTO
+#
+# 1. Initialize certificate database
+#
+#    Simply by adding a new certificate. If the certificate directory
+#    doesn't exist, the script asks for creating a one. Example:
+#
+#    $ certutil -a -n "First Cert" -i cert.pem -d /home/jt/mycerts
+#    ./certutil: cannot access /home/jt/mycerts, create? [y/N] y
+#
+#
+# 2. Add new certificate
+#
+#    $ certutil -a -n "My Cert" -i cert.pem [-d certdir]
+#
+#    Note that nickname (-n) must exist. certdir is optional - if it's
+#    not given, $PWD is used. The directory must have a file named certs.dat.
+#    If that file doesn't exist, the script refuses to do anything. If your
+#    certs.dat file is corrupted, "rm -rf" the whole dir and start from
+#    the scratch. cert.pem is the actual certificate.
+#
+# 3. Delete certificate
+#
+#    $ certutil -r -n "My Cert" [-d certdir]
+#
+#    This command removes the certificate named "My Cert". certdir is 
+#    optional, see 2.
+#
+# 4. List certificates
+#
+#    $ certutil -l [-d certdir]
+#
+#    And again, certdir is optional.
+#
+# 5. View certificate properties
+#
+#    $ certutil -v -n "My Cert" [-d certdir]
+#
+#
+
+
+# Print usage
+usage() {
+	cat << EOF
+
+Usage: $0 -l [-d dir]
+          -a -n name -i file [-d dir]
+          -r -n name [-d dir]
+          -v -n name [-d dir]
+
+       Commands:
+          -l   -- List certificates (requires a valid dir)
+          -a   -- Add certificate and create dir if necessary
+          -r   -- Remove certificate (requires a valid dir)
+          -v   -- View certificate (requires a valid dir)
+
+       Parameters:
+          dir  -- Certificate directory, or \$PWD if not given
+          name -- Nickname of the certificate
+          file -- Certificate file in PEM format
+
+EOF
+	exit 1
+}
+
+# Check path
+check_path() {
+
+	# check the directory
+	if [ ! -d $CDIR -a $ADD -eq 1 ]; then
+		echo -n "$0: cannot access $CDIR, create? [y/N] "
+		read LINE
+		case $LINE in
+			y|Y)
+				mkdir $CDIR
+				chmod 700 $CDIR
+				touch $CDIR/certs.dat
+				chmod 600 $CDIR/certs.dat
+				;;
+			*)
+				exit 1
+				;;
+		esac
+	fi
+
+	# check certs.dat
+	if [ ! -e $CDIR/certs.dat ]; then
+		echo "$0: please specify a valid cert directory"
+		exit 1
+	fi
+}
+
+# Add certificates
+add_cert() {
+	check_path
+	if [ ! -e $FILE ]; then	
+		echo "$0: cannot find $FILE"
+		exit 1
+	fi
+	HASH=`openssl x509 -in $FILE -hash -noout 2>/dev/null`.0
+	if [ $? -ne 0 ]; then
+		echo "$0: unable to load certificate $FILE"
+		exit 1
+	fi
+
+	if grep "^$CNAME|" $CDIR/certs.dat 1>/dev/null 2>&1; then
+		echo "$0: nickname already in use"
+		exit 1
+	fi
+
+	if [ -e $CDIR/$HASH ]; then
+		echo "$0: certificate already in directory"
+		echo `openssl x509 -in $CDIR/$HASH -subject -noout`
+		exit 1
+	else
+		cp $FILE $CDIR/$HASH
+		chmod 600 $CDIR/$HASH
+		echo "$CNAME|$HASH" >> $CDIR/certs.dat
+		chmod 600 $CDIR/certs.dat
+	fi
+
+}
+
+# List certificates
+#
+# (this is too slow...)
+#
+list_cert() {
+	check_path
+	echo
+	echo "Certificates in directory $CDIR"
+	echo
+	printf "%-30s%s\n" nickname subject/issuer
+	echo "----------------------------------------------------------------------------"
+	cat $CDIR/certs.dat | while read LINE; do
+		NICK=`echo $LINE | cut -d "|" -f 1`
+		HASH=`echo $LINE | cut -d "|" -f 2`
+		SUBJECT=`openssl x509 -in $CDIR/$HASH -subject -noout`
+		ISSUER=`openssl x509 -in $CDIR/$HASH -issuer -noout`
+		printf "%-30s%s\n" "$NICK" "$SUBJECT"
+		printf "%-30s%s\n\n" "" "$ISSUER"
+
+	done
+}
+
+# Remove certificates
+remove_cert() {
+	check_path
+	(
+	cat $CDIR/certs.dat | while read LINE; do
+		NICK=`echo $LINE | cut -d "|" -f 1`
+		HASH=`echo $LINE | cut -d "|" -f 2`
+		if [ "$CNAME" = "$NICK" ]; then
+			rm $CDIR/$HASH
+		else
+			echo $LINE
+		fi
+	done
+	) > /tmp/$$
+	mv /tmp/$$ $CDIR/certs.dat
+	chmod 600 $CDIR/certs.dat
+}
+
+# View certificate
+view_cert() {
+	check_path
+	cat $CDIR/certs.dat | while read LINE; do
+		NICK=`echo $LINE | cut -d "|" -f 1`
+		HASH=`echo $LINE | cut -d "|" -f 2`
+		if [ "$CNAME" = "$NICK" ]; then
+			openssl x509 -in $CDIR/$HASH -text
+			return 1
+		fi
+	done
+}
+
+# Parse option string
+ADD=0
+REMOVE=0
+LIST=0
+VIEW=0
+while getopts "arlvd:n:i:" OPT; do
+	case $OPT in
+		a)
+			ADD=1
+			;;
+		r)
+			REMOVE=1
+			;;
+		l)
+			LIST=1
+			;;
+		v)
+			VIEW=1
+			;;
+		d)
+			CDIR=$OPTARG
+			;;
+		n)
+			CNAME=$OPTARG
+			;;
+		i)
+			FILE=$OPTARG
+			;;
+		*)
+			usage
+			;;
+	esac
+done
+
+# Default options
+CDIR=${CDIR:=.}
+
+# Check command line options
+if [ $ADD -eq 1 -a $REMOVE -eq 0 -a $LIST -eq 0 -a $VIEW -eq 0 ]; then
+	if [ -n "$CNAME" -a -n "$FILE" ]; then
+		add_cert
+	else
+		echo "$0: missing certificate name or file"
+		usage
+	fi
+elif [ $REMOVE -eq 1 -a $ADD -eq 0 -a $LIST -eq 0 -a $VIEW -eq 0 ]; then
+	if [ -n "$CNAME" ]; then
+		remove_cert
+	else
+		echo "$0: missing certificate name"
+		usage
+	fi
+elif [ $LIST -eq 1 -a $ADD -eq 0 -a $REMOVE -eq 0 -a $VIEW -eq 0 ]; then
+	list_cert
+elif [ $VIEW -eq 1 -a $ADD -eq 0 -a $REMOVE -eq 0 -a $LIST -eq 0 ]; then
+	if [ -n "$CNAME" ]; then
+		if view_cert; then
+			echo "$0: cert named \"$CNAME\" not found"
+			exit 1
+		fi
+	else
+		echo "$0: missing certificate name"
+		usage
+	fi
+else
+	usage
+fi

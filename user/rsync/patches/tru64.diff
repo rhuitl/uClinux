@@ -1,0 +1,35 @@
+This is an adapted version of the original by Zoong Pham.
+
+--- orig/lib/getaddrinfo.c	2005-02-14 00:53:44
++++ lib/getaddrinfo.c	2004-06-18 17:38:35
+@@ -41,6 +41,20 @@
+ 
+ #include <rsync.h>
+ 
++/****** Start Zoong added here */
++
++#define EAI_BADHINTS	12
++#define EAI_PROTOCOL	13
++#define EAI_MAX	14
++
++#define AI_PASSIVE	0x00000001 /* get address to use bind() */
++#define AI_CANONNAME	0x00000002 /* fill ai_canonname */
++#define AI_NUMERICHOST	0x00000004 /* prevent name resolution */
++#define AI_MASK	(AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST)
++
++/****** End Zoong added here */
++
++
+ #if defined(__KAME__) && defined(INET6)
+ # define FAITH
+ #endif
+--- orig/syscall.c	2005-07-28 18:48:38
++++ syscall.c	2005-02-14 02:54:45
+@@ -27,6 +27,7 @@
+ #include "rsync.h"
+ 
+ #if !defined MKNOD_CREATES_SOCKETS && defined HAVE_SYS_UN_H
++#define _SOCKADDR_LEN
+ #include <sys/un.h>
+ #endif
+ 

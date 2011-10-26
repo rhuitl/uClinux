@@ -1,0 +1,154 @@
+#!/usr/bin/perl
+# diald.monthly - generate pretty stats for the last month
+# Written by Brian Edmonds <edmonds@cs.ubc.ca> Feb20/95
+
+require 'getopts.pl';
+&Getopts( 'p' ) || die "usage: $0 [-p]\n";
+
+%daysOfWeek = (
+  'Mon', 1, 'Tue', 2, 'Wed', 3, 'Thu', 4, 'Fri', 5,
+  'Sat', 6, 'Sun', 7 );
+@monthsOfYear = (
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' );
+%monthsOfYear = (
+  'Jan', 'January', 'Feb', 'February', 'Mar', 'March',
+  'Apr', 'April', 'May', 'May', 'Jun', 'June',
+  'Jul', 'July', 'Aug', 'August', 'Sep', 'September',
+  'Oct', 'October', 'Nov', 'November', 'Dec', 'December' );
+
+@time = localtime( time - 3600*24 );
+$month = $monthsOfYear[$time[4]];
+$year = 1900 + $time[5];
+
+$#timeByDayOfMonth = $#boutByDayOfMonth = $#binByDayOfMonth = 31;
+$#timeByDayOfWeek = $#boutByDayOfWeek = $#binByDayOfWeek = 7;
+$#timeByHourOfDay = $#boutByHourOfDay = $#binByHourOfDay = 23;
+
+$totalBytesOut = $totalBytesIn = $totalTime = 0;
+
+while( $log = </var/log/diald.log.*> ) {
+  open( LOG, "<$log" ) || next;
+  while( <LOG> ) {
+    if( /^(.*): Disconnected. Call duration (\d+) second/ ) {
+      $timestamp = $1; $duration = $2;
+      $timestamp =~ /^(\S+) $month (\d+) (\d+):\d+:\d+ \d+/ || next;
+      ( $dayOfWeek = $daysOfWeek{$1} ) > 0 || next;
+      $dayOfMonth = $2; $hourOfDay = $3;
+      $timeByDayOfMonth[$dayOfMonth] += $duration;
+      $timeByDayOfWeek[$dayOfWeek] += $duration;
+      $timeByHourOfDay[$hourOfDay] += $duration;
+      $totalTime += $duration;
+    } elsif( /IP transmited (\d+) bytes and received (\d+) bytes/ ) {
+      next unless $dayOfMonth > 0;
+      $boutByDayOfMonth[$dayOfMonth] += $1;
+      $boutByDayOfWeek[$dayOfWeek] += $1;
+      $boutByHourOfDay[$hourOfDay] += $1;
+      $totalBytesOut += $1;
+      $binByDayOfMonth[$dayOfMonth] += $2;
+      $binByDayOfWeek[$dayOfWeek] += $2;
+      $binByHourOfDay[$hourOfDay] += $2;
+      $totalBytesIn += $2;
+    } else { $dayOfMonth = 0 }
+  } close LOG;
+}
+
+if( defined $opt_p ) {
+  open( STDOUT, "|/usr/local/bin/injnews" ) || die "Couldn't injnews!\n";
+  select( STDOUT ); $| = 1;
+  print <<EOT;
+Newsgroups: gweep.stats
+Followup-To: gweep.general
+From: lios!root (diald monthly usage report script)
+Subject: diald monthly usage report
+
+EOT
+}
+&report; close STDOUT;
+exit 0;
+
+sub report {
+
+  # totals
+  print "Diald Report for $monthsOfYear{$month} $year\n\n";
+  printf "Total time connected:  %0.1fh\n", $totalTime/3600;
+  printf "Total traffic out:  %0.1fM\n", $totalBytesOut/1048576;
+  printf "               in:  %0.1fM\n", $totalBytesIn/1048576;
+  print "\n";
+
+  print <<EOT;
+                         TIME ONLINE (IN HOURS)
+
+EOT
+  &graphtrio( 'time', 3600 );
+  print <<EOT;
+                     INBOUND TRAFFIC (IN MEGABYTES)
+
+EOT
+  &graphtrio( 'bin', 1048576 );
+  print <<EOT;
+                     OUTBOUND TRAFFIC (IN MEGABYTES)
+
+EOT
+  &graphtrio( 'bout', 1048576 );
+}
+
+sub graphtrio {
+  local( $prefix, $divisor ) = @_;
+  local( @byDayOfMonth ) = eval( '@' . $prefix . 'ByDayOfMonth' );
+  local( @byHourOfDay ) = eval( '@' . $prefix . 'ByHourOfDay' );
+  local( @byDayOfWeek ) = eval( '@' . $prefix . 'ByDayOfWeek' );
+  local( $max1, $max2, $max3 );
+
+  for( $max1=0, $i=1 ; $i<=31 ; $i++ ) {
+    if( $byDayOfMonth[$i] > $max1 ) { $max1 = $byDayOfMonth[$i] }
+  }
+  for( $max2=0, $i=0 ; $i<24 ; $i++ ) {
+    if( $byHourOfDay[$i] > $max2 ) { $max2 = $byHourOfDay[$i] }
+  }
+  for( $max3=0, $i=1 ; $i<=7 ; $i++ ) {
+    if( $byDayOfWeek[$i] > $max3 ) { $max3 = $byDayOfWeek[$i] }
+  }
+  for( $i=10 ; $i>0 ; $i-- ) {
+    if( ! ( $i&1 ) ) {
+      printf '%17.1f', $max1 * $i / 10 / $divisor;
+    } else {
+      print '                 ';
+    } print ' | ';
+    for( $j=1 ; $j<=31 ; $j++ ) {
+      print $max1*$i/10 <= $byDayOfMonth[$j] ? '#' : ' ';
+    } print "\n";
+  }
+  print <<EOT;
+                  +---------------------------------
+            Day of  1 3 5 7 9 1 1 1 1 1 2 2 2 2 2 3
+             Month            1 3 5 7 9 1 3 5 7 9 1
+
+EOT
+  for( $i=10 ; $i>0 ; $i-- ) {
+    if( ! ( $i&1 ) ) {
+      printf '%8.1f', $max2 * $i / 10 / $divisor;
+    } else {
+      print '        ';
+    } print ' | ';
+    for( $j=0 ; $j<24 ; $j++ ) {
+      print $max2*$i/10 <= $byHourOfDay[$j] ? '#' : ' ';
+    } print ' ';
+    if( ! ( $i&1 ) ) {
+      printf '%14.1f', $max3 * $i / 10 / $divisor;
+    } else {
+      print '              ';
+    } print ' | ';
+    for( $j=1 ; $j<=7 ; $j++ ) {
+      print $max3*$i/10 <= $byDayOfWeek[$j] ? '##' : '  ';
+    } print "\n";
+  }
+  print <<EOT;
+         +--------------------------               +----------------
+  Hour of  0 2 4 6 8 1 1 1 1 1 2 2           Day of  M T W T F S Su
+      Day            0 2 4 6 8 0 2             Week
+
+EOT
+}
+
+# EOF

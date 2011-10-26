@@ -1,0 +1,58 @@
+#	$Id: README,v 0.4 1998/03/17 23:57:02 jjo Exp $	
+
+Quick
+~~~~~
+* YOU *NEED* ip_masq-v0.13 patch (over 2.1.90) to compile 
+* _EDIT_ Makefile and point "KSRC" to kernel source tree
+* I tested it with glibc-devel environment (libc5 may compile also)
+
+*  Do "make install", which installs 
+        /usr/sbin/ipmasqadm
+        /usr/lib/ipmasqadm/portfw.so
+        /usr/lib/ipmasqadm/autofw.so
+
+* Use ipmasqadm tool:
+  # ipmasqadm portfw  *AS you were using* #ipportfw   (see README.portfw)
+  # ipmasqadm autofw  *AS you were using* #ipautofw   (see README.autofw)
+  
+
+Details:
+~~~~~~~~
+* ipmasqadm tool
+  - "General" masq module control (just a dynamic wrapper :)
+  - now we have ELF dynamic modules under /usr/lib/ipmasqadm/: portfw.so,
+    autofw.so INSTEAD of ip_portfw and ip_autofw tools.
+    Essentially the .so modules are the same ip_xxxxfw tools, just
+    touched for dynamic loading.
+  - Ej:
+       BEFORE:         ip_portfw -A -t x.x.x.x/xx -R y.y.y.y/yy
+       NOW:     ipmasqadm portfw -A -t x.x.x.x/xx -R y.y.y.y/yy
+                          ~~~~~~ -> actually /usr/lib/ipmasqadm/portfw.so
+  - API calls
+
+         BEFORE                            NOW
+
+          # ip_portfw                     # ipmasqadm  portfw   
+            |    [ip_portfw.c]              |     [ipmasqadm.c,portfw.c]
+            |                               |
+         setsockopt()                    setsockopt()
+            |    IP_PORTFW_ADD              |     IP_FW_MASQ_ADD, "portfw"
+            |    (struct ip_portfw_edits *) |     (struct ip_fw_masqctl *)
+   USER     |                               |
+    ....... | ............................. | ..........................
+            |    [ip_sockglue.c]            |     [ip_sockglue.c]
+   KERN     |                               |
+            |                               |
+         ip_portfw_ctl()                 ip_masq_mod_ctl()  
+            +    [ip_portfw.c]              |     [ip_masq_mod.c]
+                                            |
+                                            |
+    . . . . . . . . . . . . . . . . . . . . | . . . . . . . . . . . . . .
+   KERN[mod]                             ip_port_fw_ctl()  
+                                            |     [ip_masq_portfw.c]
+
+  [same for IP_AUTOFW]
+
+
+-- Juanjo <irriga@impsat1.com.ar>    Nov 1997
+

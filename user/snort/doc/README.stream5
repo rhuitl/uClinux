@@ -1,0 +1,159 @@
+EXPERIMENTAL CODE!!!
+
+THIS CODE IS STILL EXPERIMENTAL AND MAY OR MAY NOT BE STABLE!
+USE AT YOUR OWN RISK!  DO NOT USE IN PRODUCTION ENVIRONMENTS.
+YOU HAVE BEEN WARNED.
+
+Overview
+========
+The Stream5 preprocessor is a target-based TCP reassembly module
+for Snort.  It is intended to replace both the stream4 and flow 
+preprocessors, and it is capable of tracking sessions for both
+TCP and UDP.  With Stream5, the rule 'flow' and 'flowbits' keywords
+are usable with TCP as well as UDP traffic.
+
+Since Stream5 replaces stream4, both cannot be used simultaneously.
+Remove the stream4 and flow configurations from snort.conf when the
+stream5 configuration is added.
+
+transport protocols
+-------------------
+TCP sessions are identified via the classic TCP "connection".  UDP
+sessions are established as the result of a series of UDP packets
+from two end points via the same set of ports.  ICMP messages are
+tracked for the purposes of checking for unreachable and service
+unavailable messages, which effectively terminate a TCP or UDP
+session.
+
+target-based
+------------
+Stream5, like Frag3, introduces target-based actions for handling
+of overlapping data and other TCP anomalies.  The methods for handling
+overlapping data and associated policies are the results of extensive
+research with many target operating systems.
+
+Stream5 fully supports the Stream API (partly supported by stream4),
+allowing other protocol normalizers/preprocessors to dynamically
+configure reassembly behaviour as required by the application layer
+protocol, identify sessions that may be ignored (large data transfers,
+etc), and update the identifying information about the session
+(application protocol, direction, etc) that can later be used by rules.
+
+anomaly detection
+-----------------
+TCP protocol anomalies, such as data on SYN packets, data received
+outside the TCP window, etc are configured via the detect_anomalies
+option to the TCP configuration.  Some of these anomalies are
+detected on a per-target basis.  For example, a few operating systems
+allow data in TCP SYN packets, while others do not.
+
+Configuration
+=============
+Global Configuration
+--------------------
+Global settings for the Stream5 preprocessor
+
+- Preprocessor name: stream5_global
+- Options:
+    track_tcp <yes|no>      - Track sessions for TCP
+    max_tcp <number>        - Max concurrent sessions for TCP, default 256k
+    track_udp <yes|no>      - Track sessions for UDP
+    max_udp <number>        - Max concurrent sessions for UDP, default 132k
+    track_icmp <yes|no>     - Track sessions for ICMP
+    max_icmp <number>       - Max concurrent sessions for ICMP, default 64k
+    flush_on_alert          - Backwards compatibilty.  Flush a TCP stream
+                              when an alert is generated on that stream.
+    show_rebuilt_packets    - Print/display packet after rebuilt (for debugging)
+
+TCP Configuration
+-----------------
+Provides a means on a per IP address target to configure TCP reassembly policy.
+Can have multiple occurances, per policy that is bound to an IP address.
+
+- Preprocessor name: stream5_tcp
+- Options:
+    bind_to <ip_addr>       - IP address for this policy, default any if
+                              not specified
+    timeout <number (secs)> - Session timeout, default 30
+    policy <first|last|bsd|linux|old-linux|windows|solaris|hpux|irix|macos>
+                            - The Reassembly policy (matches OS), default BSD
+    min_ttl <number>        - Default 1
+    overlap_limit <num overlaps> - Limits number of overlapping packets,
+                              default 0, unlimited
+    max_window <number>     - Maximum TCP window allow, default 0, unlimited
+    detect_anomalies        - Detect TCP protocol anomalies, default off
+    require_3whs [<alt_timeout (secs)>] - Establish sessions only on
+                              completion of SYN/SYN-ACK/ACK handshake, default
+                              off.  Alternate timeout is timeout for handshake
+                              to complete, default is 0, unlimited.
+    use_static_footprint_sizes - emulate stream4 behaviour for flushing
+                              reassembled packet.
+    dont_store_large_packets - Performance improvement to not queue large
+                              packets in reassembly buffer.  May resulted in
+                              missed attacks.
+    ports <client|server|both> [all|space seperated port list] 
+                             - Specify the client, server, or both and list of
+                               ports to do reassembly.  Can appear more than
+                               once in a given config, ie:
+                                 ports client 21 23 25 42 53 80 110 111 135
+                                              136 137 139 143 445 513 1433 1521
+                                              3306 (these are the default)
+                                 ports both 80 (example)
+                                 ports server 37 (example)
+
+UDP Configuration
+-----------------
+Configuration for UDP session tracking.  Since there is no target based
+binding, there should be only one occurance of the udp configuration.
+- Preprocessor name: stream5_udp
+- Options:
+    timeout <number (secs)> - Session timeout, default 30
+    ignore_any_rules        - Don't process any -> any (ports) rules for
+                              UDP.  This is a performance improvement and
+                              may result in missed attacks.
+
+ICMP Configuration
+------------------
+(ICMP support is currently not entirely functional)
+Configuration for ICMP session tracking.  Since there is no target based
+binding, there should be only one occurance of the udp configuration.
+- Preprocessor name: stream5_icmp
+- Options:
+    timeout <number (secs)> - Session timeout, default 30
+
+NOTE: ICMP is currently untested, in minimal code form and is NOT ready
+for testing as EXPIREMENTAL.
+
+Example configurations
+======================
+1) This example configuration emulates the behaviour of Stream4 (with
+   UDP support enabled).
+
+preprocessor stream5_global: max_tcp 8192, track_tcp yes,
+                            track_udp yes, track_icmp no
+preprocessor stream5_tcp: policy first, use_static_footprint_sizes
+preprocessor stream5_udp: ignore_any_rules 
+
+2) This configuration maps two network segments to different reassembly
+   policies, one for windows, one for linux, with all other traffic falling
+   to the default policy bsd.
+
+preprocessor stream5_global: track_tcp yes,
+preprocessor stream5_tcp: bind_to 192.168.1.0/24, policy windows
+preprocessor stream5_tcp: bind_to 10.1.1.0/24, policy linux
+preprocessor stream5_tcp: policy bsd
+
+Alerts
+======
+Stream5 uses generator ID 129.  It is capable of alerting on 7 (seven)
+anomalies, all of which relate to TCP anomalies.  There are no
+anomalies detected relating to UDP or ICMP.
+
+The list of SIDs is as follows:
+1) SYN on established session
+2) Data on SYN packet
+3) Data sent on stream not accepting data
+4) TCP Timestamp is outside of PAWs window
+5) Bad segment, overlap adjusted size less than/equal 0
+6) Window size (after scaling) larger than policy allows
+7) Limit on number of overlapping TCP packets reached

@@ -1,0 +1,246 @@
+From owner-mgetty Tue Jan 25 23:58:10 1994
+Return-Path: <owner-mgetty>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0pOwhz-0001ILC@greenie.muc.de>; Tue, 25 Jan 94 23:58 MET
+Return-Path: <colin!greenie.muc.de!snarc.greenie.muc.de!klaus>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0pOwhu-0001HhC@greenie.muc.de>; Tue, 25 Jan 94 23:58 MET
+Received: from greenie by colin.muc.de with UUCP id <22327>; Tue, 25 Jan 1994 23:41:49 +0100
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.3)
+	id <m0pOtr1-0000hiC@greenie.muc.de>; Tue, 25 Jan 94 20:55 MET
+Received: by snarc.greenie.muc.de (Linux Smail3.1.28.1 #14)
+	id m0pOt9a-0002hNC; Tue, 25 Jan 94 20:10 MET
+Message-Id: <m0pOt9a-0002hNC@snarc.greenie.muc.de>
+From:	klaus@snarc.greenie.muc.de (Klaus Weidner)
+Subject: Generating 204x196 fonts for TeX
+To:	mgetty@muc.de (mgetty mailing list)
+Date:	Tue, 25 Jan 1994 20:10:20 +0100
+X-Mailer: ELM [version 2.4 PL21]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: 7bit
+Content-Length: 5276      
+Status: RO
+
+Hello,
+
+due to popular request (hello Gert...), here is a description of what
+you have to do to get high-quality fonts for your fax files.
+
+If you use the usual setup, you will probably end up scaling down the
+300dpi bitmap fonts available on your system to 204x196dpi needed for
+faxing. This works, but the quality of the resulting fonts is awful,
+and Donald Knuth will probably send the International Font Police
+after you for such cruel abuse of a wonderful typesetting program.
+
+There are three steps you have to take care of to get better results:
+
+- your dvi-to-whatever converter has to use the right font size
+
+- metafont has to be set up to generate fonts of the right resolution
+  when needed.
+
+- both programs have to agree where the fonts are stored.
+
+I use dvips to convert the dvi input to PostScript and then GhostScript
+to generate g3 fax files. The paths used below are those used on my
+system, you will have to edit them to match your setup.
+
+A shell script takes care of everything from the user's point of view:
+
+% dvi2fax test.dvi
+
+creates the file(s) test-001.fax (one per page) in the current
+directory, which can then be passed on to sendfax.
+
+The script looks like this:
+
+----- dvi2fax ------------------------------------------------------------
+#! /bin/sh
+
+for i
+do
+	NAME=`basename $i .dvi`
+	dvips -P dfaxhigh $NAME.dvi -o $NAME.ps
+	gs -sDEVICE=dfaxhigh -sOutputFile=$NAME-%03d.fax -sNOPAUSE -- $NAME.ps
+done
+--------------------------------------------------------------------------
+
+This calls dvips with a printer name of `dfaxhigh'. The `-P' flag
+tells dvips to use the following configuration file:
+
+--- /usr/TeX/lib/tex/ps/config.dfaxhigh ----------------------------------
+M GThreeFaxHigh
+X 204
+Y 196
+--------------------------------------------------------------------------
+
+(M defines the configuration Metafont will use to generate the font,
+X and Y define the resolution in dots/inch.)
+
+You will have to define a Metafont mode for creating the fax fonts,
+by default it only knows about low-resolution faxes. Put the following
+definition into /usr/TeX/lib/mf/macros/modes.mf:
+
+--- /usr/TeX/lib/mf/macros/modes.mf --------------------------------------
+[...]
+mode_def GThreeFaxHigh =                    % 204 x 196dpi G3fax
+  mode_param (pixels_per_inch, 204);
+  mode_param (aspect_ratio, 196 / pixels_per_inch);
+  mode_param (blacker, 0);
+  mode_param (fillin, .2);
+  mode_param (o_correction, .2);
+  mode_common_setup_;
+enddef;
+--------------------------------------------------------------------------
+
+Then create a new metafont base file:
+
+        inimf "plain; input modes; dump"
+	mv plain.base /usr/TeX/lib/mf/bases/mf.base
+
+Now Metafont knows how to generate fonts at the right resolution.
+Dvips will check if the needed fonts exist, and if they don't, it
+will call MakeTeXPK to create them. On my system, the G3 fonts have
+filenames like `/usr/TeX/lib/tex/fonts/GThreeFaxHigh/cmr10.204pk'.
+The environment variable TEXPKS is used to tell dvips, xdvi and other
+programs where the fonts are stored:
+
+TEXPKS=/usr/TeX/lib/tex/fonts/%m/%f.%dpk
+
+(%m is replaced with the Metafont `mode', %f with the font name and
+%d with the X pixel size.)
+
+If the font doesn't exist, dvips will call a shell script like this:
+MakeTeXPK <font name> <dpi> <base dpi> <magnification> <mode>
+
+The MakeTeXPK script was included in my TeX distribution, I have
+edited it to match my setup:
+
+--- MakeTeXPK ------------------------------------------------------------
+#!/bin/sh
+#
+#   This script file makes a new TeX PK font, because one wasn't
+#   found.  Parameters are:
+#
+#   name dpi bdpi magnification [mode [subdir]]
+#
+#   `name' is the name of the font, such as `cmr10'.  `dpi' is
+#   the resolution the font is needed at.  `bdpi' is the base
+#   resolution, useful for figuring out the mode to make the font
+#   in.  `magnification' is a string to pass to MF as the
+#   magnification.  `mode', if supplied, is the mode to use.
+#
+#   Note that this file must execute Metafont, and then gftopk,
+#   and place the result in the correct location for the PostScript
+#   driver to find it subsequently.  If this doesn't work, it will
+#   be evident because MF will be invoked over and over again.
+#
+#   Of course, it needs to be set up for your site.
+#
+TEXDIR=/usr/TeX/lib/tex
+LOCALDIR=/usr/TeX/lib/tex
+#
+# TEMPDIR needs to be unique for each process because of the possibility
+# of simultaneous processes running this script.
+#
+if test "$TMPDIR" = ""
+then
+   TEMPDIR=/tmp/mtpk.$$
+else
+   TEMPDIR=$TMPDIR/mtpk.$$
+fi
+NAME=$1
+DPI=$2
+BDPI=$3
+MAG=$4
+MODE=$5
+
+if [ -z "$MODE" ]
+then
+case $BDPI in
+204)
+	MODE=GThreeFaxHigh
+	;;
+240)
+	MODE=EpsonMXFX
+	;;
+*)
+	MODE=localfont
+	;;
+esac
+fi
+
+DESTDIR=$LOCALDIR/fonts/$MODE
+GFNAME=$NAME.$DPI'gf'
+PKNAME=$NAME.$DPI'pk'
+
+# Clean up on normal or abnormal exit
+trap "cd /; /bin/rm -rf $TEMPDIR $DESTDIR/pktmp.$$" 0 1 2 15
+
+
+if test ! -d $DESTDIR
+then
+   mkdir $DESTDIR
+fi
+
+if test "$6" != ""
+then
+   DESTDIR=$DESTDIR"$6"
+   if test ! -d $DESTDIR
+   then
+      mkdir $DESTDIR
+   fi
+fi
+
+mkdir $TEMPDIR
+cd $TEMPDIR
+
+if test -r $DESTDIR/$PKNAME
+then
+   echo "$DESTDIR/$PKNAME already exists!"
+   exit 0
+fi
+
+# check also in the standard place
+
+if test "$6" = ""
+then
+   if test -r $TEXDIR/fonts/$PKNAME
+   then
+      echo $TEXDIR/fonts/$PKNAME already exists!
+      exit 0
+   fi
+else
+   if test -r $TEXDIR/fonts/$6"$PKNAME"
+   then
+      echo $TEXDIR/fonts/$6"$PKNAME" already exists!
+      exit 0
+   fi
+fi
+
+echo "mf \"\\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME\" < /dev/null"
+mf "\mode:=$MODE; mag:=$MAG; scrollmode; input $NAME" < /dev/null
+if test ! -r $GFNAME
+then
+   echo "Metafont failed for some reason on $GFNAME"
+   exit 1
+fi
+
+gftopk -v ./$GFNAME ./$PKNAME
+
+# Install the PK file carefully, since others may be doing the same
+# as us simultaneously.
+
+mv $PKNAME $DESTDIR/pktmp.$$
+cd $DESTDIR
+mv pktmp.$$ $PKNAME
+
+exit 0
+-----------------------------------------------------------------------------
+
+ciao, Klaus
+-- 
+\ klaus@snarc.greenie.muc.de--kweidner@physik.tu-muenchen.de--2:246/55.4
+\ .signature error -- quote dumped
+

@@ -1,0 +1,30 @@
+SG8200 CAVIUM/OCTEON PLL PROGRAMMING
+------------------------------------
+
+The SG8200 hardware platform has a software controlled PLL that needs
+its PROM programmed to output the correct clocks.
+
+To do this we have come up with a modified SG560 that can drive the i2c
+bus to the PROM on the SG8200 board. It has specially modified firmware
+that can read and drive the i2c bus to the PLL on the SG8200.
+
+This is what you need to do:
+
+1.  Hook up SG560 PLL programming cable to CON16 on SG8200
+2.  Put link on CON14 on SG8200
+3.  Power up the SG560
+4.  Power up the SG8200
+5.  Check you can read the existing PLL PROM contents
+    on the SG560 do "hd -b /dev/rtc"
+6.  Program the PROM with SG8200_PLL.bin file
+    on the SG560 do "cat SG8200_PLL.bin > /dev/rtc"
+
+That should do it. You can check the contents of the PLL again using the
+same "hd -b /dev/rtc". It should be identical to the contents of the
+SG8200_PLL.bin file.
+
+The SG8200_PLL.bin file is generated from the local SG8200_bin.hex file,
+using:
+
+    srec_cat -Output SG8200_PLL.bin -Binary SG8200_PLL.hex -Intel -ignore-checksums
+

@@ -1,0 +1,127 @@
+## $Id: Makefile-files,v 1.15 2005/03/29 15:50:46 ensc Exp $ --*- makefile -*--
+
+## Copyright (C) 2002,2003,2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+##  
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; version 2 of the License.
+##  
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##  
+## You should have received a copy of the GNU General Public License
+## along with this program; if not, write to the Free Software
+## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+##  
+
+check_LIBRARIES			=  libenscsentinel.a
+
+libenscsentinel_a_SOURCES	=  $(lib_SRCS)
+libenscsentinel_a_CPPFLAGS	=  -DENSC_TESTSUITE
+
+check_PROGRAMS +=		blacklist-parser blacklist-check		\
+				prioqueue-check simulate
+
+check_SCRIPTS			=  testsuite/blacklist-check1.sh \
+                                   testsuite/prioqueue-check1.sh \
+                                   testsuite/prioqueue-check2.sh \
+                                   testsuite/prioqueue-check3.sh
+
+blacklist_parser_SOURCES	=  testsuite/blacklist-parser.c
+blacklist_parser_LDADD		=  libenscsentinel.a $(LIBENSCVECTOR)
+blacklist_parser_CPPFLAGS	=  -DENSC_TESTSUITE
+
+blacklist_check_SOURCES		=  testsuite/blacklist-check.c
+blacklist_check_LDADD		=  libenscsentinel.a $(LIBENSCVECTOR)
+blacklist_check_CPPFLAGS	=  -DENSC_TESTSUITE
+
+prioqueue_check_SOURCES		=  testsuite/prioqueue-check.c
+prioqueue_check_LDADD		=  libenscsentinel.a
+prioqueue_check_CPPFLAGS	=  -DENSC_TESTSUITE
+
+simulate_SOURCES		=  testsuite/simulate.c
+simulate_LDADD			=  libenscsentinel.a $(LIBENSCVECTOR)
+simulate_CPPFLAGS		=  -DENSC_TESTSUITE
+
+tests_SCRPTS			=  testsuite/blacklist-parser.sh		\
+				   testsuite/blacklist-check.sh
+
+tests_XTRA			=  testsuite/functions				\
+				   testsuite/prioqueue-check.sh			\
+				   testsuite/simulate.sh
+
+tests_DAT			=  testsuite/data/blacklist-check.fd3		\
+				   testsuite/data/blacklist-check.ips		\
+				   testsuite/data/blacklist-check.lst		\
+				   testsuite/data/blacklist-check.out		\
+				   testsuite/data/blacklist-check.res		\
+				   testsuite/data/blacklist-check1.fd3		\
+				   testsuite/data/blacklist-check1.lst		\
+				   testsuite/data/blacklist-check1.out		\
+				   testsuite/data/blacklist-check1.res		\
+				   testsuite/data/blacklist.dat			\
+				   testsuite/data/blacklist.out			\
+				   testsuite/data/prioqueue-check1.inp		\
+				   testsuite/data/prioqueue-check1.out		\
+				   testsuite/data/prioqueue-check2.inp		\
+				   testsuite/data/prioqueue-check2.out		\
+				   testsuite/data/prioqueue-check3.inp		\
+				   testsuite/data/prioqueue-check3.out		\
+				   testsuite/data/simulate.cfg			\
+				   testsuite/data/simulate.inp			\
+				   testsuite/data/simulate-test.cmd		\
+				   testsuite/data/simulate-test.out		\
+				   testsuite/data/simulate-test.cfg		\
+				   testsuite/data/simulate-test.inp		\
+				   testsuite/data/simulate-test1.cmd		\
+				   testsuite/data/simulate-test1.out		\
+				   testsuite/data/simulate-test1.cfg		\
+				   testsuite/data/simulate-test1.inp		\
+				   testsuite/data/simulate-L-L.cmd		\
+				   testsuite/data/simulate-L-L.out		\
+				   testsuite/data/simulate-L-R.cmd		\
+				   testsuite/data/simulate-L-R.out		\
+				   testsuite/data/simulate-L-S.cmd		\
+				   testsuite/data/simulate-L-S.out		\
+				   testsuite/data/simulate-R-L.cmd		\
+				   testsuite/data/simulate-R-L.out		\
+				   testsuite/data/simulate-R-R.cmd		\
+				   testsuite/data/simulate-R-R.out		\
+				   testsuite/data/simulate-R-S.cmd		\
+				   testsuite/data/simulate-R-S.out
+
+generated_SCRPTS		=  testsuite/blacklist-check1.sh		\
+				   testsuite/prioqueue-check1.sh		\
+				   testsuite/prioqueue-check2.sh		\
+				   testsuite/prioqueue-check3.sh		\
+				   testsuite/simulate-test.sh			\
+				   testsuite/simulate-test1.sh			\
+				   testsuite/simulate-L-L.sh			\
+				   testsuite/simulate-L-R.sh			\
+				   testsuite/simulate-L-S.sh			\
+				   testsuite/simulate-R-L.sh			\
+				   testsuite/simulate-R-R.sh			\
+				   testsuite/simulate-R-S.sh
+
+
+TESTS +=			$(tests_SCRPTS) $(generated_SCRPTS)
+
+testsuite_FILES =		$(tests_SCRPTS) $(tests_DAT) $(tests_XTRA)
+
+testsuite_CLEANFILES =		$(generated_SCRPTS)
+
+testsuite_absdir :=		$(shell cd $(srcdir)/testsuite && pwd)
+
+testsuite/blacklist-check1.sh:	testsuite/blacklist-check.sh
+				@rm -f $@
+				ln -s $(testsuite_absdir)/$(<F) $@
+
+testsuite/prioqueue-check%.sh:	testsuite/prioqueue-check.sh
+				@rm -f $@
+				ln -s $(testsuite_absdir)/$(<F) $@
+
+testsuite/simulate%.sh:		testsuite/simulate.sh
+				@rm -f $@
+				ln -s $(testsuite_absdir)/$(<F) $@

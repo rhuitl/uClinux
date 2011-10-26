@@ -1,0 +1,20 @@
+The auth patch was contributed by Nicolas George.  Here is the excerpt from his
+email describing how to use it.  Firstly, #define SIMPLE_AUTH or add -DSIMPLE_AUTH to CFLAGS.
+
+  Then, I have implemented some basic handling of HTTP authentication. The
+  concept is that if there is a file .http-auth in the root of one site,
+  then it is an executable (most likely a script) that handles
+  authorizations. It is called with first argument the virtual host name,
+  second argument the path to the requested file, and third argument the
+  value of the Authorization header, if present. If it exists
+  successfully, access is granted, else 401.
+
+  An example of .http-auth that grants the access only to the user Cigaes
+  with password foober is:
+
+  #!/bin/sh
+  [ x"$3" = x"Basic Q2lnYWVzOmZvb2Jhcg==" ]
+
+  The format of the Authorization is not very convenient. The mangled
+  string is the base64 encoding of "$username:$password".
+

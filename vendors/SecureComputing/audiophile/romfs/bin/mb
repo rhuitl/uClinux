@@ -1,0 +1,109 @@
+#!/bin/bash
+
+ROOT_DIR="/home"
+
+depth=0
+
+declare -a pos[10]
+declare -a pth[10]
+
+pth[0]="$ROOT_DIR"
+pos[0]=0
+
+while true
+do
+	# Come here to re-expand the file listing
+	files=( `ls -1 "${pth[$depth]}" | grep -v "lost+found" | sort` )
+	nfiles=`ls -1 "${pth[$depth]}" | grep -v "lost+found" | wc -l`
+	while true
+	do
+		f="${files[${pos[$depth]}]}"
+		ff="${pth[$depth]}/$f"
+		trk="`basename $f .ogg`"
+		if [ -z "$f" ]
+		then
+			pos[$depth]=0
+			f="${files[${pos[$depth]}]}"
+		fi
+		if [ -f "$ff" ]
+		then
+			echo "$trk" >/dev/lcdtxt
+			echo -n "song           " >/dev/lcdtxt
+		elif [ -d "$ff" ]
+		then
+			echo "$trk" >/dev/lcdtxt
+			if [ -f "$ff/.noplay" ]
+			then
+				echo -n "folder         " >/dev/lcdtxt
+			elif [ -f "$ff/.inorder" ]
+			then
+				echo -n "folder:in order" >/dev/lcdtxt
+			else
+				echo -n "folder:shuffle " >/dev/lcdtxt
+			fi
+		else
+			echo "$trk" >/dev/lcdtxt
+			echo -n "unknown        " >/dev/lcdtxt
+		fi
+		a=`kp`
+		case "$a" in
+		u)
+			pos[$depth]=`expr ${pos[$depth]} - 1`
+			if [ "${pos[$depth]}" -lt 0 ]
+			then
+				pos[$depth]=`expr "$nfiles" - 1`
+			fi
+			;;
+		d)
+			pos[$depth]=`expr ${pos[$depth]} + 1`
+			if [ "${pos[$depth]}" -ge "$nfiles" ]
+			then
+				pos[$depth]=0
+			fi
+			;;
+		l)
+			if [ $depth -gt 0 ]
+			then
+				depth=`expr $depth - 1`
+			fi
+			break
+			;;
+		r)
+			if [ -d "$ff" ]
+			then
+				old=pth[$depth]
+				depth=`expr $depth + 1`
+				pth[$depth]="$ff"
+				pos[$depth]="0"
+				break
+			fi
+			;;
+		s)
+			killall oggplay
+			fg
+			if [ -d "$ff" ]
+			then
+				if [ -f "$ff/.noplay" ]
+				then
+					old=pth[$depth]
+					depth=`expr $depth + 1`
+					pth[$depth]="$ff"
+					pos[$depth]="0"
+					break
+				elif [ -f "$ff/.inorder" ]
+				then
+					oggplay -D `ls -1 "$ff"/*.ogg` &
+				else
+					oggplay -D -R -z -Z "$ff"/*.ogg &
+				fi
+			elif [ -f "$ff" ]
+			then
+				oggplay -D "$ff" &
+			fi
+			;;
+		e)
+			killall oggplay
+			;;
+		esac
+	done
+done

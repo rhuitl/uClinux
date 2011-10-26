@@ -1,0 +1,42 @@
+To install do:
+
+./configure
+make
+make install
+
+Do ./configure --help for configure options. 
+ In particular:
+
+   --enable-http-cache or --enable-local-cache may allow you to cache
+   ftp requests. See the FAQ for details.
+
+   --enable-transparent-data --enable-libiptc compiles in support for
+   transparently proxying the data connection too. See
+   README.transdata for details.
+
+   if you are going to run chrooted you may want to use  --enable-static
+   to simplify things. You may be able to get away without.
+
+Edit the config file (frox.conf). Many of these settings are
+security orientated, and I suggest you use them. They are documented
+in the comments.
+
+Your kernel will need to be compiled with transparent proxying, and
+you need to enable ip forwarding with
+echo 1 >> /proc/sys/net/ipv4/ip_forward
+
+The proxy can then listen on any port (eg. 2121). You will need to
+redirect ftp traffic to it, which means you need to either run it on
+your firewall and issue the command:
+   ipchains -A input -p tcp -s LOCALNET -d 0/0 21 -j REDIRECT 2121
+or for kernel 2.4
+   iptables -t nat -A PREROUTING -p tcp -s LOCALNET --dport 21 -j REDIRECT --to 2121
+
+or run it on another machine and have your firewall forward packets to
+it transparently.
+
+Finally run it with frox, or frox -f conffile
+
+To debug any problems you can recompile with debugging on, and change
+MaxForks to 0 in the config file. It will not detatch, and give you a
+transcript of what it's doing (in nice colours!) on stderr.

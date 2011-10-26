@@ -1,0 +1,1034 @@
+Changes from 2.2.5 to 2.2.6
+===========================
+- BUGFIX(toolkit.cxx) Fixed DefaultDomain Alias rewrite
+- BUGFIX(routing.cxx) ENUM policy not to be used with LRQ
+- BUGFIX(Neighbors.cxx) Fixed SRV policy to try both CS and LR records and not use with LRQ request
+- remove ArjReasonRouteCallToSCN (was inactive + broken for a long time)
+- BUGFIX(Toolkit.cxx) enable SQLConfig also if only Firebird is available
+- BUGFIX(RasTbl.cxx) reject the call if no gateway has capacity, don't just use the first matching gateway
+- BUGFIX(RasTbl.cxx) the first route was duplicated and a call was sent twice to the same gw.
+  Thanks to Alex Golyshev for pointing this out!
+- BUGFIX(RasSrv.cxx) fixed crash inside IRR handler
+- BUGFIX(yasocket.cxx) due to recent changes, it was impossible to send
+  more than 10240 bytes of data when data queuing had to be involved
+- move status port examples to contrib/statusport/
+- fix nonStandardData field usage, make use of assigned T.35 codes
+- BUGFIX(RasTbl.cxx) ensure that full gateways are eliminated, when failover
+  is active and remaining gateways are sorted due to their priority correctly
+- BUGFIX(ProxyChannel.cxx) preserve presentation and screening indicators
+  in Calling-Party-Number IEs
+- BUGFIX(RasTbl.cxx) restore default value for capacity and priority
+  on config reload, if removed from an EP section (or if the whole section
+  has been removed)
+- BUGFIX(Neighbor.cxx,ProxyChannel.cxx): fix canMapAlias for LRQs with
+  unregistered endpoints
+- new config section [H225toQ931] to change the H.225 reason to Q.931
+  cause code mapping
+- optional priorities for gateway prefixes: gw-alias=prefix[:=priority][,prefix[:=priority],...] (patch by Alex Golyshev and Andrey Pasukov)
+- change default value for CallSignalHandler to 5
+- BUGFIX(Toolkit.cxx): fix for calling between 2 internal networks
+- Added AcceptNonNeighborLCF to LRQFeatures settings
+- Added GnuGk OID & T.35 Codes
+- BUGFIX(Toolkit.cxx): fix to allow URI rewriting on ARQ processing
+- BUGFIX(ProxyChannel.cxx): fix to show correct Setup CallSignallingAddress when behind NAT
+- Added RemoveH235Call & RemoveH460Call Settings
+- BUGFIX(ProxyChannel.cxx): H.245 addresses being incorrectly written in NATHandler for public proxies.
+
+Changes from 2.2.4 to 2.2.5
+===========================
+- RADIUS AAA module now handles a Class attribute correctly
+- BUGFIX(clirw.cxx) missing iterator check, that could cause an invalid
+  memory access, fixed - thanks to Vladimir Voronin
+- implement optional call-id parameter for Routing commands
+- Bugfix(RasSrv.cxx) fix SignalCallID=1
+- Bugfix(Proxychannel.cxx) avoid inserting same socket twice in cleanup list
+- Bugfix(Proxychannel.cxx) make sure all members of CallSignalSocket are
+  initialized on creation
+- Bugfix(yasocket.cxx) send very large status port messages
+  in 10KB chunks and sleep after each
+- new feature: StatusPort filtering by Doron Bleiberg
+- new switch: [RoutedMode]DisableRetryChecks retries all calls
+- BUGFIX(ProxyChannel.cxx) make sure we preserve the original Setup message for
+  retries and not only copy the buffer address
+- Bugfix(Neighbor.cxx) copy canMapAlias when forwarding LRQs
+- implement virtual queues for LRQs sponsored by Associated Engineering Srl.
+- implement canMapAlias for LCFs sponsored by TelecomUnity Ltd.
+- copy all unknown IEs in Notify messages when forwarding
+  (fixes some failed transfers)
+- BUGFIX(*.cxx) set all deleted pointers to NULL
+- new SyslogAcct accounting module for the Unix syslog
+- (gkauth.cxx)Reapplied H235.1 (formally known as H235AnnexA) by using OpenH323 Authenticator factory loader
+- (rassrv.cxx)Registration Priority Added
+- (Proxychannel.cxx)TreatUnregisteredNat added. Treat unregistered calls unknown NAT status as being NAT
+- (routing.cxx)DNS SRV support to DNS Routing policy
+- (toolkit.cxx)RewriteAlias section added
+- BUGFIX(ProxyChannel.cxx) WaitAndSignal added to OnInformation to avoid NAT support crash.
+- BUGFIX(ProxyChannel.cxx) Check for NATSupport added.
+- BUGFIX(RasTbl.cxx) WaitAndSignal added to FindByEndPointid()
+- BUGFIX(ProxyChannel.cxx) Added SupportCallingNATedEndpoints.
+- Moved DNS SRV to it's own seperate policy
+- Registration pre-emption support added
+- Support for EP's on dynamic IP's
+- fixed code to compile with the latest pwlib CVS (STL string conversion)
+- Added support for GnuGK to work behind NAT box
+- Added support for Third party (non-neighbor) Gatekeepers (AcceptNonNeighborLRQ=1)
+- Added auto-detection on internal network for proxy mode.
+- Added DefaultDomain for H323 URI rewriting
+
+
+Changes from 2.2.3 to 2.2.4
+===========================
+- new Calling/CalledTypeOfNumber and Proxy configuration variables
+  in [RouteMode] section and endpoint configuration. Thanks to Vladimir Voronin
+- (ipauth.cxx) added support for prefixes. Thanks to Vladimir Voronin
+- (gksql_firebird.cxx) Firebird/Interbase driver for SQL modules. Sponsored
+  by Roitel Telecommunication S.A.
+- (Routing.cxx) NumberAnalysis routing policy can handle Setup messages now.
+  Thanks to Vladimir (vl@kamatele.com)
+- (pwlib_compat.h) adapt to changed mutexes starting with PWLib 1.9.2
+- call mute in proxy mode using userinput * (patch by Simon Horne)
+- NAT support for unregistered callers (patch by Simon Horne)
+- (gk.cxx) allow correct spelling for FortyTwo=42 entry
+- BUGFIX(yasocket.h) fix compilation with gcc 4.1
+- (clirw.cxx) process CLI ranges with leading zeros correctly
+- new CapacityControl auth/acct modules to control inbound traffic
+- BUGFIX(ProxyChannel.cxx) check added for a NULL pointer in NAT traversal code
+- (RasTbl.cxx) default SignalTimeout value increased from 15 to 30 seconds
+- BUGFIX(RasSrv.cxx) remove call records correctly in direct signaling mode,
+  when only called party is registered. Thanks to Julius Bajzik
+- BUGFIX(RasTbl.cxx) fixed race condition when accessing endpoint records
+- BUGFIX(ProxyChannel.cxx) fixed race condition in H245Socket when H.245
+  tunneling is disabled
+- (configure) better detection of PostgreSQL on FreeBSD
+- BUGFIX(RasSrv.cxx) allow bandwidth=0 in ARQ / ACF
+- BUGFIX(ProxyChannel.cxx) fix bug when using RADIUS/SQL based routing
+  for Setup messages
+- BUGFIX(ProxyChannel.cxx) check for poor NAT implementations, that might
+  have crashed GnuGk (by Simon Horne)
+- new accounting variables: %{media-oip}, %{codec}
+- new accounting variables: %{call-attemps}, %{last-cdr}, %{caller/callee-epid}
+- new feature: call failover (see manual)
+- BUGFIX(clirw.cxx) set presentationIndicator correctly in H.225.0 Setup UUIE
+- BUGFIX(RasTbl.h) when active, perform IRR checks for local
+  endpoints only, others (parent, neighbor etc.) won't send us IRRs
+- BUGFIX(Routing.cxx) remove leading zeros for ENUM queries
+- BUGFIX(RasSrv.cxx) have AcceptNeighborsCalls default to 1 like
+  the documentation always said
+- BUGFIX(Routing.cxx) fix ENUMPolicy implementation
+- new StatusAcct accounting module for the status port sponsored by Grupo Isec
+
+Changes from 2.2.2 to 2.2.3
+===========================
+- (ProxyChannel.cxx) use Calling-Party-Number to perform inbound per-gateway number rewrite
+  (GWRewriteE164), if no sourceAddress is present in H.225.0 Setup UUIE
+- IRR checking for active calls [CallTable] IRRFrequency=n, IRRCheck=TRUE
+- BUGFIX(RasSrv.cxx) terminate all calls before unregistering endpoint
+  when OverwriteEPOnSameAddress=1
+- new RewriteCLI options to control CLIR features precisely 
+- new CLIR/CLIP (Calling Line Identification Restriction/Presentation) features in
+  RewriteCLI module. Ability to hide CLI (enable CLIR/CLIP) per endpoint
+- Unix man page in the docs folder by Ivan Lopez <ilopez@enress.gov.ar>
+- do not leave sockets open when proxy handlers are idle. Peform proper cleanup
+  all the time
+- manual updated with notes on TIME_WAIT and Q931PortRange/H245PortRange/T120PortRange
+- new SocketCleanupTimeout config variable to control time to wait before
+  a socket is deleted
+- more reliable port allocation making better call throughput better on a heavily
+  loaded server or when using very small port ranges
+- more detailed description of network operations
+- if Home contains a single IP address, bind RTP sockets to this specific address,
+  instead of INADDR_ANY
+- do not remove addresses specified in Home that are not found in PWLib interface table,
+  just generate a warning
+- BUGFIX(clirw.cxx) random rewrite did not work for outbound rules and comma separated items
+- Solaris compilation errors fixed, thanks to Mikko Oilinki
+- BUGFIX(yasocket.cxx) fixed address reuse for UDP sockets in LARGE_FDSET mode,
+  broadcast RAS socket did not work previously
+- better error reporting on socket allocation
+- new ENUM routing policy from Simon Horne
+- added check for PWLib/OpenH323 minimum version supported
+- optionally signal call ids in the status port with ACF/ARJ/DCF/DRJ/RouteRequest
+  messages (switch on with SignalCallIds=1 in main section)
+- NetMeeting compatibility problems fixed
+- new [RasSrv::RRQFeatures] IRQPollCount config variable, default number
+  of "poll" IRQ messages changed from 2 to 1
+- FileIPAuth module moved from the contrib section into the main branch
+- BUGFIX(ProxyChannel.cxx) tunnelled H.245 messages were not processed
+  correctly
+
+Changes from 2.2.1 to 2.2.2
+===========================
+- allow empty key values in SQLConfig ConfigQuery/RewriteE164Query
+- restored MSVC6.0 compatibility
+- BUGFIX(radproto.cxx) GetSocket could use an invalidated iterators
+  under some circumstances. Thanks to kubuqi cn
+- (ProxyChannel.cxx) ignore incorrect mediaChannel offers with port number 0,
+  internal option [Proxy] RemoveMCInFastStartTransmitOffer to enable removing
+  mediaChannel from fast start transmit channel open offers
+- creditamout and billingmode fields may appear in a result for SQLAuth CallQuery
+- exclude all SQL modules from build if no SQL support is enabled
+- BUGFIX(ProxyChannel.cxx) originate an H.245 TCP connection from the same IP
+  as an associated signalling connection is established
+- (clirw.cxx) new CLI rewrite types - prefix replacement (*=) and an identity
+  match (~=)
+- don't lock the call table when logging accounting data on call disconnect,
+  to prevent gatekeeper long lock periods when a backend is not working properly
+- new TranslateFacility config variable to enable Facility message conversion
+  between H.323v4 and previous versions of the protocol
+- %t, %p, %{ring-time}, %{alerting-time} accounting variables ported from 2.0
+  branch. ConnectTimeout config variable replaced with SignalTimeout and AlertingTimeout
+- new %r accounting variable to get who disconnected a call, thanks to Freddy Parra
+- new generic SQLAuth module to authenticate and authorize RRQ, ARQ, LRQ and Setup messages
+- BUGFIX(ProxyChannel.cxx) another attempt to solve race issues in H.245 routed
+  mode that may cause occasional crashes
+- new --core command line argument to enable core dump generation for Unix
+- new Vendor config variable for [Endpoint] section to provide vendor specific
+  extensions when registering with a parent gatekeeper
+- added support for Connect event in SqlAcct module, thanks to Boian Bonev
+- BUGFIX(Neighbor.cxx) nonStandardData field was not included for CiscoGK neighbors
+- a new module to rewrite ANI/CLI numbers. Sponsored by Gabriel Georgescu.
+- new FreeBSD 5.3 startup script
+- BUGFIX(ProxyChannel.cxx) send proper Release Complete when the remote side
+  does not respond to a Setup message
+- BUGFIX(ProxyChannel.cxx) correctly remove calls from the call table,
+  when setup processing fails for some reason (auth failed, acct failed, ...)
+- BUGFIX(ProxyChannel.cxx) fixed config reload deadlock when using H.245
+  routed mode and listening sockets are holding the config reload mutex
+- (Routing.cxx) new routing policy NumberAnalysis to support overlapped digit
+  sending with ARQs
+- WinSvc from Franz J Ehrengruber updated to work with GnuGk 2.2.2 and 2.0.10
+- new FileIPAuth module in the contrib/ipauth directory
+- (RasTbl.cxx) call accounting updates/disconnecting is now more robust
+  and does not lock up the call table and (effectively) the gatekeeper
+  for long time periods
+- Makefile for docs, make sure generated PDF manual is searchable
+- do not support mutiple rewrite targets, as this feature does not work well
+  if rewrite is performed more than once
+- BUGFIX(GkStatus.cxx) the gatekeeper could crash if the connection
+  was closed before the welcome message has been sent
+- BIGFIX(gkacct.cxx) different Username was reported during Setup auth
+  and acct step, if no sourceAddress has been present for an unregistered call
+- more missing config reload locks added to allow seamless config reload
+- BUGFIX(ProxyChannel.cxx) the code could reference an invalid H.245 socket
+  due to recent changes
+- BUGFIX(h323util.cxx) conference/call-id could get incorrectly converted
+  to a string with some compilers
+- (Routing.cxx) ability to do per-call proxy mode control from routing handlers
+- BUGFIX(ProxyChannel.cxx) fixed race condition between signaling/H.245 channel
+  closure
+- parts of signalling code rewritten
+- default value for config variable ForwardOnFacility changed to 0
+- BUGFIX(ProxyChannel.cxx) inbound rewrite code did not check for presence
+  of sourceCallSignalAddress field in Setup messages. Use real peer IP instead
+- ability to encrypt all passwords in the config (radius shared secrets,
+  database passwords). A new EncryptAllPasswords config variable and KeyFilled
+  usage extended
+- SQLConfig ported from 2.0
+- BUGFIX(radauth.cxx) Framed-IP-Address could not be determined
+  for unregistered calls with no Setup-UUIE.sourceCallSignalAddress field,
+  causing authentication to fail
+- (ProxyChannel.cxx) small optimizations in signaling handling
+- fixed bug with aliases handling in various places, introduced by recent changes
+- BUGFIX(Toolkit.cxx) correct handling of '!' character in rewrite rules
+- provide proper handling of aliases of type partyNumber (e164Number or privateNumber)
+- BUGFIX(ProxyChannel.cxx) fix for RTP/Q931/H245/T120PortRange
+  to correct a bug with port range wraparound if the last port is 65535.
+  This caused a next port to be set to 0 and any subsequent port allocation 
+  to fail
+- BUGFIX(ProxyChannel.cxx) dynamic allocation of RTP ports did not work,
+  use a fixed range 1024-65535 as a default for RTPPortRange config variable
+- (RasTbl.cxx) LRQs received on a multicast interface triggered LCFs
+  with an invalid signalling port number (0) in signalling routed mode
+- get rid of redundant config reload mutex inside accounting modules
+- obsolete auth modules MySQLAliasAuth and MySQLPasswordAuth are now removed
+- (GkStatus.cxx) fixed a missing lock during config reload
+- accept LRQs from any port (check only an IP address)
+- SQL modules accept only one database host now (the failover was not supported
+  properly either, so it has been removed)
+
+Changes from 2.2.0 to 2.2.1
+===========================
+- enchanced prefix matching for routing policies. A dot (.) matches any digit
+- enchanced prefix matching for neighbors. A dot (.) matches any digit,
+  ! at the beginning disables the prefix
+- (ProxyChannel.cxx) critical fix - a missing lock during config reload
+  caused the gatekeeper to crash
+- (ProxyChannel.cxx) more reliable port number selection for Q.931, H.245, 
+  T.120 and RTP port ranges (before, a config reload could cause many calls 
+  to fail because of unability to get a new socket)
+- (ProxyChannel.cxx) default setting for RTPPortRange is now to let the OS select a port number
+- more flexible rewrite rules (both global and per-gw) with '.' and '%'
+  wildcard characters
+- security fix for socket handle/select oveflow issue
+- new accounting event 'connect' (only in routed mode)
+- timestamp microseconds field has a fixed length of 3 digits
+- enchanced prefix matching for gateways. A dot (.) matches any digit,
+  ! at the beginning disables the prefix
+- BUGFIX(radproto.cxx) VSA matching routing ignored a vendor identifier
+  causing incorrect attributes to be matched
+- insert missing Calling-Party-Number-IE/Display-IE if corresponing
+  Screen... options are enabled
+- shutdown the gatekeeper if there are errors in SQL auth/acct modules
+  configuration, thanks to Mikko Oilinki
+- (gkslq.cxx) try to reconnect to the database, if the initial attempt
+  failed. Thanks to Mikko Oilinki
+- another changes to Calling/Called-Station-Id handling, always use
+  Calling/Called-Party-Number IEs when available. Calling/Called-Station-Id
+  is now set outside auth modules, so acct modules receive correct
+  values, independetly of auth modules usage
+- BUGFIX(Toolkit.cxx) correctly replace %u in timestamps with number
+  of microseconds instead of passing %u to strftime
+- ability to select Called-Station-Id number type between the original one
+  (dialed number) and the rewritten one. New UseDialedNumber config option
+  for RadAuth/RadAliasAuth/RadAcct modules, new %{Dialed-Number} variable
+  for SQLAcct and FileAcct modules
+- ability to customize timestamp formats. New TimestampFormat config variables
+  for main, SqlAcct, RadAcct, FileAcct and CallTable sections
+- (ProxyChannel.cxx) safety check before a signaling socket is actually deleted
+  for being removed from an associated call record
+- new TcpKeepAlive option to remove problem with network errors and hanging
+  calls (see docs/keepalive.txt for more details)
+- RadAuth/RadAliasAuth modules can now add/remove endpoint aliases during
+  endpoint registration (using h323-ivr-in=terminal-alias: Cisco AV-Pair)
+- per-call proxy control
+- new status port command RouteToGateway
+
+Changes from 2.2beta5 to 2.2.0
+==============================
+- BUGFIX(RasSrv.cxx) invalid/unsupported RAS/signaling addresses are ignored
+  in RRQ messages
+- GCC 3.4.2 compilation errors fixed
+- BUGFIX(gkauth.cxx) PrefixAuth module crashed when checking ARQ without
+  a destinationInfo field
+
+Changes from 2.2beta4 to 2.2beta5
+=================================
+- BUGFIX(ProxyChannel.cxx) race condition with NAT sockets fixed, thanks to Daniel Liu
+- new RoundRobinGateways config option in the RasSrv::ARQFeatures sections
+  to enable/disable round-robin gateway selection
+- call capacity limits and gateway prioritization (new EP:: config sections)
+- BUGFIX(ProxyChannel.cxx) errors during H.245 channel establishment caused
+  calls to not disconnect correctly
+- check VirtualQueueRegex on startup
+- BUGFIX(gk.cxx) reopen a log file on reload (HUP) signal to allow logrotate
+  to manage logs
+- BUGFIX(RasTbl.cxx) multithreading issues with an access to endpoint record
+  data fixed. Thanks to kubuqi cn!
+- BUGFIX(ProxyChannel.cxx) RTP proxy handling moved to a separate RTP proxy
+  threads. New RtpHandlerNumber config option
+- BUGFIX(yasocket.cxx) enabled REUSE_ADDRESS option on listening sockets
+  in non-LARGE_FDSET mode to allow fast gatekeeper restarting
+- better disconnect cause reporting in Setup processing
+- ability to set call destination in auth modules. RADIUS based call routing
+- BUGFIX(Neighbor.cxx) fixed sourceInfo LRQ field handling - now it contains
+  an H.323 identifier of the gatekeeper
+- (radproto.cxx) ability to set shared secrets for each radius server 
+  separatelly, more Radius optimizations
+- new, much faster, Radius client implementation. Thanks to Pavel Pavlov
+  for numerous ideas and suggestions!
+- BUGFIX(ProxyChannel.cxx) Called-Party-Number-IE rewrite occured too late,
+  causing auth/acct modules to receive the original number instead of the rewritten one
+- (RasSrv.cxx) duplicated RAS messages are now simply discarded
+- BUGFIX(ProxyChannel.cxx) fixed proxying of RTP packets, so RTP sockets are
+  not closed on temporary errors (like remote socket not yet ready). This bug
+  affected especially NAT traversal and situation, when audio was sent very 
+  early, when reverse proxy path has not been yet established
+- BUGFIX(RasSrv.cxx) fixed handling of RRJ (fullRegistrationRequired)
+  from an alternate GnuGk
+- BUGFIX(GkStatus.cxx) fixed bug in status client authentication introduced
+  by recent changes, thanks to Razvan Radu!
+- (sqlbill) examples how to setup SQLAcct, SQLPasswordAuth and SQLAliasAuth
+  with the billing
+- direct SQL accounting module (SQLAcct) ported from 2.0 branch
+- BUGFIX(gkauth.cxx) gcc 2.95.x compilation errors fixed
+- BUGFIX(Neighbor.cxx) handling reply messages (RIP/LCF/LRJ) from neighbors 
+  fixed, thanks to kubuqi cn (kubuqi@hotmail.com)
+- support for CallCreditServiceControl in RCF and ACF messages, which allows
+  reporting call duration limit and user's account balance to endpoints. 
+  Currently RadAuth and RadAliasAuth modules support this feature.
+- BUGFIX(gk.cxx) removed an invalid test for the log filename, preventing
+  from creating log files in a directory other than the current one
+- BUGFIX(GkClient.cxx) TTL bug fixed (RRQ every second), documentation updates
+- fixed assertions caused by attempts to get/set config keys with an empty key name
+- BUGFIX(gk.cxx) fixed log file rotation under Windows, thanks to Cristian Bullokles!
+- log file rotation, new LogFile config section, new setlog and rotatelog
+  status interface commands
+- BUGFIX(gkacct.cxx) a fix to rotation interval calculation for monthly 
+  CDR file rotation
+- BUGFIX(gkacct.cxx) FileAcct monthly rotation rotated a CDR file unnecessary
+  on gatekeeper restart
+- BUGFIX(gkacct.cxx) fixed a critical bug in Username determination 
+  for unregistered endpoints, introduced by recent changes
+- BUGFIX(RasSrv.cxx) do not include an invalid access token (with null object
+  identifier) in LCF to prevent interoperability problems, thanks to Andreas Sikkema!
+- BUGFIX(ProxyChannel.cxx) better handling of multiple calls over a single
+  signalling channel by setting multipleCalls and maintainConnection
+  H.225.0 fields to FALSE in all messages. Thanks to Ian Campbell!
+- better Username, Calling-Station-Id and Called-Station-Id determination,
+  consistant across all auth/acct modules, redundant code removed
+- new Gatekeeper::Auth flag SetupUnreg to toggle Q.931 Setup authentication
+  for unregistered endpoints only
+- IncludeEndpointIP flag for RadAuth, RadAliasAuth and RadAcct is obsolete,
+  these modules will always send Framed-IP-Address
+- (sqlbill) reject gracefully Access-Requests without Framed-IP-Address
+- (sqlbill) improvements for IP only authorization
+- BUGFIX(sqlbill) FreeRadius accounting_stop_query changed to not check h323id 
+  in order to allow IP only authorization
+- BUGFIX(sqlbill) FreeRadius accounting_update_query changed to not check h323id 
+  in order to allow IP only authorization
+- (radacct.cxx) new RADIUS h323-ivr-out=h323-call-id parameter that contains
+  an H.323 Call Identifier
+- BUGFIX(radauth.cxx) better Framed-IP-Address handling in RadAliasAuth Setup check
+- BUGFIX (ProxyChannel.cxx) With a certain combination of endpoints it 
+  was possible to have UDPProxySocket trying to forward incoming RTP / 
+  RTCP trafic to 127.0.0.1:0. Added a check for this situation and send
+  traffic to non-loopback address and hope it is the correct address.
+- (sqlbill) added ability to authenticate users only by their IP 
+  (ignoring User-Name)
+- BUGFIX(radauth.cxx) RadAliasAuth will use Calling-Party-Number as User-Name
+  if no sourceAddress inside is present in Setup-UUIE
+- (sqlbill) new, more flexible tariff/rating engine
+- BUGFIX(gk.cxx) fixed signal handling to use sigaction instead of signal
+  to prevent accidental gatekeeper crashes because of restored signal handlers
+- BUGFIX(gkacct.cxx) rotation per number of lines works correctly now
+
+Changes from 2.2beta3 to 2.2beta4
+=================================
+- BUGFIX(radauth.cxx) check if generalID matches one of endpoint's aliases
+  only when authenticating RRQ
+- (gkacct.cxx) parametrized FileAcct CDR output
+- BUGFIX(gkauth.cxx) do not declare H.235 Auth Procedure I support as it is
+  not fully implemented
+- (RasSrv.cxx) do not copy nonStandardData field from RAS requests to RAS replies,
+  as it does not make any sense and cause interoperability problems with some
+  Cisco IOSes
+- (yasocket.cxx) fixed a bug in TCPListener::IsTimeout() which prevented
+  GNUgk from running > 596 hours
+- (ProxyChannel.cxx) fixed a critical bug with referencing already deleted
+  socket, when the remote party did not accept signalling tcp connection
+- (ProxyChannel.cxx) more UDP proxy optimizations
+- new flexible CDR file rotation for FileAcct module
+- (gktimer.cxx) new generic support for time-based events
+- BUGFIX(Routing.cxx) processing LRQ request should not apply round robin
+  selection to gateways with the same prefix
+- BUGFIXes: make sure we delete list items _after_ we have removed
+  them from the list
+- BUGFIX(RasTbl.cxx) make sure PrintCurrentCalls prints ACF messages
+  in the same format as all ACFs
+- improved performance of the socket code (especially when LARGE_FDSET 
+  is enabled). Faster select for a single socket and an unnecessary 
+  write lock for UDP sockets removed
+- BUGFIX(radproto.cxx) default auth/acct ports are now set to fixed values
+  1812 and 1813, due to problems with getservbyname and multithreading
+- (gksql.cxx) improved SQL query parameters replacement routine
+- removed descendancy check in radproto to allow compilation with the latest
+  RTTI enabled PWLib
+- BUGFIX(Neighbor.cxx) fixed missing parentheses, thanks to kubuqi cn
+- BUGFIX(h323util.cxx) GetIPAndPortFromTransportAddr now checks if the address
+  is valid
+- BUGFIX(ProxyChannel.cxx) fixed bugs in ForwardCall, thanks to Daniel Liu
+- header file usage more consistent
+- SQL authenticators moved to a separate file
+- added VSNET2003 sln and vcproj files
+- fixed Windows DSP files to not enable some optimizations for Windows
+  that result in VC6 linker throwing away some gnugk modules (static variables)
+- improved configure script to detect installed PWLib/OpenH323
+- significant API changes to authentication/accounting modules
+- added logparser application from Saad Faisal to the contrib section
+- pgsqlauth removed from the contrib section, as it is obsolete now
+- BUGFIX(Routing.cxx) the absense of a regexp for virtual queues wasn't detected
+- BUGFIX(ProxyChannel.cxx) multiple calls over a single signalling channel
+  are now gracefully handled using ReleaseComplete with newConnectionNeeded code.
+- (RasTbl.cxx) permanent endpoints are correctly reloaded now, with removal
+  of permanent endpoints for which config entries have been deleted
+- (gkauth.cxx) depreciated ExternalPasswordAuth finally removed
+- SQL engine rewritten completelly to use a concept of SQL driver.
+  New modules SQLPasswordAuth and SQLAliasAuth added. MySQL and PostgreSQL
+  drivers implemented. Funded by Doxum Technologies Inc.
+  Backward compatibility (MySQLAliasAuth and MySQLPasswordAuth) maintained.
+- BUGFIX(Routing.h) fixed referencing to a temporary PString object
+  after it is destroyed
+- better LOG_OFF Windows event handling to prevent gatekeeper shutdown
+  when user logs out. The patch from Franz J Ehrengruber
+- added GNU Gatekeeper Service for Windows from Franz J Ehrengruber
+- added Windows icon and version info from Franz J Ehrengruber
+- (manual.sgml) corrected MySQLPasswordAuth, MySQLAliasAuth sections,
+  removed NeighborPasswordAuth documentation (not necessary anymore)
+- (gkauth.cxx) fixed SimplePasswordAuth module to read settings from 
+  [SimplePasswordAuth] section instead of [Password] section. 
+  Fixed MySQLPasswordAuth module to accept CacheTimeout parameter.
+  Default CacheTimeout for MySQLPasswordAuth and MySQLAliasAuth set to 0
+  (do not cache passwords/aliases at all)
+- applied the concept of output trace levels for the status interface. 
+  It allows to select amount of information a status client receives
+  (level 0 - silent mode + reloads; level 1 - CDRs, RouteRequests, reloads;
+   level 2 - everything: the default mode)
+- (GkStatus.cxx) some cleanup, better tracing, new trace command introduced
+  to support multiple output levels in the future
+- added missing addpasswd Visual Studio project files (dsp and dsw)
+- (configure.in) added check for MSG_NOSIGNAL flag support with send/recv calls
+- (configure.in) better pwlib/openh323 detection patches from Klaus Kaempf
+- (RasTbl.cxx) treat MCUs as gateways and allow MCUs to register prefixes
+- (Toolkit.cxx) use in-place constructors and destructors inside RewriteData
+  to prevent Windows exceptions on rewrite rules reload in debug mode
+- removed duplicated build timestamp from 'version' command output.
+  Added special file versionts.h to ensure version.cxx is rebuilt each
+  time GnuGk is recompiled, in order to get proper build timestamp
+- (job.cxx) jobs simplified, optimised and checked for thread safety
+- (version.cxx) modified to list all extensions in the version string
+- (ProxyChannel.cxx) support for H.323 V4 provisionalRespToH245Tunneling
+  and parallelH245Control H.225.0 elements
+- log rotation now maintains the original filename and stores rotated
+  log files with precise timestamp (YYYYMMDD_HHMMSS) to prevent overwritting. 
+  Thanks to Rafael Costa dos Santos.
+- added Q.931 Setup authentication to RadAuth module to allow
+  authentication based on crypto tokens carried inside Setup
+- modified GkAuthenticator and RADIUS authenticators prototypes
+  to allow modifications of messages being processed
+  (NOTE: This may break compatibility with some customer derived classes)
+- (ProxyChannel.cxx) RTP proxy fixed to not require RTCP channel
+  and work better with T.38 faxes
+- (ProxyChannel.cxx) added new config parameter ScreenSourceAddress
+  to screen calling party aliases from UUIE Setup element
+- added sample SQL/RADIUS billing example to the contrib directory
+- removed Makefile to force users running configure script before compilation
+- added per gateway E.164 rewriting of dialedDigits in addition to
+  global E.164 rewriting
+
+Changes from 2.2beta2 to 2.2beta3
+=================================
+- addpasswd utility changed to require section name where the encrypted 
+  username/password will be stored
+- BUGFIX(gkauth.cxx) fixed call duration limit handling when multiple
+  authenticator modules are specified
+- BUGFIX(gkacct.cxx) changed accounting reload handling to first cleanup
+  the old modules and then create the new ones. This allows the FileAcct 
+  logger to work fine with the reload command
+- BUGFIX(h323util.cxx) additional check for H225_TransportAddress
+  to prevent NULL pointer assertions. Thanks to Andrey Pankov!
+- added Q.931/H.225 Setup authentication (RadAliasAuth module implementation)
+- BUGFIX(radproto.cxx) fixed invalid signed/unsigned conversion that caused
+  some functions to return unexpected results
+- BUGFIX(Neighbor.cxx) LCF is considered to come from a given neighbor
+  if either IP:PORT or neighbor identifier inside LCF nonstandarparam field matches
+  (was: neighbor identifier inside LCF nonstandarparam field or, if the field
+  is missing, IP:PORT)
+- added PostgreSQL authenticator modules to the contrib directory
+- API for AliasAuth has changed slightly
+- better checking of tokens/cryptoTokens by SimplePasswordAuth derived authenticators
+- BUGFIX(RasTbl.cxx) fixed NULL reference in CallRec::SetSocket - caused crash
+  in ForwardCall. Thanks to kubuqui cn!
+- check ReleaseComplete for H225 reason field, if no Q.931 cause IE is found
+- set disconnect cause to "normal call clearing" on DRQ received with normalDrop
+  disengageReason and no termination cause set
+- BUGFIX(ProxyChannel.cxx) fixed h225 termination cause setting for ReleaseComplete
+- better hop count handling for neighbors - now LRQ m_hopCount field 
+  is forwarded/generated correctly, according to an original hop count
+  or a ForwardHopCount config settings
+- small radius accounting/authentication module optimizations and better trace ouput
+- changed handling of multiple accounting modules (added new "alternative" control)
+- added new VirtualQueuePrefixes and VirtualQueueRegex config variables
+  to [CTI::Agents] section. These make possible to call virtual queue
+  not only with the exact alias name, but also with an alias that matches
+  configured prefixes or configured regular expression. Thanks to Max Speransky
+- renamed config variable VirtualQueue to VirtualQueueAliases 
+  (backward compatibility is maintained)
+
+Changes from 2.2beta1 to 2.2beta2
+=================================
+- BUGFIX(RasTbl.cxx) fixed connect/disconnect time handling and call duration
+  calculation. Thanks to Aivis Olsteins
+- BUGFIX(GkClient.cxx) changed SetPassword to fill LRQs with all recognized
+  tokens/cryptoTokens
+- better disconnect cause handling
+- BUGFIX(ProxyChannel.cxx) ReleaseComplete now always contains either CauseIE
+  or H225_ReleaseCompleteReason, because one of these fields is mandatory
+- added status line improvements (command expansion, repeat last command,
+  backspace handling for windows) from Hu Yuxin
+- BUGFIX(GkStatus.cxx) removed unimplemented "disconnect" and "unregister"
+  commands
+- ACF is filled with destinationInfo if aliases have changed during
+  ARQ processing and ARQ.canMapAlias is TRUE
+- added more tracing and human readable names to routing policies
+- added modified CTI virtual queues implementation from Chih-Wei Huang
+- BUGFIX(singleton.cxx): incorrect singleton instance counting with different trace levels
+- added "run as user" feature
+- plain text CDR accounting logger module from Tamas Jalsovszky
+- call duration limit features introduced for ARQ handlers
+- old LDAP support removed from the source code tree
+- full Radius - authentication and accounting(start/stop/update)
+- added configure script to detect system settings and create Makefile
+
+Changes from 2.0.x to 2.2beta1 (by cwhuang)
+===========================================
+- new method to detect NATed endpoints
+- better handling of call timeout
+- support multiple mysql servers
+- add authentication method selection for GkClient
+- the underlying architecture is almost rewritten entirely, includes
+    object factory
+    new thread model
+    universal sockets handling mechanism
+    RAS type traits
+    multi-threaded RAS server
+    new neighboring system
+    configurable routing policies
+    thread-safed gkauth
+- use MySQL C API directly instead of MySQL++
+
+Changes from 2.0.3 to 2.0.4 (by cwhuang)
+========================================
+- add multiple prefixes for neighbors from Rodrigo Gonzalez
+- TransferCall patch from Olivier GRALL <olivier.grall@caramail.com>
+- fix H.235 compatibility with lastest CVS of Openh323
+- set m_h245Tunneling as h245Tunneling flag in Setup_UUIE
+- allow h245 reverting work for calltype=1
+- allow disable Shutdown command
+- permanent endpoints can be reloaded now
+- fix conflict between AcceptGatewayPrefixes option and permanent endpoints
+- fix bug for multiple SupportedProtocols
+- add StatusWriteTimeout option
+- add OverwriteEPOnSameAddress option
+- add Shutdown command (jan)
+
+Changes from 2.0.2 to 2.0.3 (by cwhuang)
+========================================
+- add VendorIdentifier in RRQ
+- more elegant way to detect version of Openh323
+- fix typo for CheckID :(
+- fix nattype bug on fullRRQ
+- reject nated endpoint from private IP 127.0.0.1
+- fix problem if receiving DRQ before than ReleaseComplete
+- fix compile problem with latest CVS of Openh323
+- add AcceptEndpointIdentifier option
+- fix hang bug on GkStatus
+- allow to reject forwarded LRQ
+- forward call on Facility
+- fix bug LRQ with empty destinationInfo
+- send endpoint alias via sourceInfo of LRQ
+- allow set nated endpoints forcedly
+- let virtual queue feature be optional
+- fix a bug on startH245
+- implemented inbound call distribution with virtual queues
+  (based on patch by Dennis Lazreg)
+- workaround for Setup contains empty destinationAddress
+- workaround to copy cryptoTokens for the latest CVS of OpenH323
+- fix shutdown problem on SMP machine
+- reject lightweightRRQ if IP has changed
+- send DRQ to parent if reject a call
+- fix billing issue for forwarded calls
+- change 'ifdef PTRACING' to 'if PTRACING' since it is always defined
+- fix warnings of unused variables in non PTRACING mode
+- expire endpoints even in active calls
+- send endSessionCommand before closing h245socket
+
+Changes from 2.0.1 to 2.0.2 (by cwhuang)
+========================================
+- show NAT IP in print verbose command
+- fix reply of pending ARQs to NATed endpoint
+- fix bug on handling Facility
+- allow hide DisplayIE and CallingPartyNumberIE
+- fix an interoperability bug with old NAT solution
+- fix a bug that prefixes is not changed on full RRQ
+- support 'H323-GW' prefixes
+- fix leaking messages on status port
+- fix a security bug OnDRQ
+- rewrite Setup.destinationAddress even if no CalledPartyNumber
+- fix interoperability problem on CloseLogicalChannel for some bad endpoints
+- reload route table on RRJ with reason fullRegistrationRequired
+
+Changes from 2.0.0 to 2.0.1 (by cwhuang)
+========================================
+- add statistics for nated ep and calls from parent
+- avoid looped calls
+- add NetworkInterfaces option for OS that don't support GetRouteTable()
+- add H.245 Reverting technology(Patent Pending)
+- fix H.225.0 procotolID problem
+- fix a long existing bug according to Packetizer
+  http://www.packetizer.com/in/q14.html
+- add TOS flag for RTP/RTCP, thanks to Thomas Jalsovsky
+- add Citron NAT technology(Patent Pending)
+- allow multiple nated endpoints with the same private IP but
+  different public IP register simultaneously
+- fix possible race conditions in all STL list::size()
+- fix a sigfault when name of parent GK is unresolved
+- add 'gk' command to show parent GK
+- add AlwaysForwardLRQ option
+- don't do round-robin for LRQ and find command
+- fix a bug in proxy mode (when there are several session IDs in fast start)
+- improve support NATed endpoints
+- only include alternateGatekeeper field in GCF/RCF if GRQ/RRQ has supportsAltGK
+- add a workaround so OpenH323 clients won't reject our confirm messages
+  when use H.235 authenticators
+- add UseBroadcastListener option
+- fix incorrect bandwidth in answered ARQ as a child GK
+- add DisconnectSession command, thanks to Rodrigo Gonzalez
+- change debug level of received messages(Q931, H245) to 4,
+  only show sent messages if modified
+- change RasSvr to RasSrv for consistent
+- fix bandwidth problem of the answered ARQ
+- add password rule for GkStatus, thanks to Rodrigo Gonzalez
+- large fd_set patch
+- fix problem of h245socket handling
+- fix incorrect lightweight RRQ handling
+
+Changes from 2.0b8 to 2.0.0 (by cwhuang)
+========================================
+- allow to find by epid or ip address
+- improve ProxySocket for thread-safe writing
+- improve BRQ handling
+- add alternateGKs support for GkClient
+- improve alternateGKs support
+- sort the AuthRules by priority
+- clean up BroadcastListen.cxx and MulticastGRQ.cxx
+- fix a serious bug in MulticastGRQ.cxx
+- let setting options from status port work
+- print version when connect to status port
+
+Changes from 2.0b5 to 2.0b8 (by cwhuang)
+========================================
+- allow to limit port range
+- allow call unregistered endpoints
+- add RemoveTrailingChar feature
+- show CallerIP for CDR from neighbors
+- disconnect all calls on shutdown
+- disconnect calls when unregister an endpoint
+- accept LRQ from registered endpoints
+- add AcceptGatewayPrefixes option
+- always rewrite dialedDigits OnARQ
+- create symbolic link in /tmp to avoid permission problem
+- rewrite GkAuthorize to PrefixAuth module
+- accept broadcasting RRQ (workaround for Cisco Call Manager)
+
+Changes from 2.0b4 to 2.0b5 (by cwhuang)
+========================================
+- add ExternalPasswordAuth module
+- accept unregistered call if Q.931 contains CalledPartyNumber
+- add IncludeDestinationInfoInLCF option
+- allow a second ARQ if srcCallSignalAddress is in SkipForwards
+- support forwarding LRQs
+- add call duration in seconds, thanks to Rodrigo Gonzalez
+- change executable name to gnugk
+- add DropCallsByReleaseComplete option
+- support NATed endpoints by NATHandler
+- add AcceptNeighborsCalls, change the meaning of AcceptUnregisteredCalls
+
+Changes from 2.0b3 to 2.0b4 (by cwhuang)
+========================================
+- add MySQLAliasAuth module
+- add ExtraCriterion to MySQLAuth, remove CheckField
+- bandwidth management is disable by default
+- remove resourceManager, bandwidth management now in CallTable
+- allow set neighbors without prefix, no LRQs will be sent to such neighbors
+- send IRQ to an endpoint before expiring it
+- only accept unregistered call from neighbors
+- in SimplePasswordAuth module, allow expire password cache
+- add NeighborPasswordAuth module
+- check if LRQs is from IP of my neighbors 
+- add dynamic resolving name for neighbors, thanks to Rodrigo Gonzalez
+- add GkClient module
+- allow remove a key or a section in the config from status thread
+- remove isalnum check for aliases, we hope to use unicode. :)
+- add total call counting for EndpointRec
+
+Changes from 2.0b2 to 2.0b3 (by cwhuang)
+========================================
+- add AcceptUnregisteredCalls feature
+- fix problem of RouteTable in Linux with alias interfaces
+- show endtime in CDR even if call not connected
+- in routed mode, reject answered ARQ if no CallRec found
+- add detailed explanations of known options
+- support proxy for fast start logical channels
+- fix GKHome not work for proxy
+
+Changes from 2.0b1 to 2.0b2 (by cwhuang)
+========================================
+- add proxy for T.120 logical channels
+- add proxy for RTP logical channels, add Proxy section
+
+Changes from 1.3 to now (by mmuehlen)
+====================================
+- added destination analysis module list (gkDestAnalysis.cxx, gkDestAnalysis.h)
+  with a similar structure as the authentication module list 
+  (can be enabled with compiler option WITH_DEST_ANALYSIS_LIST)
+- added base class 'GkLDAP' for LDAP access (gkldap.h gkldap.cxx)
+- changed the following section names in ini-file 
+  (reason: LDAP is not only used for authentification):
+    LDAPAuth::LDAPAttributeNames -> GkLDAP:LDAPAttributeNames
+    LDAPAuth::Settings -> GkLDAP::Settings
+
+Changes from 1.3 to 2.0b1 (by cwhuang)
+======================================
+- redesign routed model, add RoutedMode section
+- add H.245 routed support, including early connect
+- TimeToLive now can be specified in config file
+- improve multi-homed support
+- new command unregisterip (jan)
+- other minor cleanup
+
+Changes from 1.2 to 1.3 (by mmuehlen)
+====================================
+- fix a bug in Toolkit::GKName (13.11.01)
+- add SrcInfo and GkName to CDR:
+    CDR|CallNo|CallId|Duration|Starttime|Endtime|CallerIP|CallerEndId|CalledIP|CalledEndId|DestInfo|
+    srcInfo|GkName (13.11.01)
+- add SHA1 support for SimplePasswordAuth (14.12.01)
+- add LDAPAliasAuth (03.01.02)
+- add support for new voip.schema (15.01.02)
+
+Changes from 1.2 to 1.3 (by cwhuang)
+====================================
+- fix problem for lightweightRRQ without callSignalAddress & rasAddress
+- rotate log on SIGHUP signal
+- write pid to /var/run/gk.pid (can be specified by --pid option)
+- rewrite dialedDigits OnLRQ
+
+Changes from 1.1 to 1.2 (by cwhuang)
+====================================
+- add MySQLPasswordAuth, need mysql++ to compile it
+- show left time of calls in PrintCurrentCalls
+- add 'Statistics' command
+- Rewrite destinationAddress in H225_Setup_UUIE
+- fix a bug in Toolkit::RewritePString
+- send DRQ to endpoints when tear down a call, give up send Release Complete
+  (in some situation it causes deadlock, very strange!!)
+  however, some buggy endpoints would ignore DRQ, sigh...
+  only send Release Complete on 'DisconnectCall' command
+- fix 'connectionList returned NULL' bug in SignalChannel.cxx
+- modify SignalConnection::Send to more thread-safe
+- modify OnARQ to fix routed mode problem
+- show count of current calls of endpoints in PrintAllRegistrationsVerbose
+- add 'Find' and 'FindVerbose' commands
+- check endpoint identifier for fullRegistrationRRQ
+- fix a (security) bug in lightweightRRQ
+- add startup and running time to 'Version' command
+- change EndpointRec::m_terminalType to be a pointer to reduce memory
+  consumed (sizeof H225_EndpointType = 2552 in x86)
+- send Release Complete to endpoints when tear down a call (routed mode)
+- disconnect calls of an endpoint on URQ
+- add DefaultCallTimeout to remove staled calls
+- fix bug in DisconnectAlias
+- only use CallId to find CallRec if it presents, this fix a potential
+  CRV conflict in ARQ
+- re-use endpoint identifier if call signal address found in RemovedList
+- send URQ & DRQ from RAS port instead of arbitrary port
+- print dialed number, number of calls in PrintCurrentCalls cmd
+- print number of endpoints in PrintAllRegistrations cmd
+- allow generate NB, UC CDR
+- don't let ttl < 60
+- only generate CDR for call that originated from my zone and connected
+  (must work in routed mode)
+- redesign CallRec & CallTable
+- extend debug cfg SEC command to retrieve a whole section
+
+Changes from 1.0 to 1.1 (by cwhuang)
+====================================
+- change neighbors structure
+- add class GkAuthInitializer for authenticators initialization
+- add authentication modules (gkauth.cxx, gkauth.h)
+
+Changes from 1.0pre9 to 1.0 (by cwhuang)
+========================================
+- add 'debug printrm' command
+- change EndpointRec::Ptr to template
+
+Changes from 1.0pre8 to 1.0pre9 (by cwhuang)
+============================================
+- Neighbor function based on LRQ/LCF.
+  GK would cache the records in a list.
+  A command "PrintAllCached" is added to GkStatus.
+  
+- Add more information in LCF reply, including terminal type, aliases
+  and supportedProtocols (if any) so that the neighbors could cache it.
+
+- Re-design EndpointRec & RegistrationTable.
+  The output format of "PrintAllRegistrations" is also changed.
+
+- Add permanent endpoints support for endpoints without RAS.
+
+- Add gateway SupportedPrefix support.
+  Note the gateway aliases no longer be treated as prefixes.
+  If you want an alias to be a prefix, add it to SupportedPrefix
+  or config file.
+
+- Replace using directive by using declaration to avoid namespace pollution.
+
+Changes from 0.17 to 1.0pre8
+============================
+- add destInfo to CallRec and CDR (cwhuang)
+- rewrite some codes in OnRRQ to be more clean and compact (cwhuang)
+- change H323RasSrv to be a separate thread, do housekeeping in the main thread (cwhuang)
+- shutdown handler refine (cwhuang)
+- allow aliases begin with '#' (cwhuang)
+- don't search endpoint table for an ARQ to an answerCall (cwhuang)
+- add registration timeout (cwhuang)
+- add mutex to RegistrationTable for thread-safe (cwhuang)
+- almost rewrite SoftPBX.cxx (cwhuang)
+- add singleton.h, singleton.cxx, change all singleton objects to derive from a
+  template singleton base to avoid code duplication and allow a better cleanup
+  (cwhuang)
+- remove all usages of for_each_with by STL for_each (cwhuang)
+- add RegistrationTable::RemovePrefixes(const PString &) (cwhuang)
+- add more fields to CDR output, add port number to ACF output (cwhuang)
+- rewrite UnixShutdownhandler for graceful shutdown (cwhuang)
+- change some members and methods in Toolkit to non-static (cwhuang)
+- ensure Toolkit::Config be called after SetConfig
+  some order of initialization in gk.cxx changed accordingly (cwhuang)
+- fix the reload mechanism, set m_RewriteFastmatch when reload (cwhuang)
+- add 'reload' command to status thread and remove 'debug reload' command
+  'shutdown' command is also added, but not implemented yet (cwhuang)
+- show a copyright notice to be compliant to GPL requirement (cwhuang)
+
+- more documentation
+- status thread: changed Disconnect command to DisconnectIp,
+  added DisconnectAlias, DisconnectCall, DisconnectEndpoint,
+  UnregisterAlias
+- better handling of DCF
+- better error checking for command arguments via status thread
+- dummy implementation for TransferCall and MakeCall (doesn't do anything, yet)
+- slightly different handling of SIGHUP
+- RewriteE164: multiple comma-separated targets, randomly chosen
+- simplified conversion between socket and H225 ip addresses
+- first steps to implement H.245-routing (doesn't do anything, yet)
+- commands via status thread are case insensitive
+- changed command line option -h (home interface) to -i, new option -h (help)
+- updated to latest OpenH323 version (pwlib 1.1.32, openh323 1.5.4)
+- use callIndentifiers instead of callReferences (the first are globally unique)
+- generate CallProceeding messages
+- using all aliases of endpoint, not only the first alias
+- generate CDRs, signal all ACFs
+- check H.225 connections with Q.931 StatusEnquiry heartbeat (optional)
+- changed default for RasSrv::RRQAuth back to confirm (so you can use
+  the gatekeeper without a config file)
+- compile fixes for Visual C++ 6.0
+
+Changes from 0.16 to 0.17
+=========================
+
+- fixed crash in status reporting of ACF in routed mode
+- fixed bug, where the destCallSignalAdress still pointed to the GK
+  after being forwarded in routed mode (prevented routed call from
+  OhPhone -> Netmeeting)
+- the config file gatekeeper.ini is no longer mandatory; simple
+  configurations will work without any config file, but you'll need
+  it for more complicated setups
+
+Changes from 0.15 to 0.16
+=========================
+
+- small fixes to make the gatekeeper compile under Visual C++ 6.0
+
+Changes from 0.14 to 0.15
+=========================
+
+- fixed unsafe cast from H323 alias to PASN_BMPString
+  Bacci Emiliano found it
+
+Changes from 0.13 to 0.14
+=========================
+
+- major bug-fix for ohphone compatibility
+  Christoph Stueckjuergen found it
+
+Changes from 0.12 to 0.13
+=========================
+
+- updated to compile with OpenH323 beta 3
+- small fix in SignalConnection for Windows NT
+  by rama@anwsi.com
+- multicast requests are answered to the specified port (not the
+  sender port
+  by Denver Trouton
+- RegistrationTable::FindByPrefix now finds the longest prefix, not
+  the first one
+  by Michael Rubashenkov
+- fix in H323RasSrv::OnLRQ to allow it to work with Cisco gatekeeper
+  by Michael Rubashenkov
+- fix to allow Netmeeting to call ohphone (the other always way has
+  been working)
+  by Andreas Hofmeister
+
+Changes from 0.11 to 0.12
+=========================
+
+- you must have a config file now to set the various new options
+  (eg. gatekeeper.ini in the current directory, or set a path on the
+  command line with -c)
+- support for failover to other gatekeepers
+- RAS messages can be forwarded to other gatekeepers
+- TCP parameters can be configured in the config file
+- what gateway to use on what E.164 prefix can be specified in the
+  config file
+- overlapped sending: specify in the config file when to send
+  "incompleteAddress" on ARQ and collect more digits
+- detailed authentication rules which endpoints may register based on
+  their IP numbers
+- rule based authentication for usage of the status port
+- alias rewriting: the gatekeeper has a list of E.164 aliases
+  that are replaced by another E.164 number
+- many bug fixes...
+
+- the timeToLive filed in RCF can be set on the command line with -l
+
+- more detailed status messages (see GkStatusMsgFmt.html)
+  many patches from Henrik Joerring
+
+Most of the changes in this release are donated by folks at MediaWays
+(Markus Storm and Torsten Will).
+They sent more stuff than I can mention here.
+
+
+Changes from 0.10 to 0.11
+=========================
+
+- many memory leaks fixed
+  by Damian Slee
+- LRQ implemented
+  patch by Ashley Unitt
+- accept LRQ as Multicast, too
+- when more bandwidth is requested than available we now grant ACF with
+  the bandwidth that's still available
+  input from Robert Jongbloed
+- more attempts for a clean shutdown handling
+- status thread accepts commands now (see gkstatus.txt)
+  patch by Ashley Unitt
+- more detailed status messages (see GkStatusMsgFmt.html)
+  input from Henrik Joerring
+- general code fixups
+  by nils@shkoo.com
+
+
+Changes from 0.9 to 0.10
+========================
+
+- trace messages now use the Pwlib trace facility (use -t or -tt ... to
+  turn them on and -o to write to a file)
+  patch from Seungoh Jhung
+- support for lightweight registration updates
+- on shutdown all registered endpoint receive a UnregistrationRequest
+- support for gateways: for gateways we only compare the prefix of
+  the E.164 address the gateway registered and assume that the gateway
+  provides access to the whole address space (needs testing!)
+  input from Frank Breitenbach
+- new command line option -h <ip> to specify the ip number the
+  gatekeeper binds to. Now you can use IP aliases on Linux and
+  start as many gatekeepers as you want.
+  input from Markus Storm
+- status messages with ip numbers
+  input from Seungoh Jhung
+- bugfixes
+  from many contributors...
+
+
+Changes from 0.8 to 0.9
+=======================
+
+- gatekeeper routed signaling implemented (only H.225; no H.245, yet)
+  provided by Sergio Artero Martinez
+- Bugfix: RRQ from Innovaphone IP400 now ok
+  input by Markus Storm
+- gk sends status messages to all clients connected to TCP port 7000
+  (eg. for SNMP agent) - this is experimental and may evolve into
+  a full-fledged interface to the gatekeeper
+- all mandatory RAS messages implemented
+

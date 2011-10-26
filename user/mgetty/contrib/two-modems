@@ -1,0 +1,560 @@
+From tmpuhf.saar.de!wg.saar.de!stone!kammer Fri Oct 21 15:19:02 1994
+Return-Path: <@tmpuhf.saar.de:stone!kammer@wg.saar.de>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0qyKo1-0001peC@greenie.muc.de>; Fri, 21 Oct 94 15:18 MET
+Received: from shug-internet.saar.de ([192.109.53.4]) by colin.muc.de with SMTP id <25571(1)>; Fri, 21 Oct 1994 15:18:33 +0100
+Received: from TMPuhf.Saar.DE (tmpuhf.saar.de [192.109.53.3]) by shug-internet.saar.de (8.6.8.1/8.5) with SMTP id PAA02329; Fri, 21 Oct 1994 15:18:17 +0100
+Received: from wg.saar.de by TMPuhf.Saar.DE with uucp
+	(Smail3.1.28.1 #1) id m0qyKVv-00021NC; Fri, 21 Oct 94 14:00 WET
+Received: by bellona.wg.saar.de id m0qyJpt-0002fRC; Fri, 21 Oct 94 13:16 
+Received: by stone.saar.de (Smail3.1.28.1 #6)
+	id m0qy2ly-0002szC; Thu, 20 Oct 94 20:03 MET
+Message-Id: <m0qy2ly-0002szC@stone.saar.de>
+Subject: mgetty-0.21 einige Patches.
+To: gert@greenie.muc.de
+Date: Thu, 20 Oct 1994 20:03:34 +0100
+From: Juergen Kammer <kammer@Stone.Quarry.Saar.DE>
+Cc: kammer@Stone.Quarry.Saar.DE (Juergen Kammer)
+X-Mailer: ELM [version 2.4 PL21]
+Content-Type: text
+Content-Length: 17047     
+Status: RO
+
+Hallo Gert,
+
+Du erinnerst Dich vielleicht noch an mich, ich war der mit dem "Deltafax",
+der sich so eine komische Konfiguration mit 2 Modems zusammengebaut hatte
+(irgendwann mit Version 0.18).
+
+Die 0.21er Testversion hab ich mir mal geangelt und meine Patches dort
+nochmal - diesmal IMHO sauberer als damals - eingebaut. Die Patches haengen
+als Bestandteil dieser Mail weiter untern dran, das eine oder andere ist
+evtl. auch fuer andere Leute interessant. Meine inittab (Linux 1.1.irgendwas)
+sieht derzeit fuer den mgetty so aus:
+
+t1:34:respawn:/etc/mgetty -x 4 -s 38400 -n 1 -C data -T 42 -X ttyS4 ttyS3
+t2:34:respawn:/etc/mgetty -x 4 -s 19200 -n 10 -C cls2 -T 48 -F ttyS4
+
+Suess, nicht?
+
+Mit der Bedeutung, dass der erste mgetty den zweiten aufweckt, falls er
+nach 42 Sekunden keinen DATA connect zustandebekommt. F steht fuer Fax only.
+Das -T bei zweiten ist Kosmetik... hat wenig Sinn, dass der mgetty laenger
+wartet, als das Modem versucht, was zu tun.
+
+    Zur Erinnerung: Mein Datenmodem hat keine FAX-Erkennung, und das FAX-
+    Modem ist ein 2400er, was ich meinen Leuten fuer Logins nicht zumuten
+    kann.  FAX-Schicker muessen halt ca. 50 Sekunden Geduld zeigen, bis ein
+    FAX-Carrier kommt. Im Prinzip entspricht das Verfahren der Einfachst-
+    Faxerkennung (Versuche DATA Verbindung, wenn kein Erfolg, versuche FAX).
+
+    Trick ist, das Faxmodem VOR dem Datenmodem an der Leitung haengen zu
+    haben, damit das FAXmodem Vorfahrt bekommt und Gespraeche "uebernehmen"
+    kann.
+
+Mit DTR togglen spiel ich auch noch, dafuer gibts auch schon Option.
+
+Frei nach Manual-Page
+
+    It *really* should be fully run-time configurable.
+
+sind alle Features schaltbar. Die Aenderungen im einzeln kannst meiner
+Aenderungsdatei entnehmen, deren momentanen Stand ich vor dem eigentlichen
+Patch hier drunterhaenge. Das ganze ist erst einen Tag alt, tickert aber
+anscheinend so vor sich hin. Falls es noch Probs hier gibt, hoerst Du von
+mir.
+
+BTW, Faxen hab ich noch nicht probiert... wird aber auch bald passieren.
+Erst noch den FAX-spool-Kram durchgehen. Hat sich ja einiges getan seit
+0.18.
+
+Keep up the good work,
+
+	Juergen.
+
+--------- jk-patch-contents follows ---------------
+
+Patch ist relativ zu <version.h follows>
+
+static char * mgetty_version = "experimental test release 0.21-August10";
+
+---
+
+Inhalt des Patches:
+
+- Wegwerfen des Pidfiles auch bei exit()-Aufrufen.
+    Aenderungen in mgetty.c.
+
+	TODO:   Lockbeseitigen und Pidfileabraeumen in anderen Dateien,
+	        wenn exit aufgerufen wird, zB in getlockname.
+	        "Quick and Dirty"-Loesung: sig_goodbye aufrufen,
+	        exit-Situation durch "Signal" >31 anzeigen.
+
+	MORETODO:  Auch dip raeumt nicht ab. Dip-Aenderungen sind bei meiner
+	        Version mannigfach (Keine Pid im Lockfile, klar, siehe
+	        patch unter contrib... aber: nach Daemonizing "lebt" dip
+	        mit anderer Pid weiter... und er hat nicht zuerst gelockt
+	        und dann open gemacht und rumgebosselt, sondern erst open
+	        gemacht, rumgebosselt, dann Lockfile (versucht) anzulegen
+	        und dann weitergebosselt. Flutschte zuerst nur als
+	        cua?, musste als getties rauswerfen, um rauszuslippen:
+	        aetzend. Heavily broken, das Teil.)
+	        Abgesehen davon, dass mein dip hier mit umherlaufenden
+	        anderen Versionen mittlerweile immer weniger zu tun hat
+	        (ifconfig + route-aufrufe in Shellskripte ausgelagert:
+	        SEHR angenehm, wenn /etc/diphosts nicht alles hergibt,
+	        was geconfig't und geroutet werden muss  [urspruenglich
+	        stammt letzteres von Patrick (bof@wg.saar.de)]. Ich weiss
+	        nicht, mit welcher Version er mal angefangen hat).
+
+	Bemerkung: Das fehlende Abraeumen stoert im lfd. Betrieb _seltenst_.
+	        Wenn die Kiste aber mal runtergefahren wird und die
+		Verhaeltnisse passen, fraegt man sich, warum der getty nicht
+		aufs Modem will (ist mir immerhin 1* passiert: alles sauber
+		hochgefahren und der getty geht nicht auf Modem, uucp
+		geht nicht, was iss denn jetzt kaputt!? Bis man in der
+		Situation an ein stale-Lockfile denkt... OK, beim Hochfahren
+		wirft man alle alten Locks weg - das war der eigentlich
+		Fehler, aber naja, was man im Vorfeld verhindern kann...
+		Ohne Runterfahren in diese Situation zu kommen, hm...,
+		unwahrscheinlich... aber wie ich Murphy kenne, wird er mich
+		eines besseren belehren.
+
+- Moeglichkeit, auf DATA zu verzichten und NUR Faxe zu machen. (fax_only)
+    Aenderungen in mgetty.c und mg_m_init.c.
+    (nur fuer Modemclass cls2 gemacht)
+    Option dafuer: -F
+
+	TODO:   Dasselbe bei FCLASS2.0.
+
+- Moeglichkeit, den Timeout im Chat (answer_chat_timeout) via CommandLine
+    zu setzen.
+    Aenderungen in mgetty.c.
+    Option dafuer: -T <timeout>
+
+- Moeglichkeit, nach Ablauf des Timeout im Chat anderen mgetty via
+    SIGUSR1 zum Abheben zu Bewegen.
+    Aenderungen in mgetty.c
+
+    Option dafuer: -X <device von anderem mgetty>
+
+- Moeglichkeit, DTR-togglen zur Initialisierung via Commandline abzuschalten
+    Aenderungen in mgetty.c
+
+    Option dafuer: -R
+
+- TODO:
+	Manualpage mit neuen Optionen aufpusten.
+
+	sendfax aufbohren: Kein Fax zu senden versuchen, wenn auf dem DATA
+	Modem ein Lock drauf ist. Puh. Sieht nach einer Compile-option aus.
+	Oder bau ichs in eines der faxspool-Skripte ein? Einstweilen gehts
+	manuell, muss halt aufpassen ;-)
+
+---------------- jk-patch follows ------------------------
+diff -u orig/mg_m_init.c ./mg_m_init.c
+--- orig/mg_m_init.c	Wed Oct 19 15:32:50 1994
++++ ./mg_m_init.c	Wed Oct 19 15:43:11 1994
+@@ -34,7 +34,7 @@
+  * To send a backslash, you have to use "\\\\" (four backslashes!) */
+ 
+ static char *	init_chat_seq[] = { "",
+-			    "\\d\\d\\d+++\\d\\d\\d\r\\dATQ0V1H0", "OK",
++			    "\\d\\d\\d+++\\d\\d\\d\r\\dATQ0H0", "OK",
+ 
+ /* initialize the modem - defined in policy.h
+  */
+@@ -64,8 +64,8 @@
+ 
+ /* initialize fax section */
+ 
+-int mg_init_fax _P3( (fd, mclass, fax_id),
+-		      int fd, char * mclass, char * fax_id )
++int mg_init_fax _P4( (fd, mclass, fax_id, fax_only),
++		      int fd, char * mclass, char * fax_id, boolean fax_only )
+ {
+     /* find out whether this beast is a fax modem... */
+ 
+@@ -103,21 +103,42 @@
+ 	 * +FCLASS=0: there are some weird modems out there that won't
+ 	 * properly auto-detect fax/data when in +FCLASS=2 mode...
+ 	 */
+-	if ( mdm_command( "AT+FCLASS=0", fd ) == FAIL )
+-	{
+-	    lprintf( L_MESG, "weird: cannot set class 0" );
+-	}
+ 
+-	/* now, set various flags and modem settings. Failures are logged,
+-	   but ignored - after all, either the modem works or not, we'll
+-	   see it when answering the phone ... */
+-    
+-	/* set adaptive answering, bit order, receiver on */
++	if ( fax_only )
++	{
++	    if ( mdm_command( "AT+FCLASS=2", fd ) == FAIL )
++	    {
++		lprintf( L_MESG, "weird: cannot set class 0" );
++	    }
++	    /* now, set various flags and modem settings. Failures are logged,
++	       but ignored - after all, either the modem works or not, we'll
++	       see it when answering the phone ... */
++	
++	    /* set adaptive answering, bit order, receiver on */
+ 
+-	if ( mdm_command( "AT+FAA=1;+FCR=1", fd ) == FAIL )
++	    if ( mdm_command( "AT+FAA=0;+FCR=1", fd ) == FAIL )
++	    {
++		lprintf( L_MESG, "cannot set reception flags" );
++	    }
++	}
++	else
+ 	{
+-	    lprintf( L_MESG, "cannot set reception flags" );
++	    if ( mdm_command( "AT+FCLASS=0", fd ) == FAIL )
++	    {
++		lprintf( L_MESG, "weird: cannot set class 0" );
++	    }
++	    /* now, set various flags and modem settings. Failures are logged,
++	       but ignored - after all, either the modem works or not, we'll
++	       see it when answering the phone ... */
++	
++	    /* set adaptive answering, bit order, receiver on */
++
++	    if ( mdm_command( "AT+FAA=1;+FCR=1", fd ) == FAIL )
++	    {
++		lprintf( L_MESG, "cannot set reception flags" );
++	    }
+ 	}
++
+ 	if ( fax_set_bor( fd, 0 ) == FAIL )
+ 	{
+ 	    lprintf( L_MESG, "cannot set bit order. Huh?" );
+diff -u orig/mgetty.c ./mgetty.c
+--- orig/mgetty.c	Mon Oct 17 19:12:08 1994
++++ ./mgetty.c	Thu Oct 20 19:34:06 1994
+@@ -102,6 +102,10 @@
+ char	* DevID;			/* device name withouth '/'s */
+ char	* GettyID = "<none>";		/* Tag for gettydefs in cmd line */
+ 
++char	* other_Device = NULL;		/* device of other mgetty to signal */
++char	* other_DevID = NULL;		/* ditto name without '/'s */
++static char other_pid_file_name[ MAXPATH ];
++
+ boolean	toggle_dtr = TRUE;		/* lower DTR */
+ 
+ int	toggle_dtr_waittime = 500;	/* milliseconds while DTR is low */
+@@ -118,18 +122,6 @@
+ boolean verbose = FALSE;
+ 
+ boolean virtual_ring = FALSE;
+-static RETSIGTYPE sig_pick_phone()		/* "simulated RING" handler */
+-{
+-    signal( SIGUSR1, sig_pick_phone );
+-    virtual_ring = TRUE;
+-}
+-static RETSIGTYPE sig_goodbye _P1 ( (signo), int signo )
+-{
+-    lprintf( L_AUDIT, "failed dev=%s, pid=%d, got signal %d, exiting",
+-	              Device, getpid(), signo );
+-    rmlocks();
+-    exit(10);
+-}
+ 
+ #ifdef MGETTY_PID_FILE
+ /* create a file with the process ID of the mgetty currently
+@@ -151,6 +143,22 @@
+     }
+ }
+ #endif
++
++static RETSIGTYPE sig_pick_phone()		/* "simulated RING" handler */
++{
++    signal( SIGUSR1, sig_pick_phone );
++    virtual_ring = TRUE;
++}
++static RETSIGTYPE sig_goodbye _P1 ( (signo), int signo )
++{
++    lprintf( L_AUDIT, "failed dev=%s, pid=%d, got signal %d, exiting",
++	              Device, getpid(), signo );
++    rmlocks();
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
++    exit(10);
++}
+     
+ 
+ enum { St_unknown,
+@@ -185,6 +193,7 @@
+ #else
+     boolean	data_only = FALSE;
+ #endif
++    boolean	fax_only  = FALSE;
+     char	* modem_class = DEFAULT_MODEMTYPE;	/* policy.h */
+     boolean	autobauding = FALSE;
+     
+@@ -244,7 +253,7 @@
+ 	direct_line = TRUE;
+     }
+ 
+-    while ((c = getopt(argc, argv, "c:x:s:rp:n:i:DC:S:m:I:ba")) != EOF)
++    while ((c = getopt(argc, argv, "c:x:s:rp:n:i:DFC:S:T:X:m:I:baR")) != EOF)
+     {
+ 	switch (c) {
+ 	  case 'c':			/* check */
+@@ -294,6 +303,9 @@
+ 	  case 'D':			/* switch off fax */
+ 	    data_only = TRUE;
+ 	    break;
++	  case 'F':			/* switch off data */
++	    fax_only = TRUE;
++	    break;
+ 	  case 'C':
+ 	    modem_class = optarg;
+ 	    if ( strcmp( modem_class, "data" ) == 0 ) data_only = TRUE;
+@@ -301,6 +313,26 @@
+ 	  case 'S':
+ 	    fax_server_file = optarg;
+ 	    break;
++	  case 'T':			/* set chat-timeout */
++	    i = atoi(optarg);
++	    if ( i > 0 && i < 120 )	/* do at least some sanity check */
++		answer_chat_timeout = i;
++	    break;
++	  case 'X':
++	    other_Device = optarg;
++	    /* remove leading /dev/ prefix */
++	    if ( strncmp( other_Device, "/dev/", 5 ) == 0 ) other_Device += 5;
++	    other_DevID = mydup( other_Device );
++	    for ( i=0; other_DevID[i] != 0; i++ )
++		if ( other_DevID[i] == '/' ) other_DevID[i] = '-';
++	    /* need pidfilename of other getty */
++#ifdef MGETTY_PID_FILE
++	    sprintf( other_pid_file_name, MGETTY_PID_FILE, other_DevID );
++#else
++	    /* use a default, hopefulle it will work */
++	    sprintf( other_pid_file_name, "/etc/mg-pid.%s", other_DevID );
++#endif
++	    break;
+ 	  case 'I':
+ 	    fax_station_id = optarg; break;
+ 	  case 'b':			/* open port in blocking mode */
+@@ -307,6 +339,8 @@
+ 	    blocking_open = TRUE; break;
+ 	  case 'a':			/* autobauding */
+ 	    autobauding = TRUE; break;
++	  case 'R':
++	    toggle_dtr  = FALSE; break;
+ 	  case '?':
+ 	    exit_usage(2);
+ 	    break;
+@@ -366,6 +400,9 @@
+     if (checklock(Device) != NO_LOCK)
+     {
+ 	while (checklock(Device) != NO_LOCK) sleep(10);
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	exit(0);
+     }
+ 
+@@ -376,6 +413,9 @@
+     if ( makelock(Device) == FAIL )
+     {
+ 	while( checklock(Device) != NO_LOCK ) sleep(10);
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	exit(0);
+     }
+ 
+@@ -395,6 +435,9 @@
+     if ( mg_open_device( devname, blocking_open ) == ERROR ) /* mg_m_init.c */
+     {
+ 	lprintf( L_FATAL, "open device %s failed, exiting", devname );
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	exit( FAIL );
+     }
+     
+@@ -412,6 +455,9 @@
+ 			 portspeed ) == ERROR )
+     {
+ 	lprintf( L_FATAL, "cannot initialize device, exiting" );
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	exit( 20 );
+     }
+     
+@@ -428,11 +474,15 @@
+ 	if ( mg_init_data( STDIN ) == FAIL )
+ 	{
+ 	    rmlocks();
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	    exit(1);
+ 	}
++	/* jk iff fax_only tell it to mg_init_fax */
+ 	/* initialize ``normal'' fax functions */
+ 	if ( ( ! data_only ) &&
+-	     mg_init_fax( STDIN, modem_class, fax_station_id ) == SUCCESS )
++	     mg_init_fax( STDIN, modem_class, fax_station_id, fax_only ) == SUCCESS )
+ 	{
+ 	    /* initialize fax polling server (only if faxmodem) */
+ 	    if ( fax_server_file )
+@@ -589,6 +639,9 @@
+ 	    lprintf( L_FATAL, "modem on %s doesn't react!", devname );
+ 
+ 	    /* give up */
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	    exit( 30 );
+ 
+ 	    break;
+@@ -635,6 +688,9 @@
+ 		mgetty_state = St_incoming_fax; break;
+ 	      default:
+ 		lprintf( L_MESG, "unexpected action: %d", what_action );
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 		exit(20);
+ 	    }
+ #endif
+@@ -672,6 +728,9 @@
+  	    while ( checklock(Device) != NO_LOCK );	
+ 
+ 	    /* OK, leave & get restarted by init */
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	    exit(0);
+ 	    break;
+ 
+@@ -689,8 +748,11 @@
+ 	    
+ 	    while ( rings < rings_wanted )
+ 	    {
++		i = (fax_only) ? 50 : 0;
++		/* increase timeout waiting for rings iff fax_only */
++		/* because other modem may ring us virtually */
+ 		if ( do_chat( STDIN, ring_chat_seq, ring_chat_actions,
+-			      &what_action, ring_chat_timeout,
++			      &what_action, ring_chat_timeout+i,
+ 			      TRUE ) == FAIL 
+ #ifdef DIST_RING
+ 		    && (what_action != DIST_RING_VOICE)
+@@ -718,6 +780,9 @@
+ 		{
+ 		    lprintf( L_WARN, "huh? Junk on the line?" );
+ 		    rmlocks();		/* line is free again */
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 		    exit(0);		/* let init restart mgetty */
+ 		}
+ 		lprintf( L_MESG, "phone stopped ringing (rings=%d)", rings );
+@@ -737,9 +802,15 @@
+ 	      case A_FAIL:
+ 		lprintf( L_AUDIT, "failed A_FAIL dev=%s, pid=%d, caller=%s",
+ 			          Device, getpid(), CallerId );
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 		exit(20);
+ 	      default:
+ 		lprintf( L_MESG, "unexpected action: %d", what_action );
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 		exit(20);
+ 	    }
+ 	    break;
+@@ -798,8 +869,44 @@
+ 		   "failed %s dev=%s, pid=%d, caller=%s, conn='%s', name='%s'",
+ 		    what_action == A_TIMOUT? "timeout": "A_FAIL", 
+ 		    Device, getpid(), CallerId, Connect, CallName );
++
++		if ( other_Device != NULL )
++		{
++		    /* we are told to try to signal other getty to take over */
++		    /* get pid of that f*cker */
++		    FILE *fp;
++		    int  other_pid = 65000;	/* never valid, pids < 32768 */
++		    fp = fopen( other_pid_file_name, "r" );
++		    if ( fp == NULL )
++			lprintf( L_ERROR, "can't get pid of other mgetty out of file %s", other_pid_file_name );
++		    else
++		    {
++			fscanf( fp, "%d\n", &other_pid ); fclose( fp );
++
++			if ( other_pid > 1 && other_pid < 32768 )
++			{
++
++			    lprintf( L_AUDIT,
++				"Found pid %d, signaling.",
++					    other_pid);
++			    if ( kill( other_pid, SIGUSR1 ) < 0 )
++			    {
++				lprintf( L_ERROR, "Signaling failed, errno = %d",
++				    errno );
++			    }
++			    else
++			    {
++				/* give it chance to overtake */
++				sleep(5);
++			    }
++			}
++		    }
++		}
+   
+ 		rmlocks();
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 		exit(1);
+ 	    }
+ 
+@@ -845,6 +952,9 @@
+ 	    lprintf( L_MESG, "start fax receiver..." );
+ 	    faxrec( FAX_SPOOL_IN );
+ 	    rmlocks();
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	    exit( 0 );
+ 	    break;
+ 	    
+@@ -852,6 +962,9 @@
+ 	    /* unknown machine state */
+ 	    
+ 	    lprintf( L_WARN, "unknown state: %s", mgetty_state );
++#ifdef MGETTY_PID_FILE
++	(void) unlink( pid_file_name );
++#endif
+ 	    exit( 33 );
+ 	}		/* end switch( mgetty_state ) */
+     }			/* end while( state != St_get_login ) */
+diff -u orig/mgetty.h ./mgetty.h
+--- orig/mgetty.h	Wed Oct 19 15:42:15 1994
++++ ./mgetty.h	Wed Oct 19 15:42:20 1994
+@@ -133,7 +133,7 @@
+ 
+ /* initialization stuff: mg_m_init.c */
+ int	mg_init_data  _PROTO(( int fd ));
+-int	mg_init_fax   _PROTO(( int fd, char * mclass, char * fax_id ));
++int	mg_init_fax   _PROTO(( int fd, char * mclass, char * fax_id, boolean fax_only ));
+ int 	mg_init_voice _PROTO(( int fd ));
+ void	faxpoll_server_init _PROTO(( int fd, char * fax_server_file ));
+ int	mg_open_device _PROTO(( char * devname, boolean blocking ));
+------------------------ENDE PATCH ----------------------------------------
+--
+Juergen Kammer	             |  Linux
+Kurt-Schumacher-Allee 139    |    - program, for whatever OS you are:
+D-66740 Saarlouis, Germany   |        ** Resistance is futile.  **
+Email: kammer@stone.saar.de  |        ** Prepare to be EMULATED.**
+

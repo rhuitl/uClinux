@@ -1,0 +1,27 @@
+#!/bin/sh
+
+ISP=adsl
+MODE=ddial
+
+if ! PREFIX=$(expr $0 : "\(/.*\)/etc/rc\.d/$(basename $0)\$"); then
+    echo "$0: Cannot determine the PREFIX" >&2
+    exit 1
+fi
+
+PATH="$PATH:$PREFIX/sbin"
+
+case $1 in
+  start)
+	"$PREFIX/sbin/modem_run" -f "$PREFIX/libdata/mgmt.o" \
+	 && ppp -quiet -$MODE $ISP \
+	 && echo -n ' ppp'
+        ;;
+  stop)
+  	killall modem_run
+  	killall ppp
+        ;;
+  *)
+	echo "Usage: $0 {start|stop}"
+	exit 1
+esac
+

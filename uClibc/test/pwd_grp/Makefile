@@ -1,0 +1,10 @@
+# uClibc pwd_grp tests
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+
+include ../Test.mak
+
+DODIFF_test_pwd  := 1
+DODIFF_test_grp  := 1
+DODIFF_pwcat     := 1
+DODIFF_grcat     := 1
+DODIFF_getgroups := 1

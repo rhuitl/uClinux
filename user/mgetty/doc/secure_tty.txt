@@ -1,0 +1,210 @@
+Paranoid Secure Port Implementation
+Marc SCHAEFER <schaefer@alphanet.ch>
+$Id: secure_tty.txt,v 4.2 1999/01/24 12:35:53 marcs Exp $
+V1.0 PV005
+Creation: 11/11/96
+Update:   10/01/99
+
+ABSTRACT:
+   If your UNIX (including Linux) system handles modem(s) and shell
+   users are allowed from modem, they can, even with correct
+   chown() and chmod() of mgetty and setup of modem to disallow
+   the '+++' escape, and even with OS support for some security on
+   setting serial device parameters, dial out and possibly also
+   troyanize the login process on the modems. The long-term solution
+   involves a kernel change in your operating system. A work around
+   needing only a mgetty configuration is possible and given here.
+   You are not concerned if you give access to the UNIX server
+   through a dial-up server through rlogin (including a UNIX server
+   running mgetty) or if you trust your users completely.
+
+1.  Introduction
+
+UNIX handling of serial ports is messy --- there is no standard way of
+locking a port for dial-out (or, there are many incompatible ways),
+and there are security issues such as a user taking control of a
+serial tty (and then of course of the connected modem) in order to
+dial out at your costs or to impersonify the login program to steal
+passwords.
+
+This ``Secure Port Implementation'' only takes care about security
+issues, not locking issues. The locking mechanism used is supposed to
+be the one mgetty uses, with ASCII lock files in /usr/spool/locks.
+
+Note that the configuration of the modem itself can be a problem and
+it out of the scope of this document. Simply note that disabling the
+escape character (+, ATS2=255) is usually a good idea for a start.
+
+We suppose as a basis that the operating system disables access to all
+file handles connected to a tty (not only from the process group) as
+soon as a hangup is detected (but only if CLOCAL is disabled). Some
+OS's might not even have this feature in and will have bigger
+problems.
+
+2.  Description of the problem
+2.1 Identification of the problem
+
+The security issue is as follows:
+
+   if the CLOCAL flag is modifiable by someone else than root,
+   or if the hangup mechanism is not preventing *any* further
+   access to the modem through the opened file handle *AND
+   a quick reopen of the device*, there might be a security
+   problem.
+
+The security issue (and the DoS) can be made even more possible
+if a normal user can create lock files which will prevent mgetty
+from restarting. However, it's sufficient to make mgetty
+not restart at all. See below.
+
+2.2 Explanations
+
+In the next sections, we will discuss the two cases on the
+control of CLOCAL. 
+
+2.2.1 CLOCAL is mutable
+
+Supposing the connected user can enable CLOCAL while it is connected.
+It will then be able to hangup, which will result in the next call
+being impossible (or answered on the last user's shell if not using
+mgetty). Also, if the user launched a program able to send AT
+commands, even if the modem escape character is disabled, it can then
+answer manually (stealing passwords by login spoofing), or dial out at
+your costs.
+
+2.2.2 CLOCAL is immutable
+
+If the user cannot change the state to CLOCAL (this is supposed to be
+possible in Linux), and if the login program or the getty program
+running under root did set it to disabled (ie modem control enabled),
+the attack given under 2.2.1 is impossible.  However, there is a
+slight time window (between the time the operating system disables all
+the access through the tty file descriptor and the getty program
+changes the owner and mode of the tty) where the same user (or the
+group, or anyone, depending if the user did an appropriate chmod on
+the tty device file, which won't be forbidden for good reasons, like
+write() and so on) can open again the tty. The slight time window
+can be very big considering you can kill -STOP the shell process,
+which will prevent mgetty from restarting.
+
+If your shell is immune against -STOP and *always* exits when
+it receives SIGHUP, then, the window is small (time from shell exit
+to mgetty chown()ing). But the problem is still there.
+
+The solution is that the kernel must atomically and unconditionnaly
+execute the following function:
+
+   user_has_hangupped()
+    - disable access to the fd for ALL accesses to the fd
+      (this is already done in Linux)
+    - chown root /dev/modem
+    - chmod 600 /dev/modem
+    - depending on the user's wishes do or do not send SIGHUP to the
+      process group.
+
+   A simpler implementation could be to refuse all further opens till a root
+   process opens the tty (.eg. mgetty). This bit would be set by mgetty
+   on login. This might be easier for the kernel (especially without devfs)
+
+Note that user_has_hangupped() means either a local hangup or a
+remote hangup.
+
+Note that if the user kill -STOP the shell, mgetty will not be
+relaunched, giving a Denial of Service attack.
+
+3.  Suggested implementation
+3.1 General implementation
+
+There should be a bit, called secure_tty, which would change the
+comportment of CLOCAL. This secure_tty will trigger or not the
+execution of the first part of user_has_hangupped. CLOCAL would still
+remain settable by the user. mgetty would set the secure_tty bit on
+startup. The kernel would implement the above fix.
+
+3.2 Dialout software
+
+Dialout software will probably be executing when mgetty is operationnal.
+In that case the permission on the tty is allowing uucp, and mode 0600.
+As soon as mgetty detects the opening of the line, it must reset the
+secure_tty bit. Another implementation would be the execution of
+a wrapper function only executable by uucp, or detection if the
+user is uucp (but that's tricky).
+
+All this would not needed if secure bit only set by mgetty when
+login starts, not when mgetty starts.
+
+4. Work-around
+
+4.1 General
+
+Until this is implemented in the kernel, one possible work around is
+as follows. Any user having a shell access should not be allowed to
+connect directly to the modem tty.  Use the rlogin localhost -l @ in
+login.config from mgetty under user nobody. Some users COULD be given
+direct access for efficiency (UUCP, FTN), while PPP access is not a
+problem since done before directly by mgetty. However, in that case,
+ensure that login disconnects after ONE login attempt. Else, someone
+can attempt login with nuucp, fail, and then try his shell access.
+
+NB: this doesn't remove the obligation to disable '+' sequence in
+    your modem.
+
+By using this rlogin workaround, users loose the ability to mesg
+on or off the low-level tty: we suggest setting it to no through
+a chmod 600 on the device at login time. Also you might loose
+some of the environment variables that mgetty sets, such as
+TERM or SPEED.
+
+Note that the work-around is the only way to make a kill -STOP or exec
+on the controlled process (shell) unable to pose a DoS problem.
+
+4.2 mgetty implementation
+
+The above approach fixes the hole, however it's
+   - complex (and thus maybe not bug-free)
+   - needs local loopback networking
+   - may be VERY risky if the localhost is equivalent in the
+     network security sense and the user under which rlogin
+     runs has a shell
+   - is prone to user error (not using -8 -E to avoid
+     shell escapes)
+   - uses one pty pair, two sockets on the local host,
+     and two more processes (rlogin/in.rlogind, plus the shell).
+
+We simplify by replacing the rlogin/in.rlogind by a single process,
+called ptylogin, which, run under root by mgetty, allocates a pty
+pair, and spawns login, as root on the slave pty with possible
+arguments.
+
+This idea was given by Theodore Y T'so.
+
+
+5. Alternative views
+
+5.1 Fix the end-of-login semantic
+
+What causes mgetty (or the getty) to restart is normally the death
+of the shell (or lowest-exec) process. If the shell dies, *AND*
+mgetty does a Linux vhangup() or fuser -k, the attacker will be
+killed since he has an open fd, just after the owner is changed
+on that tty. Thus the attack is killed early. This also alleviates
+for the Denial of Service attack. HOWEVER, note the ``early'' above.
+If the attacker can spawn a lot of processes and make so that
+the bias of the scheduling is towards him, he could do a few
+things to the modem in between. So it's an imperfect (although
+probably practical) solution. Linux support for vhangup comes
+in mgetty 1.1.20. Other OS's might user fuser -k, see mgetty's
+src.
+
+Now, if the end-of-call semantic is changed so that it's an
+unmaskable hangup condition which triggers the shell relaunch,
+then the hole is mostly (see early related stuff above) closed.
+On the contrary, if the end-of-call semantic is still the shell
+dies, nothing prevents the attacker from replacing (exec) the
+shell with a software never ending, at least not on a hangup.
+
+For all those reasons, the root-only-reopen seems the best
+solution, even if it doesn't fix the Denial of Service, which
+could be fixed by an extension to the idled, a processus noticing
+hangups, or any other things.
+

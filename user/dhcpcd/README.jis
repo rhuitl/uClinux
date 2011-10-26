@@ -1,0 +1,103 @@
+0. はじめに
+
+dhcpcd は RFC2131 および RFC1541 準拠の DHCP client daemon です。
+dhcpcd は DHCP server か ら IP アドレスおよびその他の情報を取得し、ネッ
+トワーク・インターフェースを自動的に初期化します。また、RFC2131 または 
+RFC1541 の仕様に従ってリース時間の延長を試みます。
+
+
+1. インストール
+
+'make' した後 'make install' して下さい。
+
+
+2. 使用法
+
+daemon として使用する場合は単に 'dhcpcd' と起動して下さい。'-d' オプショ
+ンを指定して起動すると foreground で動作します。また、dhcpcd はデフォ
+ルトでは eth0 をネットワーク・インターフェースとして使用します。eth1 
+等の他のネットワーク・インターフェースに対して使用したい場合は明示的に
+ネットワーク・インターフェースを指定して下さい。
+
+
+3. 利用可能 DHCP オプション
+
+現在以下の DHCP オプションをサポートしています。
+
+  o lease time
+  o renewal (T1) time
+  o rebind (T2) time
+  o netmask
+  o broadcast address
+  o router
+  o time server
+  o DNS
+  o lpr server
+  o host name
+  o domain name
+  o NTP server
+  o NIS domain name
+
+DHCP サーバから netmask, broadcast address を取得した場合はネットワー
+ク・インターフェースの初期化にその値を用います。取得出来なかった場合は 
+'natural' netmask, 'natural' broadcast address をネットワーク・インター
+フェースの初期化に用います。host name option を取得した場合は 'sethostname'
+system call, NIS domain name option を取得した場合は 'setdomainname'
+system call を用いて host 情報の初期化を行います。DNS option と domain
+name option を取得した場合、dhcpcd は '/etc/dhcpc' ディレクトリの下に
+'resolv.conf' ファイルを作成します。NTP server option を取得した場合、
+dhcpcd は '/etc/dhcpc' ディレクトリの下に 'ntp.conf' ファイルを作成し
+ます。host name, NIS domain name, lpr server, NTP server, time server
+option の値は '/etc/dhcpc/hostinfo-ifname' ファイルに書き出されます。
+ifname は実際には 'eth0' 等のネットワーク・インターフェース名です。
+
+
+4. コマンド・ファイル
+
+'-c' オプションと共にコマンド・ファイル名を指定すると、dhcpcd が IP
+address を取得し、ネットワーク・インターフェースと host 情報を初期化し
+た後指定されたコマンド・ファイルを起動します。その際下記の情報が環境変
+数としてコマンド・ファイルに渡されます。
+
+  o host name           HOSTNAME
+  o NIS domainname      NISDOMAINNAME
+  o lpr server          LPRSERVER, (LPRSERVER2, ...)
+  o NTP server          NTPSERVER, (NTPSERVER2, ...)
+  o time server         TIMESERVER, (TIMESERVER2, ...)
+  o router              ROUTER, (ROUTER2, ...)
+
+
+5. キャッシュ・ファイル
+
+dhcpcd は割り当てられた IP address を次回の起動時のために
+'/var/run/dhcpcd-cache.interface' ファイルに保存します。このファイルを
+見つけると dhcpcd はまず前回用いた IP address が使用可能かどうかを 
+DHCP server に尋ねます。この動作を行いたくない場合は
+'/var/run/dhcpcd-cache.interface' ファイルを削除してから dhcpcd を起動
+して下さい。
+
+
+6. PCMCIA
+
+PCMCIA card service 開始時に dhcpcd を自動的に起動する事が出来ます。
+'./pcmcia' ディレクトリに pcmcia-cs 用 'network' shell script のサンプ
+ルがあります。詳しくは './pcmcia/README.jis' を参照して下さい。
+
+
+7. その他
+
+SIGINT あるいは SIGTERM を受け取ると dhcpcd は DHCPRELEASE メッセージ
+を DHCP server に送出した後ネットワーク・インターフェースを down させ
+て終了します。
+
+現在 DHCPINFORM message には対応していません。
+
+同じ DHCP オプションが複数回メッセージ中に現れた場合, dhcpcd は単に最
+期に現れたオプションの値を使用します(本当は全ての同一オプションの値を
+連接しないといけません)。全てのオプションの値は255文字未満である必要が
+あります。この制限は次のバージョンで fix する予定です。
+
+
+はりぐち
+
+$Id: README.jis,v 1.1.1.1 1999-11-22 03:47:59 christ Exp $

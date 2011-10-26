@@ -1,0 +1,50 @@
+#!/bin/sh
+
+GPLOT="$HOME/.gplot"
+GPLOTPS="$HOME/.gplot.ps"
+
+outputs=$*
+
+echo " "
+echo "Plotting $* to ~/gplot.ps"
+echo " "
+
+index=0
+
+for ofile in $outputs
+do
+  index=`expr $index + 1`
+#  echo index = $index
+  OUTPUTS="${OUTPUTS} \"${ofile}\" ls ${index},"
+done
+
+OUTPUTS=`echo $OUTPUTS | sed 's/,$//g'`
+
+#echo "outputs = $OUTPUTS"
+
+echo "set data style lines" > $GPLOT
+echo "set logscale x" >> $GPLOT
+echo "set xrange [1:10000000]" >> $GPLOT
+echo "set ylabel \"Bandwidth in Mbps\"" >> $GPLOT
+echo "set xlabel \"Message Size in Bytes\"" >> $GPLOT
+
+#echo "set linestyle 1 lt -1 lw 4" >> $GPLOT
+echo "set style line 1 lt  3 lw 4" >> $GPLOT
+echo "set style line 2 lt  1 lw 4" >> $GPLOT
+echo "set style line 3 lt  5 lw 4" >> $GPLOT
+echo "set style line 4 lt  2 lw 4" >> $GPLOT
+echo "set style line 5 lt  4 lw 4" >> $GPLOT
+echo "set style line 6 lt  6 lw 4" >> $GPLOT
+#echo "set style line 7 lt  3 lw 4" >> $GPLOT
+echo "set style line 7 lt -1 lw 4" >> $GPLOT
+echo "set style line 8 lt  7 lw 4" >> $GPLOT
+
+echo "set key graph 0.4, 0.9" >> $GPLOT
+echo "set terminal postscript color" >> $GPLOT
+echo "set output \"$GPLOTPS\"" >> $GPLOT
+echo "plot $OUTPUTS" >> $GPLOT
+
+gnuplot < $GPLOT
+
+gv $GPLOTPS
+

@@ -1,0 +1,1875 @@
+#!@PERL@
+#
+# FAXRUNQ-Daemon
+#
+# scan fax-queue in regular intervals, send all faxes that are "new" and
+# ready to-be-sent, pause between retries, etc.
+#
+# main difference to "faxrunq": runs all the time, handles multiple modems
+#
+# initial version: Feb 17, 1997
+#
+my $rcs_id='RCS: $Id: faxrunqd.in,v 1.70 2005/02/17 13:52:33 gert Exp $';
+#
+# Change Log:
+# $Log: faxrunqd.in,v $
+# Revision 1.70  2005/02/17 13:52:33  gert
+# do full "queue readdir()" only once per 180 seconds now, but use "stat(.)" to
+# detect modifications to spool directory (checked every 10 seconds) -> for
+# filesys. with unix mtime semantics, this reduces load AND speeds up things
+#
+# Revision 1.69  2005/02/17 10:57:41  gert
+# change over to "use strict" ->
+#   predeclare all global variables, use "my" variables for loops
+#
+# Revision 1.68  2004/11/24 15:01:29  gert
+# Implement 'sendfax-tty-map' (run tty-specific sendfax binary)
+# add job ID to log file entry for "faxrm removed job"
+#
+# Revision 1.67  2004/11/24 13:32:06  gert
+# implement update-call-program (status update callback)
+#
+# Revision 1.66  2003/08/20 10:38:50  gert
+# reorganize signal handling:
+#   - HUP is now "graceful restart" (wait for all child processes, then quit)
+#   - USR2 is now "dump statistics to log file"
+#
+# Revision 1.65  2003/01/14 14:16:09  gert
+# include "total success" counter in the per_phone_statistics
+#
+# Revision 1.64  2003/01/07 14:48:52  gert
+# If a job is re-queued, heavily penalize previously used modem.
+# This way, a defective modem (or a modem that has problems connecting to
+# just a few destination numbers) has less impact on overall stability.
+#
+# Revision 1.63  2002/11/23 16:52:18  gert
+# make messages more clear, print warning if running as root
+#
+# Revision 1.62  2002/11/23 15:38:27  gert
+# revert 1.52->1.53 change: write faxqueue_done to $FAX_SPOOL_OUT again
+#   (we can now run as unprivileged user, and thus have no access rights
+#    to /var/run - on the other hand, nobody but 'fax' can play symlink
+#    tricks anymore, so that's now "safe")
+# move PID file (default) to $FAX_SPOOL_OUT as well (same reason)
+# implement "-u <user>" switch to drop root privileges at startup
+#
+# Revision 1.61  2002/11/13 22:12:21  gert
+# guard against file move/symlink tricks with JOB files
+#
+# Revision 1.60  2002/04/02 15:13:09  gert
+# when removing a job from the modem queue, correct queue length!
+#
+# Revision 1.59  2002/04/02 14:42:15  gert
+# fix 'write combining prio clash' problem (a high prio job gets attached
+# to a previously-queued lower-prio job, and is then sent later with the
+# low prio job, instead of immediately).  Yet another ugly special-case.
+#
+# Revision 1.58  2002/03/19 12:20:45  gert
+# change from deprecated "require 'getopts.pl'" to "use Getopt::Std"
+#
+# Revision 1.57  2002/03/06 16:10:36  gert
+# do not "write combine" jobs with different priorities
+# (assuming that "high prio" jobs will always be sent first, otherwise
+# a "low prio" job for phone number 123 could be attached to a high prio
+# job to 123, and thus be sent before a high prio job to 456)
+#
+# Revision 1.56  2002/01/04 17:52:42  gert
+# pass sendfax exit code as 2nd argument to success/failure program
+#
+# Revision 1.55  2001/12/16 14:49:03  gert
+# move 'stop' processing to after sleep($sleep_time) - otherwise 'stop'
+# isn't honoured if created while sleeping and new jobs are also created.
+#
+# Revision 1.54  2001/12/16 14:26:25  gert
+# stop queue handling if a file named 'stop' exists
+#
+# Revision 1.53  2000/08/06 14:28:37  gert
+# go from using $fax_spool_out/.last_run to VARRUNDIR/faxqueue_done
+#
+# Revision 1.52  2000/06/30 09:42:28  gert
+# write command line to log file
+#
+# Revision 1.51  1999/06/29 14:23:07  gert
+# use faxrunqd.config for maximum number of pages in combined jobs
+#
+# Revision 1.50  1999/06/11 11:54:23  gert
+# clean up history, make logging message more clear
+#
+# Revision 1.49  1999/06/11 11:50:12  gert
+# if policy routing is active, show a matching rule (if any)
+#
+# Revision 1.48  1999/05/21 14:27:24  gert
+# remove status value 'on hold' - leads to problems with queue flushing
+#
+# Revision 1.47  1999/05/21 13:26:41  gert
+# write combining phase II done - if multiple jobs are queued for the
+# same telephone number, send them with one 'sendfax' call
+#
+# Revision 1.46  1999/05/11 14:53:47  gert
+# move handling of "sendfax return codes" to subroutine - preparations
+# for combining multiple jobs into one sendfax call
+#
+# Revision 1.45  1999/05/11 11:36:37  gert
+# don't delay after reactivating 'delayed' jobs ($sleep_time=0)
+#
+# Revision 1.44  1999/04/30 15:07:55  gert
+# reorganize handling of %phone (avoid sending two faxes to the
+# same telephone number at the same time).  Introduce 'other' field
+# in the $queue{job} structure to keep track of other jobs that want
+# to be sent to the same number as this job.
+#
+# Revision 1.42  1999/04/27 10:21:43  gert
+# if locking a job (before sending) fails, set it to status 'error'.
+# the job will then be retried about an hour later.
+#
+# Revision 1.41  1999/03/12 14:37:23  gert
+# Error code '10' (ERROR or NO CARRIER) is now handled similar to
+# NO DIAL TONE - delay the job for 20 seconds, and give the modem
+# 0.2 bad points.
+# Assumption: "NO CARRIER" could be caused by a broken modem, so it should
+# be slowly phased out of service.
+#
+# Revision 1.40  1999/02/28 13:17:59  gert
+# iproperly handle the case of faxrunqd.pid containing *our* PID (after reboot)
+#
+# Revision 1.35  1998/07/20 22:02:40  gert
+# put extra brackets around exec() to silence "not reached" warnings
+#
+# Revision 1.34  1998/06/22 10:27:22  gert
+# in case of startup with a stale 'faxrunqd.pid' file, assume unclean
+# shutdown / kill -9 and remove all F.../JOB.locked files.
+#
+# Revision 1.33  1998/05/28 14:37:26  gert
+# write "Status" line for successful send attempts as well
+#
+# Revision 1.32  1998/05/25 11:46:02  gert
+# add job number (F000123) to acct.log entries
+#
+# Revision 1.31  1998/05/07 08:59:23  gert
+# make number of logfiles to keep configurable
+#
+# Revision 1.30  1998/04/23 14:25:13  gert
+# add 'modem badness' counter ($mq_badness{$tty}) to avoid using a modem
+# that is broken (locked forever / cannot be initialized / NO DIALTONE)
+# ...
+# Revision 1.1  1997/10/02 09:58:56  gd
+# Initial revision
+#
+#
+require 5.004;
+use strict;
+use POSIX;
+use IO::Handle;
+use Getopt::Std;
+
+#
+# CONFIGURATION: filenames
+#
+use vars qw / $fax_spool_out $sendfax $mail $faxrunq_cf 
+	      $fax_acct $faxrd_log $faxrd_pid $last_run /;
+
+$fax_spool_out='@FAX_SPOOL_OUT@';
+
+$sendfax='@SBINDIR@/sendfax';
+$mail='@MAILER@';
+
+$faxrunq_cf='@CONFDIR@/faxrunq.config';
+$fax_acct='@FAX_SPOOL@/acct.log';
+$faxrd_log='@FAX_SPOOL@/faxrunqd.log';
+
+$faxrd_pid='@FAX_SPOOL_OUT@/faxrunqd.pid';
+$last_run='@FAX_SPOOL_OUT@/faxqueue_done';
+
+
+#
+# CONFIGURATION: default settings, overwritten from $faxrunq_cf
+#
+my $send_mail_success=1;
+my $send_mail_failure=1;
+my $program_success='';
+my $program_failure='';
+my $program_updates='';
+my $max_tries_costly=3;
+my $max_tries_total=10;
+my $delete_jobs=0;
+my $max_combined_pages=10;
+my %sendfax_tty_map = ();
+my $policy_config='';
+my @policy=();
+
+#
+# verbose strings for error messages
+#
+my @exitcodes=( "all pages transmitted successfully",	# 0
+	     "error on command line",			#  1
+	     "cannot open Fax device",			#  2
+	     "error initializing the modem",		#  3
+	     "dial failed: BUSY",			#  4
+	     "dial failed: NO DIALTONE",		#  5
+	     "", "", "", "",				# -- not used
+	     "dial failed: ERROR or NO CARRIER",	# 10
+	     "waiting for XON failed",			# 11
+	     "transmitting or polling page(s) failed",	# 12
+	     "", "",					# 13, 14
+             "something *VERY BAD* has happend");	# 15
+
+
+#
+# command line options
+#
+my $saved_cli=join( " ", @ARGV );	# print command line to LOG later
+use vars qw / $opt_d $opt_v $opt_V $opt_l $opt_u /;
+$opt_d = 0;					# debug
+$opt_v = 0;					# verbose
+$opt_V = 0;					# print version number
+$opt_l = '';					# ttys to use
+$opt_u = '';					# user id to setuid() to
+getopts( 'dvVl:u:' ) || 
+    die "Valid options: -d (debug), -v (verbose), -l tty<n>, -u uid, -V (version)\n";
+
+if ( $opt_d ) { $opt_v=1; }
+
+if ( $opt_V )		# print version info, and exit
+{
+    print <<EOF;
+
+mgetty+sendfax by Gert Doering
+$rcs_id
+
+config file read from '$faxrunq_cf'
+
+EOF
+    exit 0;
+}
+
+if ( $opt_u ne '' )	# set user ID to $opt_u
+{
+    my ( $uid, $gid ) = ( getpwnam( $opt_u ) )[2,3];
+
+    if ( !defined($uid) || !defined($gid) )
+		{ die "$0: no such user: '$opt_u'\n"; }
+
+    print "change user ID to '$opt_u' (numeric uid: $uid, gid: $gid)\n"
+								if $opt_d;
+    $( = $) = $gid;
+    $< = $> = $uid;
+
+    if ( $> != $uid || $) != $gid )
+		{ die "$0: can't set uid to $uid / gid to $gid: $!\n"; }
+}
+if ( $> == 0 )		# root check
+{
+    print STDERR "$0: running with root privileges is not recommended\n";
+}
+
+#
+# startup... write PID file, make sure no other faxrunqd runs
+#
+if ( -f $faxrd_pid && open( FP, $faxrd_pid ) )
+{
+    my $p = <FP>; chomp $p; close FP;
+
+    if ( $p ne '' && $p != $$ )	# does process exist?
+    {
+	if ( kill( 0 => $p ) ||	
+		$! == EPERM )
+	{
+	    die "faxrunqd: already running (PID=$p)\n";
+	}
+	else			# no process found
+	{
+	    &remove_stale_locks($p);
+	}
+    }
+}
+open( FP, ">$faxrd_pid" ) ||
+	die "faxrunqd: can't write PID to '$faxrd_pid': $!\n";
+print FP "$$\n";
+close FP;
+
+#
+# set up handlers to handle "INT" (ctrl-c), "HUP" (hangup), "TERM" (kill)...
+#    (handler function does cleanup, remove lock/pid files, etc., and exits)
+#
+$SIG{INT}  = \&signal_handler;			# cleanup & exit
+$SIG{TERM} = \&signal_handler;			# cleanup & exit
+
+$SIG{USR1} = \&signal_handler_USR1;		# roll log file
+my $roll_log_file_requested = 0;
+my $roll_level=3;				# keep 3 old files around
+
+$SIG{HUP}  = \&signal_handler_HUP;		# graceful exit
+my $graceful_exit_requested = 0;
+
+$SIG{USR2} = \&signal_handler_USR2;		# write statistics to log
+my $statistics_requested = 0;
+
+#
+# read config file
+#
+if ( open( CF, $faxrunq_cf ) )
+{
+    while( <CF> )
+    {
+	print if $opt_d;
+
+	next if /^\s*#/;		# comment lines
+	chomp;
+	next if /^\s*$/;		# empty lines
+
+	if    ( /^\s*success-send-mail\s+([yYnN])/ )
+		{ $send_mail_success = ( $1 eq 'y' || $1 eq 'Y' ); }
+	elsif ( /^\s*failure-send-mail\s+([yYnN])/ )
+		{ $send_mail_failure = ( $1 eq 'y' || $1 eq 'Y' ); }
+	elsif ( /^\s*delete-sent-jobs\s+([yYnN])/ )
+		{ $delete_jobs = ( $1 eq 'y' || $1 eq 'Y' ); }
+	elsif ( /^\s*success-call-program\s+(\S.*)/ )
+		{ $program_success = "$1"; }
+	elsif ( /^\s*failure-call-program\s+(\S.*)/ )
+		{ $program_failure = "$1"; }
+	elsif ( /^\s*update-call-program\s+(\S.*)/ )
+		{ $program_updates = "$1"; }
+	elsif ( /^\s*maxfail-costly\s+(\d+)/ )
+		{ $max_tries_costly = $1; }
+	elsif ( /^\s*maxfail-total\s+(\d+)/ )
+		{ $max_tries_total = $1; }
+	elsif ( /^\s*max-modems\s+(\d+)/ )
+		{ print STDERR "WARNING: faxrunq.config parameter 'max-modems' is obsolete, use '-l'\n";}
+	elsif ( /^\s*fax-devices\s+(\S+)/ )
+		{ $opt_l = "$1"  if $opt_l eq ''; }
+	elsif ( /^\s*faxrunqd-log\s+(\S+)/ )
+		{ $faxrd_log = "$1"; }
+	elsif ( /^\s*faxrunqd-keep-logs\s+(\d+)/ )
+		{ $roll_level = $1; }
+	elsif ( /^\s*acct-log\s+(\S+)/ )
+		{ $fax_acct = "$1"; }
+	elsif ( /^\s*policy-config\s+(\S+)/ )
+		{ $policy_config = "$1"; }
+	elsif ( /^\s*faxrunqd-max-pages\s+(\d+)/ )
+		{ $max_combined_pages = $1; }
+	elsif ( /^\s*sendfax-tty-map\s+(\S+)\s+(\S+)\s*(.*)/ )
+		{ $sendfax_tty_map{$1} = { 'cmd' => $2, 
+					   'args' => [ split /\s+/, $3 ] }; }
+	else
+		{ die "syntax error in $faxrunq_cf, line $.!\n"; }
+    }
+}
+
+if ( $opt_l eq '' )
+	{ die "$0: no tty lines specified\n\t- must use '-l tty<n>' or 'fax-devices tty<n>' in 'faxrunq.config'\n"; }
+
+#
+# policy configuration
+#
+
+if ( $policy_config ne '' && -f $policy_config )
+{
+    print "reading $policy_config...\n" if $opt_d;
+    if ( open( P, $policy_config ) )
+    {
+	while( <P> )
+	{
+	    next if /^\s*#/;			# comment
+	    next if /^\s*$/;			# empty lines
+	    print "  pcfg: $_" if $opt_d;
+	    chomp;
+	    my ( $m, $s, $t, @a ) = split( /\s+/, $_ );
+
+	    push @policy, { 'match' => $m, 'substitute' => $s, 
+			    'ttys' => ( $t ne '-' )? [ split( /:/, $t) ] : [],
+			    'args' => [@a]};
+	}
+	close(P);
+    }
+}
+
+#
+# queue directory...?
+#
+
+chdir( $fax_spool_out ) ||
+	    die "can't change directory to '$fax_spool_out'";
+
+opendir FSO, "." ||
+	    die "can't read directory '$fax_spool_out'";
+
+#
+# open log file
+#
+open( LOG, ">>$faxrd_log" ) ||
+	    die "can't write log file '$faxrd_log'";
+LOG->autoflush(1);
+print LOG "\n" . localtime() .": faxrunqd starting, pid=$$\n";
+print LOG "command line arguments: $0 $saved_cli\n$rcs_id\n";
+
+#
+# internal queue
+#
+use vars qw / %queue %modem_queue %mq_length %mq_badness %tty_in_use /;
+%queue = ();
+
+my $queue_last_read = time();		# check queue directory ...
+my $queue_read_interval = 300;		# ... every 5 minutes
+my $queue_last_flushed = time();	# flush internal queue ...
+my $queue_flush_interval = 3600;	# ... once per hour
+
+#
+# child processes
+#
+use vars qw / $childs %pid2job %phones %pid2tty /;
+$childs = 0; %pid2job = (); %phones = (); %pid2tty = ();
+
+#
+# ttys available (-l tty1:tty2:... option or default)
+#
+my @standard_ttys = split( /:/, $opt_l );
+
+#
+# statistics about tty usage / success / error rates
+#
+use vars qw / %tty_statistics %per_phone_statistics /;
+%tty_statistics = (); %per_phone_statistics = ();
+
+# ###
+# ### MAIN LOOP -- rescan spool directory in certain intervals, send stuff
+# ###
+
+while( 1 )
+{
+    print LOG localtime() . ": scanning queue directory...\n" if $opt_v;
+    $queue_last_read = time();
+
+    # if a file "stop" exists in the spool dir, halt all queue processing 
+    # (wait for outstanding children, but do not start new jobs)
+    if ( -f 'stop' )
+    {
+	print LOG "queue handling stopped ($childs outstanding jobs)\n";
+	while ( $childs > 0 && -f 'stop' )
+	    { my $tty=&wait_for_child; 
+	      print LOG "* tty '$tty' done\n" if $opt_v; }
+	while( -f 'stop' )
+	    { sleep(10); }
+	print LOG localtime() . ": queue handling restarted.\n" if $opt_v;
+    }
+
+    rewinddir( FSO );
+
+    foreach my $f ( readdir( FSO ) )
+    {
+	next unless $f =~ /^F[0-9]/;
+
+	print LOG "got: $f\n" if $opt_d; 
+
+	if ( ! defined( $queue{$f} ) )
+	{
+	    next unless -d $f;
+	    print LOG "--> new job!\7\n" if $opt_d;
+
+	    $queue{$f} = { 'status' => 'unknown', 'flags' => ['-r'],
+			   'tries_c' => 0, 'tries' => 0, 'priority' => 5,
+			   'ctime' => time()};
+
+	    if ( $opt_v > 1 )
+		{ push @{$queue{$f}->{'flags'}}, '-v'; }
+
+	    &read_job_to_queue( $f );
+	}
+    }
+
+    # start all modem queues (that have requests and are not busy)
+    print LOG localtime() . ": starting modem queues...\n" if $opt_v;
+
+    foreach my $tty ( keys %modem_queue )
+    {
+	print LOG "\tQ: $tty: " . scalar( @{$modem_queue{$tty}} ) . " jobs, queue length ${mq_length{$tty}} (+${mq_badness{$tty}}), in_use: ${tty_in_use{$tty}}\n"  if $opt_d;
+
+	# use "while", not "if", in case one of the jobs was faxrm'd...
+	while( ! $tty_in_use{$tty} &&
+	        scalar( @{$modem_queue{$tty}}) > 0 )
+	{
+	    &send_job_from_queue( $tty );
+	}
+    }
+
+    # all queues started.  Now, we just sit there, waiting for an "event"
+    # to happen. This could be:
+    #   - a job finishes -> start next one from that queue
+    #   - a queue runs empty -> leave loop, maybe a new job is in spool
+    #   - 10 minutes have passed -> leave loop, check for new jobs
+
+    while(1)
+    {
+	if ( $childs == 0 ) { last; }
+
+        my $tty = &wait_for_child;
+
+	next if ( $tty eq '' );
+
+	# start next job (if there is one) on $tty
+
+	while( ! $tty_in_use{$tty} &&
+	        scalar( @{$modem_queue{$tty}}) > 0 )
+	{
+	    &send_job_from_queue( $tty );
+	}
+
+	# leave loop if a queue is empty
+	if ( $mq_length{$tty} <= 0 )
+	{
+	    print LOG "* queue $tty empty, rescan on-disk-queue\n" if $opt_v; 
+	    last;
+	}
+
+	# make sure that queue is read often enough - otherwise, a high
+	# priority job may be delayed because 100 low pri jobs are being
+	# processed and faxrunqd did not re-scan the directory...
+	if ( time()-$queue_last_read > $queue_read_interval )
+	{
+	    print LOG "* Interrupting queue run to check for new jobs.\n" if $opt_v;
+	    last;
+	}
+
+	# leave loop if user signalled for 'graceful exit'
+	if ( $graceful_exit_requested ) { last; }
+
+	# dump modem statistics if requested (SIGUSR2)
+	if ( $statistics_requested ) { last; }
+
+	# leave loop if something has changed in the on-disk queue
+	# or a stop of queue handling is requested
+	if ( -f '.queue-changed' || -f 'stop' ) { last; }
+    }
+
+    # now decide whether we want to exit, wait, or just start over
+    # with reading the on-disk-queue for new jobs...
+    print LOG localtime() . ": queue run finished, childs=$childs\n" if $opt_v;
+    print LOG "\tD: %phones=(". join(' ', keys %phones) .")\n" if $opt_d;
+
+    # use the time to update the "last run" file...
+    if ( open( LR, ">$last_run" ) )
+    {
+	print LR scalar(localtime) . " $0\n";
+	close LR;
+    }
+
+    # once per hour, completely flush internal queue, make sure nothing
+    # is left over in there, that removed jobs are thrown out, rejuvenated
+    # jobs requeued, etc.
+    # This is also done if the on-disk queue has changed (faxq -r, etc.)
+    if ( ( time() - $queue_last_flushed ) > $queue_flush_interval 
+	 || ( -f '.queue-changed' ) )
+    {
+	print LOG "*** flush internal job queue ***\n" if $opt_v;
+
+	# remove all jobs that are not in modem queues ('active') or delayed
+	# (so that all failed->rejuvenated, error, ..., jobs get done now)
+	foreach my $jj ( sort( keys( %queue )))
+	{
+	    if ( $queue{$jj}{status} ne 'active' &&
+		 $queue{$jj}{status} ne 'delayed' )
+	    {
+		print LOG "$jj: status='${queue{$jj}{status}}', flush\n" if $opt_d;
+		delete $queue{$jj};
+	    }
+	}
+
+        $queue_last_flushed = time();
+	unlink( '.queue-changed' );
+
+	# reduce "modem badness" counters, in case modem was resetted
+	foreach my $t ( keys( %mq_badness ))
+	{
+	    $mq_badness{$t} /= 2;
+	    if ( $mq_badness{$t} < 1 ) { $mq_badness{$t} = 0; }
+	}
+    }
+
+    # if signalled from the user (signal USR2), dump statistics to log file
+    if ( $statistics_requested ) 
+	{ &dump_statistics; $statistics_requested=0; }
+
+    # if signalled from the user (signal USR1), roll the log file, 
+    # flush all queues, etc.
+    if ( $roll_log_file_requested )
+    {
+	&dump_statistics;
+	print LOG localtime(). ": -- log file ends here --\n";
+	close LOG;
+
+	# roll
+	my $i=$roll_level;
+	while ( $i>=1 ) 
+	    { my $j=$i-1; rename "$faxrd_log.$j", "$faxrd_log.$i"; $i--; }
+	rename "$faxrd_log", "$faxrd_log.0";
+	$roll_log_file_requested=0;
+
+	# start new
+	open( LOG, ">$faxrd_log" ) ||
+		    die "can't re-open log file '$faxrd_log'";
+	LOG->autoflush(1);
+	print LOG localtime() .": -- new log file started --\n";
+    }
+
+    # if signalled from the user, wait for all current child processes
+    # to terminate, then exit
+    if ( $graceful_exit_requested )
+    {
+	print LOG "Graceful Exit: wait for $childs child processes\n";
+	while ( $childs > 0 )
+	    { my $tty=&wait_for_child; 
+	      print LOG "* tty '$tty' done\n" if $opt_v; }
+	&signal_handler('HUP');
+    }
+
+    # now, make sure all delayed jobs are rescheduled
+    print LOG localtime() . ": checking internal queue for delayed jobs...\n" if $opt_v;
+    my $sleep_time=180;
+
+    foreach my $job ( keys %queue )
+    {
+	if ( $queue{$job}->{'status'} eq 'delayed' )
+	{
+	    my $s = $queue{$job}->{'delayed_until'} - time();
+	    if ( $s> 0 )
+		{ print LOG "$job: delayed, $s seconds to wait\n" if $opt_d; }
+	    else
+		{ print LOG "$job: was delayed, is active again\n" if $opt_d;
+		  $queue{$job}->{'status'} = 'active'; 
+		  &put_job_to_modem_queue($job); 
+		  $sleep_time = 0; }
+	    if ( $s < $sleep_time ) 
+		{ $sleep_time = $s; }
+	}
+    }
+
+    # there's really, really nothing left to do - so fall asleep!
+    if ( $childs == 0 && $sleep_time > 0 )
+    {
+	# not even child processes to wait for... sleep.
+	print LOG "Pausing (max.) $sleep_time seconds...\n" if $opt_v;
+
+	my $qdir_mtime = (stat '.')[9];
+	while( $sleep_time > 0 )
+	{
+	    sleep ( $sleep_time > 10? 10: $sleep_time );
+	    $sleep_time -= 10;
+	    if ( $sleep_time > 0 &&
+		 (stat '.')[9] != $qdir_mtime )
+	    {
+		print LOG "Wakeup! ($sleep_time seconds early)\n" if $opt_v;
+		last;
+	    }
+	}
+    }
+}
+
+close FSO;
+# end of main loop
+
+##########################################################################
+#
+# put_job_to_modem_queue $job
+#
+# find a "suitable" modem queue for $job
+#   - no other job for this phone number already queued
+#   - this modem must be allowed for that job
+#   - if multiple queues allowed, take the shortest one
+#   - the modem used previously is heavily penalized
+#
+# called whenever a job's $queue{$job}->{status} changes to 'active'
+#
+##########################################################################
+sub put_job_to_modem_queue
+{
+    my $j = shift;
+
+    # find out whether another job is already queued for that phone
+    # number.  If yes, "attach" to that job (so that jobs can be 
+    # combined into one sendfax run).
+    my $phone = $queue{$j}->{phone};
+
+    if ( defined($phones{$phone}) )		# already job queued
+    {
+	my $job_t = $phones{$phone};
+
+	# make sure the "others" array (ref) exists
+	if ( !defined( $queue{$job_t}->{others} ) )
+		{ $queue{$job_t}->{others} = []; }
+
+	# if the "new" job has lower or equal priority, attach 
+	# (special-case: if the "old" job is currently being sent,
+	# attach higher-prio job as well - queue reordering is not 
+	# possible in that case, and this simplifies the code)
+
+	if ( ( $queue{$j}->{priority} <= $queue{$job_t}->{priority} )  ||
+	       is_on_modem($job_t) )
+	{
+	    print LOG "$j: phone number '$phone' already reserved for $job_t, attach\n"  if $opt_d;
+	    push @{$queue{$job_t}->{others}}, $j;
+	    return;
+	}
+
+	# remove lower-prio job from modem queue, put this job on modem
+	# queue, copy over "others", and add lower-prio job to it
+
+	print LOG "$j: reorder queue, prio clash with $job_t for '$phone'\n"  if $opt_d;
+	delete_job_from_queue( $job_t );
+
+	$queue{$j}->{others} = [ $job_t, @{$queue{$job_t}->{others}} ];
+	delete $queue{$job_t}->{others};
+
+	# fall-through: phone number is free, put this job into queue
+    }
+
+    # no jobs for that phone number queued so far -> take this one
+    $phones{$phone}=$j;
+
+    my @ttys = defined( $queue{$j}->{ttys} )? 
+		               @{$queue{$j}->{ttys}} : @standard_ttys;
+
+    # find tty with the shortest queue (among those that are allowed)
+    #
+    # the previously used modem always gets a queue len of "9998", and is 
+    # thus only used if no other modem is available
+    my $min_l = 9999;
+    my $min_t = $ttys[0];
+
+    foreach my $t (@ttys)
+    {
+	if ( ! defined( $modem_queue{$t} ) )		# does queue exit?
+	{						# no: create
+	    $modem_queue{$t}=[];
+	    $mq_length{$t}=0;
+	    $mq_badness{$t}=0;
+	    $tty_in_use{$t}=0;
+	}
+
+	my $this_q_len = ( $t eq $queue{$j}->{last_modem} ) ? 9998 :
+				$mq_length{$t}+$mq_badness{$t};
+
+	if ( $this_q_len < $min_l )
+	{
+	    $min_l = $this_q_len; $min_t = $t;
+	}
+    }
+
+    # add job to the end of the queue, then "bubble" it up if it
+    # has a higher priority than the preceding job.
+    push @{$modem_queue{$min_t}}, $j;
+
+    my $pri = $queue{$j}->{'priority'};		# priority of new job
+    my $n = $#{$modem_queue{$min_t}}-1;		# previous job
+
+    while( $n>=0 && $pri > $queue{ $modem_queue{$min_t}[$n] }->{'priority'} )
+    {
+	print LOG "  * pri $pri, $min_t -> bubble up to pos. $n\n"  if $opt_d;
+
+	$modem_queue{$min_t}[$n+1] = $modem_queue{$min_t}[$n]; 
+        $modem_queue{$min_t}[$n] = $j; $n--; 
+    }
+
+    # each job adds one (for dialup) plus the number of pages to the
+    # total queue length.  This should give a fairly balanced load,
+    # even if you have a mixture of very long and very short faxes
+    $queue{$j}->{weight} = 1 + scalar( @{$queue{$j}->{pages}} );
+    $mq_length{$min_t} += $queue{$j}->{weight};
+
+    print LOG "$j: possible ttys: " . join( ':', @ttys ) . " last: ". $queue{$j}->{last_modem} . " -> queue selected: $min_t (l: $min_l->" . $mq_length{$min_t} . ")\n"  if $opt_d;
+
+    # rotate @standard_ttys, to distribute load more evenly among modems
+    push @standard_ttys, (shift @standard_ttys);
+}
+
+##########################################################################
+#
+# delete_job_from_queue $job
+#
+# find modem queue for $job, remove $job, correct $mq_length{$job's tty}
+#
+# called when there's a priority clash for the same phone number
+# and the "lower prio" job in front of the queue has to be removed
+#
+# (yes, this is massively ugly, but other queueing strategies are no better)
+#
+##########################################################################
+sub delete_job_from_queue
+{
+    my $j = shift;
+    my $i;
+    print LOG " DFQ: delete job $j from modem queue\n" if $opt_d;
+
+    foreach my $tty ( keys %modem_queue )
+    {
+	my $len=$#{$modem_queue{$tty}}+1;
+	print LOG " DFQ $tty ($len): ". join(" ", @{$modem_queue{$tty}}) ."\n" if $opt_d;
+	
+	for ($i=0; $i<$len; $i++)
+	{
+	    if ( $modem_queue{$tty}[$i] eq $j )
+	    {
+		splice @{$modem_queue{$tty}}, $i, 1;
+		$mq_length{$tty} -= $queue{$j}->{weight};
+		print LOG " DFQ found --> ". join(" ", @{$modem_queue{$tty}}) ."\n" if $opt_d;
+		return;
+	    }
+	}
+    }
+    print LOG "ERROR - can't happen: Job $j not found in modem queues!\n";
+}
+
+
+##########################################################################
+#
+# get_d_time $DIR
+#
+# read mtime of $1 [directory!] 
+# (to see whether a JOB was modified recently)
+#
+##########################################################################
+sub get_d_time
+{
+    my $dir = shift;
+
+    my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+	$atime,$mtime,$ctime,$blksize,$blocks);
+
+    if ( ( $dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+	    $atime,$mtime,$ctime,$blksize,$blocks) = stat($dir) )
+    {
+	return $mtime;
+    }
+
+    return 0;
+}
+
+
+##########################################################################
+#
+# read_job_to_queue $DIR
+#
+# read $1/JOB, update $queue{$job}->xxx
+#
+##########################################################################
+
+sub read_job_to_queue
+{
+    my $job = shift;
+
+    print LOG "$job: reading $job/JOB...\n" if $opt_d;
+
+    if ( -f "$job/JOB" )
+    {
+	# guard against symlink / file-move attacks
+	my ( $inum1, $mode1 ) = (lstat "$job/JOB")[1,2];
+
+	unless ( open J, "$job/JOB" )
+	{
+	    $queue{$job}->{'status'} = 'error'; return;
+	}
+
+	$queue{$job}->{'inum'} = (stat J)[1];
+
+	if ( ! S_ISREG($mode1) || $inum1 != $queue{$job}->{'inum'} )
+	{
+	    printf LOG "$job: suspicious file permissions: 0%o, inum1=$inum1, inum2=%d!\n", $mode1, $queue{$job}->{'inum'};
+	    &remove_error_job($job);
+	    return;
+	}
+
+	$queue{$job}->{'tries'} = $queue{$job}->{'tries_c'} = 0;
+	$queue{$job}->{'last_modem'} = 'unknown';
+
+	while( <J> )
+	{
+	    chomp;
+
+	    if    ( /^\s*phone (.*)/ )
+		{ $queue{$job}->{'phone'} = $1; }
+	    elsif ( /^\s*user (.*)/ )
+		{ $queue{$job}->{'user'}  = $1; }
+	    elsif ( /^\s*mail (.*)/ )
+		{ $queue{$job}->{'mail'}  = $1; }
+	    elsif ( /^\s*pages\s+(\S.*)/ )
+		{ $queue{$job}->{'pages'} = [ split( /\s/, $1 ) ]; }
+	    elsif ( /^\s*Status/ )
+		{ $queue{$job}->{'tries'}++; 
+		  if ( /.*FATAL/ ) { $queue{$job}->{'tries_c'}++; }
+		}
+	    elsif ( /^\s*verbose_to (.*)/ )
+		{ $queue{$job}->{'verbose_to'} = $1; }
+	    elsif ( /^\s*time (\d\d\d\d)$/ )
+		{ $queue{$job}->{'time_1'} = $1; }
+	    elsif ( /^\s*time (\d\d\d\d)-(\d\d\d\d)$/ )
+		{ $queue{$job}->{'time_1'} = $1; $queue{$job}->{'time_2'}=$2; }
+	    elsif ( /^\s*priority (\d*)/ )
+		{ $queue{$job}->{'priority'} = $1; }
+
+	    elsif ( /^\s*poll/ )
+		{ push @{$queue{$job}->{'flags'}}, '-p'; }
+	    elsif ( /^\s*normal_res/ )
+		{ push @{$queue{$job}->{'flags'}}, '-n'; }
+	    elsif ( /^\s*acct_handle (.*)/)
+		{ push @{$queue{$job}->{'flags'}}, '-A', $1;
+		  $queue{$job}->{'acct_handle'} = $1; }
+	    elsif ( /^\s*input / )
+		{ ;; }
+	    else
+		{ print LOG "$job: yet unparsed line: '$_'\n"; }
+	}
+
+	close J;
+
+	if ( !defined( $queue{$job}->{'phone'} ))
+	{
+	    print LOG "$job: phone number missing!\n";
+	    &remove_error_job($job);
+	    return;
+	}
+	if ( !defined( $queue{$job}->{'user'} ))
+	{
+	    print LOG "$job: no user name given!\n";
+	    &remove_error_job($job);
+	    return;
+	}
+	if ( !defined( $queue{$job}->{'pages'} ))
+	{
+	    print LOG "$job: no pages to send!\n";
+	    &remove_error_job($job);
+	    return;
+	}
+	if ( !defined( $queue{$job}->{'mail'} ))
+	{
+	    $queue{$job}->{'mail'}=$queue{$job}->{'user'};
+	}
+
+	# !!!!!!!! sanity checks (phone, pages, ... must be present)
+
+	# remember the time the job (directory) was "created", for sorting
+	unless( $queue{$job}->{'ctime'} = (stat($job))[10] )
+			{ $queue{$job}->{'ctime'} = time(); }
+
+	print LOG "$job: CREATED: " . localtime($queue{$job}->{'ctime'}) . "\n" if $opt_d; 
+
+	# now apply "policy routing" rules (we need to know which ttys to use)
+	my $phone = $queue{$job}{'phone'};
+	foreach my $po (@policy)
+	{
+	    if ( $phone =~ /$po->{match}/ )
+	    {
+		unless( $po->{substitute} eq '-' )
+		    { eval '$phone =~ ' . $po->{substitute} . ';'; }
+		push @{$queue{$job}{'flags'}}, @{$po->{args}};
+		print LOG "    policy: rule=/$po->{match}/ -> phone: $phone, args: ". join(' ',@{$queue{$job}{'flags'}}) ."\n"  if $opt_v;
+		$queue{$job}{'phone'} = $phone;
+
+		if( scalar( @{$po->{ttys}} ) > 0 ) 
+		    { $queue{$job}{'ttys'} = \@{$po->{ttys}}; 
+		      print LOG "    policy: ttys set: " . join(':', @{$queue{$job}{'ttys'}}) ."\n"  if $opt_v;
+		    }
+		last;
+	    }
+	}
+
+	# all done, mark job as 'ready to be sent'
+	$queue{$job}->{'status'} = 'active'; 
+
+	# if timing constraints permit, put into modem queue
+	if ( &check_timing_constraints($job) )
+	{
+	    &put_job_to_modem_queue($job);
+	}
+	return;
+    }
+
+    if ( -f "$job/JOB.done" )
+    {
+	$queue{$job}->{'status'} = 'done'; return;
+    }
+
+    if ( -f "$job/JOB.error" )
+    {
+	$queue{$job}->{'status'} = 'error'; return;
+    }
+
+    if ( -f "$job/JOB.suspended" )
+    {
+	$queue{$job}->{'status'} = 'failed'; return;
+    }
+
+    # no JOB.* file found. 
+    #
+    # possibly, this job is just being created - so if the modification
+    # time of the directory is very recent, just "forget" about this job
+    # and look at it again in a minute
+    #
+    if ( (time() - &get_d_time($job)) < 240 ) 
+    {
+	print LOG "$job: no JOB file, but young directory, try again later\n";
+	delete $queue{$job};
+	return;
+    }
+
+    # it was no recent job - remove directory if older than one day
+    if ( (time() - &get_d_time($job)) > 24*3600 )
+    {
+	print LOG "$job: no JOB file, old directory, remove it\n";
+	if ( rmdir( $job ) )
+		{ delete $queue{$job}; return; }
+
+	print LOG "$job: can't rmdir(): $!\n";
+    }
+
+    # somewhere in between, or removal failed... just flag es "empty"
+    $queue{$job}->{'status'} = 'empty'; return;
+}
+
+##########################################################################
+#
+# check_timing_constraints $JOB
+#
+# get $job from $modem_queue{$1}, lock $job/JOB, fork child process,
+# set $tty_in_use{$tty}, etc.
+#
+##########################################################################
+sub check_timing_constraints
+{
+    my $j=shift;
+
+    # no constraints at all
+    if ( !defined( $queue{$j}{'time_1'} ) )  { return 1; }
+
+    my ($h,$m) = (localtime)[2,1];
+    my $now = sprintf "%02d%02d", $h, $m;
+
+    my $start_t = $queue{$j}{'time_1'};
+
+    if ( !defined( $queue{$j}{'time_2'} ) )	# only start time given
+    {
+	if ( $now > $start_t ) { return 1; }
+	print LOG "    -T- now=$now, time=$start_t";
+    }
+    else					# start + end time given
+    {
+	my $end_t = $queue{$j}{'time_2'};
+
+	if ( $start_t < $end_t )			# e.g. "02:00 - 03:00"
+	{
+	    if ( $now >= $start_t && $now <= $end_t ) { return 1; }
+	}
+	else					# e.g. "23:00 - 02:00"
+	{
+	    if ( $now >= $start_t || $now <= $end_t ) { return 1; }
+	}
+	print LOG "    -T- now=$now, time=$start_t-$end_t";
+    }
+
+    # constraints missed, calculate delay
+    my ($start_h,$start_m) = ($start_t =~ /(..)(..)/);
+    my $delay = ( $start_h - $h ) * 60 + ( $start_m - $m );
+
+    if ( $delay < 0 ) { $delay += 24*60; }
+
+    print LOG "-> delay $delay min.\n";
+
+    $queue{$j}->{status}='delayed';
+    $queue{$j}->{'delayed_until'}=time() + $delay*60;
+
+    return 0;
+}
+
+##########################################################################
+#
+# send_job_from_queue $tty
+#
+# get $job from $modem_queue{$1}, lock $job/JOB, fork child process,
+# set $tty_in_use{$tty}, etc.
+#
+##########################################################################
+sub send_job_from_queue
+{
+    my $tty = shift;
+    my $job = shift @{$modem_queue{$tty}};
+
+    print LOG "$job: Sending $job/JOB on $tty...\n" if $opt_v;
+
+    # check whether job has been removed (faxrm) in the meantime...
+    unless( -d "$job" && -f "$job/JOB" )
+    {
+	print LOG "WARNING: job $job has disappeared from disk queue!\n";
+	$queue{$job}->{'status'}='error';
+        $mq_length{$tty} -= $queue{$job}->{weight};
+	&reactivate_others($job);
+	return;
+    }
+
+    my $phone = $queue{$job}{phone};
+    my $pri   = $queue{$job}{priority};
+    my @flags = @{$queue{$job}{flags}};
+    my @pages = @{$queue{$job}{pages}};
+
+    print LOG " +  phone number: $phone\n" if $opt_d;
+    print LOG " +  priority    : $pri\n"   if $opt_d;
+    print LOG " +  flags       : " . join( ' ', @flags ) . "\n"  if $opt_d;
+    print LOG " +  pages       : " . join( ' ', @pages ) . "\n" if $opt_d;
+
+    if ( defined $sendfax_tty_map{$tty} )
+    {
+        print LOG " +  sendfax cmd : $sendfax_tty_map{$tty}{cmd} @{$sendfax_tty_map{$tty}{args}}\n" if $opt_d;
+    }
+
+    # lock job (just a hard link) vs. faxrunq
+    unless( link "$job/JOB", "$job/JOB.locked" )
+    {
+	print LOG "WARNING: can't lock job ($!), skipping!\n";
+	$queue{$job}->{'status'}='error';
+        $mq_length{$tty} -= $queue{$job}->{weight};
+	&reactivate_others($job);
+	return;
+    }
+
+    # check if other jobs are queued for the same phone number, and
+    # are eligible for sending them together
+    # criteria:
+    #     - all have the same resolution (always '-n' or never)
+    #     - no polling
+    # TODO: if multiple "-A <acct>" are set, combine that info as well
+    if ( defined( $queue{$job}->{others} ) )
+    {
+	print LOG " +  others      : " . join( ' ', @{$queue{$job}->{'others'}} ) . "\n" if $opt_d;
+	my $crit = &check_flags( @flags );
+	print LOG " +  -> criteria : $crit\n" if $opt_d;
+
+	while ( ( $#{$queue{$job}->{'others'}} >= 0 ) &&
+	        ( $#pages < $max_combined_pages-1 ) )
+	{
+	    my $c_job = ${$queue{$job}->{'others'}}[0];
+
+	    if ( &check_flags( @{$queue{$c_job}->{flags}} ) != $crit )
+	    {
+		print LOG " ++ no-combine: $c_job: flag mismatch\n" if $opt_v;
+		last;			# incompatible job, can't combine
+	    }
+
+	    # never attach jobs with lower priority
+	    if ( $queue{$c_job}->{priority} < $pri )
+	    {
+		print LOG " ++ no-combine: $c_job: prio mismatch\n" if $opt_v;
+		last;
+	    }
+
+	    # drop from 'others' list, put on 'combined' list
+	    shift @{$queue{$job}->{'others'}};
+
+	    if ( !defined( $queue{$job}->{combined} ) )
+		    { $queue{$job}->{combined} = []; }
+	    push @{$queue{$job}->{combined}}, $c_job;
+
+	    # combine pages lists
+	    my @cpages = @{$queue{$c_job}->{'pages'}};
+
+	    print LOG " ++ combine: $c_job/ ". join(' ', @cpages) . "\n" if $opt_v;
+	    foreach my $p ( @cpages )
+		    { push @pages, ("../$c_job/$p"); }
+	    print LOG " ++ combine: pages = ". join(' ', @pages) . "\n" if $opt_d;
+	}
+    }
+
+    # now fork child process
+    my $pid;
+    if ( !defined( $pid = fork ) )
+    {
+	die "CANNOT FORK -- SEVERE ERROR -- ABORTING: $!\n";
+    }
+
+    if ( $pid == 0 )		# CHILD
+    {
+	chdir $job;
+
+	my $sendfax_cmd=$sendfax;
+	my @args = ( '-l', $tty, @flags, $phone, @pages );
+
+	if ( defined $sendfax_tty_map{$tty} )
+	{
+	    $sendfax_cmd=$sendfax_tty_map{$tty}{'cmd'};
+	    unshift @args, @{ $sendfax_tty_map{$tty}{'args'} };
+	}
+
+        { exec $sendfax_cmd ('sendfax', @args ); }
+
+	print LOG "EXEC FAILED: $!\n"; 
+	exit(100);
+    }
+    else			# PARENT
+    {
+	$childs++;
+	$pid2job{$pid}=$job;
+	$pid2tty{$pid}=$tty;
+	$tty_in_use{$tty}=1;
+	printf LOG "$job: forked off child **$pid**...\n" if $opt_v;
+    }
+}
+
+##########################################################################
+# check_flags( @flags )
+#
+# analyze sendfax arguments for '-p' or '-n', set specific bits for
+# each of them
+##########################################################################
+sub check_flags
+{
+    my $bits = 0;
+
+    while ( $#_ >= 0 )
+    {
+	$_ = shift;
+	if ( $_ eq '-n' ) { $bits |= 0x01; }		# normal res
+	elsif ( $_ eq '-p' ) { $bits |= 0x02; }		# polling
+	elsif ( $_ =~ /^-[dxhlmCIADM]/ )		# skip optarg
+		{ shift; }
+    }
+    return $bits;
+}
+
+##########################################################################
+#
+# reactivate_others $job
+#
+# for all jobs 'attached' to this one (in ->{others}, because of having
+# the same phone number), put jobs back to 'active' and into the queue
+#
+##########################################################################
+sub reactivate_others
+{
+my $j = shift;
+my $phone = $queue{$j}->{phone};
+
+    # if the phone number is still marked 'busy', remove from list
+    if ( defined( $phones{$phone} ) )
+		    { delete $phones{$phone}; }
+
+    # now re-queue all attached jobs (if any)
+    if ( defined( $queue{$j}->{others} ))
+    {
+	printf LOG "$j: reactivate others...\n" if $opt_d;
+	foreach my $jj ( @{$queue{$j}->{others}} )
+	{
+	    # FIXME: check timing constraints (?)
+	    put_job_to_modem_queue($jj);
+	}
+	delete $queue{$j}->{others};
+    }
+}
+
+
+##########################################################################
+#
+# remove_error_job $DIR
+#
+# remove an erroneous job from the queue ('mv JOB JOB.error')
+#
+##########################################################################
+sub remove_error_job
+{
+    my $job = shift;
+
+    print LOG "$job: removing job from queue\n" if $opt_v;
+
+    rename( "$job/JOB", "$job/JOB.error" ) ||
+	print LOG "ERROR: can't rename '$job/JOB' to '$job/JOB.error': $!\n";
+
+    $queue{$job}->{'status'} = 'error';
+}
+
+
+##########################################################################
+#
+# wait_for_child
+#
+# wait() for child process, handle return code / JOB Status etc.
+#
+##########################################################################
+
+sub wait_for_child
+{
+my ($r, $s, $ex, $j, $t);
+
+    print LOG "Waiting for offspring ($childs out there)...\n" if $opt_d;
+
+    $r = wait; $s=$?; $ex=$s>>8;
+
+    if ( $r == -1 )
+    {
+	die "ERROR-CANTHAPPEN (wait returns -1)";
+    }
+
+    # there is a weirdness in Perl on AIX -- sometimes, wait() returns
+    # a PID that we did not start (bastard child?). It seems to be
+    # harmless to just ignore that fact and go on, but complain anyway.
+    if ( ! defined( $pid2job{$r} ) )
+    {
+	print LOG "ERROR-CANTHAPPEN (wait returns PID [$r] with no associated job) -- ignore\n";
+	print "ERROR-CANTHAPPEN (wait returns PID [$r] with no associated job)\07\07\07\07\07\07\n";
+	my $i=0; while($i<5) { sleep(10); print "\07\07\07\07\n"; $i++; }
+
+	# just *IGNORE* this fact -- pretend nothing happened
+	return '';
+    }
+
+    $childs--;
+    $j = $pid2job{$r};
+    $t = $pid2tty{$r};
+    delete $pid2job{$r};
+    delete $pid2tty{$r};
+    delete $phones{ $queue{$j}->{'phone'} };
+
+    print LOG "    ---> return=**$r** (-> job=$j, tty=$t), status=$s -> exit($ex)\n" if $opt_d;
+
+    # job is through: remove from queue length, and mark tty as free.
+    $mq_length{$t} -= $queue{$j}{weight};
+    $tty_in_use{$t}=0;
+
+    # reactivate 'attached' jobs now (this phone number is free)
+    &reactivate_others($j);
+
+    if ( $ex == 0 && $s > 0 )		# signal?!?
+    {
+	print LOG "$j: sendfax (pid $r) was killed with signal $s\n";
+	$ex = 15;
+    }
+
+    if ( $ex == 100 )
+    {
+	print LOG "Problems with exec() --> aborting\n";	#!!!!! DIE
+	unlink "$j/JOB.locked";
+	$queue{$j}->{'status'} = 'error';
+	return $t;
+    }
+
+    # save result for per-tty statistics
+    if ( ! defined( $tty_statistics{$t} ) )
+				{ $tty_statistics{$t} = {'total'=>0, '0'=>0}; }
+    if ( ! defined( $tty_statistics{$t}{$ex} ) ) 
+				{ $tty_statistics{$t}{$ex} = 0; }
+    $tty_statistics{$t}{total}++;
+    $tty_statistics{$t}{$ex}++;
+
+    # and for per-remote-phone statistics
+    my $ph = $queue{$j}->{'phone'};
+    if ( ! defined( $per_phone_statistics{$ph} ) )
+	    { $per_phone_statistics{$ph}{0} = 0; }
+    if ( ! defined( $per_phone_statistics{$ph}{$ex} ) )
+	    { $per_phone_statistics{$ph}{$ex} = 0; }
+    $per_phone_statistics{$ph}{$ex}++;
+
+    # now handle return codes.  This is tricky if multiple jobs have been 
+    # combined into one sendfax call - might have failed in the middle...
+    
+    if ( defined( $queue{$j}->{'combined'} ) )
+    {
+	my @jobs = @{$queue{$j}->{'combined'}};
+	delete $queue{$j}->{'combined'};
+
+	print LOG "$j: was combined with ". join(' ',@jobs) ."\n" if $opt_v;
+
+	if ( $ex == 0 )			# all succeeded
+	{
+	    foreach my $jj ($j, @jobs) 
+		{ &handle_return_code( $ex, $jj, $t ); }
+	}
+	elsif ( $ex <= 10 )		# dialup failed - blaim first one
+	{
+	    &handle_return_code( $ex, $j, $t );
+	    foreach my $jj (@jobs)
+	    {
+		put_job_to_modem_queue($jj);
+	    }
+	}
+	else				# some error in between
+	{				# -> check via file names (f1.done)
+	    my $found_it=0;
+	    foreach my $jj ($j, @jobs)
+	    {
+		if ( ! $found_it )	# searching for "break point"
+		{
+		    if ( &check_is_job_done( $jj ) )	# was job sent?
+			{ &handle_return_code( 0, $jj, $t ); }
+		    else				# no -> gotcha
+			{ &handle_return_code( $ex, $jj, $t );
+			  $found_it=1;}
+		}
+		else			# found it -> requeue remainder
+		{
+		    put_job_to_modem_queue($jj);
+		}
+	    }
+	}
+    }
+    else				# simple case: just a single job
+    {
+	&handle_return_code( $ex, $j, $t );
+    }
+
+    return $t;
+}
+
+##########################################################################
+#
+# check_is_job_done($JOB)
+#
+# find out whether a given job has been sent completely by looking at
+# the individual page files - if all are 'gone' (renamed to f<n>.done),
+# the job has been sent completely
+#
+##########################################################################
+
+sub check_is_job_done
+{
+    my $jj = shift;
+    my $jp;
+
+    foreach $jp ( @{$queue{$jj}->{pages}} )
+    {
+	print LOG " .. check: $jj/$jp\n" if $opt_d;
+	if ( ! -f "$jj/$jp.done" )
+		    { return 0; }
+    }
+    return 1;
+}
+
+##########################################################################
+# is_on_modem($JOB)
+#
+# find out whether a given job is being sent "right now", or just in queue
+#
+##########################################################################
+sub is_on_modem
+{
+    my $jj = shift;
+    foreach my $p ( keys %pid2job )
+    {
+	print LOG "\tcheck pid $p -> job $pid2job{$p}\n" if $opt_d;
+	if ( $pid2job{$p} eq $jj )
+	{
+	    print LOG "\tfound job $jj as pid $p, tty $pid2tty{$p} -> on modem!\n" if $opt_d;
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+##########################################################################
+#
+# handle_return_code
+#
+# process the return code from 'sendfax' (if 0, job has been sent 
+# successfully, if > 0, log failure, and requeue job, or suspend)
+#
+##########################################################################
+sub handle_return_code
+{
+    my ( $ex, $j, $tty ) = @_;
+
+    # now handle return codes
+    if ( $ex == 0 )		# job successfully sent
+    {
+	print LOG "$j: Job successfully sent\n" if $opt_v;
+
+	# remove from internal work queue
+	$queue{$j}->{'status'} = 'done';
+
+	# write status line to JOB file
+	&wstat( $j, "Status " . localtime() . " successfully sent\n");
+
+	# write acct.log
+	&wacct($j, "success");
+
+	# success mail
+	&sms($j)
+		if $send_mail_success;
+
+	# success program
+	if ($program_success ne '')
+	{
+	    print LOG "    calling program $program_success for job $j...\n" if $opt_v;
+	    system( "$program_success $fax_spool_out/$j/JOB $ex </dev/null" );
+	}
+
+	# remove JOB file
+	unless( rename( "$j/JOB", "$j/JOB.done" ) )
+	{
+	    # failed -- maybe the "$program_success" has removed it?
+	    # --> die only if the file and directory still exist
+
+	    if ( -d "$j" && -f "$j/JOB" )
+		{ die "error renaming $j/JOB: $!"; }
+	    else
+		{ print LOG "$j/JOB: rename failed ($!) - whatever...\n"; }
+	}
+
+	# if requested, erase all files
+	if ( $delete_jobs )
+	{
+	    print LOG "    delete job directory $j/.\n" if $opt_v;
+	    system( "rm -rf $j" ) if ( $j =~ /^F[0-9]/ );
+
+	    # if the directory is gone, we don't need to remember the job...
+	    delete $queue{$j};
+	}
+    }				# end if ( ex == 0 )
+    else			# failure sending job...
+    {
+	my $verb_ex = $exitcodes[$ex];
+
+	print LOG "$j: FAILED: $ex -> $verb_ex\n" if $opt_v;
+
+	# increase number of unsuccessful attempts (and costly attempts)
+	$queue{$j}->{'tries'}++;
+	$queue{$j}->{'tries_c'}++  if $ex >= 10;
+
+	# write status line to JOB file
+	my $fstr = ( $ex<10 )? "failed" : "FATAL FAILURE";
+	&wstat( $j, "Status " . localtime() . " $fstr, exit($ex): $verb_ex\n");
+
+	# remember tty used (try to get another one for next call)
+	$queue{$j}->{last_modem} = $tty;
+
+	# write acct.log
+	&wacct($j, "fail $ex: $verb_ex");
+
+	#!!!! compare numbers -> remove job, or just requeue
+
+	if ( $queue{$j}{'tries'}   >= $max_tries_total ||
+	     $queue{$j}{'tries_c'} >= $max_tries_costly )
+	{
+	    # failure mail
+	    &smf($j)
+		if $send_mail_failure;
+
+	    # failure program
+	    if ($program_failure ne '')
+	    {
+		print LOG "    calling f-program $program_failure for job $j...\n" if $opt_v;
+		system( "$program_failure $fax_spool_out/$j/JOB $ex </dev/null" );
+	    }
+
+	    # remove from queue directory (suspend, but do not delete it)
+	    unless( rename( "$j/JOB", "$j/JOB.suspended" ) )
+	    {
+		# failed -- maybe the "$program_failure" has removed it?
+		# --> die only if the file and directory still exist
+
+		if ( -d "$j" && -f "$j/JOB" )
+		    { die "error renaming $j/JOB: $!"; }
+		else
+		    { print LOG "$j/JOB: rename failed ($!) - whatever...\n"; }
+	    }
+
+	    # remove from internal queue
+	    $queue{$j}->{'status'}= 'failed';
+	}			# end if ( max tries exceeded )
+	else			# requeue...
+	{
+	    # "status update" program (so that integrated frontends can
+	    # easily inform user about what's happening - 'BUSY again!')
+	    if ($program_updates ne '')
+	    {
+		print LOG "    calling u-program $program_updates for job $j...\n" if $opt_v;
+		system( "$program_updates $fax_spool_out/$j/JOB -$ex </dev/null" );
+	    }
+
+	    if ( $ex == 4 ) 			# BUSY: delay 5 minutes
+	    {
+		$queue{$j}->{'status'}='delayed';
+		$queue{$j}->{'delayed_until'}=time()+300;
+	    }
+	    elsif ( $ex == 2 || $ex == 3 ||	# Hardware unavailable?
+		    $ex == 5 || $ex == 10 )	# (Modem broken or unplugged)
+	    {
+		$queue{$j}->{'status'}='delayed';
+		$queue{$j}->{'delayed_until'}=time()+20;
+		$mq_badness{$tty} += 0.2;	# mark modem as "bad"
+	    }
+	    else				# requeue immediately
+	    {
+		&put_job_to_modem_queue( $j );
+	    }
+	}
+    }				# end if ... else ( sending failed )
+
+    # remove LOCK (ignore errors)
+    unlink( "$j/JOB.locked" );
+}
+
+
+sub sms
+{
+my $job=shift;
+my $mail_to=$queue{$job}->{'mail'};
+my $d=localtime;
+
+    print LOG "    sending mail to $mail_to...\n" if $opt_v;
+
+    open( M, "|$mail -t" ) ||
+	die "opening pipe to mail program failed: $!";
+
+    print M "Subject: OK: your fax to " . ($queue{$job}->{'phone'}) . "\n";
+    print M <<EOF1;
+To: $mail_to
+From: root (Fax Daemon)
+
+Your fax has been sent successfully at: $d
+
+Job / Log file:
+
+EOF1
+
+    open( F, "$job/JOB" ) ||
+	die "can't read JOB.done file: $!";
+    while( <F> ) { print M $_; }
+    close(F);
+
+    print M "\nSending succeeded after " . ($queue{$job}->{'tries'}) . " unsuccessful attempts.\n";
+    close(M);
+}
+
+sub smf
+{
+my $job=shift;
+my $mail_to=$queue{$job}->{'mail'};
+my $rcvr=$queue{$job}->{'phone'};
+my $d=localtime;
+
+    print LOG "    sending mail to $mail_to...\n" if $opt_v;
+
+    open( M, "|$mail -t" ) ||
+	die "opening pipe to mail program failed: $!";
+
+    print M <<EOF1;
+To: $mail_to
+From: root (Fax Daemon)
+Subject: FAIL: your fax to $rcvr
+
+It was not possible to send your fax to $rcvr!
+
+The fax job is suspended, you can requeue it for another delivery
+attempt with the command:
+
+    cd $fax_spool_out/$job
+    mv JOB.suspended JOB
+
+or (easier) with:
+
+    faxq -r
+
+
+The log file of your job follows:
+
+EOF1
+
+    open( F, "$job/JOB" ) ||
+	die "can't read JOB.done file: $!";
+    while( <F> ) { print M $_; }
+    close(F);
+
+    close(M);
+}
+
+# write "Status" record to JOB file
+# parameters: job id, string to write to file
+sub wstat
+{
+    my ($j,$r) = @_;
+
+    # guard against file move / symlink attacks
+    my ( $check_inum, $check_mode ) = (lstat "$j/JOB")[1,2];
+
+    if ( ! S_ISREG($check_mode) || 
+         $check_inum != $queue{$j}->{'inum'} )
+    {
+	printf LOG "ERROR: suspicious file permissions: 0%o, inum old: %d, new: %d\n", $check_mode, $queue{$j}->{'inum'}, $check_inum;
+	&remove_error_job($j);
+	return;
+    }
+
+    unless ( open( J, ">>$j/JOB" ) )
+    {
+	print LOG "ERROR: can't append status line to $j/JOB: $!\n";
+	&remove_error_job($j);
+	return;
+    }
+
+    print J $r;
+    close J;
+}
+
+# write record to acct.log
+# parameters: job id, success/failure string (free form) to write to file
+sub wacct
+{
+    my ($j,$r) = @_;
+
+    my $m = $queue{$j}->{'mail'};
+    my $p = $queue{$j}->{'phone'};
+    my $a = defined( $queue{$j}->{'acct_handle'} ) ? 
+		                 $queue{$j}->{'acct_handle'} : '';
+    my $d=localtime;
+
+    unless ( open( A, ">>$fax_acct" ) )
+    {
+	print LOG "ERROR: can't open $fax_acct for appending: $!"; return;
+    }
+
+    print A "$m $j |$p |$a|$d| $r\n";
+    close A;
+}
+
+
+
+##########################################################################
+#
+# signal_handler
+#
+# called before exit'ing, when user sent a HUP or INT signal...
+#
+##########################################################################
+sub signal_handler
+{
+my $sig = shift;
+
+    print "\nfaxrunqd: signal handler: got signal $sig, goodbye...\n";
+    print LOG "\nfaxrunqd: signal handler: got signal $sig, goodbye...\n";
+
+    # save tty statistics
+    &dump_statistics;
+
+    # remove JOB locks of all currently-active jobs
+    foreach my $pi ( keys %pid2job )
+    {
+	my $jl = $pid2job{$pi};
+
+        print LOG "remove job lock $jl/JOB.locked.\n" if $opt_d;
+	unlink "$jl/JOB.locked";
+    }
+
+    # remove PID file (-> global lock)
+    print LOG "remove global lock $faxrd_pid.\n" if $opt_d;
+    unlink $faxrd_pid;
+
+    exit 7;
+}
+##########################################################################
+#
+# signal_handler_USR1
+#
+# called when user sends a USR1 signal --> set flag to roll log file
+#
+##########################################################################
+sub signal_handler_USR1
+{
+my $sig = shift;
+
+    print LOG "\nfaxrunqd: signal handler: got signal $sig, roll log file...\n";
+
+    $roll_log_file_requested = 1;
+}
+##########################################################################
+#
+# signal_handler_HUP
+#
+# called when user sends a HUP signal --> set flag to do graceful exit
+#
+##########################################################################
+sub signal_handler_HUP
+{
+my $sig = shift;
+
+    print LOG "\nfaxrunqd: signal handler: got signal $sig, will exit as soon as possible...\n";
+
+    $graceful_exit_requested = 1;
+}
+##########################################################################
+#
+# signal_handler_USR2
+#
+# called when user sends a USR2 signal --> set flag to dump statistics
+#
+##########################################################################
+sub signal_handler_USR2
+{
+my $sig = shift;
+
+    print LOG "\nfaxrunqd: signal handler: got signal $sig, dump statistics...\n";
+
+    $statistics_requested = 1;
+}
+##########################################################################
+#
+# dump_statistics
+#
+# write tty statistics to LOG
+# called before exiting, and in regular intervals
+#
+##########################################################################
+sub dump_statistics
+{
+my $t; 
+    print LOG "--------------------------------------------------\n";
+    foreach $t (keys %tty_statistics)
+    {
+	print LOG "modem statistics for tty '$t'\n";
+	print LOG "    total fax calls : ${tty_statistics{$t}{'total'}}\n";
+	print LOG "    total success   : ${tty_statistics{$t}{'0'}}\n";
+	foreach (sort(keys %{$tty_statistics{$t}}))
+	{
+	    next if ($_ eq '0') || ($_ eq 'total');
+            printf LOG "    error code %-2d   : %d (%1.1f%%) [%s]\n",
+		$_, $tty_statistics{$t}{$_}, 
+		100*$tty_statistics{$t}{$_}/$tty_statistics{$t}{total},
+		$exitcodes[$_];
+	}
+    }
+    print LOG "--------------------------------------------------\n";
+    foreach $t (sort (keys %per_phone_statistics))
+    {
+	print LOG "error statistics for remote number '$t'\n";
+	print LOG "    total success   : ${per_phone_statistics{$t}{'0'}}\n";
+	foreach (sort(keys %{$per_phone_statistics{$t}}))
+	{
+	    next if ( $_ eq '0' );
+            printf LOG "    error code %-2d   : %d [%s]\n",
+		$_, $per_phone_statistics{$t}{$_}, 
+		$exitcodes[$_];
+	}
+    }
+    print LOG "--------------------------------------------------\n";
+}
+
+
+
+##########################################################################
+#
+# remove_stale_locks
+#
+# called at startup, if stale "faxrunqd.pid" file is found
+# go through all F..../ directories, remove JOB.locked files.
+#
+##########################################################################
+sub remove_stale_locks
+{
+    print STDERR "faxrunqd: stale PID file (PID=$_[0]), removing\n";
+    unlink $faxrd_pid;
+
+    chdir( $fax_spool_out ) || return;
+
+    opendir D, "." || return;
+    foreach my $f ( readdir( D ) )
+    {
+	if ( -d $f && -f "$f/JOB.locked" )
+	{
+	    print STDERR "faxrunqd: remove stale lock \"$f/JOB.locked\"\n";
+	    unlink( "$f/JOB.locked" );
+	}
+    }
+    close D;
+    return;
+}

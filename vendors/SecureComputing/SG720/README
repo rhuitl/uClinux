@@ -1,0 +1,64 @@
+SNAPGEAR IXP425 FLASH
+---------------------
+
+1. LOADING BOOT LOADER
+
+   Using OCdemon package, setup with appropriate .gdbinit script.
+
+   Firstly make sure you have the lp drivers loaded, and then load
+   the ocdemon driver:
+
+      insmod parport
+      insmod parport_pc
+      insmod lp
+      modprobe -f ravenpp
+      mknod /dev/ocdemonpp0 c 254 0
+
+   (Ignore the ravenpp load warnings - if any).
+
+   Now startup the process demon, and start gdb:
+
+      OcdLibRemote -c XSCALE-IXP &
+      /tmp/xscale-elf-gdb -nw
+
+   Now run the "program-loader" script to program the flash with the
+   RedBoot firmware.
+
+
+
+2. REDBOOT PARTITION
+
+   To create a SnapGear RedBoot flash partition setup do:
+
+     fis init
+     fis create -b 0x01600000 -l 0x100000 -e 0x01600000 -f 0x50040000 zImage
+     fis create -b 0x00800000 -l 0x660000 -e 0x00800000 -f 0x50140000 ramdisk
+     fis create -b 0x00800000 -l 0x20000 -f 0x507a0000 config
+     fis create -b 0x00800000 -l 0x760000 -e 0x01600000 -f 0x50040000 image
+
+   Order is important, you must do the creates in the above order.
+   Now create a boot script, and default network setup for RedBoot:
+   
+     fconfig
+   
+   You want to enter this as the start script:
+   
+     fis load -b 0x00800000 ramdisk
+     fis load -b 0x01600000 zimage
+     go -n 0x01600000
+   
+   Choose a boot timeout of 3 seconds. You can select either DHCP to get
+   an initial address or hard code an IP address, your choice. Save this
+   setup into flash when done (it will prompt you to save it).
+   
+   Reboot (with "reset" command) after flash configuration. Then CTRL-C back
+   into RedBoot at the prompt. Now load a kernel into RAM and run:
+   
+     load -r -v -b 0x01600000 zImage
+     load -r -v -b 0x00800000 ramdisk.gz
+     go -n 0x01600000
+   
+   You can now do a standard netflash to load a real image:
+
+     netflash <tftp-server> imagez.bin
+

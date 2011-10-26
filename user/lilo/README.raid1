@@ -1,0 +1,481 @@
+        Notes for use of LILO on RAID installations.
+
+(LILO version 22.0 through 22.4.1 -- 17-Apr-2001)
+(LILO version 22.5 and later -- 14-Mar-2003) see NEW CONSIDERATIONS
+
+
+RESTRICTIONS
+============
+
+Only RAID1 is supported.  LILO may be used to boot a system
+containing other RAID level partitions, but it may not be installed
+on any RAID partition other than RAID level 1.
+
+
+GOAL
+====
+
+The goal of a RAID1 installation of LILO is redundancy.  Redundancy to
+the point that a failure of one disk in an array will not render the
+system difficult to boot.
+
+A secondary goal of LILO on a RAID installation is to maintain array
+coherency when the LILO command line is written back to the map file. 
+This writeback occurs when the '-R' switch command line is cleared,
+when the user has specified the 'lock' option, or if a 'fallback'
+command line is in use.
+
+
+INSTALLATION ON A RAID SET
+==========================
+
+A RAID installation of the LILO boot loader is initiated by
+specifying that the boot record is to be placed in the boot area of
+a RAID partition.  This is accomplished by the 'boot=' line in the
+LILO configuration file, '/etc/lilo.conf'.  For instance, a system
+running with '/dev/md1' mounted as root ('/'), would use the line:
+
+   boot = /dev/md1
+
+to initiate a RAID installation.  As directed, the boot record is
+written to the RAID partition.  Unfortunately, in the event of
+failure of the RAID set disk from which booting occurs, the boot record
+on the surviving disk(s) will only be usable if the disks are entirely
+"parallel" to the disk that originally booted the system.
+
+To continue, we first need some terminology for talking about RAID 1
+partitions.
+
+
+TERMINOLOGY
+===========
+
+RAID 1 writes the same data to the corresponding disk blocks of the
+partitions which make up the RAID set.  Two partitions are said to be
+"parallel" if they start at exactly the same sector address on their
+respective drives.  This means that files on the two disks have their
+data written at exactly the same absolute sector addresses on both
+drives.  
+
+Two partitions are said to be "skewed" if they do not start at the
+same sector address on their respective drives.  Data within each
+partition will be at the same offset from the beginning of each
+partition, but not at the same absolute sector address.
+
+
+PARALLEL CASE
+=============
+
+"Parallel" RAID sets are the easiest for LILO to handle.  One boot
+record, written to the boot area of the RAID partition, references the
+same sectors, no matter which disk is operational at boot time.  For
+"parallel" RAID installations, LILO has no need to write boot records
+outside of the RAID partition, if primary.  This is in contrast to
+previous versions of LILO based upon the "lilo.raid1" patch file to
+vanilla version 21, which wrote the LILO boot record to the Master Boot
+Records of all of the drives in the array, and not to the RAID
+partition.
+
+With the boot record written to the RAID partition on "parallel" RAID
+sets, every drive has a boot record which will boot the system. 
+There is now only one map file, and this file may be referenced by
+any of the boot records, since it is at exactly the same sector
+address on every drive.  To insure that it is possible to boot from
+this simplest LILO installation to "parallel" RAID set partitions,
+one must insure that they are primary partitions; i.e., partition
+numbers 1-4 on their respective disks, and that each disk has written
+to it a "master" boot loader which boots the partition marked "active".
+And on each disk, mark the RAID set partition active.  Booting normally
+occurs from the drive with the lowest BIOS device code (0x80).  In
+the event this drive fails, another drive assumes the role of BIOS
+device code 0x80, and in the case of a "parallel" RAID installation,
+will be perfectly bootable.
+
+The unusual event of RAID set partitions which are parallel, but not
+primary partitions will be described later.
+
+
+MORE TERMINOLOGY
+================
+
+A boot record is "accessible", if it exists on a primary parition,
+which may be marked "active"; or it is a Master Boot Record (MBR),
+written to sector 0 of a drive.
+
+Non-RAID LILO installations write accessible boot records when they
+write to primary partitions, such as:
+
+   boot = /dev/hda1
+
+or,
+
+   boot = /dev/sdb3
+
+Boot records are written to the MBR by specifying the drive; viz.,
+
+   boot = /dev/hdb
+
+writes to the MBR of the slave drive on the primary IDE controller.
+
+Similarly, a boot record is "inaccessible" if it is written to a
+logical (or secondary) partition; i.e., partition numbers 5 and
+above.  These partitions are not booted by any of the usual MBR boot
+loaders which search the partition table for a partition marked
+"active".  They may be booted from a boot manager, such as the LILO
+boot menu, and are booted as 'other=' entries in the configuration
+file, '/etc/lilo.conf'.
+
+
+SKEWED CASE
+===========
+
+"Skewed" installations are not quite as simple.  Here the partitions
+are not likely to be primary, and their distinguishing characteristic
+is that files on the filesystem within the partition lie at different
+absolute sector addresses:  kernel files, initrd files, and the LILO
+map file, in particular.  Thus any boot record written to '/dev/mdX',
+the RAID partition, will have sector addresses which cannot be
+guaranteed accurate for all drives.  Worst case is that they are
+accurate for only one drive.  Hence, this boot will work for one
+drive, but it is not universal.  It will fail for some drive or
+drives in the array.
+
+In this case, LILO needs to place boot records in "accessible" places
+so that all drives will be bootable in a recovery situation.
+
+Here the need for the user to specify alternative actions becomes
+necessary.  There is a new keyword now recoginzed in the
+configuration file, and a new command line switch corresponding to
+the keyword:  'raid-extra-boot=' and the '-x' switch.  The following
+description will be for the configuration file option, but is equally
+applicable to the command line switch.
+
+For the simplest of "skewed" installations, it may be undesirable to
+have LILO automatically write boot records outside of the RAID
+partition.  In this case, 'raid-extra-boot=' should be specified,
+literally, as "none"; viz.,
+
+   boot = /dev/md1
+   raid-extra-boot = none
+
+With this specification, LILO will write the boot record to
+'/dev/md1' only.  If the RAID disk on the lowest BIOS device code
+fails, the array may not be bootable, except from a floppy disk.
+
+Without the specification "none", the default LILO action in the case
+of a skewed installation is:
+
+   boot = /dev/md1
+   raid-extra-boot = auto
+
+This requests LILO to place recovery boot records on the MBRs of any
+drives for which the the '/dev/md1' boot record is not valid, because
+of partition skew.  Even with "auto" specified, or implied by having
+no 'raid-extra-boot=' line, LILO will never write a boot record to
+the MBR of BIOS device 0x80.  This MBR is considered so critical,
+that it will never be written, unless you specifically request it.
+
+It is strongly suggested that before any LILO installation on a RAID
+set, that LILO be run with the 'test' flag:  '-t'.  LILO will go
+through all the motions of mapping the kernel(s) to be booted, but it
+will tell you where it wants to write any additional boot records.
+
+  lilo -t
+
+Is strongly recommended, especially if you are not sure whether you
+have a "skewed" (extra boot records needed) or "parallel" RAID
+installation.
+
+If boot records are desired on all MBRs of all disks with partitions
+in the raid set, then the following specification is used:
+
+   boot = /dev/md1		# OR,   -b /dev/md1
+   raid-extra-boot = mbr	# OR,   -x mbr
+
+If there are three disks with partitions that are part of the /dev/md1
+raid set, then the Master Boot Records of all three will receive
+additional boot records. With this specification, the MBR of BIOS
+device 0x80 will be overwritten. 
+
+The caution to run 'lilo -t' first, just to see where LILO will write
+boot records, is reemphasized.
+
+The keyword 'raid-extra-boot=' may also be used to specify exactly
+where you want LILO to write the auxiliary boot records.  Consider
+the following RAID installation:  disk 0:  /dev/hdc6; disk 1: 
+/dev/sda1.  The installation is "skewed".  Disks /dev/hda and
+/dev/hdb exist, and occupy BIOS device codes 0x80 and 0x81,
+respectively.  /dev/hdc is BIOS device code 0x82, and /dev/sda is
+BIOS device code 0x83.  If the configuration file looks something
+like:
+
+   boot = /dev/md1
+   #  the following line is not needed, but may be used to
+   #  force the device code which the RAID set will boot as
+   #disk=/dev/md1 bios=0x82
+   #  disks hda and hdb are on the expected bios codes 80 & 81
+   #
+   disk=/dev/hdc bios=0x82
+   disk=/dev/sda bios=0x83
+   #
+   image = /boot/vmlinuz
+      label = linux
+      root = /dev/md1
+      read-only
+   other = /dev/hda
+      label = MBR
+
+then LILO will write the boot record to boot from 0x82, the lowest
+device code of any disk in the RAID set.  An additional boot record
+will be written to the MBR of '/dev/hdc'.  Disk '/dev/sda' is
+bootable should '/dev/hdc' fail under the following circumstance: 
+'/dev/hdc' is removed, freeing BIOS device code 0x82.  '/dev/sda' now
+installs on the lowest code, 0x82, and will boot as long as partition
+1 is marked active.
+
+The same effect could be achieved with the configuration file having
+the extra line:
+
+  raid-extra-boot = /dev/hdc
+
+Further, the use of extra boot records could be extended as follows:
+
+  raid-extra-boot = "/dev/hdc,/dev/sda"
+
+Now both disks in the RAID set have usable boot records on the MBRs. 
+There is no need to worry about "active" partitions in a recovery
+situation.
+
+
+BACKWARD COMPATIBLITY
+=====================
+
+Backward compatibility with earlier versions of LILO raid is provided
+by (versions 21 through 21.7.5)
+
+   raid-extra-boot = mbr-only
+
+Use of "mbr-only" defeats writing the boot record to the RAID
+partition, '/dev/md1' in the examples above, defeats the protection
+against writing to the MBR of BIOS device 0x80 (which is usually
+'/dev/hda' or '/dev/sda'), and writes to all MBRs of the drives in
+the RAID set.  Except for not writing to the boot record of the 
+raid partition, this option is otherwise the same as the "raid-
+extra-boot=mbr" specification discussed above.
+
+On XFS filesystems, writing a boot record to the RAID partition itself
+would be catastrophic.  Hence, on XFS filesystems, use of this option
+is MANDATORY.
+
+
+MASTER BOOT RECORDS and ACTIVE PRIMARY PARTITIONS
+=================================================
+
+The active partition, /dev/sda1 in the case above is booted by a
+"Master Boot Record" written to /dev/sda.   LILO may be requested
+to write such a Master record with the command:
+
+   lilo -M /dev/sda     # write master boot record
+
+The Master Boot Record performs the same function as the DOS utility
+'fdisk /mbr', except that the DOS code is only used for the C: drive. 
+The LILO master boot record facility may be placed on sector 0 of
+any drive.  It serves an additional function in RAID1 installations,
+in that it will determine, and pass to the boot sector of the active
+partition the correct BIOS device code of the drive, whether it is
+0x80, 0x81, or higher.
+
+The active partition may be set with the -A flag; viz.,
+
+   lilo -A /dev/sda 1   # note the space!!!
+
+or checked; viz.,
+
+   lilo -A /dev/sda     # check active partition
+
+(response:  /dev/sda1)
+
+
+REMINDERS
+=========
+
+Unstated, but required by an installation of LILO to a RAID
+partition, all of the files used in booting must reside on the RAID
+set.  This means:  initrd, kernel, and message files; plus the LILO
+internal files:  map, boot.b, and chain.b, if used.  Normally, the
+internal files are kept in the '/boot' directory.  Many distributions
+of Linux also place the kernel and initrd files in this same
+directory.  Others place them in the root, '/', directory.  Either
+location is acceptable, as long as they are within the same RAID
+partition which you are making bootable.
+
+LILO variations:  version 22.2 enforces the placement of the map file
+on the RAID parition.  Version 22.3 eliminates the need for the
+boot.b and chain.b files, and relaxes the restriction that the
+message file be on the RAID partition by copying it into the map
+file.  Likewise, any bitmap= file is copied into the map file, so it
+too may reside anywhere.  It remains the user's responsibility to see
+that the Kernel and Initrd files are on the bootable raid partition. 
+The /boot directory, with the map file, is the recommended location for
+these files.
+
+If for some reason you want to write the MBR of BIOS device 0x80, you
+will have to specify it explicitly.  Since LILO tells you where all
+other auxiliary boot records have been written, if any, you will have
+to mention these in addition to the MBR on drive 0x80.
+
+(versions 22.0 through 22.4.1):
+When making an installation of LILO to a RAID set, remember that LILO
+will only make the disk with the lowest device code bootable.  For
+very many RAID installations, this will be BIOS device code 0x80. 
+The second and succeeding disks in the RAID set are not bootable in
+the running RAID configuration; they only become bootable if the disk
+on device code 0x80 is removed, so that one of them becomes BIOS
+drive 0x80.
+
+
+ERROR MESSAGES (versions 22.0 through 22.4.1):
+==============
+
+If LILO is unable to write all of the auxiliary boot records it would
+like, or your map file is not on the RAID partition, you will get the 
+error message:
+
+  "Warning: FLAG_RAID_NOWRITE has been set"
+
+This warning has two consequences.  First, the clearing the '-R'
+stored command line will not take place; 'lock' will not work
+properly; and 'fallback' will not work properly.  All of these LILO
+options require LILO to re-write the stored boot command line before
+the kernel is booted.  Because RAID set consistency cannot be
+maintained, the boot loader will fall back to a read-only mode of
+operation.  For many installations this is acceptable.  The command
+line switch, '-R' will still work from a running system, since the
+kernel RAID codes will maintain set coherency.
+
+The second consequence of this message, is a warning that not all
+boot records needed for booting in a disk failure scenario were
+written.  The system may boot fine with the lowest BIOS code disk
+running, but be prepared to use a boot floppy in the event this disk
+fails.  This may or may not be acceptable.
+
+This message will most often appear when 'raid-extra-boot=' was
+specified as "none"; or, if specified as (or defaulted to), "auto",
+the extra boot record it could not write was to the MBR of BIOS
+device 0x80, usually '/dev/hda' or '/dev/sda'.  This could happen
+with a skewed installation, where the RAID set partition on BIOS
+device code 0x80 is not a primary partition.  If it were a primary
+partition, then the RAID partition boot record written to '/dev/md?'
+would be used, and there would be no necessity to write to the MBR of
+BIOS disk 0x80.
+
+
+NEW CONSIDERATIONS        (version 22.5 and later)
+==================
+
+Booting is now based upon a 32-bit industry standard Volume ID,
+rather than the 8-bit BIOS device code.  Device codes are still
+generated, but are used primarily as an index into a volume id table. 
+This means that the LILO-installed boot sector must contain the
+volume id of the drive containing the map file, since this is where
+the second stage loader is guaranteed to be located.  The record on
+the first sector of a RAID1 partition is not unique, but is shared
+among all the partitions in the raid set.  These partitions span two
+or more drives.  
+
+The worst case scenario is that the boot scheme falls back to actual
+device codes, and is as reliable as the version 22.4.1 and earlier
+codes.  A failed installation will still boot, as long a the failed
+(first) drive is removed, and the backup (second) drive fills the
+emptied BIOS device code slot formerly occupied by the failed drive.
+
+Version 22.5 (and later) installations are more robust, as long as
+the boot record on the RAID1 partition has access to the BIOS device
+code under which it is booting; or, booting takes place from an
+auxiliary boot record installed using the option "mbr"; or by
+explicit declaration.  Auxiliary boot records are not shared across
+drives, so they may have variations within them, such as their own
+unique volume id's, for use in accessing the correct map file.  (They
+also contain unique offset information, in the case of skewed
+partitions.)
+
+The most fault tolerant systems will be those installed using the
+"mbr" (or "mbr-only") specification.
+
+
+CONSERVATIVE INSTALLATION    (version 22.5.1 and later)
+=========================
+
+The most robust RAID1 installations, PARALLEL or SKEWED, are installed
+with:
+
+   lilo -x mbr
+
+This installation will boot any disk with a RAID partition on any
+BIOS device code. It is not restricted to PARALLEL installations only
+as is the next method.
+
+Equally robust PARALLEL installations will use the new Master Boot
+Record, activate the RAID1 partition on each drive, and install using
+the specification that the MBR bios can be relied upon to pass the
+correct BIOS device code in the DL register:
+
+   lilo -x auto
+     or
+   lilo -x none
+
+will produce a warning message telling you that the following is needed:
+
+   lilo -M /dev/sda	# install new MBR
+   lilo -A /dev/sda 3	# activate the correct partition (# 3)
+   lilo -M /dev/sdb	# install new MBR
+   lilo -A /dev/sdb 2   # activate the correct partition (# 2)
+
+If the partitions of the PARALLEL installation are not all primary, the
+warning message will not be issued, and non-primary partitions will not
+be bootable.  (The MBR from LILO version 22.5.1 or later MUST be used.
+Once installed, it does not have to be re-installed each time you update
+the boot record on the RAID partition.)
+
+Since it is easier to achieve the most robust state of affairs with
+the "-x mbr" or "raid-extra-boot=mbr" specification, it is the
+suggested method of installation.
+
+
+REMEMBER
+========
+
+With a RAID installation, always run:
+
+   lilo -t
+
+first -- just to let LILO tell you what it is about to do.  Use the
+'-v' flag, too, for more verbose output.
+
+
+REFERENCES
+==========
+
+The 'man' pages for "lilo" and "lilo.conf" have been updated, and are
+the main reference material for using the new switches and config
+options.
+
+The 'README' file in the LILO source directory, generated from the
+doc materials, is still the best tutorial on booting, as well as a good
+reference for many of the more obscure lilo options.  The 'man' pages
+now contain most of this reference material, but in a condensed form.
+
+
+CREDITS
+=======
+
+Thanks to Piete Brooks <lilo+pb@cl.cam.ac.uk> for prodding me
+into attacking the RAID1 issues, for his incisive criticism of the
+resulting work as it emerged, and for testing the early codes.
+
+(end)
+written 04/19/01 -- John Coffman <johninsd@san.rr.com>
+updated 05/10/01 -- John Coffman
+updated 08/08/01 -- John Coffman
+updated 03/15/03 -- John Coffman (to version 22.5.1)
+updated 09/07/04 -- John Coffman (spelling & punctuation)

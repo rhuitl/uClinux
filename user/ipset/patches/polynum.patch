@@ -1,0 +1,538 @@
+Index: ipset/ipset_polynum.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/ipset_polynum.c	2010-08-24 13:20:05.752020562 +1000
+@@ -0,0 +1,233 @@
++/* Copyright 2009 Dr Paul Dale (pauli@snapgear.com)
++ *
++ * This program is free software; you can redistribute it and/or modify   
++ * it under the terms of the GNU General Public License as published by   
++ * the Free Software Foundation; either version 2 of the License, or      
++ * (at your option) any later version.                                    
++ *                                                                         
++ * This program is distributed in the hope that it will be useful,        
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of         
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          
++ * GNU General Public License for more details.                           
++ *                                                                         
++ * You should have received a copy of the GNU General Public License      
++ * along with this program; if not, write to the Free Software            
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++
++#include <stdio.h>			/* *printf */
++#include <string.h>			/* mem* */
++
++#include "ipset.h"
++
++#include <linux/netfilter_ipv4/ip_set_polynum.h>
++
++#define BUFLEN 30;
++
++#define OPT_CREATE_FROM    0x01
++#define OPT_CREATE_TO      0x02
++
++static void parse_polynum(const char *str, ip_set_ip_t *num) {
++	if (string_to_number(str, 0, 65536, num) != 0)
++		exit_error(PARAMETER_PROBLEM, 
++		           "Invalid polynumber `%s' specified", str);
++}
++
++/* Initialize the create. */
++static void polynum_create_init(void *data UNUSED)
++{
++	DP("create INIT");
++	/* Nothing */
++}
++
++/* Function which parses command options; returns true if it ate an option */
++static int
++polynum_create_parse(int c, char *argv[] UNUSED, void *data, unsigned *flags)
++{
++	struct ip_set_req_polynum_create *mydata = data;
++
++	DP("create_parse");
++
++	switch (c) {
++	case '1':
++		parse_polynum(optarg, &mydata->from);
++
++		*flags |= OPT_CREATE_FROM;
++
++		DP("--from %x (%u)", mydata->from, mydata->from);
++
++		break;
++
++	case '2':
++		parse_polynum(optarg, &mydata->to);
++
++		*flags |= OPT_CREATE_TO;
++
++		DP("--to %x (%u)", mydata->to, mydata->to);
++
++		break;
++
++	default:
++		return 0;
++	}
++
++	return 1;
++}
++
++/* Final check; exit if not ok. */
++static void
++polynum_create_final(void *data, unsigned int flags)
++{
++	struct ip_set_req_polynum_create *mydata = data;
++
++	if (flags == 0) {
++		exit_error(PARAMETER_PROBLEM,
++			   "Need to specify --from and --to\n");
++	} else {
++		/* --from --to */
++		if ((flags & OPT_CREATE_FROM) == 0
++		    || (flags & OPT_CREATE_TO) == 0)
++			exit_error(PARAMETER_PROBLEM,
++				   "Need to specify both --from and --to\n");
++	}
++
++	DP("from : %x to: %x  diff: %d", mydata->from, mydata->to,
++	   mydata->to - mydata->from);
++
++	if (mydata->from > mydata->to)
++		exit_error(PARAMETER_PROBLEM,
++			   "From can't be lower than to.\n");
++
++	if (mydata->to - mydata->from > MAX_RANGE)
++		exit_error(PARAMETER_PROBLEM,
++			   "Range too large. Max is %d numbers in range\n",
++			   MAX_RANGE+1);
++}
++
++/* Create commandline options */
++static const struct option create_opts[] = {
++	{.name = "from",	.has_arg = required_argument,	.val = '1'},
++	{.name = "to",		.has_arg = required_argument,	.val = '2'},
++	{NULL},
++};
++
++/* Add, del, test parser */
++static ip_set_ip_t
++adt_parser(int cmd UNUSED, const char *arg, void *data)
++{
++	struct ip_set_req_polynum *mydata = data;
++
++	parse_polynum(arg, &mydata->ip);
++	DP("%u", (unsigned int)mydata->ip);
++
++	return 1;	
++}
++
++/*
++ * Print and save
++ */
++
++static void
++polynum_initheader(struct set *set, const void *data)
++{
++	const struct ip_set_req_polynum_create *header = data;
++	struct ip_set_polynum *map = set->settype->header;
++
++	memset(map, 0, sizeof(struct ip_set_polynum));
++	map->first_ip = header->from;
++	map->last_ip = header->to;
++}
++
++static void
++polynum_printheader(struct set *set, unsigned options)
++{
++	struct ip_set_polynum *mysetdata = set->settype->header;
++
++	printf(" from: %u", mysetdata->first_ip);
++	printf(" to: %u\n", mysetdata->last_ip);
++}
++
++static void
++polynum_printpolynums_sorted(struct set *set, void *data,
++		  u_int32_t len UNUSED, unsigned options, char dont_align)
++{
++	struct ip_set_polynum *mysetdata = set->settype->header;
++	u_int32_t addr = mysetdata->first_ip;
++
++	DP("%u -- %u", mysetdata->first_ip, mysetdata->last_ip);
++	while (addr <= mysetdata->last_ip) {
++		if (test_bit(addr - mysetdata->first_ip, data))
++			printf("%u\n", (unsigned int)addr);
++		addr++;
++	}
++}
++
++static void
++polynum_saveheader(struct set *set, unsigned options)
++{
++	struct ip_set_polynum *mysetdata = set->settype->header;
++
++	printf("-N %s %s --from %u", 
++	       set->name,
++	       set->settype->typename,
++	       mysetdata->first_ip);
++	printf(" --to %u\n", mysetdata->last_ip);
++}
++
++static void
++polynum_savepolynum(struct set *set, void *data,
++	  u_int32_t len UNUSED, unsigned options, char dont_align)
++{
++	struct ip_set_polynum *mysetdata = set->settype->header;
++	u_int32_t addr = mysetdata->first_ip;
++
++	while (addr <= mysetdata->last_ip) {
++		if (test_bit(addr - mysetdata->first_ip, data))
++			printf("-A %s %u\n",
++			       set->name, (unsigned int)addr);
++		addr++;
++	}
++}
++
++static void usage(void)
++{
++	printf
++	    ("-N set polynum --from NUMBER --to NUMBER\n"
++	     "-A set NUMBER\n"
++	     "-D set NUMBER\n"
++	     "-T set NUMBER\n");
++}
++
++static struct settype settype_polynum = {
++	.typename = SETTYPE_NAME,
++	.protocol_version = IP_SET_PROTOCOL_VERSION,
++
++	/* Create */
++	.create_size = sizeof(struct ip_set_req_polynum_create),
++	.create_init = polynum_create_init,
++	.create_parse = polynum_create_parse,
++	.create_final = polynum_create_final,
++	.create_opts = create_opts,
++
++	/* Add/del/test */
++	.adt_size = sizeof(struct ip_set_req_polynum),
++	.adt_parser = &adt_parser,
++
++	/* Printing */
++	.header_size = sizeof(struct ip_set_polynum),
++	.initheader = polynum_initheader,
++	.printheader = polynum_printheader,
++	.printips = polynum_printpolynums_sorted,
++	.printips_sorted = polynum_printpolynums_sorted,
++	.saveheader = polynum_saveheader,
++	.saveips = polynum_savepolynum,
++
++	.usage = &usage,
++};
++
++CONSTRUCTOR(polynum)
++{
++	settype_register(&settype_polynum);
++
++}
+Index: ipset/Makefile
+===================================================================
+--- ipset.orig/Makefile	2010-08-24 13:10:45.000000000 +1000
++++ ipset/Makefile	2010-08-24 13:20:49.341518172 +1000
+@@ -69,6 +69,7 @@ SETTYPES:=ipmap portmap macipmap
+ SETTYPES+=iptree iptreemap
+ SETTYPES+=iphash nethash ipporthash ipportiphash ipportnethash
+ SETTYPES+=setlist
++SETTYPES+=polynum
+ 
+ lower=$(shell echo $(1) | tr [:upper:] [:lower:])
+ upper=$(shell echo $(1) | tr [:lower:] [:upper:])
+Index: ipset/kernel/Kconfig.ipset
+===================================================================
+--- ipset.orig/kernel/Kconfig.ipset	2010-08-24 13:09:35.000000000 +1000
++++ ipset/kernel/Kconfig.ipset	2010-08-24 13:20:49.361527640 +1000
+@@ -47,6 +47,14 @@ config IP_NF_SET_MACIPMAP
+ 
+ 	  To compile it as a module, choose M here.  If unsure, say N.
+ 
++config IP_NF_SET_POLYNUM
++	tristate "polynumber set support"
++	depends on IP_NF_SET
++	help
++	  This options adds the polynumber set type support.
++
++	  To compile it as a module, choose M here.  If unsure, say N.
++
+ config IP_NF_SET_PORTMAP
+ 	tristate "portmap set support"
+ 	depends on IP_NF_SET
+Index: ipset/kernel/Makefile.ipset
+===================================================================
+--- ipset.orig/kernel/Makefile.ipset	2010-08-24 13:09:35.000000000 +1000
++++ ipset/kernel/Makefile.ipset	2010-08-24 13:20:49.371567245 +1000
+@@ -2,6 +2,7 @@
+ obj-$(CONFIG_IP_NF_SET) += ip_set.o
+ obj-$(CONFIG_IP_NF_SET_IPMAP) += ip_set_ipmap.o
+ obj-$(CONFIG_IP_NF_SET_PORTMAP) += ip_set_portmap.o
++obj-$(CONFIG_IP_NF_SET_POLYNUM) += ip_set_polynum.o
+ obj-$(CONFIG_IP_NF_SET_MACIPMAP) += ip_set_macipmap.o
+ obj-$(CONFIG_IP_NF_SET_IPHASH) += ip_set_iphash.o
+ obj-$(CONFIG_IP_NF_SET_NETHASH) += ip_set_nethash.o
+Index: ipset/kernel/include/linux/netfilter_ipv4/ip_set.h
+===================================================================
+--- ipset.orig/kernel/include/linux/netfilter_ipv4/ip_set.h	2010-08-24 13:11:31.000000000 +1000
++++ ipset/kernel/include/linux/netfilter_ipv4/ip_set.h	2010-08-24 13:18:29.871296958 +1000
+@@ -15,6 +15,10 @@
+ #define IP_SET_DEBUG
+ #endif
+ 
++#ifdef CONFIG_IP_NF_SET_POLYNUM_MODULE
++#include <net/sock.h>
++#endif
++
+ /*
+  * A sockopt of such quality has hardly ever been seen before on the open
+  * market!  This little beauty, hardly ever used: above 64, so it's
+@@ -81,6 +85,10 @@ typedef uint16_t ip_set_id_t;
+ #define IPSET_DST		0x02	/* Destination match/add */
+ #define IPSET_MATCH_INV		0x04	/* Inverse matching */
+ 
++
++#define IPSET_GROUPS		IPSET_SRC
++#define IPSET_TS_CATS		IPSET_DST
++
+ /*
+  * Set features
+  */
+@@ -536,7 +544,21 @@ module_exit(ip_set_##type##_fini);
+ static inline ip_set_ip_t
+ ipaddr(const struct sk_buff *skb, const u_int32_t *flags)
+ {
++#ifdef CONFIG_IP_NF_SET_POLYNUM_MODULE
++	if (flags[0] & IPSET_SRC) {
++		if (skb->sk && skb->sk->sk_authd_saddr)
++			return ntohl(skb->sk->sk_authd_saddr);
++		else
++			return ntohl(ip_hdr(skb)->saddr);
++	} else {
++		if (skb->sk && skb->sk->sk_authd_daddr)
++			return ntohl(skb->sk->sk_authd_daddr);
++		else
++			return ntohl(ip_hdr(skb)->daddr);
++	}
++#else
+ 	return ntohl(flags[0] & IPSET_SRC ? ip_hdr(skb)->saddr : ip_hdr(skb)->daddr);
++#endif
+ }
+ 
+ #define jhash_ip(map, i, ip)	jhash_1word(ip, *(map->initval + i))
+Index: ipset/kernel/include/linux/netfilter_ipv4/ip_set_polynum.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/kernel/include/linux/netfilter_ipv4/ip_set_polynum.h	2010-08-24 13:17:57.551925654 +1000
+@@ -0,0 +1,26 @@
++#ifndef __IP_SET_POLYNUM_H
++#define __IP_SET_POLYNUM_H
++
++#include <linux/netfilter_ipv4/ip_set.h>
++#include <linux/netfilter_ipv4/ip_set_bitmaps.h>
++#include <linux/types.h>
++
++#define SETTYPE_NAME	"polynum"
++
++struct ip_set_polynum {
++	void *members;			/* the polynum proper */
++	ip_set_ip_t first_ip;		/* host byte order, included in range */
++	ip_set_ip_t last_ip;		/* host byte order, included in range */
++	u_int32_t size;			/* size of the ipmap proper */
++};
++
++struct ip_set_req_polynum_create {
++	ip_set_ip_t from;
++	ip_set_ip_t to;
++};
++
++struct ip_set_req_polynum {
++	ip_set_ip_t ip;
++};
++
++#endif /* __IP_SET_POLYNUM_H */
+Index: ipset/kernel/ip_set_polynum.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/kernel/ip_set_polynum.c	2010-08-24 13:21:17.851346799 +1000
+@@ -0,0 +1,173 @@
++/* Copyright (C) 2009 Dr Paul Dale <pauli@snapgear.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/* Kernel module implementing an integer set type as a bitmap */
++
++#include <linux/module.h>
++#include <linux/ip.h>
++#include <linux/tcp.h>
++#include <linux/udp.h>
++#include <linux/skbuff.h>
++#include <linux/errno.h>
++#include <asm/uaccess.h>
++#include <asm/bitops.h>
++#include <linux/spinlock.h>
++
++#include <net/ip.h>
++
++#include <linux/netfilter_ipv4/ip_set_polynum.h>
++
++static inline ip_set_ip_t get_polynum_count(const struct sk_buff *skb, const u_int32_t *flags) {
++	__u32 *p = NULL;
++
++	if (skb == NULL || skb->sk == NULL)
++		return 0;
++
++	if (flags[0] & IPSET_GROUPS)
++		p = skb->sk->sk_authd_groups;
++	else if (flags[0] & IPSET_TS_CATS)
++		p = skb->sk->sk_authd_ts_categories;
++	if (p != NULL)
++		return *p;
++	return 0;
++}
++
++static inline const ip_set_ip_t *get_polynum_list(const struct sk_buff *skb, const u_int32_t *flags) {
++	__u32 *p = NULL;
++
++	if (skb == NULL || skb->sk == NULL)
++		return NULL;
++
++	if (flags[0] & IPSET_GROUPS)
++		p = skb->sk->sk_authd_groups;
++	else if (flags[0] & IPSET_TS_CATS)
++		p = skb->sk->sk_authd_ts_categories;
++	if (p != NULL)
++		return p+1;
++	return NULL;
++}
++
++
++static inline int polynum_test(const struct ip_set *set, ip_set_ip_t ignored, int num, const ip_set_ip_t *list, const struct sk_buff *skb)
++{
++	const struct ip_set_polynum *map = set->data;
++	int i;
++
++	DP("set: %s, num:%u", set->name, num);
++	for (i=0; i<num; i++) {
++		const ip_set_ip_t e = list[i];
++
++		DP("set: %s, elem[%d]:%u", set->name, i, e);
++		if (e >= map->first_ip && e <= map->last_ip &&
++				test_bit(e - map->first_ip, map->members)) {
++			if (skb != NULL)
++				skb->sk->sk_polynum_match = e;
++			return !0;
++		}
++	}
++	if (skb != NULL)
++		skb->sk->sk_polynum_match = 0;
++	return 0;
++}
++
++#define KADT_CONDITION							\
++	const ip_set_ip_t *list = get_polynum_list(skb, flags);	\
++									\
++	if (list == NULL)						\
++		return 0;
++	
++UADT(polynum, test, 1, &req->ip, NULL)
++KADT(polynum, test, get_polynum_count, ip, list, skb)
++
++static inline int
++polynum_add(struct ip_set *set, ip_set_ip_t num)
++{
++	struct ip_set_polynum *map = set->data;
++
++	if (num < map->first_ip || num > map->last_ip)
++		return -ERANGE;
++	if (test_and_set_bit(num - map->first_ip, map->members))
++		return -EEXIST;
++		
++	DP("num %u", num);
++	return 0;
++}
++
++UADT(polynum, add)
++KADT(polynum, add, get_polynum_count)
++
++static inline int
++polynum_del(struct ip_set *set, ip_set_ip_t num)
++{
++	struct ip_set_polynum *map = set->data;
++
++	if (num < map->first_ip || num > map->last_ip)
++		return -ERANGE;
++	if (!test_and_clear_bit(num - map->first_ip, map->members))
++		return -EEXIST;
++		
++	DP("num %u", num);
++	return 0;
++}
++
++UADT(polynum, del)
++KADT(polynum, del, get_polynum_count)
++
++static inline int
++__polynum_create(const struct ip_set_req_polynum_create *req,
++		 struct ip_set_polynum *map)
++{
++	if (req->to - req->from > MAX_RANGE) {
++		ip_set_printk("range too big, %d elements (max %d)",
++			      req->to - req->from + 1, MAX_RANGE+1);
++		return -ENOEXEC;
++	}
++	return bitmap_bytes(req->from, req->to);
++}
++
++BITMAP_CREATE(polynum)
++BITMAP_DESTROY(polynum)
++BITMAP_FLUSH(polynum)
++
++static inline void
++__polynum_list_header(const struct ip_set_polynum *map,
++		      struct ip_set_req_polynum_create *header)
++{
++}
++
++BITMAP_LIST_HEADER(polynum)
++BITMAP_LIST_MEMBERS_SIZE(polynum, struct ip_set_req_polynum,
++			 (map->last_ip - map->first_ip + 1),
++			 test_bit(i, map->members))
++
++static void
++polynum_list_members(const struct ip_set *set, void *data, char dont_align)
++{
++	const struct ip_set_polynum *map = set->data;
++	uint32_t i, n = 0;
++	ip_set_ip_t *d;
++
++	if (dont_align) {
++		memcpy(data, map->members, map->size);
++		return;
++	}
++
++	for (i = 0; i < map->last_ip - map->first_ip + 1; i++)
++		if (test_bit(i, map->members)) {
++			d = data + n * IPSET_ALIGN(sizeof(ip_set_ip_t));
++			*d = map->first_ip + i;
++			n++;
++		}
++}
++
++IP_SET_TYPE(polynum, IPSET_TYPE_PORT | IPSET_DATA_SINGLE)
++
++MODULE_LICENSE("GPL ");
++MODULE_AUTHOR("Dr Paul Dale");
++MODULE_DESCRIPTION("polynum type of IP sets");
++
++REGISTER_MODULE(polynum)

@@ -1,0 +1,21 @@
+#!/bin/sh
+
+/bin/pppd file /etc/config/ppp.conf 2>&1 >/dev/null &
+
+n=0
+while test $n -lt 30
+do
+    sleep 4
+    v=`ifconfig -a | grep ppp0`
+    if test -n "$v"
+    then
+        v=`ifconfig ppp0 | grep RUNNING`
+        if test -n "$v"
+	then
+	    exit 0
+        fi
+    fi
+    n=`expr $n + 1`
+done
+
+exit 1

@@ -1,0 +1,134 @@
+.\" "%W% %G%"
+.TH brcfg\ 0.29 8
+.SH NAME
+brcfg \- Configure and monitor Linux Kernel Bridging functions
+.SH SYNOPSIS
+.B brcfg [ start ] [ stop ] [ status ] [ STP ] [ debug on | off ]
+.TP
+.B brcfg stats  [ zero | enable | disable | show ]
+.TP
+.B brcfg [ policy accept|reject ] [ list ] [ exempt <prot1> <prot2> .. ]
+.TP
+.B brcfg [ port <nr> [ disable | enable | priority <val> | pathcost <val> ] ]
+.TP
+.B brcfg [ device <ifname> [ disable | enable | priority <val> | pathcost <val> ] ] 
+.SH DESCRIPTION
+.I Brcfg
+will display the current bridge status without parameters. Specifying
+parameters may alter the bridge operation in the kernel.
+
+.IBrcfg 
+will fail when the kernel has not been specifically compiled to
+include bridging. This tool wll only work with later 2.2/2.3 kernels and 
+2.4 kernels.
+
+.SH Theory of Operation
+Bridging is possible if the machine you are running Linux on has multiple
+Ethernet interfaces to make both ethernet seem to be one for all protocols
+on both networks.
+
+The Kernel uses an intelligent algorithm to perform bridging and to
+syncronize/exchange information with other bridges on the Networks. The kernel will listen to MAC
+addresses on all interfaces and build up tables describing which MAC address
+is located on which interface. Broadcast packets or packets whose
+destination interface is not known are forwarded to all attached interfaces
+(they are "flooded").
+
+The bridging happens at the lowest level of the Ethernet protocol and is
+transparent for all higher protocols such as DecNet LAT or Netbeui or
+whatever people have come up with to run on Ethernet.
+
+.SH PROBLEMS
+Trying to route regular protocols (TCP/IP, EtherTalk etc) will not work
+correctly on interfaces that are bridged. Use the logical brg0 interface 
+to attach the machine to the bridged network.
+
+Bridging uses promiscuous mode that means your machine will process
+.B every
+packet and check if its to be forwarded to other networks. That will cost
+a lot in CPU resources. Be sure to use a good network card able to deliver
+an incoming full network load into the TCP/Stack of Linux.
+.SH OPTIONS
+.TP
+.B debug [ on | off ]
+Switch the bridge / port into debugging mode. Huge amounts of information
+will be logged via the kernel describing what the bridge is doing.
+.TP
+.B device <ifname> [ enable | disable | priority <value> | pathcost <value> ]
+With additional arguments modifies the behavior of the port for interface, 
+otherwise it displays it. The priority is important when you have multiple 
+bridges between the same networks. Pathcost is the cost for forwarding over 
+this interface's segment to another bridge.
+.TP
+.B exempt <prot1> <prot2> ...
+exempt specified protocols from the default policy (see policy option).
+Usually this is used to specify which protocols should not be bridged (with
+the default "accept" policy). You can get a list of supported protocols with
+the "list" option. Please switch on protocol statistics (see stats option)
+before exempting a protocol to know as what packet type your network
+drivers recognize packets.
+.br
+The exempt option must be the final option on a line. It will assume all
+following values on the commandline are protocol specifiers.
+.br
+If you know what you are doing then you can also specify a protocol number
+from <net/if_ether.h> as a parameter to exempt.
+.TP
+.B list
+Lists all protocols the brcfg program understands.
+.TP
+.B pathcost <value>
+Assumes some priority to a path across the bridge. This is only effective
+in a multi-bridge situation.
+.TP
+.B policy [ accept | reject ]
+The policy of the bridge. "reject" means that no protocols will be bridged
+unless specified with the "exempt" option. "accept" means that all protocols
+will be bridged unless specified with the "exempt" option. The default is
+"accept".
+.br
+Changing the policy will erase the list of protocols exempted.
+.TP
+.B port <nr> [ enable | disable | priority <value> | pathcost <value> ]
+With additional arguments modifies the behavior of a port, otherwise it displays 
+it. The priority is important when you have multiple bridges between the same 
+networks. Pathcost is the cost for forwarding over this port's segment to another
+bridge.
+.TP
+.B priority <value>
+Assign a priority for this bridge. Applicable only to multi-bridge scenario.
+.TP
+.B start
+Starts the bridge. On bootup the bridge is disabled so that options can be
+set using the brcfg command before bringing the bridge up.
+.TP
+.B stop
+Stops bridge operation.
+.TP
+.B stats [show]
+Shows the current counters / protocols encountered on the networks.
+.TP
+.B stats zero
+Zeros the list of protocols and counters in the kernel.
+.TP
+.B stats enable
+Enables the recording of protocols and the counting of packets for each
+protocol type in the kernel. This function is OFF by default.
+.TP
+.B stats disable
+Disables the keeping of statistics.
+.TP
+With no options displays the current bridge status.
+.TP
+.SH AUTHOR
+.PP
+.I Unknown + Christoph Lameter + Matthew Grant
+.RS
+.nf
+clameter@debian.org (Christoph Lameter)
+.fi
+.nf
+grantma@anathoth.gen.nz (Matthew Grant)
+.fi
+.RE
+.SH COPYRIGHT GPL

@@ -1,0 +1,49 @@
+Date: Mon, 22 Feb 1999 08:35:40 +0100
+From: Gert Doering <gert@greenie.muc.de>
+To: Pang Wai Man Raymond <wmpang@se.cuhk.edu.hk>, mgetty@muc.de
+Subject: Re: Restrict login through callback, not dial-in by mgetty?
+X-mgetty-docs: http://alpha.greenie.net/mgetty/
+
+Hi,
+
+On Mon, Feb 22, 1999 at 10:53:24AM +0800, Pang Wai Man Raymond wrote:
+> Requirement
+> ===========
+> Without using the dialback modem, 
+> 1. a dummy account with password, can initiate the callback 
+> 2. users can only login through callback, but not dial-in.
+> 
+> I can implement step 1 but not 2. Does anybody have alternative?
+
+Set up login.config like this:
+
+------- login.config sample, file version 2 ----------
+# login.config
+#
+# use version-2 format
+!version 2
+#
+#
+# this is the dummy user name, it's allowed to login only if this 
+# is not already an ongoing callback
+callback	N	-	-	/bin/login @
+#
+# these are the real users: only allowed if it's a callback ("Y")
+*		Y	-	- 	/bin/login @
+#
+# if some other user name was entered, and it's not a callback, 
+# throw them out
+*		-	-	-	/bin/false
+------- login.config sample, file version 2 ----------
+
+I admit that the "version 2" stuff isn't documented anywhere yet (except
+the source) and it hasn't been fully tested either.  So please get mgetty
+1.1.20, test it, and report back to us :)
+
+gert
+-- 
+USENET is *not* the non-clickable part of WWW!
+                                                           //www.muc.de/~gert/
+Gert Doering - Munich, Germany                             gert@greenie.muc.de
+fax: +49-89-35655025                        gert.doering@physik.tu-muenchen.de
+

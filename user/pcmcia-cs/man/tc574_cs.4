@@ -1,0 +1,74 @@
+.\" Copyright (c) 1998 Donald Becker and David Hinds.
+.\" tc574_cs.4 1.7 2001/06/22 01:12:38
+.\"
+.TH 3C574_CS 4 "$Date" "pcmcia-cs"
+
+.SH NAME
+3c574_cs \- 3Com 3c574 Etherlink XL 10/100 PC Card device driver
+
+.SH SYNOPSIS
+.B insmod 3c574_cs.o
+[\fBpc_debug=\fIn\fR]
+[\fBif_port=\fIn\fR]
+[\fBirq_list=\fIi,j,...\fR]
+[\fBfull_duplex=\fIn\fR]
+[\fBauto_polarity=\fIn\fR]
+[\fBmax_interrupt_work=\fIn\fR]
+
+.SH DESCRIPTION
+\fB3c574_cs\fR is the low-level Card Services driver for the 3Com
+3c574 EtherLink XL PCMCIA ethernet adapter.  When this driver is
+attached to a card, it allocates the next available ethernet device
+(\fBeth0\fR..\fBeth#\fR).  This device name will be reported in the
+kernel log file, and passed on to \fBcardmgr\fR(8).
+.PP
+The driver uses the N-Way autonegotiating transceiver to negotiate the
+speed and duplex of the network link.  If the link partner does not
+support negotiation, only the link speed is detected.
+
+.SH PARAMETERS
+.TP
+.BI pc_debug= n
+Selects the PCMCIA debugging level.  This parameter is only available
+if the module is compiled with debugging enabled.  A non-zero value
+enables debugging.
+.TP
+.BI if_port= n
+Selects the transceiver type.  Only 0, 1, and 4 are acceptable values, other
+values return an error.  This actual value specificed is ignored -- the
+autonegotiating transceiver selects the media speed and duplex used.
+.TP
+.BI irq_list= i,j,...
+This option limits the set of interrupts that may be allocated by this driver.
+The default is all normally-usable IRQs.
+.TP
+.BI full_duplex= n
+This flag determines if only full-duplex modes are advertised.  It
+defaults to 0 (false).
+.TP auto_polarity= n
+This flag can be used to control the transceiver's auto polarity
+detection capability.  Some Cisco Catalyst switches are known to
+interact badly with this feature in 10baseT mode.  It defaults to 1
+(enabled).
+.TP
+.BI max_interrupt_work= work-limit
+This option selects the maximum amount of work handled during each
+interrupt.  Each received packet counts as one unit of work, as does
+updating statistics counters and handling errors.  The default is 32.
+
+.SH DIAGNOSTICS
+.TP
+.B eth#: interrupt(s) dropped!
+Indicates that the driver did not receive an interrupt notification
+for some reason.  The driver will poll the card (with a significant
+performance penalty) if the problem persists.  The most likely cause
+is an interrupt conflict and/or host bridge configuration problem.
+
+.SH AUTHOR
+Driver core: Donald Becker \- becker@scyld.com
+.PP
+PC Card interface: David Hinds \- dahinds@users.sourceforge.net
+
+.SH "SEE ALSO"
+cardmgr(8), pcmcia(5), ifport(8).
+

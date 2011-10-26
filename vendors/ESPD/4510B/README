@@ -1,0 +1,93 @@
+June 16, 2004
+
+Curt Brune <curt@cucy.com>
+http://www.cucy.com/
+
+The 4510B product adds support for the ARM7tdmi-based Samsung S3C4510B
+CPU and the EVB4510 evaluation board from ESPD Inc., which is based on
+the Samsung part.  A description of the board is available from ESPD's
+web site:
+
+http://www.espd-inc.com/prod01-arm-samsung4510.htm
+
+The makefile generates two binary files:
+
+  image/romfs.img   -- the ROMFS binary image
+  image/image.bin   -- the Linux binary image
+
+I use the u-boot boot loader to load these images and to provide the
+default command line.  The u-boot installation provides the "mkimage"
+utility for packaging the binary images.  I run mkimage as follows to
+package linux.bin and romfs.img -- note that I'm specifying to load
+the romfs.img just after the BSS, rounded to an 8KB boundary:
+
+     BSS_ADDR=`tail -1 linux-2.6.x/System.map`
+     RD_ADDR=`set -- ${BSS_ADDR} ; echo 0x${1}`
+     # align to 8KB
+     RD_ADDR=`printf 0x%08x $(( RD_ADDR + (8*1024) - (RD_ADDR % (8*1024)) ))`
+     
+     mkimage -A arm -O linux -T kernel -C none \
+         -a 0x8000 -e 0x8000 -n "Linux 2.6.6-hcs0 Kernel Image" \
+         -d linux.bin uImage.bin
+     
+     mkimage -A arm -O linux -T ramdisk -C none \
+        -a ${RD_ADDR} -n "ROMFS Image" \
+        -d romfs.img uImage.romfs
+
+U-Boot is nice because it figures out the appropriate Linux command
+line arguments to load the initrd correctly.  Set the u-boot
+"bootargs" environment variable to "root=/dev/ram0 keepinitrd" and you
+are in business.  Below I load the uImage files using TFTP and boot:
+
+>>  evb4510 # tftp 100000 uImage.bin
+>>  TFTP from server 10.0.0.1; our IP address is 10.0.0.11
+>>  Filename 'uImage.bin'.
+>>  Load address: 0x100000
+>>  Loading: #################################################################
+>>  	 #################################################################
+>>  	 #################################################################
+>>  	 ##############################################
+>>  done
+>>  Bytes transferred = 1232252 (12cd7c hex)
+>>  evb4510 # tftp 600000 uImage.romfs
+>>  TFTP from server 10.0.0.1; our IP address is 10.0.0.11
+>>  Filename 'uImage.romfs'.
+>>  Load address: 0x600000
+>>  Loading: #################################################################
+>>  	 #################################################################
+>>  	 ###################################
+>>  done
+>>  Bytes transferred = 841792 (cd840 hex)
+>>  evb4510 # bootm 100000 600000
+>>  ## Booting image at 00100000 ...
+>>     Image Name:   Linux 2.6.6-hcs0 Kernel Image
+>>     Image Type:   ARM Linux Kernel Image (uncompressed)
+>>     Data Size:    1232188 Bytes =  1.2 MB
+>>     Load Address: 00008000
+>>     Entry Point:  00008000
+>>     Verifying Checksum ... OK
+>>  OK
+>>  ## Loading Ramdisk Image at 00600000 ...
+>>     Image Name:   ROMFS Image
+>>     Image Type:   ARM Linux RAMDisk Image (uncompressed)
+>>     Data Size:    841728 Bytes = 822 kB
+>>     Load Address: 00144000
+>>     Entry Point:  00144000
+>>     Verifying Checksum ... OK
+>>  
+>>  Starting kernel ...
+>>  
+>>  Linux version 2.6.6-hsc0 (curt@hongkong) (gcc version 2.95.3 20010315 (release)(ColdFire patches - 20010318 from http://fiddes.net/coldfire/)(uClinux XIP and shared lib patches from http://www.snapgear.com/)) #2 Thu Jun 17 13:30:57 PDT 2004
+>>  CPU: Samsung-S3C4510B [36807001] revision 1 (ARMv4T)
+>>  Machine: ESPD 4510B(S3C4510B)
+>>  
+
+If you do not use u-boot you will need to compile a default command
+line into your linux image.  A suitable command line would be:
+
+root=/dev/ram0 initrd=0x00200000,900K keepinitrd
+
+By default the kernel uses 1024KB ramdisks -- if your romfs.img is
+larger than that you need to increase the size of your ramdisks.
+
+Happy hacking!

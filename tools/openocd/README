@@ -1,0 +1,78 @@
+Using OpenOCD
+=============
+
+To use OpenOCD to flash one of our devices, you need the following equipment
+* A Debugger
+	- We currently have a Amontec JTAGKey and some OpenOCD-USB debuggers
+	  hanging about. These will work fine.
+* OpenOCD 0.3.0 or later
+	- Please grab this from sourceforge.
+	- You will also need libftdi v16 - you can build this from source if 
+	  your package management system doesnt have it
+
+Building:
+	To build, use the following configure command line
+	./configure --enable-ft2232_libftdi --disable_werror
+	then make; sudo make install
+
+	If you are building a "git" tree then you need to run:
+
+	./configure --enable-maintainer_mode --enable-ft2232_libftdi \
+			--disable_werror
+
+SG Targets
+==========
+The directory structure is as follows
+
+targets
+ |_____
+	Each one of our devices will have a target here. Please use the
+	"approved" product name for the device. These are the files you will
+	reference on the OpenOCD command line.
+
+platforms
+ |______
+	common
+		This directory has common utility scripts in it. Currently
+		these are limited to memory tests, and some convience
+		functions used by existing scripts
+	xscale
+		XScale platform specific scripts.
+	 	Scripts exist for 8 and 16 bit flash, Disk On Chip (DoC)
+		support, and generic XScale functionality (UARTS, memory
+		init, PCI etc).
+
+Flashing a Device
+=================
+First, make sure you've got a bootloader built. Do this by building a whole
+tree, or configuring a tree then running 'make boot_only'
+
+If you want to flash in an existing bootloader, copy your .sgb file to
+boot/boot.bin
+
+Now, you need to modify the target script based on the debugger you've got.
+
+If you've got the JTAGKey, make sure the first line of the script is:
+"source [find interface/jtagkey.cfg]"
+Otherwise, for the OpenOCD-USB debuggers, the first line should be:
+"source [find interface/openocd-usb.cfg]"
+
+Run OpenOCD from the root of your new-wave tree. Unless you've setup tricky
+udev rules to set the correct permissions on your debugger, you'll need to
+use sudo. Use the following line
+"sudo openocd -f tools/openocd/targets/target.cfg"
+
+In another terminal, telnet to localhost:4444 to get the the OpenOCD command
+line. The commands for halting and flashing the devices should be explained
+in the target script, but for the 580, type the following:
+
+reset halt
+flash-boot
+
+This will halt the CPU, and start the flashing process. When you get a
+prompt back, wait ~10 to 15 seconds, for the flash to finish, and then type
+halt. The flash program (for the 580 at least) will busy loop after the
+flash has succeeded, so you can examine the instructions around the current
+program counter ( help armv4_5 disassemble ), to check you made it there.
+
+Reboot the device, and you should have a working unit again.

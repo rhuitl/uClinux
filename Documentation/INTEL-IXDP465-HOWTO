@@ -1,0 +1,118 @@
+Intel IXDP465
+-------------
+
+1. Compiler Tool Chain
+
+   Before you can compile the Linux kernel, libraries and applications to
+   generate an IXP4xx image you must install an appropriate compiler tool
+   chain. I suggest you use the arm-linux tool chain that accompanies this
+   source distribution (the arm-linux-tools-XXXXXXXX.tar.gz package). To
+   install this toolchain do:
+
+   1. login as root
+   2. cd /
+   3. tar xvzf arm-linux-tools-XXXXXXXX.tar.gz
+
+   This current package contains binaries of the following tools:
+
+        binutils-2.14
+        gcc-3.3.2
+        glibc-2.2.5
+
+2. Building the Source
+
+   Follow these simple steps to compile binary images ready to run on the
+   Intel IXDP465 board:
+
+   1.  tar xvzf uClinux-dist-XXXXXXXX.tar.gz
+   2.  cd uClinux-dist
+   3.  make xconfig
+
+       . Choose the "Target Platform Selection" menu item
+       . Select the "Vendor/Product" tab and choose "Intel/IXP465"
+       . Select the "Libc version" tab and choose "Glibc"
+       . "Save and Exit" this configuration
+
+   4.  make dep
+   5.  make
+
+   That is it!  The final make step will run through and compile the Linux
+   kernel, glibc library and a sample application set. It will also package
+   the result into two files ready to load onto the IXDP465 board, zImage
+   and ramdisk.gz.
+
+   Most often linux-2.4.x and glibc are used on this target, but uClibc
+   and linux-2.6.x are also supported on this board.
+
+
+3. Loading and Running
+
+   You will need an Intel IXDP465 board fitted with the RedBoot loader in
+   flash. You should firstly setup RedBoot configuration with a client
+   and server IP address (alternatively you can use the builtin DHCP
+   support).
+
+   Copy the binary files from uClinux-dist, images/zImage and
+   images/ramdisk.gz to the TFTP area of the download server.
+
+   To load and run Linux issue the following commands:
+
+        load -r -v -b 0x01600000 zImage
+        load -r -v -b 0x00800000 ramdisk.gz
+        go -n 0x01600000
+
+   You should see the Linux boot banner, and then be presented with a
+   bash shell prompt. A reasonable utility set is in place, mostly using
+   the busybox tool set. By default the rc script will run a dhcp client,
+   and so with a local dhcp server in place Linux will acquire an IP
+   address.
+
+
+4. Saving to Flash with RedBoot
+
+   You can setup the flash memory from within RedBoot to directly load
+   and run linux.
+
+   The following procedure describes howto setup and load Linux into
+   the flash:
+
+     fis init
+     load -r -v -b 0x01600000 zImage
+     fis create -b 0x01600000 -l 0xb0000 zImage
+     load -r -v -b 0x00800000 ramdisk.gz
+     fis create -b 0x00800000 -l 0x1d0000 ramdisk
+
+   Then create a boot script to automatically load and run:
+
+     fconfig
+
+        >> fis load -b 0x00800000 ramdisk
+        >> fis load -b 0x01600000 zImage
+        >> go -n 0x01600000
+   
+   Note: the go "-n" argument is used to halt the NPE's BEFORE control is
+         passed to kernel loaded as the NPE's can be in use by RedBoot.
+
+
+5. Customizing the Build
+
+   Using "make xconfig" in uClinux-dist you can customize the kernel and
+   application configurations. There is a large selection of packages in
+   the application configuration.
+
+   Consult the README file at the top level of uClinux-dist for some more
+   information about configuration and building.
+
+   Note also that uClinux-dist does not contain the Intel Access Library or
+   Drivers patch. So only the external PCI EEPRO 10/100 ethernet board can
+   be used by default, neither of the builtin ethernet ports are active.
+   To build with the Intel AccessLibrary to get the ethernet support goto
+   Rob Ranslam's sourceforge project site:
+
+       http://ixp4xx-osdg.sourceforge.net
+
+   The "uClinux on the IXDP425 and IXP400 Access Library Integration
+   HOWTO" provides instructions and a script to integrate the Access Library
+   with uClinux. There is also general information un using the IXDP425 and
+   IXDP465 and uClinux.
+

@@ -1,0 +1,1367 @@
+			  Nessus 0.99.0 C Plugins API
+			  
+			  
+             Author : Renaud Deraison <deraison@nessus.org>
+
+
+Overview
+-----------------------------------------------------------------
+
+
+	The Nessus Security Scanner performs its security
+checks by launching external pieces of code called 'plugins'.
+One plugin is in charge of one security check against one
+host.
+
+There are, at this time, two languages to write security checks :
+NASL (the Nessus Attack Scripting Language) and C.
+NASL should be prefered as it makes plugins which are easily
+portable and shareable. C plugins should be avoided, except when
+NASL proves to not be powerful enough.
+
+
+This document teaches you how to write a C Nessus plugin.
+
+Once more : *** C Nessus plugins should be avoided, except when
+it is not possible to write them in NASL ***
+
+
+
+This document covers the following topics :
+
+1. How to compile a C plugin
+ 
+2. The plugins framework
+ 2.1 The main .c file
+ 2.2 The file includes.h
+ 2.3 The file nessusraw.h
+ 2.4 The plugin_init() function
+ 2.5 The plugin_run()  function
+ 
+3. The Nessus library functions
+ 3.1 plugin_init() related functions
+   3.1.1 plug_set_name() 
+   3.1.2 plug_set_category()
+   3.1.3 plug_set_family()
+   3.1.4 plug_set_description()
+   3.1.5 plug_set_summary()
+   3.1.6 plug_set_copyright()
+   
+ 3.2 plugin additional functions
+   3.2.1 plug_set_timeout()
+   3.2.2 plug_set_dep()			
+   3.2.3 add_plugin_preference()	
+   3.2.4 get_plugin_preference()
+   
+ 3.3 target informations
+    3.3.1 plug_get_hostname()
+    3.3.2 plug_get_host_ip()
+    3.3.3 plug_get_host_open_port()
+    3.3.4 host_get_port_state()
+    
+ 3.4 network operations
+    3.4.1  open_sock_tcp()
+    3.4.2  recv_line()
+    3.4.3  ftp_log_in()
+    3.4.4  ftp_get_pasv_address()
+    3.4.5  is_cgi_installed()		
+    3.4.6  ping_host()
+    3.4.7  tcp_ping_host()
+    3.4.8  tcp_timing()
+    
+ 3.5 plugins inter communication (PIIC)
+    3.5.1 Introduction
+    3.5.2 plug_set_key()
+    3.5.3 plug_get_key()
+    3.5.4 Standard keys			
+     
+ 3.6 Reporting a problem to the Nessus server
+    3.6.1 post_hole()
+    3.6.2 post_info()
+     
+4. Interfacing a Nessus plugin with the libpcap library  
+
+  4.1 Makefile changes
+  
+  4.2 libpcap-related Nessus functions	
+  	4.2.1 routethrough()
+	4.2.2 get_datalink_size()
+	
+	
+5. A sample plugin commented
+
+   
+
+ 
+
+1. How to compile a C plugin
+-----------------------------------------------------------------
+
+	C plugins must be compiled into shared libraries 
+before they can be used by Nessus. Turning a C file into
+a shared library is a painful process, which is not portable.
+
+That is why nessus-0.99.0 comes with the utility 'nessus-build'
+which will build a .c plugin and turn it into a .nes file.
+
+Its usage is :
+
+		nessus-build input.c output.nes
+		
+This script will create the directory $TMP/nessus-build and
+will copy there the libtool which is appropriate to your system,
+as well as a generic Makefile. But you should not care anyway,
+except if your plugin contains several .c files.		
+
+  
+2. The plugins framework
+-----------------------------------------------------------------
+
+ 2.1 The main .c file 
+ ----------------------------------------------------------------
+   The main .c file will contain the two critical functions that
+   we will discuss right after this. 
+   
+   
+ 2.2 The file "includes.h"
+ ----------------------------------------------------------------   
+    The file "includes.h" contains all the includes necessary to
+    write a plugin.
+    
+    
+ 2.3 The file "nessusraw.h"
+ ----------------------------------------------------------------
+    nessusraw.h contains all the includes to define the structs
+    ip, tcphdr, udphdr and icmp (BSD style). If these structures
+    are not defined in the system includes, then it redefines
+    them.
+     
+    You should include this file if your plugin plays with
+    raw sockets.
+        
+ 2.4 the plugin_init() function
+ ----------------------------------------------------------------
+   Synopsis :
+    
+    int plugin_init(struct arglist * desc);
+    
+   Description :
+   
+    This function is called by the server so that the plugin
+    declares who is it, what it performs and so on. It should be
+    declared by your plugin, and must contain calls to the 
+    following functions :
+    
+    	plug_set_name()        (3.1.1)
+	plug_set_category()    (3.1.2)
+	plug_set_family()      (3.1.3)
+	plug_set_description() (3.1.4)
+	plug_set_summary()     (3.1.5)
+	plug_set_copyright()   (3.1.6)
+	
+	
+    It may also contain some calls to the function 
+    
+        add_plugin_preference()	
+    
+    We will define all these functions in section 3.1 
+    (except add_plugin_preference which will be defined in another
+    section)
+    
+    This function should return 0. Also, no initialization must be made
+    during this function, since all the dynamically allocated variables
+    will be destroyed right after the plugin exits from plugin_init()
+    
+  2.5 the plugin_run() function
+  ----------------------------------------------------------------
+   Synopsis :
+   
+     int plugin_run(struct arglist * desc);
+     
+   Description :
+   
+     This is the main plugin entry point. It may contain whatever you want.
+   
+3. The Nessus library functions
+-----------------------------------------------------------------
+
+ 3.0 Notes on the internationalization of Nessus
+ ----------------------------------------------------------------
+ 
+   nessus-0.99.0 and newer support multilingual plugins. That is,
+   each plugin may contain descriptions in any language.
+   
+   As a result of this, most of the functions have
+   a 'language' argument which will tell nessusd in which
+   language the data passed is. 
+   Those functions can be called several times, with a 
+   different 'language' argument each time.
+   
+   The 'language' argument must be NULL for english (default),
+   or must contain the same name as in nessusd.conf.
+   ("deutsch", "francais", and so on...)
+   
+   The NULL language must be called LAST !
+   
+   Here is an exemple :
+   
+   	plug_set_name(env, "Test FTP", "francais");
+   	plug_set_name(env, "FTP check", NULL);
+	
+	
+   
+ 3.1 plugin_init() related functions
+ ----------------------------------------------------------------
+ 
+  3.1.1 plug_set_name()
+  ---------------------------------------------------------------
+    Synopsis :
+    
+     #include <includes.h>
+     void plug_set_name(struct arglist * desc, const char * name,
+     			const char * language);
+     
+    Description :
+    
+     This function tells the server the full name of the plugin. The 
+     name may contain spaces. 
+     
+     The argument 'desc' is the argument which is given to the function
+     plugin_init().
+     
+     This function must only be called during plugin_init().
+
+     
+     See also explained here : 
+       
+       languages (3.0)
+       plugin_init(2.3)
+       
+   3.1.2 plug_set_category
+   ---------------------------------------------------------------
+   
+    Synopsis : 
+    
+     #include <includes.h>
+     void plug_set_category(struct arglist * desc, int category);
+    
+    Description :
+    
+     This function tells the server in which category the plugin is. 
+     The argument 'category' must be one of the following :
+     
+      ACT_GATHER_INFO : the plugin gathers informations about the 
+      		        remote host. No harm is made
+			
+      ACT_ATTACK      : the plugin will attack the remote server and
+      			may steal sensitive data. However, no harm
+			is made : the attacked services are still working 
+			after the plugin has done its job.
+						
+      ACT_DENIAL      : the plugin performs a denial of service attack
+      			against the remote host.
+			
+      ACT_PASSIVE     : the plugin will perform a passive attack. 
+      
+      ACT_SCANNER     : the plugin is actually a port scanner
+      
+     
+    If a plugin is in one of the first three category, then it will be
+    subject to a timeout watchdog on the server side, so even if there
+    is an infinite loop in it, the plugin will not make the server hang.
+    
+    The two other categories are not subject to a timeout watchdog, so
+    you should double check your code when writing one.
+    
+    The argument 'desc' is the argument given as a parameter to the
+    plugin_init() function.
+    
+    This function must only be called during the plugin_init() function.
+    
+    
+   See also explained here :
+   
+     plugin_init(2.3)
+     
+     
+  3.1.3 plug_set_family
+  ---------------------------------------------------------------  
+    Synopsis :
+    
+      #include <includes.h>
+      void plug_set_family(struct arglist * desc,
+      			   const char * family,
+			   const char * name);
+      
+    Description :
+    
+     This function tells the Nessus server the family of the plugin. 
+     
+     The family name should be one of the existing family name 
+     ("CGI abuses", "Sendmail", and so on...), but you are free to
+     create your own family ("Joe's factory plugins").
+     
+     The argument 'family' contains the family name.
+     The argument 'desc' is the argument given as a parameter to 
+     plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   See also explained here :
+   
+     languages(3.0)
+     plugin_init(2.3)
+     
+  3.1.4 plug_set_description
+  ---------------------------------------------------------------
+    Synopsis : 
+     
+     #include <includes.h>
+     void plug_set_description(struct arglist * desc,
+     			       const char * description,
+			       const char * language);
+     
+     
+    Description :
+    
+     This function sends the complete description of what the plugin does
+     to the Nessus server, which will in turn send it to the Nessus client
+     which will display it to the end user. So, 'description' should contain
+     a full description of what the plugin does. The string may contain
+     new lines.
+     The argument 'desc' is the argument given as a parameter to 
+     plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   See also explained here :
+   
+     languages(3.0)
+     plugin_init(2.3)
+     
+     
+  3.1.5 plug_set_summary
+  ---------------------------------------------------------------
+    Synopsis :
+    
+     #include <includes.h>
+     void plug_set_summary(struct arglist * desc, 
+     			  const char * summary,
+			  const char * language);
+     
+    Description :
+    
+     This function sends a summary of what the plugin does to the Nessus
+     server, which will in turn send it to the Nessus client which will 
+     display it as tooltips which shortly explains what the plugin does.
+     
+     It should NOT contain newlines, and should be as short as possible.
+     
+     The argument 'desc' is the argument given as a parameter to 
+     plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   See also explained here :
+   
+     languages(3.0)
+     plugin_init(2.3)
+               
+	       
+  3.1.6 plug_set_copyright
+  ---------------------------------------------------------------
+   Synopsis :
+   
+    #include <includes.h>
+    void plug_set_copyright(struct arglist * desc, 
+    		            const char * author,
+    			    const char * language);
+    
+   Description :
+   
+    This function tells to the Nessus server who made the plugin, so that
+    the Nessus client can show it.
+    
+    The argument 'author' should contain your name
+    
+    The argument 'desc' is the argument given as a parameter to 
+    plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   See also explained here :
+   
+     languages(3.0)
+     plugin_init(2.3)
+     
+     
+ 3.2 plugin additional functions
+ ----------------------------------------------------------------
+ 
+  3.2.1 plug_set_timeout
+  ---------------------------------------------------------------
+   Synopsis :
+   
+    #include <includes.h>
+    void plug_set_timeout(struct arglist * desc, int timeout);
+   
+   Description :
+   
+     When a plugin is one of ACT_GATHER_INFO, ACT_ATTACK or ACT_DENIAL,
+     the Nessus server sets up a watchdog which waits for PLUGIN_TIMEOUT
+     seconds before killing the plugin. 
+     This function allows your plugin to extend or to reduce the time you
+     want your plugin to run.
+     
+     'timeout' is the new timeout limit for the plugin, in seconds.
+     
+     The argument 'desc' is the argument given as a parameter to 
+     plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   See also explained here :
+   
+     plugin_init(2.3)
+   
+  3.2.2 plug_set_dep
+  ---------------------------------------------------------------
+   Synopsis :
+    
+    #include <includes.h>
+    void plug_set_dep(struct arglist * desc, 
+    		      const char * dependencie);
+    
+   Description :
+   
+     This function tells the Nessus server that you want your plugin to
+     be launched AFTER the plugin 'dependencie'. 
+     The argument 'dependencie' is the *file name* of the plugin you want to
+     be launched before (ie: 'portmap.nes').
+     
+     This function is useful when you deal with plugins intercommunication.
+     
+     The argument 'desc' is the argument given as a parameter to 
+     plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   Note :
+   
+   
+     . If a plugin has multiple dependencies, it may call this function
+       several times, because all the dependencies will be 
+       stored
+     
+     . circular dependencies are not handled, so be sure to test which 
+       plugin depends on which.
+    
+    
+   See also explained here :
+   
+     plugin_init(2.3)
+     
+     
+  3.2.3 add_plugin_preference
+  ---------------------------------------------------------------
+    Synopsis : 
+    
+     #include <includes.h>
+     void add_plugin_preference(struct arglist * desc, 
+     				const char * preference_name,
+				const char * type,
+				const char * default_value);
+
+    Description  :
+    
+     This function will tell to the Nessus server that the plugin
+     must ask something directly to the user. The Nessus server will
+     forward this request to the client which will draw a dialog box
+     regarding your plugin.
+     
+     This does not mean interactive communication with the user, but 
+     additional preferences that must be set by the client.
+     
+     An application for this feature would be password cracking program
+     which would ask the location of a dictionary file to the user.
+     
+     + preference_name : is the name that will appear on the client side
+     		       	 for the preference (for instance : 'wordlist location')
+     + type 	       : is one of the following :
+     
+     			PREF_ENTRY
+			PREF_CHECKBOX	
+		 	PREF_RADIO	
+			
+      + default_value  : depends of the value of 'type'.
+      
+      
+      This needs to be explained :
+      
+      PREF_ENTRY    : the client will create a field where the user
+      		      can enter data. This is what you will use
+		      if you want the user to give you the location
+		      of a file. 
+		     
+		      If this is the type you choose, then 'value' will
+		      be the default value inserted in the text area.
+		   
+      PREF_CHECKBOX:  the client will create a checkable box where
+       		      that the user will activate or deactivate.
+		      This is mainly useful for boolean questions.
+		      
+		      If this is the type you choose, then 'value' will
+		      have to be either 'yes' (box checked) or 'no'
+		      (box not checked)
+
+      PREF_RADIO   :  the client will create a set of radio buttons,
+      		      and the user will only select one value among
+		      the multiple ones.
+       	              
+		      If this is the type you choose, then 'value' will
+		      be a list of semicolumn-separated differents value.
+		      ie : "low;medium;high"
+		      
+		      Only one of these words will be returned to the
+		      plugin via the get_plugin_preference() function.
+		      
+      		      
+     The argument 'desc' is the argument given as a parameter to 
+     plugin_init().
+     
+     This function must only be called during the plugin_init() function.
+     
+   Note :
+   
+     You should use wise default values, because not all Nessus clients
+     pay attention to the plugins preferences.
+     
+     This function has a different name from the other plugins-related
+     functions (plug_*). This is because of the implementation 
+     of this function which modifies the Nessus server global
+     preferences, whereas the other plug_* functions only modify
+     the structure 'desc'.
+     
+   See also explained here :
+   
+     plugin_init(2.3)    
+     get_plugin_preference(3.2.4)
+     
+   3.2.4 get_plugin_preference	
+   ---------------------------------------------------------------
+    Synopsis : 
+    
+     #include <includes.h>
+     char * get_plugin_preference(struct arglist * desc, 
+     				  const char *	preference_name);
+
+    Description :
+    
+      Returns the value that was entered by the user for 
+      a preference defined via add_plugin_preference()
+      
+      The argument 'preference_name' must be the exact same
+      name as the one used in add_plugin_preference()
+      
+      The argument 'desc' is the argument given as a parameter to 
+      plugin_run().
+     
+      This function must only be called during the plugin_run() function,
+      or in one of the functions called by this function.
+     
+     Note :
+   
+      Not all Nessus clients pay attention to the plugins preferences,
+      to the value returned by get_plugin_preference() may be the
+      default value you declared in add_plugin_preference()
+     
+      This function has a different name from the other plugins-related
+      functions (plug_*). This is because of the implementation 
+      of this function which modifies the Nessus server global
+      preferences, whereas the other plug_* functions only modify
+      the structure 'desc'.
+    
+    See also explained here :
+   
+     plugin_init(2.3)    
+     add_plugin_preference(3.2.3)
+    
+    
+   	   		 		    
+ 3.3 Target informations
+ ----------------------------------------------------------------
+ 
+  3.3.1 plug_get_hostname()
+  ---------------------------------------------------------------
+   Synopsis :
+   
+    #include <includes.h>
+    const char * plug_get_hostname(struct arglist * desc);
+    
+   Description :
+   
+    Returns the name of the host being attacked. 
+    
+    'desc' is the argument given as a parameter to the function
+    plugin_run().
+    
+   See also explained here :
+   
+     plug_get_host_ip(3.3.2)
+     
+   
+  3.3.2 plug_get_host_ip()
+  ---------------------------------------------------------------
+   Synopsis :
+   
+    #include <includes.h>
+    struct in_addr * plug_get_host_ip(struct arglist * desc);
+    
+   Description :
+   
+    Returns a pointer to the IP of the host being attacked. 
+    
+    'desc' is the argument given as a parameter to the function
+    plugin_run().
+    
+   See also explained here :
+   
+     plug_get_hostname(3.3.1)
+     
+  3.3.3 plug_get_host_open_port()
+  ---------------------------------------------------------------
+  
+   Synopsis :
+   
+    #include <includes.h>
+    unsigned int plug_get_host_open_port(struct arglist * desc);
+    
+   Description :
+   
+    Returns the number of a port which is opened on the remote host.
+    'desc' is the argument given as a parameter to the function
+    plugin_run()
+    
+   Returns :
+   
+      The first open port of the remote host
+   or 0 if there is no open port.
+   
+   Notes :
+   
+     This function really attempts to connect to the remote port,
+   so you don't need to double-check its results
+   
+      
+  3.3.4 host_get_port_state()
+  ---------------------------------------------------------------
+   Synopsis :
+   
+    #include <includes.h>
+    int host_get_port_state(struct arglist * desc, unsigned int port);
+    
+   Description :
+   
+    Returns the status of the tcp port 'port'. 
+    
+    'desc' is the argument given as a parameter to the function
+    plugin_run().
+   
+   Returns :
+   
+    1 if the port is open
+    0 if the port is closed
+    
+   Note :
+   
+    You should pay an extreme attention to this function. In fact,
+    it relies on the port scan to determine whether a port is open
+    or not, and the port you are asking for may or may not be
+    in the scanned range of port. 
+    
+    If the server has not scanned the port, then it is said to be
+    open, so you should use this function as :
+    
+    If host_get_port_state() = 0, then we know that the port is closed
+    If host_get_port_state() is NOT 0, then the port MAY be open, but
+    you should double-check this one.
+    
+       
+ 3.4 network operations
+ ----------------------------------------------------------------
+ 
+  3.4.1  open_sock_tcp()
+  ---------------------------------------------------------------
+   Synopsis :
+   
+     #include <includes.h>
+     int open_sock_tcp(struct arglist * desc, unsigned int port);
+     
+   Description :
+   
+     This function opens a socket and establishes the connection to
+     the remote host port 'port'.   
+     'desc' is the argument given as a parameter to the function
+      plugin_run().
+      
+   Returns : 
+      . -1 if an error occured
+      . a valid socket fd if no error occured
+      
+      
+    3.4.2  recv_line()
+    ---------------------------------------------------------------
+    
+    Synopsis :
+    
+      #include <includes.h>
+      void recv_line(int soc, char * buffer, size_t buffer_size);
+      
+     Description :
+     
+      This function reads the data which is waiting on the socket
+      'soc' until a newline ('\n') is encountered or until the
+      size of the data read is equals to buffer_size.
+      
+      'buffer' : is a buffer which will contain the data read
+      'buffer_size' : is the size of 'buffer'
+      
+    Note :
+      This function does not handle timeouts. So if there is no data
+      to read this function will hang. 
+      If you do not know whether there is data waiting or not, use
+      select(2).
+       
+   3.4.3  ftp_log_in()
+   --------------------------------------------------------------- 
+    Synopsis :
+    
+      #include <includes.h>
+      int ftp_log_in(int soc, char * username, char * password);
+      
+    Description :
+    
+      This function logs into the remote FTP server as 'username/password'.
+      
+      'soc' : is a freshly open socket to the remote FTP port (21)
+      
+    Returns :
+     
+       . 1 if an error occured (could not log in)
+       . 0 if we could log in
+       
+    Notes :
+       If you want to connect anonymously, 'username' should be
+       set to 'ftp' and password to 'joe@'
+          
+    See also explained here :
+   
+     open_sock_tcp(3.4.1)
+     ftp_get_pasv_address(3.4.3) 
+      
+    3.4.4  ftp_get_pasv_address()
+    ---------------------------------------------------------------
+     Synopsis :
+        
+	 #include <includes.h>
+	 int ftp_get_pasv_address(int soc, struct sockaddr_in * sockaddr);
+	 
+     Description :
+     
+      This function issues the 'PASV' command, parses the result and
+      stores it in 'sockaddr'.
+      'soc' : is a socket connected to a FTP server we log into.
+      
+      This is useful to connect to the data stream of a FTP server.
+      
+     Returns : 
+     
+       . 1 if an error occured
+       . 0 in case of success
+       
+      See also explained here :
+   
+       open_sock_tcp(3.4.1)
+       ftp_log_in(3.4.2) 
+      
+    3.4.5  is_cgi_installed()
+    ---------------------------------------------------------------
+      Synopsis :
+      
+        #include <includes.h>
+	int is_cgi_installed(struct arglist * desc, const char* cgi_name);
+	
+      Description :
+      
+        This function determines whether the cgi 'cgi_name' is installed.
+	If cgi_name does not start with '/', then this function will
+	look in /cgi-bin/, or else it will assume that you give the 
+	full path to the cgi.
+	
+        'desc' is the argument given as a parameter to the function
+        plugin_run().
+
+
+      Note :
+         
+	 Only nessus-alpha2 and newer makes a distinction about
+	 whether the cgi_name starts by a '/' or not.
+	 
+	 The older versions check everything in /cgi-bin/
+	 	 
+      Returns : 
+      
+        . 0 if the cgi is not installed
+	. 1 if it is
+	
+    3.4.6  ping_host()
+    ---------------------------------------------------------------
+       Synopsis :
+       
+         #include <includes.h>
+	 int ping_host(struct in_addr host);
+	 
+       Description :
+       
+         This function sends an ICMP echo query to the remote host, 
+	 (several times in fact) and waits for an answer.
+	 
+       Returns :
+      
+          1 if the host is alive (replied)
+	  0 if it is not
+	  
+       Note :
+       
+         Using this function is not a good idea since many host do not
+	 reply to ICMP ECHO queries any more. You should use tcp_ping_host()
+	 instead.
+	 
+       See also : 
+       
+         tcp_ping_host(3.4.7)
+	    
+    3.4.7  tcp_ping_host()
+    ---------------------------------------------------------------	
+	Synopsis :
+	
+	   #include <includes.h>
+	   #include <nessusraw.h>
+	   
+	   int tcp_ping_host(struct in_addr host);
+	   
+	Description :
+	
+	    This function will send two TCP packets to the remote host :
+	    one with the TH_SYN and TH_ACK flags set, and if the does not
+	    reply, one with the TH_FIN flag set. If the remote host
+	    replies to one of these packets, then it is alive.
+	    
+	    This functions puts the interface between localhost and 
+	    the remote host in promisc. mode, so that if any traffic
+	    coming from the remote host is intercepted before it answers
+	    our TCP packets, they will be considered as alive.
+	   
+	 Returns :
+	 
+	     1 if the remote host is alive (replied or traffic coming from
+	       it has been sniffed)
+	       
+	     0 if it is not (no answer)
+	     
+	 Note :
+	 
+	    Your plugin must be linked against the libpcap-nessus to use
+	    this function, as tcp_ping_host() is defined in it.      
+	    
+    3.4.8 tcp_timing()
+    ---------------------------------------------------------------	    
+	
+	Synopsis :
+	
+	  #include <includes.h>
+	  #include <nessusraw.h>
+	  
+	 long tcp_timing(struct in_addr host, int num_probes, int port);
+	
+        Description :
+       
+          This function returns the average TCP response time of the remote
+	host when sending SYN packets to the port <port>.
+	
+	This function is mainly used to determine whether the CPU of
+	the remote host has jumped to 100% or not (you mesure the
+	variation of the response time between before and after an
+	attack).
+	
+	Returns :
+	
+	  -1 if an error occured
+	  0  if the host is the local host
+	  The average reponse time, in ms, of the remote host
+	  
+	Notes :
+	
+	  You must link your plugin against the libpcap-nessus to use
+	 this function.
+	 
+	  This function will wait for each answer during 800 ms, no more.
+	 
+	   
+ 3.5 plugins inter communication (PIIC)     
+ ----------------------------------------------------------------
+ 
+   3.5.1 Introduction
+   --------------------------------------------------------------
+    There is some need for the plugins to share their results. For instance,
+    the 'portmap.nes' plugin will check wether portmap is installed, and
+    some other plugins will be able to perform portmap-related functions
+    because they know that portmap is installed.
+    
+    This avoids the redundancy of test, speeds up on the overall, and
+    make the attacks smarter.
+    
+    Currently, the communication is done via 'keys' : you give the key
+    a name, and another plugin can call it.
+    
+    The keys are only shared between the plugins that are attacking
+    the same host.
+    
+  3.5.2 plug_set_key()
+  --------------------------------------------------------------
+    Synopsis :
+    
+     void plug_set_key(struct arglist * desc,
+     		       char * name,
+		       int type,
+		       void * value);
+	
+     Description :
+     
+       Creates a new key which can be accessed by other plugins attacking
+       the same host.
+       
+       'desc' is the argument given as a parameter to the function
+        plugin_run().
+	
+       'name' is the name you will give to your key. 
+       Currently, the names have the syntax : 
+        service/name
+       (like : 'nis/domain') 
+       
+       But the function doesn't regard this kind of thing, so you are
+       allowed to call it whatever you want (the name must not include
+       a newline though)
+       
+       'type' must be set to ARG_STRING which is the only data
+       format which is currently working. This is being worked on
+       though.
+       
+       'value' is the data you want to set (typically, a pointer to a string)
+       It must not contain newlines.
+   
+     Notes :
+        
+      . This function will be modified soon to accept other data formats
+        and to accept that strings may contain newlines.
+       
+      . strlen(name) + strlen(value) must be less than 500 chars
+       
+      . When you call plug_get_key(), you send a message to 
+        the nessus server which will send it in turn to the other
+	plugins when they are being launched. So, if you call
+	plug_set_key(..., "foo", ....) and then plug_get_key(...., "foo"),
+	plug_get_key() will not return the value you defined with
+	plug_set_key()
+	
+	
+    3.5.3 plug_get_key()
+    --------------------------------------------------------------
+    Synopsis :
+    
+     void * plug_set_key(struct arglist * desc,
+     		       char * name);
+	
+    Description :
+     
+      Returns the value of the key 'name'.
+      Returns NULL if the key was not defined or was set to 0
+      
+      
+   3.5.4 Standard keys
+   --------------------------------------------------------------
+     Several plugins define the following keys. Note that you
+     must call plug_set_dep() if you want to use them, because
+     if you do not, your plugin may be launched before the plugin
+     which will set the key you are interested in.
+     
+     Key        : "OperatingSystem"
+     Defined in : "queso.nes"
+     Type	: ARG_STRING
+     Value      : name of the remote operating system
+     
+     
+     Key 	: "OperatingSystemVersion" 
+     Defined in : "queso.nes"
+     Type	: ARG_STRING
+     Value 	: version of the remote OS
+     
+     Key        : "ftp/anonymous_access"
+     Defined in : "ftp_anonymous.nes"
+     Type	: ARG_STRING
+     Value      : "yes" if the remote FTP server accepts anonymous
+     		  logins, "no" if it does not
+	
+     Key	: "ftp/writeable_dir"
+     Defined in : "ftp_write_dirs.nes"
+     Type	: ARG_STRING
+     Value 	: NULL if there is no anonymous-writeable directory
+     		  or the name of a writeable directory on the remote
+		  side.
+		  
+     Key	: "ftp/writeable_root"
+     Defined in : "ftp_root.nes"
+     Type	: ARG_INT
+     Value 	: 1 if the remote root directory is writeable when
+     		  logged in anonymously
+		  
+		  	  		  
+     Key   	:  "rpc/portmapper"
+     Defined in :  "portmap.nes"
+     Type	: ARG_STRING
+     Value	:  "yes" if the remote host has an accessible portmapper
+     		   "no" if it does not
+		   
+     Key	: "Services/ftp"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a FTP server is listenning
+     		  (not always 21). Set as an integer
+		  
+     Key	: "Services/www"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a HTTP server is listenning
+     		  (not always 80). Set as an integer
+		  
+     Key  	: "Services/ssh"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a SSH server is listenning
+     		  (not always 22). Set as an integer	  		  	 	  
+    
+     Key  	: "Services/smtp"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a SMTP server is listenning
+     		  (not always 25). Set as an integer		
+     
+     Key  	: "Services/http_proxy"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a HTTP proxy server is 
+     		  listenning (not always 3128). Set as an integer
+     
+     Key	: "Services/pop2"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a POP2 server is 
+     		  listenning (not always 109). Set as an integer
+     
+     Key	: "Services/pop3"
+     Defined in : "find_service.nes"
+     Type	: ARG_INT
+     Value	: The number of the port on which a POP3 server is 
+     		  listenning (not always 110). Set as an integer
+     
+     
+     
+     
+   3.6 Reporting a problem to the Nessus server
+   ---------------------------------------------------------------
+   
+    3.6.1 post_hole()
+    --------------------------------------------------------------
+     Synopsis :
+     
+       void post_hole(struct arglist * desc, int port, 
+       		      const char * problem);
+		      
+       void post_hole_udp(struct arglist * desc, int port,
+       		      const char * problem);
+		      
+       void proto_post_hole(struct arglist * desc, int port,
+       		      const char * protocol,
+		      const char * problem);
+		      	      	      
+      Description :
+      
+        Sends to the Nessus server the description of a very serious
+	hole.
+	
+	'desc' is the argument given as a parameter to the function
+	plugin_run()
+	
+	'port' is the number of the port affected by the problem.
+	-1 means : 'general' and is used when the problem does not
+	come directly from a given port.
+	
+	'protocol' is the protocol affected by the flow (ie: "tcp",
+	"udp", "icmp")
+	
+	'problem' is the description of the problem, which may contain
+	newlines.
+	
+      Notes :
+      
+        post_hole() is used for TCP related holes
+	
+	post_hole() and post_hole_udp() call the function proto_post_hole
+	
+	If 'problem' is set to NULL, then this function will
+	return the description of the plugin, as registered in
+	plug_set_description(), in the user selected language.
+	
+      See also explained here :
+      
+        post_info(3.6.2)
+	
+	
+   3.6.2 post_info()
+   -------------------------------------------------------------- 
+     Synopsis :
+     
+       void post_info(struct arglist * desc, int port, 
+       		      const char * problem);
+		      
+       void post_info_udp(struct arglist * desc, int port,
+       		      const char * problem);
+		      
+       void proto_post_info(struct arglist * desc, int port,
+       		      const char * protocol,
+		      const char * problem);
+		      	      	      
+      Description :
+      
+        Sends to the Nessus server a warning regarding a service,
+	or a whole protocol.
+	
+	'desc' is the argument given as a parameter to the function
+	plugin_run()
+	
+	'port' is the number of the port affected by the problem.
+	-1 means : 'general' and is used when the problem does not
+	come directly from a given port.
+	
+	'protocol' is the protocol affected by the flow (ie: "tcp",
+	"udp", "icmp")
+	
+	'problem' is the description of the problem, which may contain
+	newlines.
+	
+      Notes :
+      
+        post_info() is used for TCP related warnings
+	
+	post_info() and post_info_udp() call the function proto_post_info
+	
+	If 'problem' is set to NULL, then this function will
+	return the description of the plugin, as registered in
+	plug_set_description(), in the user selected language.
+	
+	
+     See also explained here :
+      
+        post_hole(3.6.1)
+	
+	
+	
+		 
+4. Interfacing a Nessus plugin with the libpcap library
+-----------------------------------------------------------------
+  
+  4.1 Makefile changes
+  --------------------------------------------------------------- 
+   Nessus now includes the libpcap, which is compiled as a shared
+   library called 'libpcap-nessus'. If your plugin needs the libpcap,
+   then its Makefile must be modified :
+   
+   the line :
+   
+   LIBS=-L${rootdir}/libs -lnessus
+   
+   should become :
+   
+   LIBS=-L${rootdir}/libs -lnessus -lpcap-nessus
+   
+   Also, your plugin must make the following include :
+   
+   #include <pcap.h>
+   
+   See the libpcap documentation to learn how to use the libpcap.
+   
+  4.2 libpcap-related Nessus functions	
+  ---------------------------------------------------------------
+  
+    4.2.1 routethrough()
+    -------------------------------------------------------------
+     Synopsis :
+     
+     	char * routethrough(struct in_addr * dest, 
+			    struct in_addr * src);
+
+     Description :
+     
+      	This function returns the name of the interface (eth0, lo0, ...)
+     which will be used to reach the address "dest" going from the
+     address "src" (which is typically the local host IP).
+     
+     Returns :
+     
+        The name of the interface 
+	or
+	NULL if an error occured
+	
+     History :
+     	
+	This function was taken from Fyodor's Nmap, available at
+	http://www.insecure.org/nmap/
+	
+	
+   4.2.2 get_datalink_size()
+   -----------------------------------------------------------------
+      Synopsis :
+      
+      	int get_datalink_size(int datalink);
+
+      Description :
+      
+      	Returns the size of the data link of the interface.
+	
+	datalink is the value returned by pcap_datalink()
+   
+   
+   
+   
+5. A sample plugin commented
+-----------------------------------------------------------------
+
+Here is a typical Nessus plugin, which is pretty stupid. 
+Here is what it does :
+
+ - it makes sure it is run AFTER the plugin portmap.nes
+ - it asks the user whether it should run twice
+ - it checks whether the remote port 21 is open
+ - it attempts to connect anonymously on the remote
+   FTP server
+ - if it succeeds, then it reports that the remote FTP
+   server accepts anonymous connections
+ - it sets a PIIC key indicating whether the remote FTP
+   server accepts anonymous connections, so that the other
+   plugins will not have to attempt to connect if it does not
+   accepts anonymous connections
+   
+
+#include <includes.h> /* include all what we want */
+
+/* 
+ * Since the plugin name, description and so on
+ * may take some lines, I like to define them in the plugin
+ * header
+ *
+ * This will make 
+ 
+#define FR_NAME "plugin d'exemple"
+#define NAME "sample plugin"
+
+#define FR_DESCRIPTION "Ce plugin ne fait rien de\n\
+spécial, il montre seulement comment écrire un plugin"
+
+#define DESCRIPTION "This plugin does nothing\n\
+special, it justs shows how to write a plugin\n"
+#define SUMMARY "does nothing"
+#define FR_SUMMARY "ne fait rien"
+
+#define COPYRIGHT "Renaud Deraison"
+
+
+int 
+plugin_init(desc)
+ struct arglist * desc;
+{
+/*
+ * Required calls
+ */
+ plug_set_name(desc, FR_NAME, "francais");
+ plug_set_name(desc, NAME, NULL);
+ 
+ plug_set_description(desc, FR_DESCRIPTION, "francais");
+ plug_set_description(desc, DESCRIPTION,NULL);
+ 
+ plug_set_summary(desc, FR_SUMMARY, "francais");
+ plug_set_summary(desc, SUMMARY, NULL);
+ 
+ plug_set_copyright(desc, COPYRIGHT,NULL);
+ plug_set_family(desc, "Test", NULL);
+ plug_set_category(desc, ACT_GATHER_INFO);
+
+ /*
+  * We want to be launched after portmap.nes
+  */
+ plug_set_dep(desc, "portmap.nes");
+ /*
+  * And after queso.nes
+  */
+ plug_set_dep(desc, "queso.nes");
+ /* 
+  * We ask the user something
+  */
+ add_plugin_preference(desc, "Run twice", PREF_CHECKBOX, "yes");
+ return(0);
+}
+
+
+int
+plugin_run(desc)
+ struct arglist * desc;
+{
+ /*
+  * This our plugin main entry point
+  */
+ char * run_twice = get_plugin_preference(desc, "Run twice");
+ int soc;
+ int max = 1;
+ int i;
+ if(!strcmp(run_twice, "yes"))max++;
+ 
+ /*
+  * Do our stuff
+  * 
+  * This plugin will just open a FTP connection to the remote host
+  *
+  */
+ for(i=0;i<max;i++)
+ {
+  if(!host_get_port_state(desc, 21))return(0);
+  soc = open_sock_tcp(desc, 21);
+  if(soc < 0)return(0);
+  if(ftp_log_in(desc, "ftp", "joe@"))
+  {
+   /*
+    * The FTP accepts anonymous connections. We set
+    * it as a PIIC key
+    */
+    plug_set_key(desc, "ftp/anonymous_open", ARG_STRING, "yes");
+    
+    /*
+     * Warn that the FTP accepts anonymous connections
+     */
+    post_info(desc, 21, "The remote ftp server\n\
+    accepts anonymous logins");
+   }
+   else plug_set_key(desc, "ftp/anonymous_open", ARG_STRING, "no");
+  }
+  return(0);
+ }
+   	       
+	

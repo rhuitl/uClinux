@@ -1,0 +1,21 @@
+watchdog /dev/watchdog
+setmac -n 1 -f /dev/mtd0 -o 0xc000
+hostname Audiophile
+hwclock --hctosys --utc
+# turn the internal speaker off
+mixer pcm2 0
+insmod lcdtxt
+insmod keypad
+# leave ram0 for the recovery images root FS
+# /bin/expand /etc/ramfs.img /dev/ram0
+/bin/expand /etc/ramfs.img /dev/ram1
+/bin/expand /etc/ramfs.img /dev/ram2
+mount -t proc proc /proc
+mount -t ext2 /dev/ram1 /var
+mount -t ext2 /dev/ram2 /etc/config
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+/bin/flatfsd -r

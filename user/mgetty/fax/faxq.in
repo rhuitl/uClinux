@@ -1,0 +1,156 @@
+#!@SHELL@
+#
+# faxq program 
+#
+# like "lpq" or "mailq", show jobs waiting in the output queue
+#
+# SCCS: $Id: faxq.in,v 4.10 2003/09/25 07:34:14 gert Exp $ Copyright (C) 1994 Gert Doering
+#
+FAX_SPOOL=@FAX_SPOOL@
+FAX_SPOOL_OUT=@FAX_SPOOL_OUT@
+
+#
+# echo program that will accept escapes (bash: "echo -e", sun: /usr/5bin/echo)
+#
+echo="@ECHO@"
+
+#
+# an awk that is not stone-old-brain-dead (that is, not oawk...)
+#
+AWK=@AWK@
+
+#
+# helper program for privileged queue access
+FAXQ_HELPER=@LIBDIR@/faxq-helper
+
+if cd $FAX_SPOOL_OUT 
+then :
+else
+    $echo "cannot chdir to $FAX_SPOOL_OUT..." >&2
+    exit 1
+fi
+
+jobs="*/JOB"
+requeue=""
+changepri=""
+
+while [ -n "$1" ]
+do
+    case $1 in
+	-v) verbose="true" ;;
+	-o) jobs="*/JOB.done" ;;
+	-s) jobs="*/JOB.s*" ;;
+	-a) jobs="*/JOB*" ;;
+	-r) jobs="*/JOB.s*"; requeue="true" ;;
+	-P) if [ -z "$2" -o -z "$3" ] ; then
+		echo "$0: -P needs arguments!" >&2 ; exit 1 ;
+	    fi
+	    jobs="$2/JOB"; changepri="$3" ; shift ; shift
+	    ;;
+	*) cat <<EOF_MSG >&2
+$0: invalid option: $flag
+valid options:
+  -o: show old jobs
+  -s: show suspended jobs
+  -a: show all jobs
+  -v: verbose output
+  -r: restart suspended jobs
+  -P <job> <pri>: change priority of job <job> to <pri>
+EOF_MSG
+	   exit 1 ;;
+    esac
+    shift
+done
+
+jobs=`ls $jobs 2>/dev/null`
+[ -z "$jobs" ] && $echo "no jobs."
+for i in $jobs
+do
+    USER=""; PHONE=""; PAGES=""; MAILTO=""; VERBTO=""; 
+    ACCT=""; INPUT=""; TIME=""; PRI=""; RE=""
+
+    # read jobs using 'tr', remove all quote characters, dollar, and backslash
+    if [ -z "$verbose" ]
+    then
+	eval `tr -d '\042\047\140\134\044\073' <$i | \
+	     $AWK '$1=="user" { printf "USER=%s;", $2 }
+		   $1=="phone" { printf "PHONE=%s;", $2 }
+		   $1=="pages" { printf "PAGES=%d;", NF-1 }
+		   $1=="priority" { printf "PRI=\" pri=%s.\";", $2}' -`
+	$echo "$i: queued by $USER. $PAGES page(s) to $PHONE.$PRI"
+    else
+	eval `tr -d '\042\047\140\134\044\073' <$i | \
+	     $AWK '$1=="user" { printf "USER=%s;", $2 }
+		   $1=="mail"  { printf "MAILTO=\"%s\";", substr( $0, 6 ) }
+		   $1=="phone" { printf "PHONE=%s;", $2 }
+		   $1=="verbose_to" \
+			       { printf "VERBTO=\"%s\";", substr( $0, 12 ) }
+		   $1=="acct_handle" \
+			       { printf "ACCT=\"%s\";", substr( $0, 13 ) }
+		   $1=="input" { printf "INPUT=\"%s\";", substr( $0, 7 ) }
+		   $1=="time"  { printf "TIME=\"%s:%s\";",
+				 substr( $0, 6, 2 ), substr( $0, 8,2 ) }
+		   $1=="subject"{ printf "RE=\"%s\";", substr( $0, 9 ) }
+		   $1=="priority"{ printf "PRI=\"%s\";", $2 }
+		   $1=="pages" { if ( NF==2 ) printf "PAGES=\"%s\";", $2
+				 else if ( NF==3 )
+                                     printf "PAGES=\"%s %s\";", $2, $3
+				 else
+                                     printf "PAGES=\"%s ... %s\";", $2, $NF
+			       }' -`
+	$echo "$i:"
+	$echo "\tQueued by: $USER"
+       if [ -z "$VERBTO" ]
+       then
+	$echo "\t       to: $PHONE"
+       else
+	$echo "\t       to: $VERBTO ($PHONE)"
+       fi
+       test ! -z "$RE" && \
+	$echo "\t       Re: $RE"
+       test ! -z "$MAILTO" && \
+	$echo "\t   E-Mail: $MAILTO"
+       test ! -z "$INPUT" && \
+	$echo "\t    Input: $INPUT"
+	$echo "\t    Pages: $PAGES"
+       test ! -z "$TIME" && \
+	$echo "\tSend time: $TIME"
+       test ! -z "$ACCT" && \
+	$echo "\tAcct info: $ACCT"
+       test ! -z "$PRI" && \
+	$echo "\t Priority: $PRI"
+
+	sed -e '/Status/!d' -e 's/Status/           Status:/' $i
+       if [ -f "$i.locked" ] ; then
+        $echo "\t   Status: LOCKED (being sent right now)"
+       else
+	expr $i : ".*done$" >/dev/null ||
+	$echo "\t   Status: not sent yet"
+       fi
+    fi
+
+# if "changepri", change priority of job
+# TODO - this is currently broken, needs changing over to $FAXQ_HELPER
+    if [ -n "$changepri" ] && expr "$i" : ".*JOB$" >/dev/null
+    then
+	d=`dirname $i`
+	if [ ! -w $d ] ; then
+	    $echo "$i: not owner, can't change priority"
+	else
+	    echo "priority $changepri" >>$i
+	    $echo "Priority changed to $changepri"
+	    touch .queue-changed 2>/dev/null
+	fi
+    fi
+
+# if "requeue", requeue *.suspended-Jobs
+    if [ -n "$requeue" ] && expr "$i" : ".*JOB.s" >/dev/null
+    then
+	d=`dirname $i`
+	$FAXQ_HELPER requeue $d
+    fi
+done
+
+test -n "$verbose" -a -n "$jobs" -a -r faxqueue_done &&
+    $echo "\nLast \`\`faxrunq'' run at: `cat faxqueue_done`"
+

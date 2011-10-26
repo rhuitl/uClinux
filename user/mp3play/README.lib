@@ -1,0 +1,55 @@
+
+	README for MPEG decoder for 68k/ColdFire
+
+
+Revision history:
+
+21-oct-1999: First release with ColdFire support, and under GPL. (Rob Scott)
+
+
+Backround:
+
+After searching the net for a MP3 decoder that wasn't too big, didn't require
+a pentium, and that I could make sense of, I discovered that Stéphane TAVENARD
+had written a 68K based decoder. I was able to convince him that releasing
+the code under GPL would be a good thing, and started porting it to ColdFire.
+The port wasn't too difficult, mostly dealing with the executable size
+limitations of the binfmt loader, and elminating the use of floating point
+for table initialization.
+
+Thanks to Stéphane for making this possible!
+
+Building:
+
+The makefiles are currently set up to build with the uClinux ColdFire tool
+chain. Edit make.common to change the location of the toolchain. Go to
+mpegdec_lib, perform a make, then go to mpegdec_demo and do another make.
+This will result in a coldfire executable. If you wish to build an x86
+version, comment out the ColdFire define the two directories' Makefiles,
+and do a "make clean && make" in both directories. 
+
+Running:
+
+Currently, I copy the mpegdec_demo to the romfs/bin area, and do a make in
+the uClinux directory, to have it included in the boot image. Then I use
+NFS to mount a directory that has the MP3 files.
+
+Performance:
+
+I haven't done accurate timing, but on a 54 MHz 5206e processor, it seems
+that decode is about .5 realtime. On a 90 MHz 5307 processor, it seems
+close to real time. I lack audio output hardware to actually hear the results.
+
+Caveats:
+
+Currently, the mpegdec_demo reads in a fixed amount of data and decodes it.
+It needs to be changed to continuously fill the mpeg data buffer, as the
+decoder empties it.
+
+Todo list:
+
+Changing mpegdec_demo to continuously stream data.
+Translate the existing 68K assembly language routines to ColdFire, in the
+hope that decoding will get to real time on the 5206e.
+
+

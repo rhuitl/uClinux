@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+#	Mount appropriate image from attached storage device.
+#
+echo
+echo "SnapGear loop boot loading..."
+echo
+/bin/mount -t proc proc proc
+
+SGU=""
+if [ -f /boot.cfg ]
+then
+	# Use first entry in the boot.cfg file.
+	SGU=`head -1 /boot.cfg`
+fi
+if [ -z "$SGU" ]
+then
+	# No boot.cfg file list, so find anything we can boot!
+	SGU=`find -name "*.sgu" | head -1`
+fi
+if [ -z "$SGU" ]
+then
+	echo "ERROR: can't find any SGU image to mount?"
+	exit 1
+fi
+
+echo "LOOP: mounting $SGU..."
+
+/bin/mount -o loop $SGU /mnt
+/bin/mount -o remount,rw,commit=1 /
+cd /mnt
+/sbin/pivot_root . sda1
+exec /usr/sbin/chroot . /bin/init

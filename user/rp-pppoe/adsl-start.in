@@ -1,0 +1,161 @@
+#!/bin/sh
+# @configure_input@
+#***********************************************************************
+#
+# adsl-start
+#
+# Shell script to bring up an ADSL connection
+#
+# Copyright (C) 2000 Roaring Penguin Software Inc.
+#
+# $Id: adsl-start.in,v 1.1.1.1 2000-11-17 05:28:41 davidm Exp $
+#
+# This file may be distributed under the terms of the GNU General
+# Public License.
+#
+# Usage: adsl-start [config_file]
+#        adsl-start interface user [config_file]
+# Second form overrides USER and ETH from config file.
+# If config_file is omitted, defaults to /etc/ppp/pppoe.conf
+#
+#***********************************************************************
+
+# From AUTOCONF
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+# Paths to programs
+CONNECT=@sbindir@/adsl-connect
+IFCONFIG=/sbin/ifconfig
+
+# Defaults
+CONFIG=/etc/ppp/pppoe.conf
+USER=""
+ETH=""
+ME=`basename $0`
+# Must be root
+if [ "`id -u`" != 0 ] ; then
+    echo "$ME: You must be root to run this script" >& 2
+    exit 1
+fi
+
+# Debugging
+if [ "$DEBUG" = "1" ] ; then
+    echo "*** Running in debug mode... please be patient..."
+    DEBUG=/tmp/pppoe-debug-$$
+    export DEBUG
+    mkdir $DEBUG
+    if [ "$?" != 0 ] ; then
+	echo "Could not create directory $DEBUG... exiting"
+	exit 1
+    fi
+    DEBUG=$DEBUG/pppoe-debug.txt
+
+    # Initial debug output
+    echo "---------------------------------------------" > $DEBUG
+    date >> $DEBUG
+    echo "Output of uname -a" >> $DEBUG
+    uname -a >> $DEBUG
+    echo "---------------------------------------------" >> $DEBUG
+    echo "Output of ifconfig -a" >> $DEBUG
+    $IFCONFIG -a >> $DEBUG
+    echo "---------------------------------------------" >> $DEBUG
+    if [ "`uname -s`" = "Linux" ] ; then
+	echo "Output of lsmod" >> $DEBUG
+	lsmod >> $DEBUG
+	echo "---------------------------------------------" >> $DEBUG
+    fi
+    echo "Output of netstat -n -r" >> $DEBUG
+    netstat -n -r >> $DEBUG
+    echo "---------------------------------------------" >> $DEBUG
+    echo "Contents of /etc/resolv.conf" >> $DEBUG
+    cat /etc/resolv.conf >> $DEBUG
+    echo "---------------------------------------------" >> $DEBUG
+    echo "Contents of /etc/ppp/options" >> $DEBUG
+    cat /etc/ppp/options >> $DEBUG 2>/dev/null
+    echo "---------------------------------------------" >> $DEBUG
+else
+    DEBUG=""
+fi
+
+# Sort out command-line arguments
+case "$#" in
+    1)
+	CONFIG="$1"
+	;;
+    3)
+	CONFIG="$3"
+	;;
+esac
+
+if [ ! -f "$CONFIG" -o ! -r "$CONFIG" ] ; then
+    echo "$ME: Cannot read configuration file '$CONFIG'" >& 2
+    exit 1
+fi
+
+. $CONFIG
+
+# Check for command-line overriding of ETH and USER
+case "$#" in
+    2|3)
+	ETH="$1"
+	USER="$2"
+	;;
+esac
+
+# Check for pidfile
+if [ -r "$PIDFILE" ] ; then
+    PID=`cat "$PIDFILE"`
+    # Check if still running
+    kill -0 $PID > /dev/null 2>&1
+    if [ $? = 0 ] ; then
+	echo "$ME: There already seems to be an ADSL connection up (PID $PID)" >& 2
+	exit 1
+    fi
+    # Delete bogus PIDFILE
+    rm -f "$PIDFILE" "$PIDFILE.pppd" "$PIDFILE.pppoe"
+fi
+
+# Start the connection in the background unless we're debugging
+if [ "$DEBUG" != "" ] ; then
+    $CONNECT "$@"
+    exit 0
+fi
+
+$CONNECT "$@" > /dev/null 2>&1 &
+CONNECT_PID=$!
+
+if [ "$CONNECT_TIMEOUT" = "" -o "$CONNECT_TIMEOUT" = 0 ] ; then
+    exit 0
+fi
+
+# Don't monitor connection if dial-on-demand
+if [ "$DEMAND" != "" -a "$DEMAND" != "no" ] ; then
+    exit 0
+fi
+
+# Monitor connection
+TIME=0
+while [ true ] ; do
+    @sbindir@/adsl-status $CONFIG > /dev/null 2>&1
+
+    # Looks like the interface came up
+    if [ $? = 0 ] ; then
+	# Print newline if standard input is a TTY
+	tty -s && echo " Connected!"
+	exit 0
+    fi
+
+    tty -s && echo -n "$PING"
+    sleep $CONNECT_POLL
+    TIME=`expr $TIME + $CONNECT_POLL`
+    if [ $TIME -gt $CONNECT_TIMEOUT ] ; then
+	break
+    fi
+done
+
+echo "TIMED OUT"
+# Timed out!  Kill the adsl-connect process and quit
+kill $CONNECT_PID > /dev/null 2>&1
+exit 1
+

@@ -1,0 +1,78 @@
+ChangeLog for hostapd
+
+2004-10-03 - v0.2.5
+	* fixed EAPOL reauthentication to trigger WPA/WPA2 reauthentication
+	* fixed EAPOL state machine to stop if STA is removed during
+	  eapol_sm_step(); this fixes at least one segfault triggering bug with
+	  IEEE 802.11i pre-authentication
+	* fixed an alignment issue that could cause SHA-1 to fail on some
+	  platforms (e.g., Intel ixp425 with a compiler that does not 32-bit
+	  align variables)
+	* fixed RADIUS reconnection after an error in sending interim
+	  accounting packets
+
+2004-07-17 - v0.2.4 (beginning of 0.2.x stable releases)
+	* fixed some accounting cases where Accounting-Start was sent when
+	  IEEE 802.1X port was being deauthorized
+
+2004-06-20 - v0.2.3
+	* modified RADIUS client to re-connect the socket in case of certain
+	  error codes that are generated when a network interface state is
+	  changes (e.g., when IP address changes or the interface is set UP)
+	* fixed couple of cases where EAPOL state for a station was freed
+	  twice causing a segfault for hostapd
+	* fixed couple of bugs in processing WPA deauthentication (freed data
+	  was used)
+
+2004-05-31 - v0.2.2
+	* fixed WPA/WPA2 group rekeying to use key index correctly (GN/GM)
+	* fixed group rekeying to send zero TSC in EAPOL-Key messages to fix
+	  cases where STAs dropped multicast frames as replay attacks
+	* added support for copying RADIUS Attribute 'Class' from
+	  authentication messages into accounting messages
+	* send canned EAP failure if RADIUS server sends Access-Reject without
+	  EAP message (previously, Supplicant was not notified in this case)
+	* fixed mixed WPA-PSK and WPA-EAP mode to work with WPA-PSK (i.e., do
+	  not start EAPOL state machines if the STA selected to use WPA-PSK)
+
+2004-05-06 - v0.2.1
+	* added WPA and IEEE 802.11i/RSN (WPA2) Authenticator functionality
+	  - based on IEEE 802.11i/D10.0 but modified to interoperate with WPA
+	    (i.e., IEEE 802.11i/D3.0)
+	  - supports WPA-only, RSN-only, and mixed WPA/RSN mode
+	  - both WPA-PSK and WPA-RADIUS/EAP are supported
+	  - PMKSA caching and pre-authentication
+	  - new hostapd.conf variables: wpa, wpa_psk, wpa_passphrase,
+	    wpa_key_mgmt, wpa_pairwise, wpa_group_rekey, wpa_gmk_rekey,
+	    rsn_preauth, rsn_preauth_interfaces
+	* fixed interim accounting to remove any pending accounting messages
+	  to the STA before sending a new one
+
+2004-02-15 - v0.2.0
+	* added support for Acct-Interim-Interval:
+	  - draft-ietf-radius-acct-interim-01.txt
+	  - use Acct-Interim-Interval attribute from Access-Accept if local
+	    'radius_acct_interim_interval' is not set
+	  - allow different update intervals for each STA
+	* fixed event loop to call signal handlers only after returning from
+	  the real signal handler
+	* reset sta->timeout_next after successful association to make sure
+	  that the previously registered inactivity timer will not remove the
+	  STA immediately (e.g., if STA deauthenticates and re-associates
+	  before the timer is triggered).
+	* added new hostapd.conf variable, nas_identifier, that can be used to
+	  add an optional RADIUS Attribute, NAS-Identifier, into authentication
+	  and accounting messages
+	* added support for Accounting-On and Accounting-Off messages
+	* fixed accounting session handling to send Accounting-Start only once
+	  per session and not to send Accounting-Stop if the session was not
+	  initialized properly
+	* fixed Accounting-Stop statistics in cases where the message was
+	  previously sent after the kernel entry for the STA (and/or IEEE
+	  802.1X data) was removed
+
+
+Note:
+
+Older changes up to and including v0.1.0 are included in the ChangeLog
+of the Host AP driver.

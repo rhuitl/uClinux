@@ -1,0 +1,31 @@
+--- a/tools/build/v2/tools/gcc.jam
++++ b/tools/build/v2/tools/gcc.jam
+@@ -292,7 +292,7 @@ toolset.flags gcc.compile PCH_FILE <pch>on : <pch-file> ;
+ 
+ # Declare flags and action for compilation.
+ toolset.flags gcc.compile OPTIONS <optimization>off   : -O0 ;
+-toolset.flags gcc.compile OPTIONS <optimization>speed : -O3 ;
++toolset.flags gcc.compile OPTIONS <optimization>speed : ;
+ toolset.flags gcc.compile OPTIONS <optimization>space : -Os ;
+ 
+ toolset.flags gcc.compile OPTIONS <inlining>off  : -fno-inline ;
+@@ -598,7 +598,7 @@ rule init-link-flags ( toolset linker condition )
+         # as opposed to -s since icc (intel's compiler) is generally
+         # option-compatible with and inherits from the gcc toolset, but does not
+         # support -s.
+-        toolset.flags $(toolset).link OPTIONS     $(condition)/<debug-symbols>off : -Wl,--strip-all   : unchecked ;
++        toolset.flags $(toolset).link OPTIONS     $(condition)/<debug-symbols>off :                   : unchecked ;
+         toolset.flags $(toolset).link RPATH       $(condition)                    : <dll-path>        : unchecked ;
+         toolset.flags $(toolset).link RPATH_LINK  $(condition)                    : <xdll-path>       : unchecked ;
+         toolset.flags $(toolset).link START-GROUP $(condition)                    : -Wl,--start-group : unchecked ;
+--- a/tools/jam/src/build.jam
++++ b/tools/jam/src/build.jam
+@@ -176,7 +176,7 @@ toolset darwin cc :  "-o " : -D
+ ## GCC 2.x, 3.x, 4.x
+ toolset gcc gcc : "-o " : -D
+     : -pedantic -fno-strict-aliasing
+-    [ opt --release : [ opt --symbols : -g : -s ] -O3 ]
++    [ opt --release : ]
+     [ opt --debug : -g -O0 -fno-inline ]
+     -I$(--python-include) -I$(--extra-include) -Wno-long-long
+     : -L$(--python-lib[1]) -l$(--python-lib[2]) ;

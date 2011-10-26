@@ -1,0 +1,169 @@
+
+avp Module
+
+Jiri Kuthan
+
+   FhG Fokus
+
+   Copyright © 2004, 2005 FhG FOKUS
+     _________________________________________________________
+
+   Table of Contents
+   1. User's Guide
+
+        1.1. Overview
+        1.2. Dependencies
+        1.3. Exported Parameters
+        1.4. Exported Functions
+
+              1.4.1. set_iattr(attribute,value)
+              1.4.2. flags2attr()
+              1.4.3. set_sattr(attribute,value)
+              1.4.4. uri2attr(attribute)
+              1.4.5. print_sattr(attribute)
+              1.4.6. attr2uri(attribute)
+              1.4.7. is_sattr_set(attribute)
+              1.4.8. avp_exists(attribute, value)
+
+   List of Examples
+   1-1. set_iattr usage
+   1-2. flags2attr usage
+   1-3. set_sattr usage
+   1-4. uri2attr usage
+   1-5. is_sattr_set usage
+     _________________________________________________________
+
+Chapter 1. User's Guide
+
+1.1. Overview
+
+   This module contains several functions that can be used to
+   manipulate the contents of AVPs (Attribute-Value pairs). The
+   AVPs are variables attached to the SIP message being
+   processed. Each variable has its name and value. AVPs can be
+   used to store arbitrary data or as a means of inter-module
+   comminication.
+
+   You may also want to check the avpops module which is more
+   flexible and contains more functions. In future SER releases
+   the avp module will be probably deprecated in favor of avpops
+   module.
+     _________________________________________________________
+
+1.2. Dependencies
+
+   None.
+     _________________________________________________________
+
+1.3. Exported Parameters
+
+   The module exports no parameters.
+     _________________________________________________________
+
+1.4. Exported Functions
+
+1.4.1. set_iattr(attribute,value)
+
+   Create an AVP of type integer.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP to be created.
+     * value - Integer value of the AVP.
+
+   Example 1-1. set_iattr usage
+...
+set_iattr("fr_inv_timer", "60")
+...
+     _________________________________________________________
+
+1.4.2. flags2attr()
+
+   Store the current state of SER flags into AVP called "flags".
+
+   Example 1-2. flags2attr usage
+...
+flags2attr()
+...
+     _________________________________________________________
+
+1.4.3. set_sattr(attribute,value)
+
+   Create an AVP of type string.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP to be created.
+     * value - String value of the AVP.
+
+   Example 1-3. set_sattr usage
+...
+set_sattr("called_number", "1234")
+...
+     _________________________________________________________
+
+1.4.4. uri2attr(attribute)
+
+   Store the Request-URI of the message being processed in an
+   AVP. The new value of the Request-URI will be used if it has
+   been already rewritten by some other function or module.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP.
+
+   Example 1-4. uri2attr usage
+...
+uri2attr("saved_ruri")
+...
+     _________________________________________________________
+
+1.4.5. print_sattr(attribute)
+
+   Print the value of an AVP to syslog.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP.
+     _________________________________________________________
+
+1.4.6. attr2uri(attribute)
+
+   Rewrite the Request-URI of the message being processed with
+   the value of an AVP.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP.
+     _________________________________________________________
+
+1.4.7. is_sattr_set(attribute)
+
+   Test for the existence of AVP with given name. The function
+   returns 1 if given AVP exists and 0 if not.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP.
+
+   Example 1-5. is_sattr_set usage
+...
+if (is_sattr_set("saved_ruri")) {
+  uri2attr("saved_uri");
+} else {
+  rewriteuri("sip:a@iptel.org");
+};
+...
+     _________________________________________________________
+
+1.4.8. avp_exists(attribute, value)
+
+   Test whether an AVP with given name and value exists. The
+   functio returns 1 if the AVP with given name and value exists
+   and 0 if not. The value of the AVP is compared string-wise.
+   The comparison is case sensitive.
+
+   Meaning of the parameter is as follows:
+
+     * attribute - The name of of the AVP.
+     * value - The AVP value to look for.

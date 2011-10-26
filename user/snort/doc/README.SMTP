@@ -1,0 +1,135 @@
+SMTP
+====
+Andrew Mullican <amullican@sourcefire.com>
+Thanks to Dan Roelker <droelker@sourcefire.com>,
+Marc Norton <mnorton@sourcefire.com>, and Steve Sturges
+<ssturges@sourcefire.com> for their help with the design.
+
+-- Overview --
+SMTP is an SMTP decoder for user applications.  Given a data buffer,
+SMTP will decode the buffer and find SMTP commands and responses.
+It will also mark the command, data header data body sections, as well
+as TLS data.
+
+SMTP handles stateless and stateful processing.  It saves state
+between individual packets.  However maintaining correct state is
+dependent on the reassembly of the client side of the stream (ie, a
+loss of coherent stream data results in a loss of state).
+
+-- Configuration --
+SMTP has the usual configuration items, such as port and inspection_type.
+Also, SMTP command lines can be normalized to remove extraneous spaces.
+TLS-encrypted traffic can be ignored, which improves performance.  In addition,
+regular mail data can be ignored for an additional performance boost.  Since
+so few (none in the current snort ruleset) exploits are against mail data,
+this is relatively safe to do and can improve the performance of data
+inspection.
+
+The configuration options are described below:
+
+* ports { port [port] ... } *
+This specifies on what ports to check for SMTP data.  Typically, this will
+include 25 and possibly 465, for encrypted SMTP.
+
+* inspection_type stateful|stateless
+Indicate whether to operate in stateful or stateless mode.
+
+* normalize all|none|cmds *
+This turns on normalization.  Normalization checks for more than one space
+character after a command.  Space characters are defined as space (ASCII 0x20)
+or tab (ASCII 0x09).
+all checks all commands
+none turns off normalization for all commands.
+cmds just checks commands listed with the "normalize_cmds" parameter.
+
+* ignore_data *
+Ignore data section of mail (except for mail headers) when processing rules.
+
+* ignore_tls_data *
+Ignore TLS-encrypted data when processing rules.
+
+* max_command_line_len <int> *
+Alert if an SMTP command line is longer than this value.  Absence of this
+option or a "0" means never alert on command line length.
+RFC 2821 recommends 512 as a maximum command line length.
+
+* max_header_line_len <int> *
+Alert if an SMTP DATA header line is longer than this value.  Absence of this
+option or a "0" means never alert on data header line length.
+RFC 2821 recommends 1024 as a maximum data header line length.
+
+* max_response_line_len <int> *
+Alert if an SMTP response line is longer than this value.  Absence of this
+option or a "0" means never alert on response line length.
+RFC 2821 recommends 512 as a maximum response line length.
+
+* alt_max_command_line_len <int> { <cmd> [<cmd>] }
+Overrides max_command_line_len for specific commands
+
+* no_alerts *
+Turn off all alerts for this preprocessor.
+
+* invalid_cmds { <Space-delimited list of commands> } *
+Alert if this command is sent from client side.
+DEFAULT empty list
+
+* valid_cmds { <Space-delimited list of commands> } *
+List of valid commands.  We do not alert on commands in this list.
+DEFAULT empty list, but preprocessor has this list hard-coded:
+{ ATRN AUTH BDAT DATA DEBUG EHLO EMAL ESAM ESND ESOM ETRN EVFY EXPN }
+{ HELO HELP IDENT MAIL NOOP QUIT RCPT RSET SAML SOML SEND ONEX QUEU }
+{ STARTTLS TICK TIME TURN TURNME VERB VRFY X-EXPS X-LINK2STATE }
+{ XADR XAUTH XCIR XEXCH50 XGEN XLICENSE XQUE XSTA XTRN XUSR  }
+
+* alert_unknown_cmds *
+Alert if we don't recognize command.
+DEFAULT off
+
+* normalize_cmds { <Space-delimited list of commands> } *
+Normalize this list of commands
+DEFAULT { RCPT VRFY EXPN }
+
+* xlink2state { enable/disable drop }
+Enable/disable xlink2state alert
+Drop if alerted
+DEFAULT enable
+
+* print_cmds *
+List all commands understood by the preprocessor.  This not normally
+printed out with the configuration because it prints so much data.
+
+Example:
+preprocessor SMTP: \
+  ports { 25 } \
+  inspection_type stateful \
+  normalize cmds \
+  normalize_cmds { EXPN VRFY RCPT } \
+  ignore_data \
+  ignore_tls_data \
+  max_command_line_len  512 \
+  max_header_line_len   1024 \
+  max_response_line_len 512 \
+  no_alerts \
+  alt_max_command_line_len 300 { RCPT } \
+  invalid_cmds { } \
+  valid_cmds { } \
+  xlink2state disable \
+  print_cmds
+
+Default:
+preprocessor SMTP: \
+  ports { 25 } \
+  inspection_type stateful \
+  normalize cmds \
+  normalize_cmds { EXPN VRFY RCPT } \
+  alt_max_command_line_len 260 { MAIL } \
+  alt_max_command_line_len 300 { RCPT } \
+  alt_max_command_line_len 500 { HELP HELO ETRN } \
+  alt_max_command_line_len 255 { EXPN VRFY }
+
+Notes:
+"RCPT TO:" and "MAIL FROM:" are SMTP commands.  For the preprocessor
+configuration, they are referred to as RCPT and MAIL, respectively.
+Within the code, the preprocessor actually maps RCPT and MAIL to the
+correct command name.
+

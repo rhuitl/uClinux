@@ -1,0 +1,2089 @@
+diff -ruN ppp-2.2.0g/README.tacacs ppp-2.2.0g.tacacs/README.tacacs
+--- ppp-2.2.0g/README.tacacs	Thu Jan  1 01:00:00 1970
++++ ppp-2.2.0g.tacacs/README.tacacs	Mon Feb 16 18:52:45 1998
+@@ -0,0 +1,124 @@
++
++                          TACACS+ support for pppd
++                                      
++   
++    Copyright 1997 by Pawel Krawczyk <kravietz@ceti.com.pl>
++    
++                           Distributed under GPL
++                                      
++Introduction
++
++   This module supports subset of TACACS+ functions allowing a Linux
++   dialup server to authenticate, authorize and account users on remote
++   authentication server. This includes:
++   
++     * PAP authentication
++     * authorization for IP protocol
++     * accounting of PPP session beginning and end
++       
++   All above functions are performed from within pppd program with
++   username and password passed with PPP protocol. In addition, there is
++   standalone TACACS+ client program - tacc, which can be used as
++   replacement for login program in getty style dialup server programs.
++   
++Installation
++
++    1. Download the distribution:
++       http://ceti.com.pl/~kravietz/progs/tacc-1.5.tar.gz
++    2. Download and original pppd sources. This program was developed on
++       version 2.2.0g. You can find pppd sources on local sunsite.unc.edu
++       mirror.
++    3. Compile tacc, by entering tacc-1.5 subdirectory and typing make.
++    4. Apply the patch to pppd source tree:
++
++        patch -p0 <pppd-tacacs.patch
++    5. Configure pppd sources as described in INSTALL file.
++    6. Run make in pppd subdirectory, with the following extra
++       parameters:
++       
++        USE_TACACS_PLUS=1
++                to actually compile pppd with TACACS+ support
++                
++        USE_BIND8=1
++                if your are using BIND 8.x; this is a small workaround to
++                use old functions from libc; if you don't use BIND 8.x,
++                simply omit this parameter
++                
++    7. You should now have two programs: tacc and pppd. You should
++       install them in appropriate directory and configure your dialup
++       server to actually use them. The following is example of my
++       /etc/mgetty/login.conf:
++
++/AutoPPP/ -     autoppp /usr/sbin/pppd auth -chap +pap tacacs debug -detach
++*         -     @       /usr/local/sbin/tacc @
++
++    8. Configure your TACACS+ server. You can get it from
++       ftp://ftpeng.cisco.com/pub/tacacs/. Following options are
++       necessary in tac_plus configuration file:
++       
++        default authentication = file filename
++                passwd(5) file; use /etc/passwd even if you have shadow
++                passwords suite installed
++                
++        key = "string"
++                key used to encrypt TACACS+ packets over the network
++                
++        user = DEFAULT { default service = permit }
++                permit all valid and authenticated users to use PPP
++                
++       For more details about configuring TACACS+ server refer to
++       users_guide in the server distribution.
++    9. To enable TACACS+ authentication in pppd use the following options
++       in /etc/ppp/options file:
++       
++        tacacs-server aaa.bbb.ccc.ddd
++                TACACS+ server IP address (multiple allowed)
++                
++        tacacs-secret string
++                key used to encrypt TACACS+ packets over the network;
++                should be same as the key defined on TACACS+ server
++                
++        -tacacs-encryption
++                send packets cleartext; this is for debugging only, do
++                not use in real operations
++                
++        tacacs-accounting
++                if you want pppd to send TACACS+ accounting packets to
++                the server; currently it includes only start and stop
++                messages
++                
++        tacacs-authorize
++                if you want pppd to request authorization for use of PPP
++                for already authenticated user; currently this is limited
++                to service PPP and protocol IP
++                
++   10. When running pppd (probably from mgetty or similiar software), add
++       tacacs option, e.g.:
++
++        /usr/sbin/pppd auth +pap -chap tacacs
++
++   Note that since current version you should use tacacs option instead
++       of previous login! This option tell pppd to actually use TACACS+
++       functions.
++   11. Test if this works. If not, that's probably because keys on
++       authentication and dialup servers are different. tacc can be used
++       to test if the TACACS+ server is working correctly:
++
++        $ tacc -TRA -u user -p pass -s localhost -k 'secret key' -w
++        Authentication OK
++        Authorization OK: Service granted.
++        Accounting: START ok
++        Accounting: STOP ok
++        $ _
++       In case of problems recompiling auth_tac.c with -DDEBUGTAC will
++       cause every TACACS+ function report its progress and errors to
++       syslog. I'll appreciate such log file very much if you send me a
++       bug report.
++       
++                                     tacc
++                                       
++   tacc documentation was moved to manual page. It was also extended ;)
++     _________________________________________________________________
++   
++   Latest versions of this patch can be found on:
++   http://www.ceti.com.pl/~kravietz/progs/tacacs.html
+diff -ruN ppp-2.2.0g/pppd/ChangeLog.tacacs ppp-2.2.0g.tacacs/pppd/ChangeLog.tacacs
+--- ppp-2.2.0g/pppd/ChangeLog.tacacs	Thu Jan  1 01:00:00 1970
++++ ppp-2.2.0g.tacacs/pppd/ChangeLog.tacacs	Mon Feb 16 18:05:13 1998
+@@ -0,0 +1,31 @@
++1.5
++* Many changes in `tacc', mostly in user interface
++* 'tacc' is no longer distributed as patch to pppd
++
++1.4
++* Added more TACACS+ accounting attributes
++* Fixed some bugs in accounting
++* Functions now return server messages 
++* Accounting and authorization now work both for IP and IPX
++* Multiple TACACS+ servers may be defined
++* Major changes in the way of handling TACACS+ AAA 
++
++1.3
++* Added simple TACACS+ accounting
++* New options for pppd to enable TACACS+, authorization and accounting
++* TACACS+ procedures are no longer called from login() function 
++* Minor fixes in tacc.c and auth_tac.c
++
++1.2
++* Changed names of some internal functions (prepending "_")
++* tac_send and tac_read functions now accept file descriptor on input
++* _tac_crypt() was rewritten to be more RFC compliant
++* New function _tac_header()
++
++1.1
++* Added `tacc' client
++
++1.0
++* First working version, basic TACACS+ PAP authentication
++  on top of login() function
++
+diff -ruN ppp-2.2.0g/pppd/Makefile.linux ppp-2.2.0g.tacacs/pppd/Makefile.linux
+--- ppp-2.2.0g/pppd/Makefile.linux	Thu Feb  5 13:34:39 1998
++++ ppp-2.2.0g.tacacs/pppd/Makefile.linux	Mon Feb 16 18:10:58 1998
+@@ -20,18 +20,32 @@
+ HEADERS := $(HEADERS) .depend
+ endif
+ 
+-# CC = gcc
+-DEBUG_FLAGS = -DDEBUGALL
++CC = gcc
++#DEBUG_FLAGS = -DDEBUGTAC
+ COMPILE_FLAGS = -D_linux_=1 -DHAVE_PATHS_H
+-COPTS = -O2 # -g
++#COPTS = -Wall -ggdb3
++COPTS = -O2
+ VER = 2.2.0
+-LIBS = -lbsd -lbind -L/usr/local/lib
++LIBS = -lbsd
+ 
+ CFLAGS= $(COPTS) $(DEBUG_FLAGS) $(COMPILE_FLAGS)
+ SOURCE= RELNOTES Makefile.linux $(PPPDSRCS) $(HEADERS) $(MANPAGES)
+ 
+ ifdef USE_MS_DNS
+ CFLAGS   += -DUSE_MS_DNS=1
++endif
++
++ifdef USE_TACACS_PLUS
++CFLAGS   += -DUSE_TACACS_PLUS=1
++PPPDSRCS += auth_tac.c
++HEADERS  += auth_tac.h
++PPPDOBJS += auth_tac.o
++endif
++
++ifdef USE_BIND8
++# this really doesn't make use of BIND8
++# it's workaround to use old BIND4 functions from libc
++CFLAGS   += -D__inet_addr=inet_addr -D__inet_aton=inet_aton -D__inet_ntoa=inet_ntoa
+ endif
+ 
+ ifdef IPX_CHANGE
+diff -ruN ppp-2.2.0g/pppd/auth.c ppp-2.2.0g.tacacs/pppd/auth.c
+--- ppp-2.2.0g/pppd/auth.c	Fri Mar 15 18:19:48 1996
++++ ppp-2.2.0g.tacacs/pppd/auth.c	Wed Feb 11 15:19:31 1998
+@@ -48,6 +48,7 @@
+ #include <netdb.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++#include <linux/if_ppp.h>
+ 
+ #ifdef HAS_SHADOW
+ #include <shadow.h>
+@@ -66,6 +67,14 @@
+ #include "ccp.h"
+ #include "pathnames.h"
+ 
++#ifdef USE_TACACS_PLUS
++#include "tacplus.h"
++#include "auth_tac.h"
++int task_id; 			/* task identifier for accounting */
++char *tac_username; 		/* storage between tac_login() and logout()
++				   also IPCP and IPXCP use this */
++#endif
++
+ #if defined(sun) && defined(sparc)
+ #include <alloca.h>
+ #endif /*sparc*/
+@@ -397,16 +406,23 @@
+     ret = UPAP_AUTHACK;
+     f = fopen(filename, "r");
+     if (f == NULL) {
+-	if (!uselogin) {
++	if (!uselogin
++#ifdef USE_TACACS_PLUS
++		&& !usetacacs
++#endif
++ 	) {
+ 	    syslog(LOG_ERR, "Can't open PAP password file %s: %m", filename);
+ 	    ret = UPAP_AUTHNAK;
+ 	}
+-    } else {
++    } 
++
++    else {
+ 	check_access(f, filename);
+ 	if (scan_authfile(f, user, our_name, secret, &addrs, filename) < 0
+ 	    || (secret[0] != 0 && (cryptpap || strcmp(passwd, secret) != 0)
+ 		&& strcmp(crypt(passwd, secret), secret) != 0)) {
+-	    syslog(LOG_WARNING, "PAP authentication failure for %s", user);
++	    syslog(LOG_WARNING, "PAP authfile authentication failure for %s",
++									user);
+ 	    ret = UPAP_AUTHNAK;
+ 	}
+ 	fclose(f);
+@@ -419,6 +435,17 @@
+ 	}
+     }
+ 
++#if 0 /* currently obsolete, call to tac_login was moved to upap.c */
++#ifdef USE_TACACS_PLUS
++    if(usetacacs && ret == UPAP_AUTHACK) {
++      ret = tac_login(user, passwd);
++      if(ret == UPAP_AUTHNAK) {
++       syslog(LOG_WARNING, "PAP TACACS+ authentication failure for %s", user);
++      }
++    }
++#endif
++#endif
++
+     if (ret == UPAP_AUTHNAK) {
+ 	*msg = "Login incorrect";
+ 	*msglen = strlen(*msg);
+@@ -510,6 +537,84 @@
+ }
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++/* do TACACS+ authentication instead of 
++ * checking username and password against local
++ * passwd(5) files
++ *
++ * returns:
++ *	UPAP_AUTHNAK: Login failed.
++ *	UPAP_AUTHACK: Login succeeded.
++ */
++int
++tac_login(auser, apasswd, userlen, passlen, msg, msglen)
++	char *auser;
++	char *apasswd;
++	int userlen;
++	int passlen;
++	char **msg;
++	int *msglen;
++{
++    char buf[40];
++    char *tty;
++    char *tacmsg;
++    int tac_fd;
++    struct tac_attrib *attr;
++    char passwd[256], user[256];
++
++    BCOPY(apasswd, passwd, passlen);
++    passwd[passlen] = '\0';
++    BCOPY(auser, user, userlen);
++    user[userlen] = '\0';
++
++    /* record tty name */
++    tty = devnam;
++    if(strncmp(tty, "/dev/", 5) == 0)
++	tty += 5;
++
++    tac_fd=tac_connect(tac_server, tac_servers);
++
++    if(tac_fd < 0) {
++ 	*msg = "TACACS+ server error";
++	*msglen = strlen(*msg);
++    	return(UPAP_AUTHNAK);
++    }
++
++    if(tac_authen_pap_send(tac_fd, user, passwd, tty) < 0) {
++    	*msg = "TACACS+ error";
++	*msglen = strlen(*msg);
++    	return(UPAP_AUTHNAK);
++    }
++
++    tacmsg=tac_authen_pap_read(tac_fd);
++
++    /* authentication failed, return */
++    if(tacmsg != NULL) {
++     	syslog(LOG_ERR, "TACACS+ authentication failed for `%s': %s",
++								user, tacmsg);
++     	*msg = tacmsg;
++     	*msglen = strlen(*msg);
++     	return(UPAP_AUTHNAK);
++    }
++
++    close(tac_fd);
++
++    syslog(LOG_INFO, "user %s logged in", user);
++    logwtmp(tty, user, "");
++    logged_in = TRUE;
++
++    /* store username for accounting and authorization functions */
++    tac_username = (char *) xcalloc(1, strlen(user)+1);
++    strncpy(tac_username, user, strlen(user));
++    
++    *msg = "Login ok";
++    *msglen = strlen(*msg);
++
++    return (UPAP_AUTHACK);
++
++}
++#endif /* USE_TACACS_PLUS */
++
+ /*
+  * login - Check the user name and password against the system
+  * password database, and login the user if OK.
+@@ -590,6 +695,7 @@
+     logged_in = TRUE;
+ 
+     return (UPAP_AUTHACK);
++
+ }
+ 
+ /*
+@@ -605,6 +711,7 @@
+ 	tty += 5;
+     logwtmp(tty, "", "");		/* Wipe out wtmp logout entry */
+     logged_in = FALSE;
++
+ }
+ 
+ 
+diff -ruN ppp-2.2.0g/pppd/auth_tac.c ppp-2.2.0g.tacacs/pppd/auth_tac.c
+--- ppp-2.2.0g/pppd/auth_tac.c	Thu Jan  1 01:00:00 1970
++++ ppp-2.2.0g.tacacs/pppd/auth_tac.c	Mon Feb 16 18:06:14 1998
+@@ -0,0 +1,911 @@
++/* auth_tac.c - TACACS+ PAP authentication for pppd
++ * 
++ * Copyright 1997-98 by Pawel Krawczyk <kravietz@ceti.com.pl>
++ *
++ * Distributed under GPL.
++ *
++ * See http://www.ceti.com.pl/~kravietz/progs/tacacs.html
++ * for details.
++ */
++
++#include <stdio.h>
++#include <unistd.h> 		/* getpid() */
++#include <stdlib.h> 		/* rand(), calloc() */
++#include <time.h>
++#include <syslog.h>
++#include <errno.h>
++#include <netinet/in.h> 	/* htonl,... */
++#include <string.h> 		/* bcopy,... */
++#include <netdb.h> 		/* getservbyname */
++#include "tacplus.h"
++#include "md5.h"
++#include "magic.h"
++#include "auth_tac.h"
++//#include "pppd.h"
++
++#define MD5_LEN 16
++
++int tac_ver_major=1;
++int tac_ver_minor=5;
++
++/* external and global vars used */
++int session_id; 		/* session storage for session_id */
++extern char *tac_secret;    	/* TACACS+ shared secret */
++extern int tac_encryption;  	/* do we encrypt packets? */
++char *system_err_msg="Authentication error, please contact administrator.";
++char *protocol_err_msg="Protocol error.";
++char *author_ok_msg="Service granted.";
++char *author_fail_msg="Service not allowed.";
++char *author_err_msg="Protocol error.";
++
++/* functions in this file */
++int tac_connect(u_long *server, int servers);
++int tac_authen_pap_send(int fd, char *user, char *pass, char *tty);
++char *tac_authen_pap_read(int fd);
++HDR *_tac_req_header(u_char type);
++void _tac_crypt(u_char *buf, HDR *th, int length);
++char *_tac_check_header(HDR *th, int type);
++u_char *tac_pseudo_pad(int len, HDR *hdr);
++void tac_add_attrib(struct tac_attrib *attr, char *name, char *value);
++void tac_free_attrib(struct tac_attrib *attr);
++int tac_account_send(int fd, int type, char *user, char *tty,
++	 struct tac_attrib *attr);
++char *tac_account_read(int fd);
++int tac_author_send(int fd, char *username, char *tty, 
++	struct tac_attrib *attr);
++struct areply *tac_author_read(int fd);
++void *xcalloc(size_t nmemb, size_t size);
++void *xrealloc(void *ptr, size_t size);
++
++/* this functions returns file descriptor
++ * of connection to the TACACS+ server 
++ *
++ * since v1.4 it also supports switching to
++ * secondary servers if some of them don't work
++ */
++int tac_connect(u_long *server, int servers) {
++	struct sockaddr_in serv_addr;
++	struct servent *s;
++	int fd;
++	int tries = 0;
++
++	if(!servers) {
++		syslog(LOG_ERR, "no TACACS+ servers defines");
++		return(-1);
++	}
++
++	while(tries < servers) {	
++
++ 		bzero( (char *) &serv_addr, sizeof(serv_addr));
++		serv_addr.sin_addr.s_addr = server[tries];
++
++		s=getservbyname("tacacs", "tcp");
++		if(s == NULL) 
++			serv_addr.sin_port = htons(TAC_PLUS_PORT);
++		else
++			serv_addr.sin_port = s->s_port;
++
++		if((fd=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
++       	   		syslog(LOG_WARNING, 
++				"socket creation error for %s: %m",
++							ip_ntoa(server[tries]));
++			tries++;
++			continue;
++		}
++
++		if(connect(fd, (struct sockaddr *) &serv_addr, 
++						sizeof(serv_addr)) < 0)
++    		{
++     	  		syslog(LOG_WARNING, 
++				"connection to %s failed: %m",
++						ip_ntoa(server[tries]));
++			tries++;
++			continue;
++    		}
++
++		/* connected ok */
++		TACDEBUG((LOG_DEBUG, "%s: connected to %s", __FUNCTION__, \
++			       	ip_ntoa(server[tries])));
++		return(fd);
++	}
++
++	/* all attempts failed */
++	syslog(LOG_ERR, "all possible TACACS+ servers failed");
++	return(-1);
++
++} /* tac_connect */
++
++/* this function returns pre-filled TACACS+
++ * packet header of given type
++ * 1. you MUST fill th->datalength and th->version
++ * 2. you MAY fill th->encryption, th->version
++ * 3. you are responsible for freeing allocated header 
++ */
++HDR *_tac_req_header(u_char type) {
++ 	HDR *th;
++
++ 	th=(HDR *) xcalloc(1, TAC_PLUS_HDR_SIZE);
++
++ 	/* preset some packet options in header */
++ 	th->type=type;
++ 	th->seq_no=1; /* always 1 for request */
++ 	th->encryption=TAC_PLUS_ENCRYPTED;
++ 
++ 	/* make session_id from pseudo-random number */
++ 	session_id=magic();
++ 	th->session_id=htonl(session_id);
++
++ 	return(th);
++}
++
++int tac_author_send(int fd, char *user, char *tty, struct tac_attrib *attr) {
++	HDR *th;
++	struct author tb;
++	u_char user_len, port_len;
++	struct tac_attrib *a;
++	int i = 0; 	/* arg count */
++	int pkt_len = 0;
++	int w; /* write count */
++	u_char *pkt;
++	u_char *pktp;
++	int ret = 0;
++
++	th=_tac_req_header(TAC_PLUS_AUTHOR);
++
++	/* set header options */
++ 	th->version=TAC_PLUS_VER_0;
++ 	th->encryption=tac_encryption ? TAC_PLUS_ENCRYPTED : TAC_PLUS_CLEAR;
++
++	TACDEBUG((LOG_DEBUG, "%s: user '%s', tty '%s', encrypt: %s", \
++		       	__FUNCTION__, user, \
++			tty, tac_encryption ? "yes" : "no"))
++	
++	user_len=(u_char) strlen(user);
++	port_len=(u_char) strlen(tty);
++
++	tb.authen_method=AUTHEN_METH_TACACSPLUS;
++	tb.priv_lvl=TAC_PLUS_PRIV_LVL_MIN;
++	tb.authen_type=TAC_PLUS_AUTHEN_TYPE_PAP;
++	tb.service=TAC_PLUS_AUTHEN_SVC_PPP;
++	tb.user_len=user_len;
++	tb.port_len=port_len;
++	tb.rem_addr_len=0;
++
++	/* allocate packet */
++	pkt=(u_char *) xcalloc(1, TAC_AUTHOR_REQ_FIXED_FIELDS_SIZE);
++	pkt_len=sizeof(tb);
++
++	/* fill attribute length fields */
++	a = attr;
++	while(a->attr != 0 && a) {
++		
++		pktp=pkt + pkt_len; /* save before it's increased */
++		pkt_len += sizeof(a->attr_len);
++		pkt = xrealloc(pkt, pkt_len);	
++		bcopy(&a->attr_len, pktp, sizeof(a->attr_len));
++		i++;
++
++		a = a->next;
++	}
++
++	/* fill the arg count field and add the fixed fields to packet */
++	tb.arg_cnt = i;
++	bcopy(&tb, pkt, TAC_AUTHOR_REQ_FIXED_FIELDS_SIZE);
++
++#define PUTATTR(data, len) \
++	pktp = pkt + pkt_len; \
++	pkt_len += len; \
++	pkt = xrealloc(pkt, pkt_len); \
++	bcopy(data, pktp, len);
++
++	/* fill user and port fields */
++	/*
++	pktp = pkt + pkt_len;
++	pkt_len += user_len;
++	pkt = xrealloc(pkt, pkt_len);
++	bcopy(user, pktp, user_len);
++	*/
++
++	PUTATTR(user, user_len)
++	
++	/*	
++	pktp = pkt + pkt_len;
++	pkt_len += port_len;
++	pkt = xrealloc(pkt, pkt_len);
++	bcopy(tty, pktp, port_len);
++	*/
++	
++	PUTATTR(tty, port_len)
++
++	/* fill attributes */
++	a = attr;
++	while(a->attr != 0 && a) {
++		/*
++		pktp = pkt + pkt_len;
++		pkt_len += a->attr_len;
++		pkt = xrealloc(pkt, pkt_len);
++		bcopy(a->attr, pktp, a->attr_len);
++		*/
++		PUTATTR(a->attr, a->attr_len)
++
++		a = a->next;
++	}
++
++	/* finished building packet, fill len_from_header in header */
++	th->datalength = htonl(pkt_len);
++
++	/* write header */
++ 	w=write(fd, th, TAC_PLUS_HDR_SIZE);
++
++	if(w < TAC_PLUS_HDR_SIZE) {
++		syslog(LOG_ERR, "author hdr send failed: wrote %d of %d", w,
++				TAC_PLUS_HDR_SIZE);
++		ret = -1;
++	}
++	
++	/* encrypt packet body  */
++ 	_tac_crypt(pkt, th, pkt_len);
++
++	/* write body */
++	w=write(fd, pkt, pkt_len);
++	if(w < pkt_len) {
++		syslog(LOG_ERR, "author body send failed: wrote %d of %d", w,
++				pkt_len);
++		ret = -1;
++	}
++
++	free(pkt);
++	free(th);
++
++	return(ret);
++}
++
++struct areply *tac_author_read(int fd) {
++	HDR th;
++	struct author_reply *tb;
++	int len_from_header, r, len_from_body;
++	char *pktp;
++	char *msg = NULL;
++
++	struct areply *re = (struct areply *) xcalloc(1, sizeof(struct areply));
++	
++	r=read(fd, &th, TAC_PLUS_HDR_SIZE);
++	if(r < TAC_PLUS_HDR_SIZE) {
++  		syslog(LOG_ERR,
++ 			"short author header, %d of %d: %m",
++		 	r, TAC_PLUS_HDR_SIZE);
++		re->msg = system_err_msg;
++		re->status = AUTHOR_STATUS_ERROR;
++  		return(re);
++ 	}
++
++	/* check header consistency */
++	msg = _tac_check_header(&th, TAC_PLUS_AUTHOR);
++	if(msg != NULL) {
++		/* no need to process body if header is broken */
++		re->msg = msg;
++		re->status = AUTHOR_STATUS_ERROR;
++		return(re); 
++	}
++
++ 	len_from_header=ntohl(th.datalength);
++ 	tb=(struct author_reply *) xcalloc(1, len_from_header);
++
++ 	/* read reply packet body */
++ 	r=read(fd, tb, len_from_header);
++ 	if(r < len_from_header) {
++  		syslog(LOG_ERR,
++			 "short author body, %d of %d: %m",
++			 r, len_from_header);
++		re->msg = system_err_msg;
++		re->status = AUTHOR_STATUS_ERROR;
++  		return(re);
++ 	}
++
++ 	/* decrypt the body */
++ 	_tac_crypt((u_char *) tb, &th, len_from_header);
++
++ 	/* check consistency of the reply body
++	 * len_from_header = declared in header
++	 * len_from_body = value computed from body fields
++	 */
++ 	len_from_body = TAC_AUTHOR_REPLY_FIXED_FIELDS_SIZE +
++	    		tb->msg_len + tb->data_len;
++	    
++	pktp = (u_char *) tb + TAC_AUTHOR_REPLY_FIXED_FIELDS_SIZE;
++	
++	for(r = 0; r < tb->arg_cnt; r++) {
++	    len_from_body += sizeof(u_char); /* add arg length field's size*/
++	    len_from_body += *pktp; /* add arg length itself */
++	}
++	
++ 	if(len_from_header != len_from_body) {
++  		syslog(LOG_ERR,
++			"inconsistent author reply body, incorrect key?");
++		re->msg = system_err_msg;
++		re->status = AUTHOR_STATUS_ERROR;
++  		return(re);
++ 	}
++
++	/* packet seems to be consistent, prepare return messages */
++	/* server message for user */
++	if(tb->msg_len) {
++		char *msg = (char *) xcalloc(1, tb->msg_len+1);
++		bcopy(tb+TAC_AUTHOR_REPLY_FIXED_FIELDS_SIZE
++				+ (tb->arg_cnt)*sizeof(u_char),
++				msg, tb->msg_len);
++		re->msg = msg;
++	}
++
++	/* server message to syslog */
++	if(tb->data_len) {
++		char *smsg=(char *) xcalloc(1, tb->data_len+1);
++		bcopy(tb + TAC_AUTHOR_REPLY_FIXED_FIELDS_SIZE
++				+ (tb->arg_cnt)*sizeof(u_char)
++				+ tb->msg_len, smsg, 
++				tb->data_len);
++		syslog(LOG_ERR, "author failed: %s", smsg);
++		free(smsg);
++	}
++
++	/* prepare status */
++	switch(tb->status) {
++		/* success conditions */
++		case AUTHOR_STATUS_PASS_ADD:
++		case AUTHOR_STATUS_PASS_REPL:
++			if(!re->msg) re->msg=author_ok_msg;
++			re->status=tb->status;
++			break;
++
++		/* authorization failure conditions */
++		/* failing to follow is allowed by RFC, page 23  */
++		case AUTHOR_STATUS_FOLLOW: 
++		case AUTHOR_STATUS_FAIL:
++			if(!re->msg) re->msg=author_fail_msg;
++			re->status=AUTHOR_STATUS_FAIL;
++			break;
++
++		/* error conditions */	
++		case AUTHOR_STATUS_ERROR:
++		default:
++			if(!re->msg) re->msg=author_err_msg;
++			re->status=AUTHOR_STATUS_ERROR;
++	}
++
++	free(tb);	
++	TACDEBUG((LOG_DEBUG, "%s: server replied '%s'", __FUNCTION__, \
++			re->msg))
++	return(re);
++	
++}
++
++/* checks given reply header for possible inconsistencies:
++ *  - type other tha expected
++ *  - sequence number other than 2
++ *  - session id different from one sent in request
++ * returns pointer to error message
++ * or NULL when header is correct
++ */
++char *_tac_check_header(HDR *th, int type) {
++
++ 	if(th->type != type) {
++  		syslog(LOG_ERR,
++			 "unrelated reply, type %d, expected %d", th->type,
++								type);
++  		return(protocol_err_msg);
++ 	} else if(th->seq_no != 2) {
++  		syslog(LOG_ERR, "not a reply - seq_no %d != 2", th->seq_no);
++  		return(protocol_err_msg);
++ 	} else if(ntohl(th->session_id) != session_id) {
++  		syslog(LOG_ERR, 
++			"unrelated reply, received session_id %d != sent %d",
++                	ntohl(th->session_id), session_id);
++  		return(protocol_err_msg);
++ 	}
++	
++	return(NULL); /* header is ok */	
++
++} /* check header */
++
++int tac_account_send(int fd, int type, char *user, char *tty,
++	 struct tac_attrib *attr) {
++	HDR *th;
++	struct acct tb;
++	u_char user_len, port_len;
++	struct tac_attrib *a;
++	int i = 0; 	/* arg count */
++	int pkt_len = 0;
++	int w; /* write count */
++	u_char *pkt;
++	u_char *pktp;
++	int ret = 0;
++
++	th=_tac_req_header(TAC_PLUS_ACCT);
++
++	/* set header options */
++ 	th->version=TAC_PLUS_VER_0;
++ 	th->encryption=tac_encryption ? TAC_PLUS_ENCRYPTED : TAC_PLUS_CLEAR;
++
++	TACDEBUG((LOG_DEBUG, "%s: user '%s', tty '%s', encrypt: %s, type: %s", \
++			__FUNCTION__, user, tty, \
++			(tac_encryption) ? "yes" : "no", \
++			(type == TAC_PLUS_ACCT_FLAG_START) ? "START" : "STOP"))
++	
++	user_len=(u_char) strlen(user);
++	port_len=(u_char) strlen(tty);
++
++	tb.flags=(u_char) type;
++	tb.authen_method=AUTHEN_METH_TACACSPLUS;
++	tb.priv_lvl=TAC_PLUS_PRIV_LVL_MIN;
++	tb.authen_type=TAC_PLUS_AUTHEN_TYPE_PAP;
++	tb.authen_service=TAC_PLUS_AUTHEN_SVC_PPP;
++	tb.user_len=user_len;
++	tb.port_len=port_len;
++	tb.rem_addr_len=0;
++
++	/* allocate packet */
++	pkt=(u_char *) xcalloc(1, TAC_ACCT_REQ_FIXED_FIELDS_SIZE);
++	pkt_len=sizeof(tb);
++
++	/* fill attribute length fields */
++	a = attr;
++	while(a->attr != 0 && a) {
++		
++		pktp=pkt + pkt_len; /* save before it's increased */
++		pkt_len += sizeof(a->attr_len);
++		pkt = xrealloc(pkt, pkt_len);	
++		bcopy(&a->attr_len, pktp, sizeof(a->attr_len));
++		i++;
++
++		a = a->next;
++	}
++
++	/* fill the arg count field and add the fixed fields to packet */
++	tb.arg_cnt = i;
++	bcopy(&tb, pkt, TAC_ACCT_REQ_FIXED_FIELDS_SIZE);
++
++#define PUTATTR(data, len) \
++	pktp = pkt + pkt_len; \
++	pkt_len += len; \
++	pkt = xrealloc(pkt, pkt_len); \
++	bcopy(data, pktp, len);
++
++	/* fill user and port fields */
++	/*
++	pktp = pkt + pkt_len;
++	pkt_len += user_len;
++	pkt = xrealloc(pkt, pkt_len);
++	bcopy(user, pktp, user_len);
++	*/
++
++	PUTATTR(user, user_len)
++	
++	/*	
++	pktp = pkt + pkt_len;
++	pkt_len += port_len;
++	pkt = xrealloc(pkt, pkt_len);
++	bcopy(tty, pktp, port_len);
++	*/
++	
++	PUTATTR(tty, port_len)
++
++	/* fill attributes */
++	a = attr;
++	while(a->attr != 0 && a) {
++		/*
++		pktp = pkt + pkt_len;
++		pkt_len += a->attr_len;
++		pkt = xrealloc(pkt, pkt_len);
++		bcopy(a->attr, pktp, a->attr_len);
++		*/
++		PUTATTR(a->attr, a->attr_len)
++
++		a = a->next;
++	}
++
++	/* finished building packet, fill len_from_header in header */
++	th->datalength = htonl(pkt_len);
++
++	/* write header */
++ 	w=write(fd, th, TAC_PLUS_HDR_SIZE);
++
++	if(w < TAC_PLUS_HDR_SIZE) {
++		syslog(LOG_ERR, "acct hdr send failed: wrote %d of %d", w,
++				TAC_PLUS_HDR_SIZE);
++		ret = -1;
++	}
++	
++	/* encrypt packet body  */
++ 	_tac_crypt(pkt, th, pkt_len);
++
++	/* write body */
++	w=write(fd, pkt, pkt_len);
++	if(w < pkt_len) {
++		syslog(LOG_ERR, "acct body send failed: wrote %d of %d", w,
++				pkt_len);
++		ret = -1;
++	}
++
++	free(pkt);
++	free(th);
++
++	return(ret);
++}
++
++/* this function sends a packet do TACACS+ server, asking
++ * for validation of given username and password
++ */
++int tac_authen_pap_send(int fd, char *user, char *pass, char *tty)
++{
++ 	HDR *th; 		 /* TACACS+ packet header */
++ 	struct authen_start tb; /* message body */
++ 	int user_len, port_len, pass_len, bodylength, w;
++ 	int pkt_len=0;
++ 	u_char *pkt;
++	int ret=0;
++
++ 	th=_tac_req_header(TAC_PLUS_AUTHEN);
++
++ 	/* set some header options */
++ 	th->version=TAC_PLUS_VER_1;
++ 	th->encryption=tac_encryption ? TAC_PLUS_ENCRYPTED : TAC_PLUS_CLEAR;
++
++	TACDEBUG((LOG_DEBUG, "%s: user '%s', pass '%s', tty '%s', encrypt: %s", \
++		 __FUNCTION__, user, pass, tty, \
++	 	(tac_encryption) ? "yes" : "no"))	 
++	
++ 	/* get size of submitted data */
++ 	user_len=strlen(user);
++ 	port_len=strlen(tty);
++ 	pass_len=strlen(pass);
++
++ 	/* fill the body of message */
++ 	tb.action=TAC_PLUS_AUTHEN_LOGIN;
++ 	tb.priv_lvl=TAC_PLUS_PRIV_LVL_MIN;
++ 	tb.authen_type=TAC_PLUS_AUTHEN_TYPE_PAP;
++ 	tb.service=TAC_PLUS_AUTHEN_SVC_PPP;
++ 	tb.user_len=user_len;
++ 	tb.port_len=port_len;
++ 	tb.rem_addr_len=0;          /* may be e.g Caller-ID in future */
++ 	tb.data_len=pass_len;
++
++ 	/* fill body length in header */
++ 	bodylength=sizeof(tb) + user_len
++		+ port_len + pass_len; /* + rem_addr_len */
++
++ 	th->datalength= htonl(bodylength);
++
++ 	/* we can now write the header */
++ 	w=write(fd, th, TAC_PLUS_HDR_SIZE);
++	if(w < 0 || w < TAC_PLUS_HDR_SIZE) {
++		syslog(LOG_ERR, "short write on PAP header: wrote %d of %d: %m", w, TAC_PLUS_HDR_SIZE);
++		ret=-1;
++	}
++
++ 	/* build the packet */
++ 	pkt=(u_char *) xcalloc(1, bodylength+10);
++
++ 	bcopy(&tb, pkt+pkt_len, sizeof(tb)); /* packet body beginning */
++ 	pkt_len+=sizeof(tb);
++ 	bcopy(user, pkt+pkt_len, user_len);  /* user */
++ 	pkt_len+=user_len;
++ 	bcopy(tty, pkt+pkt_len, port_len);   /* tty */
++ 	pkt_len+=port_len;
++ 	bcopy(pass, pkt+pkt_len, pass_len);  /* password */
++ 	pkt_len+=pass_len;
++
++ 	/* pkt_len == bodylength ? */
++	if(pkt_len != bodylength) {
++		TACDEBUG((LOG_DEBUG, "tac_authen_send: bodylength %d != pkt_len %d", bodylength, pkt_len));
++	} 
++ 	
++	/* encrypt the body */
++ 	_tac_crypt(pkt, th, bodylength);
++
++ 	w=write(fd, pkt, pkt_len);
++	if(w < 0 || w < pkt_len) {
++		syslog(LOG_ERR, "short write on PAP body: wrote %d of %d: %m", w, pkt_len);
++		ret=-1;
++	}
++
++ 	free(pkt);
++ 	free(th);
++
++ 	return(ret);
++} /* tac_authen_pap_send */
++
++char *tac_account_read(int fd) {
++	HDR th;
++	struct acct_reply *tb;
++	int len_from_header, r, len_from_body;
++	char *msg = NULL;
++
++	r=read(fd, &th, TAC_PLUS_HDR_SIZE);
++	if(r < TAC_PLUS_HDR_SIZE) {
++  		syslog(LOG_ERR,
++ 			"short PAP acct header, %d of %d: %m",
++		 	r, TAC_PLUS_HDR_SIZE);
++  		return(system_err_msg);
++ 	}
++
++ 	/* check the reply fields in header */
++ 	if(th.type != TAC_PLUS_ACCT) {
++  		syslog(LOG_ERR,
++			 "unrelated reply, type %d, expected %d", th.type,
++			TAC_PLUS_ACCT);
++  		return(protocol_err_msg);
++ 	} else if(th.seq_no != 2) {
++  		syslog(LOG_ERR, "not a reply - seq_no %d != 2", th.seq_no);
++  		return(protocol_err_msg);
++ 	} else if(ntohl(th.session_id) != session_id) {
++  		syslog(LOG_ERR, 
++			"unrelated reply, received session_id %d != sent %d",
++                	ntohl(th.session_id), session_id);
++  		return(protocol_err_msg);
++ 	}
++
++ 	len_from_header=ntohl(th.datalength);
++ 	tb=(struct acct_reply *) xcalloc(1, len_from_header);
++
++ 	/* read reply packet body */
++ 	r=read(fd, tb, len_from_header);
++ 	if(r < len_from_header) {
++  		syslog(LOG_ERR,
++			 "incomplete message body, %d bytes, expected %d: %m",
++			 r, len_from_header);
++  		return(system_err_msg);
++ 	}
++
++ 	/* decrypt the body */
++ 	_tac_crypt((u_char *) tb, &th, len_from_header);
++
++ 	/* check the length fields */
++ 	len_from_body=sizeof(tb->msg_len) + sizeof(tb->data_len) +
++            sizeof(tb->status) + tb->msg_len + tb->data_len;
++
++ 	if(len_from_header != len_from_body) {
++  		syslog(LOG_ERR,
++			"invalid reply content, incorrect key?");
++  		return(system_err_msg);
++ 	}
++
++ 	/* save status and clean up */
++ 	r=tb->status;
++	if(tb->msg_len) {
++		msg=(char *) xcalloc(1, tb->msg_len);
++		bcopy(tb+TAC_ACCT_REPLY_FIXED_FIELDS_SIZE, msg, tb->msg_len); 
++	} else
++		msg="Accounting failed";
++
++ 	free(tb);
++
++ 	/* server logged our request successfully */
++	if(r == TAC_PLUS_ACCT_STATUS_SUCCESS) {
++		TACDEBUG((LOG_DEBUG, "%s: accounted ok", __FUNCTION__))
++		return(NULL);
++	}
++	/* return pointer to server message */
++	syslog(LOG_DEBUG, "accounting failed, server reply was %d (%s)", 
++								r, msg);
++ 	return(msg);
++
++}
++
++
++/* reads packet from TACACS+ server; returns:
++ *            NULL    if the authentication succeded
++ *  string pointer    if it failed
++ */
++char *tac_authen_pap_read(int fd) {
++ 	HDR th;
++ 	struct authen_reply *tb;
++ 	int len_from_header, r, len_from_body;
++	char *msg = NULL;
++
++ 	/* read the reply header */
++ 	r=read(fd, &th, TAC_PLUS_HDR_SIZE);
++ 	if(r < TAC_PLUS_HDR_SIZE) {
++  		syslog(LOG_ERR,
++ 			"error reading PAP authen header, read %d of %d: %m",
++		 	r, TAC_PLUS_HDR_SIZE);
++  		return(system_err_msg);
++ 	}
++
++ 	/* check the reply fields in header */
++ 	if(th.type != TAC_PLUS_AUTHEN) {
++  		syslog(LOG_ERR,
++			 "unrelated reply, type %d, expected %d", th.type,
++			TAC_PLUS_AUTHEN);
++  		return(protocol_err_msg);
++ 	} else if(th.seq_no != 2) {
++  		syslog(LOG_ERR, "not a reply - seq_no %d != 2", th.seq_no);
++  		return(protocol_err_msg);
++ 	} else if(ntohl(th.session_id) != session_id) {
++  		syslog(LOG_ERR, 
++			"unrelated reply, received session_id %d != sent %d",
++                	ntohl(th.session_id), session_id);
++  		return(protocol_err_msg);
++ 	}
++ 
++ 	len_from_header=ntohl(th.datalength);
++ 	tb=(struct authen_reply *) xcalloc(1, len_from_header);
++
++ 	/* read reply packet body */
++ 	r=read(fd, tb, len_from_header);
++ 	if(r < len_from_header) {
++  		syslog(LOG_ERR,
++			 "incomplete message body, %d bytes, expected %d: %m",
++			 r, len_from_header);
++  		return(system_err_msg);
++ 	}
++
++ 	/* decrypt the body */
++ 	_tac_crypt((u_char *) tb, &th, len_from_header);
++
++ 	/* check the length fields */
++ 	len_from_body=sizeof(tb->status) + sizeof(tb->flags) +
++            sizeof(tb->msg_len) + sizeof(tb->data_len) +
++            tb->msg_len + tb->data_len;
++
++ 	if(len_from_header != len_from_body) {
++  		syslog(LOG_ERR,
++			"invalid reply content, incorrect key?");
++  		return(system_err_msg);
++ 	}
++
++ 	/* save status and clean up */
++ 	r=tb->status;
++	if(tb->msg_len) {
++		msg=(char *) xcalloc(1, tb->msg_len);
++		bcopy(tb+TAC_AUTHEN_REPLY_FIXED_FIELDS_SIZE, msg, tb->msg_len); 
++	} else
++		msg="Login incorrect";
++
++ 	free(tb);
++
++ 	/* server authenticated username and password successfully */
++ 	if(r == TAC_PLUS_AUTHEN_STATUS_PASS) {
++		TACDEBUG((LOG_DEBUG, "%s: authentication ok", __FUNCTION__))
++		return(NULL);
++	}
++		
++	/* return pointer to server message */
++	syslog(LOG_DEBUG, "authentication failed, server reply was %d (%s)", 
++								r, msg);
++ 	return(msg);
++
++} /* tac_authen_pap_read */
++
++void tac_add_attrib(struct tac_attrib *attr, char *name, char *value) {
++	struct tac_attrib *a;
++	u_char l1, l2;
++
++	a = attr;
++
++	/* find last block in chain */
++	while((a->attr != 0) && (a->next != 0)) {
++		a = a->next;
++	}
++	
++	/* fill the block */
++	l1 = (u_char) strlen(name);
++	l2 = (u_char) strlen(value);
++	a->attr_len=l1+l2+1;
++	a->attr = (char *) xcalloc(1, l1+l2+1);
++	bcopy(name, a->attr, l1);
++	*(a->attr+l1)='=';
++	bcopy(value, (a->attr+l1+1), l2);
++
++	/* allocate next structure */
++	a->next=(struct tac_attrib *) xcalloc(1, sizeof(struct tac_attrib));
++	
++}
++
++void tac_free_attrib(struct tac_attrib *attr) {
++	struct tac_attrib *a;
++	struct tac_attrib *b;
++
++	a = attr;
++
++	while(a->attr != 0 && a) {
++		free(a->attr);
++		b = a;
++		a = a->next;
++		free(b);
++	}
++
++}
++
++/* make MD5 pseudo pad for TACACS+ encryption
++   use data from packet header and secret, which
++   should be a global var */
++u_char *_tac_md5_pad(int len, HDR *hdr)  {
++ int n, i, bufsize;
++ int bp=0; /* buffer pointer */
++ int pp=0; /* pad pointer */
++ u_char *pad;
++ u_char *buf;
++ MD5_CTX mdcontext;
++
++ /* make pseudo pad */
++ n=(int)(len/16)+1;  /* number of MD5 runs */
++ bufsize=sizeof(hdr->session_id) + strlen(tac_secret) + sizeof(hdr->version)
++         + sizeof(hdr->seq_no) + MD5_LEN + 10;
++ buf= (u_char *) xcalloc(1, bufsize);
++ pad= (u_char *) xcalloc(n, MD5_LEN);
++
++ for(i=0; i<n; i++) {
++ /* MD5_1 = MD5{session_id, secret, version, seq_no}
++    MD5_2 = MD5{session_id, secret, version, seq_no, MD5_1} */
++
++  /* place session_id, key, version and seq_no in buffer */
++  bp=0;
++  bcopy(&hdr->session_id, buf, sizeof(session_id));
++  bp+=sizeof(session_id);
++  bcopy(tac_secret, buf+bp, strlen(tac_secret));
++  bp+=strlen(tac_secret);
++  bcopy(&hdr->version, buf+bp, sizeof(hdr->version));
++  bp+=sizeof(hdr->version);
++  bcopy(&hdr->seq_no, buf+bp, sizeof(hdr->seq_no));
++  bp+=sizeof(hdr->seq_no);
++
++  /* append previous pad if this is not the first run */
++  if(i) {
++    bcopy(pad+((i-1)*MD5_LEN), buf+bp, MD5_LEN);
++    bp+=MD5_LEN;
++  }
++  
++  MD5Init(&mdcontext);
++  MD5Update(&mdcontext, buf, bp);
++  MD5Final(&mdcontext);
++  bcopy(&mdcontext.digest, pad+pp, MD5_LEN);
++   
++  pp+=MD5_LEN;
++ }
++
++ free(buf);
++ return(pad);
++ 
++} /* _tac_md5_pad */
++
++/* this function simply XORs each byte in buffer with
++   byte in pad; this is used both for encryption and
++   decryption, since XOR is symmetrical */
++void _tac_crypt(u_char *buf, HDR *th, int length) {
++ int i;
++ u_char *pad;
++ 
++ /* null operation if no encryption requested */
++ if(th->encryption == TAC_PLUS_ENCRYPTED) {
++ 
++  pad=_tac_md5_pad(length, th);
++ 
++  for(i=0; i<length; i++) {
++   *(buf+i) ^= pad[i];
++  }
++  
++  free(pad);
++ 
++ } else {
++  syslog(LOG_WARNING, "using no TACACS+ encryption");
++ }
++} /* _tac_crypt */
++
++void *xcalloc(size_t nmemb, size_t size) {
++	register void *val = calloc(nmemb, size);
++	if(val == 0) {
++		syslog(LOG_ERR, "%s: calloc(%u,%u) failed", __FUNCTION__, 
++			nmemb, size);
++		exit(1);
++	}
++	return val;
++}
++
++void *xrealloc(void *ptr, size_t size) {
++	register void *val = realloc(ptr, size);
++	if(val == 0) {
++		syslog(LOG_ERR, "%s: realloc(%u) failed", __FUNCTION__, size);
++		exit(1);
++	}
++	return val;
++}
+diff -ruN ppp-2.2.0g/pppd/auth_tac.h ppp-2.2.0g.tacacs/pppd/auth_tac.h
+--- ppp-2.2.0g/pppd/auth_tac.h	Thu Jan  1 01:00:00 1970
++++ ppp-2.2.0g.tacacs/pppd/auth_tac.h	Mon Feb 16 18:06:14 1998
+@@ -0,0 +1,40 @@
++/*
++ * Copyright 1997 by Pawel Krawczyk <kravietz@ceti.com.pl>
++ *
++ * See http://www.ceti.com.pl/~kravietz/progs/tacacs.html
++ * for details.
++ *
++ */
++
++#ifndef _AUTH_TAC_H
++#define _AUTH_TAC_H
++
++#if defined(DEBUGTAC) && !defined(TACDEBUG)
++#define TACDEBUG(x)	syslog x;
++#else
++#define TACDEBUG(x)
++#endif
++
++extern int tac_ver_major;
++extern int tac_ver_minor;
++
++extern int tac_connect(u_long *server, int servers);
++extern int tac_authen_pap_send(int fd, char *user, char *pass, char *tty);
++extern char *tac_authen_pap_read(int fd);
++extern HDR *_tac_req_header(u_char type);
++extern void _tac_crypt(u_char *buf, HDR *th, int length);
++extern u_char *_tac_md5_pad(int len, HDR *hdr);
++extern void tac_add_attrib(struct tac_attrib *attr, char *name, char *value);
++extern void tac_free_attrib(struct tac_attrib *attr);
++extern int tac_account_send(int fd, int type, char *user, char *tty,
++	 struct tac_attrib *attr);
++extern char *tac_account_read(int fd);
++extern void *xcalloc(size_t nmemb, size_t size);
++extern void *xrealloc(void *ptr, size_t size);
++extern char *_tac_check_header(HDR *th, int type);
++extern int tac_author_send(int fd, char *username, char *tty, 
++	struct tac_attrib *attr);
++extern struct areply *tac_author_read(int fd);
++
++#endif
++
+diff -ruN ppp-2.2.0g/pppd/ipcp.c ppp-2.2.0g.tacacs/pppd/ipcp.c
+--- ppp-2.2.0g/pppd/ipcp.c	Fri Nov 24 01:00:37 1995
++++ ppp-2.2.0g.tacacs/pppd/ipcp.c	Mon Feb 16 18:10:15 1998
+@@ -37,6 +37,22 @@
+ #include "ipcp.h"
+ #include "pathnames.h"
+ 
++#ifdef USE_TACACS_PLUS
++#ifdef _linux_
++#include <net/if.h>
++#include <linux/if_ppp.h>
++#endif
++#include <time.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include "tacplus.h"
++#include "auth_tac.h"
++#include "magic.h"
++extern char *tac_username;
++extern int task_id;
++struct ifpppstatsreq treq;
++#endif
++
+ /* global vars */
+ ipcp_options ipcp_wantoptions[NUM_PPP];	/* Options that we want to request */
+ ipcp_options ipcp_gotoptions[NUM_PPP];	/* Options that peer ack'd */
+@@ -1028,6 +1044,11 @@
+     u_int32_t mask;
+     ipcp_options *ho = &ipcp_hisoptions[f->unit];
+     ipcp_options *go = &ipcp_gotoptions[f->unit];
++#ifdef USE_TACACS_PLUS
++    char *msg;
++    char *tty;
++    struct tac_attrib *attr;
++#endif
+ 
+     IPCPDEBUG((LOG_INFO, "ipcp: up"));
+     go->default_route = 0;
+@@ -1053,13 +1074,64 @@
+     /*
+      * Check that the peer is allowed to use the IP address it wants.
+      */
+-    if (!auth_ip_addr(f->unit, ho->hisaddr)) {
++    if (!auth_ip_addr(f->unit, ho->hisaddr) 
++#ifdef USE_TACACS_PLUS
++		&& (!tac_authorize && usetacacs)
++#endif
++		) {
+ 	syslog(LOG_ERR, "Peer is not authorized to use remote address %s",
+ 	       ip_ntoa(ho->hisaddr));
+ 	ipcp_close(f->unit);
+ 	return;
+     }
+ 
++#ifdef USE_TACACS_PLUS
++	if(usetacacs) {
++		/* this is needed both by acct and author */
++		tty=devnam;
++		if(strncmp(tty, "/dev/", 5) == 0) tty+=5;	
++	}
++
++	if(tac_authorize && usetacacs) {
++		/* ask for authorization to provide IP to the peer */
++		int tac_fd;
++		struct areply *arep;
++
++		TACDEBUG((LOG_DEBUG, "ipcp_up: sending author request for %s", \
++						ip_ntoa(ho->hisaddr)))
++		attr=(struct tac_attrib *)xcalloc(1, sizeof(struct tac_attrib));
++		tac_add_attrib(attr, "service", "ppp");
++		tac_add_attrib(attr, "protocol", "ip"); /* ask for IPCP */
++		tac_add_attrib(attr, "addr", ip_ntoa(ho->hisaddr));
++
++		tac_fd=tac_connect(tac_server, tac_servers);
++
++		if(tac_author_send(tac_fd, tac_username, tty, attr) < 0) {
++			ipcp_close(f->unit);
++			TACDEBUG((LOG_DEBUG, "ipcp_up: error sending request"))
++			return;
++		}
++
++		arep = tac_author_read(tac_fd);
++
++		if(arep->status != AUTHOR_STATUS_PASS_ADD &&
++						arep->status != AUTHOR_STATUS_PASS_REPL) {
++			syslog(LOG_ERR, "IPCP authorization failure: %s", arep->msg);
++			ipcp_close(f->unit);
++			return;
++		}
++		TACDEBUG((LOG_DEBUG, "ipcp_up: successful authorization: %s", \
++						arep->msg));
++
++		/* TODO: check arep->attrib and add to
++		 * ipcp_wantoptions[f->unit].hisaddr 
++		 */
++
++		close(tac_fd);
++		tac_free_attrib(attr);
++	}
++#endif
++
+     syslog(LOG_NOTICE, "local  IP address %s", ip_ntoa(go->ouraddr));
+     syslog(LOG_NOTICE, "remote IP address %s", ip_ntoa(ho->hisaddr));
+ 
+@@ -1093,6 +1165,40 @@
+ 	if (sifproxyarp(f->unit, ho->hisaddr))
+ 	    go->proxy_arp = 1;
+ 
++#ifdef USE_TACACS_PLUS
++	if(tac_accounting && usetacacs) {
++		char buf[40];	
++		int tac_fd;
++
++		TACDEBUG((LOG_NOTICE, "ipcp_up: start accounting"));
++		attr=(struct tac_attrib *)xcalloc(1, sizeof(struct tac_attrib));
++		sprintf(buf, "%lu", time(0));
++  		tac_add_attrib(attr, "start_time", buf);
++		task_id=magic();
++		sprintf(buf, "%u", task_id);
++		tac_add_attrib(attr, "task_id", buf);
++		tac_add_attrib(attr, "service", "ppp");
++		tac_add_attrib(attr, "protocol", "ip");
++		tac_add_attrib(attr, "addr", ip_ntoa(ho->hisaddr));
++		
++ 		tac_fd=tac_connect(tac_server, tac_servers);
++
++		if(tac_fd) {
++			tac_account_send(tac_fd, TAC_PLUS_ACCT_FLAG_START,
++					 	tac_username, tty, attr);
++	
++			tac_free_attrib(attr);
++
++			if(tac_account_read(tac_fd) != NULL) 
++				syslog(LOG_WARNING,
++					"TACACS+ accounting start failed");
++
++			close(tac_fd);	
++		}
++		TACDEBUG((LOG_NOTICE, "ipcp_up: start accounting done"));
++	}
++#endif
++
+     /*
+      * Execute the ip-up script, like this:
+      *	/etc/ppp/ip-up interface tty speed local-IP remote-IP
+@@ -1118,6 +1224,78 @@
+ 
+     ouraddr = ipcp_gotoptions[f->unit].ouraddr;
+     hisaddr = ipcp_hisoptions[f->unit].hisaddr;
++
++#ifdef USE_TACACS_PLUS
++    /* get interface statistics for accounting */
++
++    if(tac_accounting && usetacacs) {
++    	char buf[40];
++    	int tac_fd, reqfd;
++    	struct tac_attrib *attr;
++		char *tty;
++
++		tty=devnam;
++		if(strncmp(tty, "/dev/", 5) == 0) tty+=5;	
++
++    	bzero(&treq, sizeof(treq));
++
++    	/* get interface statistics */
++    	reqfd = socket(AF_INET, SOCK_DGRAM, 0);
++
++#ifdef _linux_
++	treq.stats_ptr = (caddr_t) &treq.stats;
++#endif
++
++    	if(reqfd < 0)
++		syslog(LOG_DEBUG,
++		 "cannot get PPP statistics for %s (socket): %m", ifname);
++    	else {
++		sprintf(treq.ifr__name, "%s", ifname);
++		if(ioctl(reqfd, SIOCGPPPSTATS, &treq) < 0)
++		    syslog(LOG_DEBUG,
++		 	"cannot get PPP statistics for %s (ioctl): %m", ifname);
++		}
++
++     /* send stop accounting packet */
++
++		TACDEBUG((LOG_DEBUG, "ipcp_down: stop accounting"))
++		attr=(struct tac_attrib *) xcalloc(1, sizeof(struct tac_attrib));
++
++		sprintf(buf, "%lu", time(0));
++  		tac_add_attrib(attr, "stop_time", buf);
++		sprintf(buf, "%u", task_id);
++		tac_add_attrib(attr, "task_id", buf);
++		tac_add_attrib(attr, "service", "ppp");
++		tac_add_attrib(attr, "protocol", "ip");
++
++		if(((treq.stats).p).ppp_obytes) {
++			sprintf(buf, "%u", ((treq.stats).p).ppp_obytes);
++			tac_add_attrib(attr, "bytes_out", buf);
++			sprintf(buf, "%u", ((treq.stats).p).ppp_ibytes);
++			tac_add_attrib(attr, "bytes_in", buf);
++			sprintf(buf, "%u", ((treq.stats).p).ppp_opackets);
++			tac_add_attrib(attr, "paks_out", buf);
++			sprintf(buf, "%u", ((treq.stats).p).ppp_ipackets);
++			tac_add_attrib(attr, "paks_in", buf);
++		}
++
++		tac_fd=tac_connect(tac_server, tac_servers);
++
++		if(tac_fd) {
++			tac_account_send(tac_fd, TAC_PLUS_ACCT_FLAG_STOP, 
++					tac_username, tty, attr);
++
++			tac_free_attrib(attr);
++
++			if(tac_account_read(tac_fd) != NULL) 
++				syslog(LOG_DEBUG, "TACACS+ accounting stop failed");
++
++			close(tac_fd);
++		}
++		TACDEBUG((LOG_DEBUG, "ipcp_down: stop accounting done"))
++    }
++#endif
++
+     if (ipcp_gotoptions[f->unit].proxy_arp)
+ 	cifproxyarp(f->unit, hisaddr);
+     if (ipcp_gotoptions[f->unit].default_route) 
+diff -ruN ppp-2.2.0g/pppd/lcp.c ppp-2.2.0g.tacacs/pppd/lcp.c
+--- ppp-2.2.0g/pppd/lcp.c	Fri Apr 12 15:10:31 1996
++++ ppp-2.2.0g.tacacs/pppd/lcp.c	Sun Feb  1 02:47:06 1998
+@@ -1489,6 +1489,7 @@
+ lcp_down(f)
+     fsm *f;
+ {
++
+     lcp_echo_lowerdown(f->unit);
+     ccp_lowerdown(f->unit);
+     ipcp_lowerdown(f->unit);
+diff -ruN ppp-2.2.0g/pppd/main.c ppp-2.2.0g.tacacs/pppd/main.c
+--- ppp-2.2.0g/pppd/main.c	Tue Nov 21 07:53:48 1995
++++ ppp-2.2.0g.tacacs/pppd/main.c	Sun Feb  1 12:39:32 1998
+@@ -244,7 +244,13 @@
+     }
+     syslog(LOG_NOTICE, "pppd %s.%d started by %s, uid %d",
+ 	   VERSION, PATCHLEVEL, p, uid);
+-  
++
++#ifdef USE_TACACS_PLUS
++    if(usetacacs)
++    syslog(LOG_NOTICE, "using TACACS+ driver v%d.%d", tac_ver_major,
++    	tac_ver_minor);
++#endif
++
+     /*
+      * Compute mask of all interesting signals and install signal handlers
+      * for each.  Only one signal handler may be active at a time.  Therefore,
+diff -ruN ppp-2.2.0g/pppd/options.c ppp-2.2.0g.tacacs/pppd/options.c
+--- ppp-2.2.0g/pppd/options.c	Fri Nov 24 01:00:35 1995
++++ ppp-2.2.0g.tacacs/pppd/options.c	Sat Jan 31 22:07:14 1998
+@@ -100,6 +100,18 @@
+ char	*ipparam = NULL;	/* Extra parameter for ip up/down scripts */
+ int	cryptpap;		/* Passwords in pap-secrets are encrypted */
+ 
++#ifdef USE_TACACS_PLUS
++#include "tacplus.h"
++#include "auth_tac.h"
++int usetacacs = 0;		/* Use TACACS+ authentication */
++u_long tac_server[TAC_PLUS_MAXSERVERS];	/* TACACS+ servers addresses */
++int tac_servers = 0;		/* number of configured servers */
++int tac_encryption = 1;         /* Encrypt TACACS+ packets */
++char *tac_secret;		/* Packets encryption key */
++int tac_authorize = 0;		/* Authorize user requesting service */
++int tac_accounting = 0;		/* Do TACACS+ accounting */
++#endif
++
+ #ifdef _linux_
+ int idle_time_limit = 0;
+ static int setidle __P((char **));
+@@ -203,6 +215,15 @@
+ static int setdnsaddr __P((char **));
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++static int settacacsserver __P((char **));
++static int settacacssecret __P((char **));
++static int setnotacacsencryption __P((void));
++static int settacacsauthorize __P((void));
++static int settacacsaccounting __P((void));
++static int setdotacacs __P((void));
++#endif
++
+ static int number_option __P((char *, u_int32_t *, int));
+ static int readable __P((int fd));
+ 
+@@ -320,6 +341,15 @@
+     {"dns-addr", 1, setdnsaddr}, /* DNS address(es) for the peer's use */
+ #endif
+ 
++#ifdef USE_TACACS_PLUS
++    {"tacacs", 0, setdotacacs},
++    {"tacacs-server", 1, settacacsserver},
++    {"tacacs-secret", 1, settacacssecret},
++    {"-tacacs-encryption", 0, setnotacacsencryption},
++    {"tacacs-authorize", 0, settacacsauthorize},
++    {"tacacs-accounting", 0, settacacsaccounting},
++#endif
++
+     {NULL, 0, NULL}
+ };
+ 
+@@ -2037,3 +2067,70 @@
+     return (1);
+   }
+ #endif /* USE_MS_DNS */
++
++
++#ifdef USE_TACACS_PLUS
++static int
++settacacsserver(argv)
++    char **argv;
++{
++    	if(tac_servers >= TAC_PLUS_MAXSERVERS) {
++    		fprintf(stderr, "Too many tacacs-server options, max is %d",
++			TAC_PLUS_MAXSERVERS);
++		return(0);
++    	}
++    
++    	tac_server[tac_servers] = inet_addr(*argv);
++
++    	if (tac_server[tac_servers] == -1) {
++		fprintf(stderr, "Invalid TACACS+ server address %s\n", *argv);
++		return 0;
++    	}
++
++	tac_servers++;
++    	return(1);
++}
++
++static int
++settacacssecret(argv)
++    char **argv;
++{
++    tac_secret=(char *) calloc(1, strlen(*argv));
++    strncpy(tac_secret, *argv, strlen(*argv));
++    if(*argv == NULL) {
++     fprintf(stderr, "TACACS+ secret is not specified or invalid: \"%s\" ", *argv);
++     return(0);
++    }
++    return(1);
++}
++
++static int
++setnotacacsencryption(void)
++{
++    tac_encryption=0;
++    return(1);
++      
++}
++
++static int
++setdotacacs(void)
++{
++    usetacacs=1;
++    return(1);
++}
++
++static int
++settacacsauthorize(void)
++{
++    tac_authorize=1;
++    return(1);
++}
++
++static int
++settacacsaccounting(void)
++{
++    tac_accounting=1;
++    return(1);
++}
++
++#endif /* USE_TACACS_PLUS */
+diff -ruN ppp-2.2.0g/pppd/pppd.h ppp-2.2.0g.tacacs/pppd/pppd.h
+--- ppp-2.2.0g/pppd/pppd.h	Wed Nov 22 14:48:54 1995
++++ ppp-2.2.0g.tacacs/pppd/pppd.h	Wed Feb 11 16:06:57 1998
+@@ -86,6 +86,18 @@
+ extern char	*ipparam;	/* Extra parameter for ip up/down scripts */
+ extern int	cryptpap;	/* Others' PAP passwords are encrypted */
+ 
++#ifdef USE_TACACS_PLUS
++#include "tacplus.h"
++#include "auth_tac.h"
++extern int usetacacs;		/* Use TACACS+ authentication */
++extern u_long tac_server[TAC_PLUS_MAXSERVERS];	/* TACACS+ server */
++extern int tac_servers;
++extern int tac_encryption;         /* Encrypt TACACS+ packets */
++extern char *tac_secret;		/* Packets encryption key */
++extern int tac_authorize;		/* Authorize user requesting service */
++extern int tac_accounting;		/* Do TACACS+ accounting */
++#endif
++
+ /*
+  * Values for phase.
+  */
+@@ -190,6 +202,9 @@
+ #define DEBUGIPXCP	1
+ #define DEBUGUPAP	1
+ #define DEBUGCHAP	1
++#ifdef USE_TACACS_PLUS
++#define	DEBUGTAC	1
++#endif
+ #endif
+ 
+ #ifndef LOG_PPP			/* we use LOG_LOCAL2 for syslog by default */
+@@ -242,6 +257,12 @@
+ #define CHAPDEBUG(x)	if (debug) syslog x
+ #else
+ #define CHAPDEBUG(x)
++#endif
++
++#ifdef DEBUGTAC
++#define TACDEBUG(x)	syslog x;
++#else
++#define TACDEBUG(x)
+ #endif
+ 
+ #ifndef SIGTYPE
+diff -ruN ppp-2.2.0g/pppd/sys-linux.c ppp-2.2.0g.tacacs/pppd/sys-linux.c
+--- ppp-2.2.0g/pppd/sys-linux.c	Thu Feb  5 13:33:51 1998
++++ ppp-2.2.0g.tacacs/pppd/sys-linux.c	Wed Jan 28 22:34:48 1998
+@@ -72,6 +72,7 @@
+ #include <net/route.h>
+ #include <linux/if_ether.h>
+ #include <netinet/in.h>
++#include <sys/utsname.h>
+ 
+ #include "pppd.h"
+ #include "fsm.h"
+@@ -89,6 +90,7 @@
+ 
+ int sockfd;			/* socket for doing interface ioctls */
+ 
++
+ static char *lock_file;
+ 
+ #define MAX_IFS		5000
+@@ -927,8 +929,16 @@
+ 
+     if (ioctl(sockfd, SIOCADDRT, &rt) < 0)
+       {
+-        syslog (LOG_ERR, "ioctl(SIOCADDRT) device route: %m");
+-        return (0);
++#if 1
++	struct utsname u;
++
++	uname(&u);
++	/* 2.1 kernels (and probably above) */
++	if(strncpy(u.release, "2.1", 3) != 0) {
++          syslog (LOG_ERR, "ioctl(SIOCADDRT) device route: %m");
++          return (0);
++	}
++#endif
+       }
+     return 1;
+   }
+diff -ruN ppp-2.2.0g/pppd/tacplus.h ppp-2.2.0g.tacacs/pppd/tacplus.h
+--- ppp-2.2.0g/pppd/tacplus.h	Thu Jan  1 01:00:00 1970
++++ ppp-2.2.0g.tacacs/pppd/tacplus.h	Mon Feb  9 12:52:10 1998
+@@ -0,0 +1,257 @@
++/* 
++   Copyright (c) 1995-1998 by Cisco systems, Inc.
++   Portions copyright 1997-98 by Pawel Krawczyk <kravietz@ceti.com.pl>
++
++   Permission to use, copy, modify, and distribute this software for
++   any purpose and without fee is hereby granted, provided that this
++   copyright and permission notice appear on all copies of the
++   software and supporting documentation, the name of Cisco Systems,
++   Inc. not be used in advertising or publicity pertaining to
++   distribution of the program without specific prior permission, and
++   notice be given in supporting documentation that modification,
++   copying and distribution is by permission of Cisco Systems, Inc.
++
++   Cisco Systems, Inc. makes no representations about the suitability
++   of this software for any purpose.  THIS SOFTWARE IS PROVIDED ``AS
++   IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
++   WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
++   FITNESS FOR A PARTICULAR PURPOSE.
++*/
++
++#ifndef _TACPLUS_H
++#define _TACPLUS_H
++
++struct tac_attrib {
++	char *attr;
++	u_char attr_len;
++	struct tac_attrib *next;
++};
++
++struct areply {
++	struct tac_attrib *attr;
++	char *msg;
++	int status;
++};
++
++#ifndef TAC_PLUS_MAXSERVERS		
++#define TAC_PLUS_MAXSERVERS		4
++#endif
++
++#ifndef TAC_PLUS_PORT
++#define	TAC_PLUS_PORT			49
++#endif
++
++#define TAC_PLUS_READ_TIMEOUT		180	/* seconds */
++#define TAC_PLUS_WRITE_TIMEOUT		180	/* seconds */
++
++/* All tacacs+ packets have the same header format */
++
++struct tac_plus_pak_hdr {
++    u_char version;
++
++#define TAC_PLUS_MAJOR_VER_MASK 0xf0
++#define TAC_PLUS_MAJOR_VER      0xc0
++
++#define TAC_PLUS_MINOR_VER_0    0x0
++#define TAC_PLUS_VER_0  (TAC_PLUS_MAJOR_VER | TAC_PLUS_MINOR_VER_0)
++
++#define TAC_PLUS_MINOR_VER_1    0x01
++#define TAC_PLUS_VER_1  (TAC_PLUS_MAJOR_VER | TAC_PLUS_MINOR_VER_1)
++
++    u_char type;
++
++#define TAC_PLUS_AUTHEN			1
++#define TAC_PLUS_AUTHOR			2
++#define TAC_PLUS_ACCT			3
++
++    u_char seq_no;		/* packet sequence number */
++    u_char encryption;		/* packet is encrypted or cleartext */
++
++#define TAC_PLUS_ENCRYPTED 0x0		/* packet is encrypted */
++#define TAC_PLUS_CLEAR     0x1		/* packet is not encrypted */
++
++    int session_id;		/* session identifier FIXME: Is this needed? */
++    int datalength;		/* length of encrypted data following this
++				 * header */
++    /* datalength bytes of encrypted data */
++};
++
++#define TAC_PLUS_HDR_SIZE 12
++
++typedef struct tac_plus_pak_hdr HDR;
++
++/* Authentication packet NAS sends to us */ 
++
++struct authen_start {
++    u_char action;
++
++#define TAC_PLUS_AUTHEN_LOGIN    0x1
++#define TAC_PLUS_AUTHEN_CHPASS   0x2
++#define TAC_PLUS_AUTHEN_SENDPASS 0x3 /* deprecated */
++#define TAC_PLUS_AUTHEN_SENDAUTH 0x4
++
++    u_char priv_lvl;
++
++#define TAC_PLUS_PRIV_LVL_MIN 0x0
++#define TAC_PLUS_PRIV_LVL_MAX 0xf
++
++    u_char authen_type;
++
++#define TAC_PLUS_AUTHEN_TYPE_ASCII  1
++#define TAC_PLUS_AUTHEN_TYPE_PAP    2
++#define TAC_PLUS_AUTHEN_TYPE_CHAP   3
++#define TAC_PLUS_AUTHEN_TYPE_ARAP   4
++
++    u_char service;
++
++#define TAC_PLUS_AUTHEN_SVC_LOGIN  1
++#define TAC_PLUS_AUTHEN_SVC_ENABLE 2
++#define TAC_PLUS_AUTHEN_SVC_PPP    3
++#define TAC_PLUS_AUTHEN_SVC_ARAP   4
++#define TAC_PLUS_AUTHEN_SVC_PT     5
++#define TAC_PLUS_AUTHEN_SVC_RCMD   6
++#define TAC_PLUS_AUTHEN_SVC_X25    7
++#define TAC_PLUS_AUTHEN_SVC_NASI   8
++
++    u_char user_len;
++    u_char port_len;
++    u_char rem_addr_len;
++    u_char data_len;
++    /* <user_len bytes of char data> */
++    /* <port_len bytes of char data> */
++    /* <rem_addr_len bytes of u_char data> */
++    /* <data_len bytes of u_char data> */
++};
++
++#define TAC_AUTHEN_START_FIXED_FIELDS_SIZE 8
++
++/* Authentication continue packet NAS sends to us */ 
++struct authen_cont {
++    u_short user_msg_len;
++    u_short user_data_len;
++    u_char flags;
++
++#define TAC_PLUS_CONTINUE_FLAG_ABORT 0x1
++
++    /* <user_msg_len bytes of u_char data> */
++    /* <user_data_len bytes of u_char data> */
++};
++
++#define TAC_AUTHEN_CONT_FIXED_FIELDS_SIZE 5
++
++/* Authentication reply packet we send to NAS */ 
++struct authen_reply {
++    u_char status;
++
++#define TAC_PLUS_AUTHEN_STATUS_PASS     1
++#define TAC_PLUS_AUTHEN_STATUS_FAIL     2
++#define TAC_PLUS_AUTHEN_STATUS_GETDATA  3
++#define TAC_PLUS_AUTHEN_STATUS_GETUSER  4
++#define TAC_PLUS_AUTHEN_STATUS_GETPASS  5
++#define TAC_PLUS_AUTHEN_STATUS_RESTART  6
++#define TAC_PLUS_AUTHEN_STATUS_ERROR    7 
++#define TAC_PLUS_AUTHEN_STATUS_FOLLOW   0x21
++
++    u_char flags;
++
++#define TAC_PLUS_AUTHEN_FLAG_NOECHO     0x1
++
++    u_short msg_len;
++    u_short data_len;
++
++    /* <msg_len bytes of char data> */
++    /* <data_len bytes of u_char data> */
++};
++
++#define TAC_AUTHEN_REPLY_FIXED_FIELDS_SIZE 6
++
++#define AUTHEN_METH_NONE             0x01
++#define AUTHEN_METH_KRB5             0x02
++#define AUTHEN_METH_LINE             0x03
++#define AUTHEN_METH_ENABLE           0x04
++#define AUTHEN_METH_LOCAL            0x05
++#define AUTHEN_METH_TACACSPLUS       0x06
++#define AUTHEN_METH_RCMD             0x20
++
++struct acct {
++    u_char flags;
++
++#define TAC_PLUS_ACCT_FLAG_MORE     0x1
++#define TAC_PLUS_ACCT_FLAG_START    0x2
++#define TAC_PLUS_ACCT_FLAG_STOP     0x4
++#define TAC_PLUS_ACCT_FLAG_WATCHDOG 0x8
++	    
++    u_char authen_method;
++    u_char priv_lvl;
++    u_char authen_type;
++    u_char authen_service;
++    u_char user_len;
++    u_char port_len;
++    u_char rem_addr_len;
++    u_char arg_cnt; /* the number of cmd args */
++    /* one u_char containing size for each arg */
++    /* <user_len bytes of char data> */
++    /* <port_len bytes of char data> */
++    /* <rem_addr_len bytes of u_char data> */
++    /* char data for args 1 ... n */
++};
++
++#define TAC_ACCT_REQ_FIXED_FIELDS_SIZE 9
++
++struct acct_reply {
++    u_short msg_len;
++    u_short data_len;
++    u_char status;
++
++#define TAC_PLUS_ACCT_STATUS_SUCCESS 0x1
++#define TAC_PLUS_ACCT_STATUS_ERROR   0x2
++#define TAC_PLUS_ACCT_STATUS_FOLLOW  0x21
++
++};
++
++#define TAC_ACCT_REPLY_FIXED_FIELDS_SIZE 5
++
++/* An authorization request packet */
++struct author {
++    u_char authen_method;
++    u_char priv_lvl;
++    u_char authen_type;
++    u_char service;
++
++    u_char user_len;
++    u_char port_len;
++    u_char rem_addr_len;
++    u_char arg_cnt;		/* the number of args */
++
++    /* <arg_cnt u_chars containing the lengths of args 1 to arg n> */
++    /* <user_len bytes of char data> */
++    /* <port_len bytes of char data> */
++    /* <rem_addr_len bytes of u_char data> */
++    /* <char data for each arg> */
++};
++
++#define TAC_AUTHOR_REQ_FIXED_FIELDS_SIZE 8
++
++/* An authorization reply packet */
++struct author_reply {
++    u_char status;
++    u_char arg_cnt;
++    u_short msg_len;
++    u_short data_len;
++
++#define AUTHOR_STATUS_PASS_ADD       0x01
++#define AUTHOR_STATUS_PASS_REPL      0x02
++#define AUTHOR_STATUS_FAIL           0x10
++#define AUTHOR_STATUS_ERROR          0x11
++#define AUTHOR_STATUS_FOLLOW	     0x21
++
++    /* <arg_cnt u_chars containing the lengths of arg 1 to arg n> */
++    /* <msg_len bytes of char data> */
++    /* <data_len bytes of char data> */
++    /* <char data for each arg> */
++};
++
++#define TAC_AUTHOR_REPLY_FIXED_FIELDS_SIZE 6
++
++
++#endif
+diff -ruN ppp-2.2.0g/pppd/upap.c ppp-2.2.0g.tacacs/pppd/upap.c
+--- ppp-2.2.0g/pppd/upap.c	Mon Jun 12 14:03:25 1995
++++ ppp-2.2.0g.tacacs/pppd/upap.c	Sun Feb  1 16:52:54 1998
+@@ -34,6 +34,11 @@
+ #include "pppd.h"
+ #include "upap.h"
+ 
++#ifdef USE_TACACS_PLUS
++extern int usetacacs;
++extern int tac_login(char *user, char *passwd, int userlen, int passlen, 
++					char **msg, int *msglen);
++#endif
+ 
+ upap_state upap[NUM_PPP];		/* UPAP state; one for each unit */
+ 
+@@ -353,8 +358,15 @@
+     /*
+      * Check the username and password given.
+      */
+-    retcode = check_passwd(u->us_unit, ruser, ruserlen, rpasswd,
+-			   rpasswdlen, &msg, &msglen);
++
++    retcode = 
++#ifdef USE_TACACS_PLUS
++	    usetacacs ? 
++		tac_login(ruser, rpasswd, ruserlen, rpasswdlen, 
++				     &msg, &msglen) : /* use TACACS+ */
++#endif
++		check_passwd(u->us_unit, ruser, ruserlen, rpasswd,
++			  rpasswdlen, &msg, &msglen); /* use local files */
+ 
+     upap_sresp(u, retcode, id, msg, msglen);
+ 

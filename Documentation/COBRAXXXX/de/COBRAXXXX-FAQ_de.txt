@@ -1,0 +1,149 @@
+Datei:      COBRAXXXX-FAQ_de.txt
+Ort:        uClinux-dist/Documentation/COBRAXXXX/de/
+            und COBRAXXXX-CD/documentation/boards/
+Autor:      Heiko Degenhardt (linux@sentec-elektronik.de)
+Inhalt:     Haeufig gestellte Fragen zu den Boards.
+Version:    v01.00
+Datum:      Wed Mar 24 17:59:40 CET 2004
+Lizenz:     Dieses Dokument steht unter der GNU GPL
+            (siehe uClinux-dist/COPYING)
+______________________________________________________________________
+
+Aenderungen
+
+040324  v01.00 Erstellung
+        Neue Version da fuer COBRA5272 und COBRA5282
+        Erstellt aus COBRA5272-FAQ_de.txt, v02.00
+        (hede)
+______________________________________________________________________
+
+ALLGEMEIN
+
+Q: Was heisst "COBRA5272" bzw. "COBRA5282"?
+A: COBRA steht fuer "COldfire Board for Rapid Applications". Die 5272
+   zeigt an, dass dieses COBRA-Board auf dem Motorola ColdFire 5272
+   basiert. Das COBRA5282 basiert dementsprechend auf dem MCF5282. 
+
+Q: Wo kann man das Board bestellen? Wo ist die Homepage?
+A: Der Vertrieb fuer das Board erfolgt ueber den ELEKTRONIKLADEN. Die 
+   Seite fuer Bestellungen und Preise findet man im Internet unter
+   http://www.elektronikladen.de/cobra5272.html bzw.
+   http://www.elektronikladen.de/cobra5282.html.
+   Die Homepage fuer die Boards (mit Software, Dokumentation u.s.w.) 
+   ist http://www.sentec-elektronik.de/cobra/.
+
+Q: Ok, ich habe nun ein Board. Was sind die ersten Schritte, um
+   zu einem funktionierenden Image fuer dieses zu kommen?
+A: Wenn Sie die uClinux-Sourcen entpackt haben, lesen Sie bitte
+   ./Documentation/COBRAXXXX/de/COBRAXXXX-Getting-started_de.txt
+   sowie die Dokumente unterhalb documentation/boards/ der
+   COBRAXXXX-CD fuer eine Einfuehrung.
+
+KOMMUNIKATION
+
+Q: Was fuer ein Kabel kann ich fuer die Kommunikation ueber die
+   serielle Schnittstelle des Boards verwenden?
+A: Man verwendet ein "normales" serielles Kabel (kein sogenanntes 
+   "Nullmodem-Kabel"!).
+
+Q: Welche Standardwerte fuer die Kommunikation sind eingestellt?
+A: Fuer die serielle Schnittstelle: 19200 Baud, 8n1
+   Server-IP:  192.168.100.1
+   Client-IP:  192.168.100.2
+   Netzmaske:  255.255.255.0
+   Gateway-IP: 0.0.0.0
+   Ethernet:   00:00:00:00:00:01 
+(beim COBRA5282 ist die MAC-Adresse 00:CF:52:82:CF:01).
+
+Q: Wo kann man die Befehle veraendern, die beim Start des Kernels
+   abgearbeitet werden (ifconfig, mount...)?
+A: Beim Start des uClinux-Kernels werden die Befehle der Datei
+   uClinux-dist/vendors/senTec/romfs/etc/rc ausgefuehrt. In ihr
+   koennen z. B. die IP-Adresse, Netzmaske, die mount-Optionen etc.
+   eingestellt werden.
+   (HINWEIS: Fuer eine Beschreibung der Befehle sei auf die Manual-
+   Seiten verwiesen, z. B. "man ifconfig").
+
+Q: Ich moechte ein Programm automatisch starten, welches "stdin"
+   verwendet, um mit dem Nutzer zu kommunizieren. Wenn ich dieses
+   aus der /etc/rc heraus anstarte, bekommt es aber kein Terminal.
+   Wie kann ich dies beheben?
+A: Verwenden Sie im Programm die serielle Schnittstelle, ueber die
+   die Kommunikation laufen soll, direkt. Oeffnen Sie also nicht
+   "stdio", sondern bspw. "/dev/ttyS1" (fuer die zweite serielle
+   Schnittstelle).
+
+FEHLER/PROBLEME
+
+Q: Das Board resettet immer, was tun?
+A: Hier sind mehrere Punkte zu ueberpruefen:
+   a) Strombegrenzung erhoehen:
+   Das Netztteil sollte bei 6V etwa 500mA zur Verfuegung stellen
+   (bei Starterkits mit Laengsregler eventuell auch die Versorgungs-
+   spannung mal auf 7.5V erhoehen).
+
+   b) Spannung messen:
+   Bei Starterkit-Boards befindet sich am oberen Rand (auf der
+   Seite der Betriebsspannungszufuehrung) eine Leuchtdiodenleiste
+   (D3..D10) und links daneben eine Steckerleiste. Hier fuehren
+   die oberen Kontakte plus, die unteren Masse. Die Spannung
+   zwischen diesen muss >3.15V sein.
+   Beim COBRA5282-Starterkit sind ueber dem Lochraster-Feld
+   jeweils vier Stifte mit "GND" bzw. "+3.3V" bezeichnet.
+   Zwischen diesen muss die Spannung ebenfalls >3.15V sein.
+
+Q: "make" bringt einen Fehler, ueber eine ungueltige Referenz zu
+   "del_mtd_partitions"?
+A: CONFIG_MTD_PARTITIONS in der Kernel-Config einschalten!
+
+Q: Nach Eingabe von "make dep" oder "make" kommen ploetzlich ganz
+   viele Meldungen. Wie kann man die ansehen?
+A: Es besteht die Moeglichkeit, die Ausgaben dieser Befehle in eine
+   Datei umzuleiten. Dazu ruft man z. B. auf:
+   "make 2>&1 | tee errs".
+   Hier werden die Ausgaben fuer Meldungen und Fehler an das Programm
+   "tee" uebergeben (ueber eine sog. "Pipe" mit dem Symbol "|"),
+   welches sie in eine Datei "errs" schreibt. Diese kann man sich 
+   dann z. B. mit "less errs" ansehen.
+
+Q: Ich habe noch keinen BDM-Adapter. Wo kann ich einen solchen 
+   beziehen?
+A: Die Adapter sind unter http://www.pemicro.com oder    
+   http://www.cybertec.com.au erhaeltlich. Achten Sie darauf, einen
+   geschirmten Typ fuer 3,3V und fuer Coldfire zu verwenden.
+
+Q: Der Download aus dBUG funktioniert schlecht bzw. stuerzt
+   ab. Ich verwende aber die richtigen Kabel. Was kann ich tun?
+A: Es scheint Probleme im dBUG-Code zu geben, sodass dBUG
+   wenig fehlertolerant gegenueber Probleme zwischen den
+   Netzwerk-Interfaces ist. Unserer Erfahrung nach laeuft
+   der Download am stabilsten, wenn Sie den Dateinamen mit
+   angeben, also z.B. "dn image.bin". Ausserdem sollten Sie
+   beim COBRA5272 die Netzwerk-Geschwindigkeit auf 10MBit
+   einstellen, beim COBRA5282 auf 100MBit, Halbduplex.
+   Hierzu koennen Sie z.B. auf einem Linux-Host das mii-tool
+   verwenden.
+   Diese Probleme scheinen nicht aufzutreten, wenn Sie einen
+   Switch oder Hub verwenden, um das Board und den PC zu
+   verbinden.
+
+Speziell COBRA5272:
+Q: Ich moechte Peripherie am externen Bus verwenden. Ich habe mit
+   dem Oszilloskop gesehen, dass die ChipSelects dort "floaten", das
+   Ansprechen meiner Peripherie also nicht funktionieren kann. Was
+   kann ich tun?
+A: Die Treiber IC 0201 - IC 0209 (s.a. Schematic S. 3) werden selbst
+   auch durch die ChipSelects gesteuert. Werden sie ausgeschaltet,
+   treiben sie die Ausgaenge nicht mehr, weshalb deren Pegel langsam
+   wieder auf "Low" sinkt. Soll dies verhindert werden, koennen die
+   benoetigten ChipSelects mit einem Pull-Up (4.7k) versehen werden.
+
+
+FEEDBACK
+
+Hinweise, Kritik und Ideen zu dieser FAQ bitte per EMail an
+linux@sentec-elektronik.de.
+
+_____________________________________________________________________
+(c) 2004, senTec Elektronik GmbH, Heiko Degenhardt
+

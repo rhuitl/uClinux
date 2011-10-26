@@ -1,0 +1,130 @@
+# syslog.template
+
+# kernel messages
+[REPORT -> System booted at $d ($1)]
+vmlinux: Linux version (\S*)
+[REPORT -> vmlinux: keyboard error at $d]
+vmlinux: keyboard error
+[IGNORE]
+vmlinux: VFS: Disk change detected on device 2/0
+vmlinux: Console: colour EGA\+ 80x25, 1 virtual console \(max 63\)
+vmlinux: Calibrating delay loop.. ok - 16.77 BogoMips
+vmlinux: Serial driver version 4.00 with no serial options enabled
+vmlinux: tty00 at 0x03f8 \(irq = 4\) is a 16450
+vmlinux: tty01 at 0x02f8 \(irq = 3\) is a 16550A
+vmlinux: tty02 at 0x03e8 \(irq = 4\) is a 16450
+vmlinux: tty03 at 0x02e8 \(irq = 3\) is a 16550A
+vmlinux: lp1 at 0x0378, using polling driver
+vmlinux: snd4 <Gravis UltraSound 2.4 \(1024k\)> at 0x220 irq 15 drq 6
+vmlinux: hda: WDC AC280M, 81MB w/31KB Cache, CHS=980/10/17, MaxMult=8
+vmlinux: hdb: WDC AC2700H, 696MB w/128KB Cache, LBA, CHS=1416/16/63, MaxMult=16
+vmlinux: ide0: primary interface on irq 14
+vmlinux: Floppy drive\(s\): fd0 is 1.44M
+vmlinux: FDC 0 is a 8272A
+vmlinux: Memory: 19208k/20480k available \(616k kernel code, 384k reserved, 272k data\)
+vmlinux: This processor honours the WP bit even when in supervisor mode. Good.
+vmlinux: Swansea University Computer Society NET3.019
+vmlinux: Swansea University Computer Society TCP/IP for NET3.019
+vmlinux: IP Protocols: ICMP, UDP, TCP
+vmlinux: SLIP: version 0.8.3-NET3.019-NEWTTY \(4 channels\)
+vmlinux: CSLIP: code copyright 1989 Regents of the University of California
+vmlinux: Checking 386/387 coupling... Ok, fpu using exception 16 error reporting.
+vmlinux: Checking 'hlt' instruction... Ok.
+vmlinux: Partition check:
+vmlinux:   hda: disabled multiple mode
+vmlinux:   hda: hda1 hda2
+vmlinux:   hdb: disabled multiple mode
+vmlinux:   hdb: hdb1 hdb2 hdb3 hdb4 < hdb5 hdb6 hdb7 hdb8 hdb9 hdb10 hdb11 >
+vmlinux: EXT2-fs warning: mounting unchecked fs, running e2fsck is recommended
+vmlinux: VFS: Mounted root \(ext2 filesystem\).
+vmlinux: Adding Swap: 32804k swap-space
+
+# nntpd messages
+[IGNORE]
+nntpd\[\d+\]: edmonds\.home\.cs\.ubc\.ca unrecognized READER
+nntpd\[\d+\]: edmonds\.home\.cs\.ubc\.ca timeout
+
+# diald messages
+[IGNORE]
+diald\[\d+\]: Failed to received first packet
+diald\[\d+\]: Closing down idle link\.
+diald\[\d+\]: Running connect \(pid = \d+\)\.
+diald\[\d+\]: Connect script failed\.
+diald\[\d+\]: SIGHUP: modem got hung up on\.
+diald\[\d+\]: Delaying 30 seconds before clear to dial\.
+diald\[\d+\]: Alarm was \d+ seconds early
+diald\[\d+\]: child process \d+ terminated with signal \d+
+diald\[\d+\]: Error opening device /dev/modem: Device or resource busy
+
+# init messages
+[IGNORE]
+init\[1\]: Going to runlevel: (4|5)
+init\[1\]: Sending processes the TERM signal
+init\[1\]: Sending processes the KILL signal
+
+# syslogd messages
+[IGNORE]
+syslogd: restart
+syslogd: exiting on signal 15
+
+# sendmail messages
+[COUNT -> sendmail: $n messages received from grolsch]
+sendmail\[\d+\]: \w+: from=.*, relay=(ean|root)@grolsch
+[COUNT -> sendmail: $n messages received from the local system]
+sendmail\[\d+\]: \w+: from=.*, relay=\S+@localhost
+[COUNT -> sendmail: $n messages to hub mailer]
+sendmail\[\d+\]: \w+: to=.*, mailer=hub,.* stat=Sent
+[COUNT -> sendmail: $n messages to prog mailer]
+sendmail\[\d+\]: \w+: to=.*, mailer=prog,.* stat=Sent
+[COUNT -> sendmail: $n messages to UUCP mailer]
+sendmail\[\d+\]: \w+: to=.*, mailer=uucp,.* stat=Sent
+[IGNORE]
+sendmail\[\d+\]: starting daemon \(8.6.9\): SMTP\+queueing\@00:20:00
+sendmail\[\d+\]: \w+: to=.*, stat=queued
+sendmail\[\d+\]: \w+: to=.*, mailer=hub,.* stat=Deferred
+sendmail\[\d+\]: collect: unexpected close on connection
+sendmail\[\d+\]: timeout waiting for input
+sendmail\[\d+\]: alias database .* rebuilt by edmonds
+sendmail\[\d+\]: .*: \d+ aliases, longest \d+ bytes
+
+# cron messages
+[IGNORE]
+/usr/local/sbin/cron\[\d+\]: \(CRON\) STARTUP \(fork ok\)
+/USR/LOCAL/SBIN/CRON\[\d+\]: \(\w+\) CMD \(/usr/lib/cron/[^;]+\)
+/USR/LOCAL/SBIN/CRON\[\d+\]: \(root\) CMD \(/bin/telinit (4|5)\)
+/USR/LOCAL/SBIN/CRON\[\d+\]: \(news\) CMD \(/usr/local/libexec/news/[^;]+\)
+/USR/LOCAL/SBIN/CRON\[\d+\]: \(uucp\) CMD \(/usr/local/lib/uucp/[^;]+\)
+/USR/LOCAL/SBIN/CRON\[\d+\]: \(edmonds\) CMD \(/users/edmonds/etc/cron/[^;]+\)
+
+# crontab messages
+[COUNT -> crontab: root changed root's crontab $n times]
+crontab\[\d+\]: \(root\) REPLACE \(root\)
+[COUNT -> crontab: root changed bin's crontab $n times]
+crontab\[\d+\]: \(root\) REPLACE \(bin\)
+[COUNT -> crontab: root changed uucp's crontab $n times]
+crontab\[\d+\]: \(root\) REPLACE \(uucp\)
+[COUNT -> crontab: edmonds changed edmonds' crontab $n times]
+crontab\[\d+\]: \(edmonds\) REPLACE \(edmonds\)
+[IGNORE]
+crontab\[\d+\]: \(root\) (BEGIN|END) EDIT \((bin|root|uucp)\)
+crontab\[\d+\]: \(edmonds\) (BEGIN|END) EDIT \((edmonds)\)
+/usr/local/sbin/cron\[\d+\]: \(root\) RELOAD \(tabs/root\)
+/usr/local/sbin/cron\[\d+\]: \(uucp\) RELOAD \(tabs/uucp\)
+/usr/local/sbin/cron\[\d+\]: \(bin\) RELOAD \(tabs/bin\)
+/usr/local/sbin/cron\[\d+\]: \(edmonds\) RELOAD \(tabs/edmonds\)
+
+# internet daemons
+[REPORT -> in.rshd: connect from $1 at $d]
+in.rshd\[\d+\]: connect from (.*)
+[REPORT -> in.rlogind: connect from $1 at $d]
+in.rlogind\[\d+\]: connect from (.*)
+
+# who's suing who
+[REPORT -> su: root on $2 by $1 at $d]
+su: (\w+) on (.*)
+
+# printer messages
+[IGNORE]
+lpd\[\d+\]: unable to get official name for remote machine hp207
+
+# EOF

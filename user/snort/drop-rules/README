@@ -1,0 +1,43 @@
+#  Drop ruleset README
+#  Version 0.3
+#  Last modified 27 March, 2003
+#
+# These rule sets have been especially modified to work with 
+# snort_inline and drop known attacks.  For more information 
+# about snort_inline, refer to
+#
+#  http://www.honeynet.org/papers/honeynet/tools/
+#
+# OPTIONS:
+# drop		Drop packet and log attempt
+# sdrop         Drop packet and do NOT log attempt
+# reject        Drop packet, send RST, and log attempt
+#               For UDP, send ICMP unreachable
+#
+# For the ability to modify attacks, you will need a different rule base,
+# specifically 'replace.rules'.  This rulebase does not exist, it is 
+# currently under development by the Honeynet Project.
+#
+# WARNING: This rulebase should be considered beta.  We have only begun
+# testing it.  We need your help in improving these drop rulesets.
+# Please send all suggestions and corrections to <rules@honeynet.org>.  
+# You will most likely want to modify this rulebase for use within your 
+# organization.
+
+############################################################################
+### TEST RULES: Designed for you to test Snort-Inline capabilities,      ###
+### By default, these are commented out, you have to enable for testing. ###
+############################################################################
+
+## DROP:    This rule should silently drop and log any outbound connection to port 23 (Telnet)
+# drop tcp $HONEYNET any <> $EXTERNAL_NET 23 (msg: "Dropping Telnet connection";)
+
+## SDROP:   This rule should silently drop (and NOT log) any outbound connection to port 22 (SSH)
+# sdrop tcp $HONEYNET any <> $EXTERNAL_NET 22 
+
+## REJECT:  This rule should reject (send RST) and log any outbound connection to port 21 
+# reject tcp $HONEYNET any <> $EXTERNAL_NET 22 (msg: "Rejecting FTP Connection";)
+
+## REPLACE: These rules should modify the content of outbound packets and log the attempt.
+# alert tcp $HONEYNET any <> $EXTERNAL_NET 80 (msg: "Modifying HTTP GET command"; content:"GET"; replace:"BET";)
+# alert udp $HONEYNET any <> $EXTERNAL_NET 53 (msg: "Modifying DNS query"; content: "com"; replace: "org";)

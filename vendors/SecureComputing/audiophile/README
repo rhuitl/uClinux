@@ -1,0 +1,75 @@
+SNAPGEAR EP9312 FLASH
+---------------------
+
+These instructions document how to use the OCdemon debugger (with
+ARM 20pin JTAG header) to program the flash in-circuit on EP9312
+based boards (specifically this is for the Trusonic/IPD).
+
+
+0. SETTING UP DEBUGGER
+
+   Using OCdemon package, setup with appropriate .gdbinit script.
+   (Use new-wave/tools/misc/ipd.gdb).
+
+   Firstly make sure you have the lp drivers loaded, and then load
+   the ocdemon driver:
+
+	  cat /proc/devices | grep ocdemon
+      mknod /dev/ocdemonpp0 c XXX 0
+      insmod parport
+      insmod parport_pc
+      insmod lp
+      insmod -f ocdemompp
+
+   (Ignore the ocdemonpp load warnings).
+
+   Now startup the process demon, and start gdb:
+
+      OcdLibRemote -c ARM9 &
+      arm-elf-gdb
+
+   Sometimes the debugger cannot access the CPU internals. Not sure why,
+   but it happens from time to time. If it happens exit gdb and then
+   manually reset the CPU board (jumper reset pins on the LITE300 for
+   example). If all else fails remove power from the board and re-apply.
+
+   I have also found that the generic arm-elf-gdb doesn't work right
+   for me with the debugger. I have switched to using the xscale-elf-gdb
+   from the Redboot tools package. It seems to work better.
+
+
+1. FLASHING BOOT LOADER
+
+   Inside gdb run the following commands:
+
+      init
+      uart-load
+
+   Now cat out the boot.bin file on the serial port attached to the console.
+   It is set for 57600 baud, 8 data bits, 1 stop bit, no parity.
+
+   (Note, for some reason I cannot load binary files into RAM reliably
+   through the OCdemon. It corrupts some bits in the data. Don't know why,
+   but loading through the serial port seems 100% reliable).
+
+   When completed break into gdb with CTRL-C. To check how many data bytes
+   where read (should be exact byte size of boot.bin) then do:
+
+      print $r4
+
+   Now program the boot loader into flash with:
+
+      flash-boot
+
+   This dosn't take long, but does not return to the prompt, you need to
+   break into it (with CTRL-C) then check $r5, if it is 0x8000 then you are
+   done.
+
+   Sometimes (though not often) the serial load does not correctly down load
+   the image (hey there is no flow control implemented :-) so check that what
+   made it into flash is good:
+
+      x/32x 0
+
+   It should match a hexdump of boot.bin.
+

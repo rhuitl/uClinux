@@ -1,0 +1,83 @@
+## $Id: Makefile-files,v 1.8 2005/03/29 02:10:05 ensc Exp $		--*- makefile -*--
+
+## Copyright (C) 2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+##  
+## This program is free software; you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation; version 2 of the License.
+##  
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##  
+## You should have received a copy of the GNU General Public License
+## along with this program; if not, write to the Free Software
+## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+ENSC_VECTOR_SRCS =		ensc_vector/vector-clear.c \
+				ensc_vector/vector-free.c \
+				ensc_vector/vector-init.c \
+				ensc_vector/vector-insert.c \
+				ensc_vector/vector-internal.h \
+				ensc_vector/vector-popback.c \
+				ensc_vector/vector-pushback.c \
+				ensc_vector/vector-resize.c \
+				ensc_vector/vector-resizeinternal.hc \
+				ensc_vector/vector-search.c \
+				ensc_vector/vector-searchselforg.c \
+				ensc_vector/vector-sort.c \
+				ensc_vector/vector-unique.c \
+				ensc_vector/vector-zeroend.c \
+				ensc_vector/list-at.c \
+				ensc_vector/list-add.c \
+				ensc_vector/list-free.c \
+				ensc_vector/list-init.c \
+				ensc_vector/list-insertinternal.c \
+				ensc_vector/list-internal.h \
+				ensc_vector/list-search.c \
+				ensc_vector/list-searchselforg.c
+
+ENSC_VECTOR_HDRS =		ensc_vector/vector.h \
+				ensc_vector/vector.hc \
+				ensc_vector/list.h \
+				ensc_vector/list.hc
+
+
+libensc_vector_glibc_a_SOURCES =	$(ENSC_VECTOR_SRCS)
+libensc_vector_glibc_a_CPPFLAGS =	$(AM_CPPFLAGS)
+
+libensc_vector_diet_a_SOURCES =		$(ENSC_VECTOR_SRCS)
+libensc_vector_diet_a_CPPFLAGS =	$(AM_CPPFLAGS)
+
+ENSC_VECTOR_LIBS =
+
+if ENSC_USE_GLIBC
+LIBENSCVECTOR_GLIBC =		libensc_vector-glibc.a
+ENSC_VECTOR_LIBS +=		$(LIBENSCVECTOR_GLIBC)
+else
+LIBENSCVECTOR_GLIBC =		lib-glibc-not-enabled-error.a
+endif
+
+if ENSC_USE_DIETLIBC
+LIBENSCVECTOR_DIET =		libensc_vector-diet.a
+ENSC_VECTOR_LIBS +=		$(LIBENSCVECTOR_DIET)
+else
+LIBENSCVECTOR_DIET =		lib-dietlibc-not-enabled-error.a
+endif
+
+
+if 	ENSC_USE_DIETLIBC
+LIBENSCVECTOR =			$(LIBENSCVECTOR_DIET)
+else	!ENSC_USE_DIETLIBC
+if	ENSC_USE_GLIBC
+LIBENSCVECTOR =			$(LIBENSCVECTOR_GLIBC)
+else	!ENSC_USE_GLIBC
+LIBENSCVECTOR =			lib-nolib-enabled-error.a
+endif	!ENSC_USE_GLIBC
+endif	!ENSC_USE_DIETLIBC
+
+CLEANFILES +=			libensc_vector-diet.a \
+				libensc_vector-glibc.a
+
+include $(srcdir)/ensc_vector/testsuite/Makefile-files

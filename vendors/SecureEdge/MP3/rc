@@ -1,0 +1,18 @@
+hostname MP3
+echo "SecureEdgeMP3" > /dev/lcdtxt
+/bin/rtc -s
+/bin/expand /etc/ramfs.img /dev/ram0
+/bin/expand /etc/ramfs.img /dev/ram1
+mount -t proc proc /proc
+mount -t ext2 /dev/ram0 /var
+mount -t ext2 /dev/ram1 /etc/config
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+/bin/flatfsd -r
+insmod ad1845 &
+tune2fs -j /dev/hda1 &
+tune2fs -j /dev/hda2 &
+echo "/etc/rc complete."

@@ -1,0 +1,26 @@
+# $Id: tripwire.chk,v 1.2 1993/08/19 05:27:24 genek Exp $
+#
+# tripwire.chk - S.J. Safdar (shabby@cc.purdue.edu)
+# Provide a cops-style interface to tripwire.
+#
+umask 077
+
+TEST=/bin/test
+ECHO=/bin/echo
+
+if $TEST ! -f ./tripwire ; then
+	$ECHO "Tripwire not compiled here, exiting.";
+fi
+
+if $TEST ! -d ./Databases ; then
+	mkdir ./Databases
+	./tripwire -initialize
+	exit 0
+fi
+
+if $TEST ! -f ./Databases/tw.* ; then
+	./tripwire -initialize
+else
+	./tripwire
+fi
+

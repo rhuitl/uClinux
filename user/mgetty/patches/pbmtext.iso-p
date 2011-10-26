@@ -1,0 +1,70 @@
+From ppp412.protel.DE!eckhard%smyrno Mon Jan 29 21:43:24 1996
+Return-Path: <eckhard%smyrno@ppp412.protel.DE>
+Received: by greenie.muc.de (/\==/\ Smail3.1.24.1 #24.2)
+	id <m0th0Q1-0002cpC@greenie.muc.de>; Mon, 29 Jan 96 21:43 MET
+Received:  from smyrno (ppp412.protel.DE)
+	by srv.cip.physik.tu-muenchen.de with SMTP id AA08680
+	for <gdoering@physik.tu-muenchen.de> (5.67a/IDA-1.5/bs04);
+	Mon, 29 Jan 1996 21:43:00 +0100
+Received: (from eckhard@localhost) by smyrno (8.6.12/8.6.9) id VAA02626 for gdoering@physik.tu-muenchen.de; Mon, 29 Jan 1996 21:48:02 +0100
+Date: Mon, 29 Jan 1996 21:48:02 +0100
+From: Eckhard Rueggeberg <Eckhard.Rueggeberg@protel.de>
+Message-Id: <199601292048.VAA02626@smyrno>
+To: gdoering@Physik.TU-Muenchen.DE
+Status: ROr
+
+Ich habe mal nachgeschaut : die Font-Prozeduren in libpbm5.c kvnnen sehr
+wohl 255-Char-Fonts. Nur in pbmtext.c ist davon abweichend char als 
+unsigned Byte benutzt, deswegen geht es nicht. Ich hdnge mal ein diff
+meines Patches an, mit dem es wunderbar funktioniert. Das .bdf-File 
+f|r "fine" ist ja auch trivial zu generieren, aber f|r "normal" werde 
+ich wohl mit der Hand machen m|ssen ...
+
+Eckhard R|ggeberg
+Eckhard.Rueggeberg@protel.de
+
+127a128
+> 
+149c150,151
+< 	int lastch, cp_unsigned;
+---
+> 	char lastch;
+> 
+151,153c153
+< 	    cp_unsigned = *cp;
+< 	    if ( cp_unsigned < 0 ) cp_unsigned += 256;
+< 	    if (!fn->glyph[cp_unsigned])
+---
+> 	    if (!fn->glyph[*cp])
+157,158c157,158
+< 		if (fn->glyph[cp_unsigned]->x < 0)
+< 			x = -fn->glyph[cp_unsigned]->x;
+---
+> 		if (fn->glyph[*cp]->x < 0)
+> 			x = -fn->glyph[*cp]->x;
+160c160
+< 			bwid += fn->glyph[cp_unsigned]->x;
+---
+> 			bwid += fn->glyph[*cp]->x;
+164,165c164,165
+< 	    bwid += fn->glyph[cp_unsigned]->xadd;
+< 	    lastch = cp_unsigned;
+---
+> 	    bwid += fn->glyph[*cp]->xadd;
+> 	    lastch = *cp;
+191,194c191,193
+< 	    int h, w, y, cp_unsigned;
+< 	    cp_unsigned = *cp;
+< 	    if ( cp_unsigned < 0 ) cp_unsigned += 256;
+< 	    if (!(glyph = fn->glyph[cp_unsigned]))
+---
+> 	    int h, w, y;
+> 
+> 	    if (!(glyph = fn->glyph[*cp]))
+221a221
+> 
+234c234
+< 	else if ( buf[i] < ' ' && buf[i] >= 0 )
+---
+> 	else if ( buf[i] < ' ' || buf[i] > '~' )
+

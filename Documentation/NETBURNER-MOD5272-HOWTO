@@ -1,0 +1,45 @@
+NetBurner MOD5272 How To
+------------------------
+
+This is some tips about how to archive uClinux running in NetBurner MOD5272,
+but it is applied to MOD5282 too.
+
+The NetBurner TFTP client don't work correctly with Linux TFTP server, to
+get it working you need manually set the target IP and MAC in your host
+(where TFTP server is running) to it use the ARP command:
+
+    arp -s 192.168.0.1 00:03:F4:01:1E:F0
+
+Where 192.168.0.1 is the target (MOD5272) board and 00:03:F4:01:1E:F0 is
+the target MAC address.
+
+You need copy the image.s19 to your TFTP directory using uppercase characters,
+because the NetBurner TFTP client convert the input file name to uppercase:
+
+    cp images/image.s19 /tftpboot/IMAGE.S19
+
+Start the board and enter in NetBurner monitor (press 'A' key in serial
+console), then execute:
+
+    NB> ndl image.s19
+
+When the download finished execute:
+
+    NB> go 2000000
+
+Then uClinux will start.
+
+If you want write uClinux in MOD5272 flash memory use the compcode from
+NetBurner SDK, you can recompile this program to Linux since source code is
+available. Execute this command:
+
+    compcode IMAGE.S19 IMAGEAPP.S19
+
+To write it in MOD5272 flash use this command:
+
+    NB> nfla imageapp.s19
+
+
+Alan Carvalho de Assis
+alancarbr@yahoo.com.br
+

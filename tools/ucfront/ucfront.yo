@@ -1,0 +1,143 @@
+mailto(steveb@snapgear.com)
+manpage(ucfront)(1)(June 2005)()()
+manpagename(ucfront)(a compiler front end for building uClinux)
+manpagesynopsis()
+
+ucfront [OPTION]
+
+ucfront <compiler> [COMPILER OPTIONS]
+
+manpagedescription()
+
+ucfront is a gcc compiler front end for building the front compiler cache.
+It is designed to simplify using a cross compiler with a specific libc
+(uC-libc, uClibc or glibc) which is different from the libc which as used
+when building the compiler.
+
+manpageoptions()
+
+These options only apply when you invoke ucfront as "ucfront". When
+invoked as a compiler none of these options apply. In that case your
+normal compiler options apply and you should refer to your compilers
+documentation.
+
+startdit()
+dit(bf(-h)) Print a options summary page
+
+dit(bf(-V)) Print the ucfront version number
+enddit()
+
+manpagesection(INSTALLATION)
+
+ucfront is located in $ROOTDIR/tools/ucfront and is compiled and use
+automatically during builds as long as the following entries
+exist in your vendors/config/<arch>/config.arch.
+
+verb(
+	CC  = ucfront-gcc $(CROSS_COMPILE)gcc $(CPUFLAGS)
+	CXX = ucfront-g++ $(CROSS_COMPILE)g++ $(CPUFLAGS)
+)
+
+Both ucfront-gcc and ucfront-g++ are symlinks to tools/ucfront/ucfront
+and they invoke the given compiler with arguments which are modified
+depending upon the currently selected libc.
+
+manpagesection(EXTRA OPTIONS)
+
+When run as a compiler front end ucfront usually just takes the same
+command line options as the compiler you are using. The only exception
+to this is the option '--ucfront-skip'. That option can be used to tell
+ucfront that the next option is definitely not a input filename, and
+should be passed along to the compiler as-is. 
+
+The reason this can be important is that ucfront does need to parse the
+command line and determine what is an input filename and what is a
+compiler option, as it needs the input filename to determine the name
+of the resulting object file (among other things). The heuristic
+ucfront uses in this parse is that any string on the command line that
+exists as a file is treated as an input file name (usually a C
+file). By using --ucfront-skip you can force an option to not be
+treated as an input file name and instead be passed along to the
+compiler as a command line option.
+
+manpagesection(ENVIRONMENT VARIABLES)
+
+ucfront uses a number of environment variables to control operation. In
+most cases you won't need any of these as the defaults will be fine.
+
+The first set of environment variables may be set manually to control
+the operation of ucfront.
+
+startdit()
+
+dit(bf(UCFRONT_LOGFILE)) If you set the UCFRONT_LOGFILE environment
+variable then ucfront will write some log information in that file.
+This is useful for tracking down problems.
+
+dit(bf(UCFRONT_DEBUG)) This option causes ucfront to print the full
+command which is executed after modifying arguments.
+
+dit(bf(UCFRONT_PATH)) You can optionally set UCFRONT_PATH to a colon
+separated path where ucfront will look for the real compilers. If you
+don't do this then ucfront will look for the first executable matching
+the compiler name in the normal PATH that isn't a symbolic link to
+ucfront itself.
+
+dit(bf(UCFRONT_CC)) You can optionally set UCFRONT_CC to force the name
+of the compiler to use. If you don't do this then ucfront works it out
+from the command line.
+
+dit(bf(UCFRONT_PREFIX)) This option adds a prefix to the command line
+that ucfront runs when invoking the compiler. This may be useful to
+invoke ccache or distcc.
+
+enddit()
+
+The next set of environment variables are normally set by the
+build environment and are used to determine the lib configuration.
+
+startdit()
+
+dit(bf(ROOTDIR)) Specifies the top of the build tree. If this is not
+set, it is inferred from the path to ucfront.
+
+dit(bf(CONFIG_LIBCDIR)) Specifies the path to the libc in use.
+
+dit(bf(CONFIG_DEFAULTS_LIBC_...)) Specifies the libc in use.
+
+enddit()
+
+If the bf(CONFIG_...) environment variables are not set, they are
+read from the file $ROOTDIR/.config
+
+This is useful when invoking ucfront manually.
+
+manpagesection(HOW IT WORKS)
+
+The basic idea is to detect the location and type of libc and also
+whether the current operation is a compile or a link and then add
+some or all of the following to the compiler command line:
+
+itemize(
+  it() -I $ROOTDIR/include
+  it() -I libc include directory
+  it() -L $ROOTDIR/lib
+  it() -L libc lib directory
+  it() appropriate start files (e.g. crt1.o, crtbeginS.o, crtn.o) based
+       on the library and compiler combination
+)
+
+manpagesection(HISTORY)
+
+ucfront was inspired by a combination of ccache written by Andrew Tridgell
+url(http://samba.org/~tridge/)(http://samba.org/~tridge/) and the m68knommu
+ld front end wrapper.
+
+It borrows heavily from the ccache source code.
+
+manpageauthor()
+
+ucfront was written by Steve Bennett <steveb@snapgear.com>
+
+ucfront is released under the GNU General Public License version 2 or
+later.

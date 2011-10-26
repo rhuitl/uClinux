@@ -1,0 +1,79 @@
+.\"             -*-Nroff-*-
+.\"
+.TH g3cat 1 "27 Oct 93" "greenie" "mgetty+sendfax manual"
+.IX g3cat
+.SH NAME
+g3cat \- concatenate multiple g3 documents
+.SH SYNOPSIS
+g3cat [\-l] [\-a] g3-file1 ...
+.SH DESCRIPTION
+.IX "Group 3 fax"
+.IX fax
+.I "g3cat "
+concatenates g3 files. These can either be 'raw', that is,
+bitmaps packed according to the CCITT T.4 standard for one-dimensional
+bitmap encoding, or 'digifax' files, created by GNU's GhostScript
+package with the
+.B "digifax "
+drivers. Its output is a concatenation of all the input files, in raw G3
+format, with two white lines in between.
+.sp
+If a \- is given as input file, stdin is used.
+.sp
+If the input data is malformed, a warning is printed to stderr, and the
+output file will have a blank line at this place.
+
+.PP
+.SH OPTIONS
+.TP
+.B "\-l "
+separate files with a one-pixel wide black line.
+.TP
+.B "\-h <blank lines>"
+specifies the number of blank lines
+.I g3cat
+should prepend to each page. Default is 0.
+.TP
+.B "\-L <lines>"
+limit lenght of output page to maximum <lines> lines.
+.SH SPECIAL-CASE OPTIONS
+.TP
+.B "\-w <width>"
+specifies the desired page width in pixels per line. Default is 1728 PELs,
+and this is mandatory if you want to send the fax to a standard fax machine.
+If one of the input files doesn't match this line width (for example because
+it was created by a broken G3 creator), a warning is printed, and the line
+width is transparently fixed.
+.TP
+.B "\-a "
+byte-align the end-of-line codes (EOL) in the file. Every EOL will end at
+a byte boundary, that is, with a \001 byte.
+.TP
+.B "\-p <pad>"
+specifies a minimum number of bytes that each output line must be padded
+to.  Padding is done with 0-bits before the EOL code.
+.TP
+.B "\-R"
+suppress output of end-of-page code (RTC).
+
+.PP
+.SH "Example"
+The following example will put a header line on a given g3 page, 'page1'
+and put the result into 'page2':
+
+echo '$header' | pbmtext | pbm2g3 | g3cat \- page1 >page2
+
+.SH FILES
+.ta
+--
+.fi
+
+.SH BUGS
+Hopefully none :-).
+
+.SH "SEE ALSO"
+g32pbm(1), sendfax(8), faxspool(1)
+
+.SH AUTHORS
+.I g3cat
+is Copyright (C) 1993 by Gert Doering, <gert@greenie.muc.de>

@@ -1,0 +1,600 @@
+Index: ipset/kernel/ip_set_urlfrag.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/kernel/ip_set_urlfrag.c	2010-08-24 13:20:43.761501140 +1000
+@@ -0,0 +1,274 @@
++/* Copyright (C) 2009 Dr Paul Dale <pauli@snapgear.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/* Kernel module implementing an integer set type as a bitmap */
++
++#include <linux/module.h>
++#include <linux/ip.h>
++#include <linux/tcp.h>
++#include <linux/udp.h>
++#include <linux/skbuff.h>
++#include <linux/errno.h>
++#include <asm/uaccess.h>
++#include <asm/bitops.h>
++#include <linux/spinlock.h>
++
++#include <net/ip.h>
++
++#include <linux/netfilter_ipv4/ip_set_urlfrag.h>
++
++#define NodeSize	(sizeof(struct urlfrag_node))
++#define NodesPerPage	(PAGE_SIZE / NodeSize)
++#define Pages(nodes)	DIV_ROUND_UP((nodes), NodesPerPage)
++#define Node(d, node)	((d)->_nodes[(node)/NodesPerPage] + (node)%NodesPerPage)
++
++
++extern inline const char *authd_url(const struct sk_buff *skb) {
++	return skb->sk->sk_authd_url;
++}
++
++
++extern inline ip_set_ip_t get_nothing(const struct sk_buff *skb, const u_int32_t *f) {
++	return 0;
++}
++
++
++static inline int urlfrag_test(struct ip_set *set, ip_set_ip_t ignored,
++				const char *url)
++{
++	struct ip_set_urlfrag *trie = set->data;
++
++	if (trie->nodecount == 0 || *url == '\0')
++		return 0;
++
++	for (;*url != '\0'; url++) {
++		const char *w = url;
++		unsigned int node = 0;
++		for (;;) {
++			if (Letter(trie, node) == *w) {
++				if (IsWord(trie, node)) {
++					return !0;
++				}
++				if(*++w == '\0')
++					break;
++				node = Arc(trie, node);
++				if (node == 0)
++					break;
++			} else {
++				if(IsLastArc(trie, node))
++					break;
++				node = Next(trie, node);
++			}
++		}
++	}
++	return 0;
++}
++
++#define KADT_CONDITION							\
++	const char *url = authd_url(skb);				\
++									\
++	if (url == NULL)						\
++		return 0;
++	
++UADT(urlfrag, test, req->frag)
++KADT(urlfrag, test, get_nothing, url)
++
++
++static unsigned int GetNewNode(struct ip_set_urlfrag *trie, char ch) {
++	unsigned int node;
++
++	if (trie->nodecount >= IPSET_FRAG_TRIE_SIZE)
++		return -1;
++
++	if (trie->nodecount % NodesPerPage == 0) {
++		unsigned int page = trie->nodecount / NodesPerPage;
++		trie->_nodes[page] = (struct urlfrag_node *)get_zeroed_page(GFP_ATOMIC);
++		if (!trie->_nodes[page])
++			return -1;
++	}
++
++	node = trie->nodecount++;
++	Letter(trie, node) = ch;
++	return node;
++}
++
++
++static inline int urlfrag_add(struct ip_set *set, ip_set_ip_t num, const char *word) {
++	struct ip_set_urlfrag *trie = set->data;
++	unsigned int node = 0, node2;
++
++	if (word == NULL || *word == '\0')
++		return -EINVAL;
++
++	if(trie->nodecount == node) {
++		node = GetNewNode(trie, *word);
++		if (node == -1)
++			return -ENOMEM;
++	}
++	while (*word != '\0') {
++		if (Letter(trie, node) == *word) {
++			/* Early exit if already in TRIE */
++			if (IsWord(trie, node)) {
++				return 0;
++			}
++			word++;
++			if (*word == '\0') break;
++			node2 = Arc(trie, node);
++			if (node2 == 0) {
++				node2 = GetNewNode(trie, *word);
++				if (node2 == -1)
++					return -ENOMEM;
++				Arc(trie, node) = node2;
++			}
++			node = node2;
++		} else {
++			node2 = Next(trie, node);
++			if (node2 == 0) {
++				node2 = GetNewNode(trie, *word);
++				if (node2 == -1)
++					return -ENOMEM;
++				Next(trie, node) = node2;
++			}
++			node = node2;
++		}
++	}
++	Arc(trie, node) = 0;
++	Node(trie, node)->word = 1;
++	return 0;
++}
++
++UADT(urlfrag, add, req->frag)
++KADT(urlfrag, add, get_nothing, NULL)
++
++static inline int urlfrag_del(struct ip_set *set, ip_set_ip_t num, const char *w) {
++	struct ip_set_urlfrag *trie = set->data;
++	unsigned int node = 0;
++
++	if (trie->nodecount == 0 || w == NULL || *w == '\0')
++		return -EEXIST;
++	for (;;) {
++		if (Letter(trie, node) == *w) {
++			if (*++w == '\0')
++				break;
++			node = Arc(trie, node);
++		} else if (IsLastArc(trie, node))
++			return -EEXIST;
++		else
++			node = Next(trie, node);
++	}
++
++	if (!IsWord(trie, node))
++		return -EEXIST;
++	Node(trie, node)->word = 0;
++	return 0;
++}
++
++UADT(urlfrag, del, req->frag)
++KADT(urlfrag, del, get_nothing, NULL)
++
++
++static int urlfrag_create(struct ip_set *set, const void *data, u_int32_t size) {
++	struct ip_set_urlfrag *trie;
++	size_t bytes;
++
++	bytes = sizeof(*trie) +
++		sizeof(trie->_nodes[0]) * Pages(IPSET_FRAG_TRIE_SIZE);
++	trie = kmalloc(bytes, GFP_KERNEL);
++	if (!trie) {
++		DP("out of memory for %zu bytes", bytes);
++		return -ENOMEM;
++	}
++	trie->nodecount = 0;
++	trie->flags = 0;
++	set->data = trie;
++	return 0;
++}
++
++static void urlfrag_free_pages(struct ip_set_urlfrag *trie) {
++	unsigned int page;
++
++	for (page = 0; page < Pages(trie->nodecount); page++)
++		free_page((unsigned long)trie->_nodes[page]);
++}
++
++static void urlfrag_destroy(struct ip_set *set) {
++	struct ip_set_urlfrag *trie = set->data;
++
++	urlfrag_free_pages(trie);
++	kfree(trie);
++	set->data = NULL;
++}
++
++
++/* Empty the set.
++ */
++static void urlfrag_flush(struct ip_set *set) {
++	struct ip_set_urlfrag *trie = set->data;
++	urlfrag_free_pages(trie);
++	trie->nodecount = 0;
++}
++
++
++/* Return the header used to create the set.
++ * In our case, this means the flags since we've no other parameters.
++ */
++static void urlfrag_list_header(const struct ip_set *set, void *data) {
++}
++
++
++/* Count the number of entries in the trie.
++ * Since we're not doing tail reduction, this equates to running through
++ * all the nodes and locating that tagged as end of words.
++ */
++static int urlfrag_list_members_size(const struct ip_set *set, char dont_align) {
++	const struct ip_set_urlfrag *trie = set->data;
++
++	return sizeof(struct ip_set_urlfrag) +
++		sizeof(struct urlfrag_node) * trie->nodecount;
++}
++
++
++static void urlfrag_list_members(const struct ip_set *set, void *data, char dont_align) {
++	const struct ip_set_urlfrag *trie = set->data;
++	unsigned int node;
++	void *p = data;
++
++	memcpy(p, trie, sizeof(*trie));
++	p += sizeof(*trie);
++	for (node = 0; node < trie->nodecount; node++) {
++		const struct urlfrag_node *n = Node(trie, node);
++		memcpy(p, n, sizeof(*n));
++		p += sizeof(*n);
++	}
++}
++
++struct ip_set_type ip_set_urlfrag = {					
++	.typename		= "urlfrag",
++	.features		= IPSET_DATA_SINGLE,
++	.protocol_version	= IP_SET_PROTOCOL_VERSION,
++	.create			= &urlfrag_create,
++	.destroy		= &urlfrag_destroy,
++	.flush			= &urlfrag_flush,
++	.reqsize		= sizeof(struct ip_set_req_urlfrag),
++	.addip			= &urlfrag_uadd,
++	.addip_kernel		= &urlfrag_kadd,
++	.delip			= &urlfrag_udel,
++	.delip_kernel		= &urlfrag_kdel,
++	.testip			= &urlfrag_utest,
++	.testip_kernel		= &urlfrag_ktest,
++	.header_size		= sizeof(struct ip_set_req_urlfrag_create),
++	.list_header		= &urlfrag_list_header,
++	.list_members_size	= &urlfrag_list_members_size,
++	.list_members		= &urlfrag_list_members,
++	.me			= THIS_MODULE,
++};
++
++MODULE_LICENSE("GPL ");
++MODULE_AUTHOR("Dr Paul Dale");
++MODULE_DESCRIPTION("urlfrag type of IP sets");
++
++REGISTER_MODULE(urlfrag)
+Index: ipset/kernel/Kconfig.ipset
+===================================================================
+--- ipset.orig/kernel/Kconfig.ipset	2010-08-24 13:19:58.201978563 +1000
++++ ipset/kernel/Kconfig.ipset	2010-08-24 13:20:11.861997655 +1000
+@@ -55,6 +55,14 @@ config IP_NF_SET_POLYNUM
+ 
+ 	  To compile it as a module, choose M here.  If unsure, say N.
+ 
++config IP_NF_SET_URLFRAG
++	tristate "url fragment set support"
++	depends on IP_NF_SET
++	help
++	  This options adds the url fragment set type support.
++
++	  To compile it as a module, choose M here.  If unsure, say N.
++
+ config IP_NF_SET_PORTMAP
+ 	tristate "portmap set support"
+ 	depends on IP_NF_SET
+Index: ipset/kernel/include/linux/netfilter_ipv4/ip_set_urlfrag.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/kernel/include/linux/netfilter_ipv4/ip_set_urlfrag.h	2010-08-24 13:20:11.861997655 +1000
+@@ -0,0 +1,57 @@
++#ifndef __IP_SET_URLFRAG_H
++#define __IP_SET_URLFRAG_H
++
++#include <linux/netfilter_ipv4/ip_set.h>
++
++#define SETTYPE_NAME "urlfrag"
++
++#define IPSET_FRAG_LEN			1024	/* Maximum length of a fragment */
++
++#define IPSET_FRAG_COMPACTED		1
++
++/* Define the basic TRIE node */
++#define IPSET_FRAG_IWBITS		1
++#define IPSET_FRAG_ARCBITS		18
++#define IPSET_FRAG_CHARBITS		8
++
++#ifndef __KERNEL__
++#define Node(d, node)		((d)->_nodes + node)
++#endif
++#define IsWord(d, node)		(Node(d, node)->word)
++#define IsLastArc(d, node)	(Node(d, node)->next == 0)
++#define IsLeaf(d, node)		(Node(d, node)->arc == 0)
++#define Letter(d, node)		(Node(d, node)->letter)
++#define Arc(d, node)		(Node(d, node)->arc)
++#define Next(d, node)		(Node(d, node)->next)
++#define Data(d, node)		(Node(d, node)->data)
++
++#define IPSET_FRAG_TRIE_SIZE		(1<<IPSET_FRAG_ARCBITS)
++
++struct __attribute__ ((__packed__)) urlfrag_node {
++	char letter;
++	unsigned arc:IPSET_FRAG_ARCBITS;
++	unsigned next:IPSET_FRAG_ARCBITS;
++	unsigned word:IPSET_FRAG_IWBITS;
++};
++
++
++struct ip_set_urlfrag {
++	u_int32_t nodecount;
++	u_int32_t flags;
++#ifdef __KERNEL__
++	struct urlfrag_node *_nodes[0];
++#else
++	struct urlfrag_node _nodes[0]; 
++#endif
++};
++
++struct ip_set_req_urlfrag_create {
++	u_int32_t flags;
++};
++
++struct ip_set_req_urlfrag {
++	ip_set_ip_t ip;
++	char frag[IPSET_FRAG_LEN];
++};
++
++#endif	/* __IP_SET_URLFRAG_H */
+Index: ipset/ipset_urlfrag.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/ipset_urlfrag.c	2010-08-24 13:20:23.711577050 +1000
+@@ -0,0 +1,211 @@
++/* Copyright 2008 Jozsef Kadlecsik (kadlec@blackhole.kfki.hu)
++ *
++ * This program is free software; you can redistribute it and/or modify   
++ * it under the terms of the GNU General Public License as published by   
++ * the Free Software Foundation; either version 2 of the License, or      
++ * (at your option) any later version.                                    
++ *                                                                         
++ * This program is distributed in the hope that it will be useful,        
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of         
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the          
++ * GNU General Public License for more details.                           
++ *                                                                         
++ * You should have received a copy of the GNU General Public License      
++ * along with this program; if not, write to the Free Software            
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include <stdio.h>				/* *printf */
++#include <string.h>				/* mem*, str* */
++#include <stdlib.h>				/* qsort */
++
++#include "ipset.h"
++
++#include <linux/netfilter_ipv4/ip_set_urlfrag.h>
++
++
++#define OPT_CREATE_HASHSIZE	0x01U
++#define OPT_CREATE_PROBES	0x02U
++#define OPT_CREATE_RESIZE	0x04U
++#define OPT_CREATE_NETWORK	0x08U
++#define OPT_CREATE_FROM		0x10U
++#define OPT_CREATE_TO		0x20U
++
++
++
++/* To output the set we need some helpers */
++
++#define FLAG_SORT	1
++#define FLAG_SAVE	2
++
++struct node_info {
++	unsigned int	node;
++	char		ch;
++};
++
++
++/* Initialize the create. */
++static void urlfrag_create_init(void *data) {
++	struct ip_set_req_urlfrag_create *mydata = data;
++
++	DP("create INIT");
++	mydata->flags = 0;
++}
++
++/* Function which parses command options; returns true if it ate an option */
++static int urlfrag_create_parse(int c, char *argv[] UNUSED, void *data, unsigned *flags) {
++	return 0;
++}
++
++/* Final check; exit if not ok. */
++static void urlfrag_create_final(void *data, unsigned int flags) {
++}
++
++
++/* Create commandline options */
++static const struct option create_opts[] = {
++	{NULL},
++};
++
++/* Add, del, test parser */
++static ip_set_ip_t adt_parser(int cmd, const char *arg, void *data) {
++	struct ip_set_req_urlfrag *mydata = data;
++
++	strncpy(mydata->frag, arg, IPSET_FRAG_LEN-1);
++	mydata->frag[IPSET_FRAG_LEN-1] = '\0';
++	return 1;
++};
++
++/*
++ * Print and save
++ */
++static void urlfrag_initheader(struct set *set, const void *data) {
++	const struct ip_set_req_urlfrag_create *header = data;
++	struct ip_set_urlfrag *map = set->settype->header;
++
++	memset(map, 0, sizeof(struct ip_set_urlfrag));
++	map->flags = header->flags;
++}
++
++static void urlfrag_printheader(struct set *set, unsigned options) {
++	printf("\n");
++}
++
++static int dump_cmp(const void *v1, const void *v2) {
++	const struct node_info *n1 = (const struct node_info *)v1;
++	const struct node_info *n2 = (const struct node_info *)v2;
++	if (n1->ch > n2->ch)
++		return 1;
++	if (n1->ch == n2->ch)
++		return 0;
++	return -1;
++}
++
++static void dump(unsigned int node, struct ip_set_urlfrag *trie, int flags, short widx, char word[], char *name) {
++	int numarc;
++	unsigned int n;
++	int i;
++
++	if (node >= trie->nodecount)
++		return;
++
++	/* Figure out how many arcs from this branch */
++	for (numarc = 1, n = node; !IsLastArc(trie, n); n = Next(trie, n))
++		numarc++;
++
++	/* Create a table of arcs */
++	struct node_info arcs[numarc];
++
++	i = 0;
++	for (i = 0, n = node; ; n = Next(trie, n)) {
++		arcs[i].node = n;
++		arcs[i++].ch = Letter(trie, n);
++		if (IsLastArc(trie, n))
++			break;
++	}
++
++	/* Optionally sort the table of arcs */
++	if (flags & FLAG_SORT)
++		qsort(arcs, numarc, sizeof(struct node_info), &dump_cmp);
++
++	/* Output the table of arcs and recurse if required */
++	for (i=0; i<numarc; i++) {
++		n = arcs[i].node;
++		word[widx] = arcs[i].ch;
++		if (IsWord(trie, n)) {
++			word[widx+1] = '\0';
++			if (flags & FLAG_SAVE) {
++				printf("-A %s %s\n", name, word);
++			} else {
++				printf("%s\n", word);
++			}
++		}
++		if (Arc(trie, n))
++			dump(Arc(trie, n), trie, flags, widx+1, word, name);
++	}
++}
++
++static void urlfrag_printips(struct set *set, void *data, u_int32_t len, unsigned options, char dont_align) {
++	struct ip_set_urlfrag *trie = data;
++	char word[IPSET_FRAG_LEN];
++
++	dump(0, trie, 0, 0, word, set->name);
++}
++
++static void urlfrag_printips_sorted(struct set *set, void *data, u_int32_t len, unsigned options, char dont_align) {
++	struct ip_set_urlfrag *trie = data;
++	char word[IPSET_FRAG_LEN];
++
++	dump(0, trie, FLAG_SORT, 0, word, set->name);
++}
++
++static void urlfrag_saveheader(struct set *set, unsigned options) {
++	printf("-N %s %s\n", set->name, set->settype->typename);
++}
++
++/* Print save for an IP */
++static void urlfrag_saveips(struct set *set, void *data, u_int32_t len, unsigned options, char dont_align) {
++	struct ip_set_urlfrag *trie = data;
++	char word[IPSET_FRAG_LEN];
++
++	dump(0, trie, FLAG_SAVE, 0, word, set->name);
++}
++
++static void urlfrag_usage(void) {
++	printf("-N set urlfrag\n"
++	     "-A set fragment\n"
++	     "-D set fragment\n"
++	     "-T set fragment\n");
++}
++
++static struct settype settype_urlfrag = {
++	.typename = SETTYPE_NAME,
++	.protocol_version = IP_SET_PROTOCOL_VERSION,
++
++	/* Create */
++	.create_size = sizeof(struct ip_set_req_urlfrag_create),
++	.create_init = urlfrag_create_init,
++	.create_parse = urlfrag_create_parse,
++	.create_final = urlfrag_create_final,
++	.create_opts = create_opts,
++
++	/* Add/del/test */
++	.adt_size = sizeof(struct ip_set_req_urlfrag),
++	.adt_parser = &adt_parser,
++
++	/* Printing */
++	.header_size = sizeof(struct ip_set_urlfrag),
++	.initheader = urlfrag_initheader,
++	.printheader = urlfrag_printheader,
++	.printips = urlfrag_printips,
++	.printips_sorted = urlfrag_printips_sorted,
++	.saveheader = urlfrag_saveheader,
++	.saveips = urlfrag_saveips,
++	
++	.usage = urlfrag_usage,
++};
++
++CONSTRUCTOR(urlfrag) {
++	settype_register(&settype_urlfrag);
++
++}
+Index: ipset/kernel/Makefile.ipset
+===================================================================
+--- ipset.orig/kernel/Makefile.ipset	2010-08-24 13:19:58.212049925 +1000
++++ ipset/kernel/Makefile.ipset	2010-08-24 13:20:11.861997655 +1000
+@@ -3,6 +3,7 @@ obj-$(CONFIG_IP_NF_SET) += ip_set.o
+ obj-$(CONFIG_IP_NF_SET_IPMAP) += ip_set_ipmap.o
+ obj-$(CONFIG_IP_NF_SET_PORTMAP) += ip_set_portmap.o
+ obj-$(CONFIG_IP_NF_SET_POLYNUM) += ip_set_polynum.o
++obj-$(CONFIG_IP_NF_SET_URLFRAG) += ip_set_urlfrag.o
+ obj-$(CONFIG_IP_NF_SET_MACIPMAP) += ip_set_macipmap.o
+ obj-$(CONFIG_IP_NF_SET_IPHASH) += ip_set_iphash.o
+ obj-$(CONFIG_IP_NF_SET_NETHASH) += ip_set_nethash.o
+Index: ipset/Makefile
+===================================================================
+--- ipset.orig/Makefile	2010-08-24 13:19:58.181925481 +1000
++++ ipset/Makefile	2010-08-24 13:20:11.861997655 +1000
+@@ -70,6 +70,7 @@ SETTYPES+=iptree iptreemap
+ SETTYPES+=iphash nethash ipporthash ipportiphash ipportnethash
+ SETTYPES+=setlist
+ SETTYPES+=polynum
++SETTYPES+=urlfrag
+ 
+ lower=$(shell echo $(1) | tr [:upper:] [:lower:])
+ upper=$(shell echo $(1) | tr [:lower:] [:upper:])

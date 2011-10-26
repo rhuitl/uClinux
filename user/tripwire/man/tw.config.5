@@ -1,0 +1,341 @@
+.\" $Id: tw.config.5,v 1.14 1994/07/25 15:46:24 gkim Exp $
+.\"
+.\" Macros added by addw@phcomp.co.uk for those systems where the an
+.\" troff macro package doesn't know about .Ps & .Pe.
+.\" Note it is assumed that CW is a constant width font.
+.\" Ps - Start display text
+.de Ps
+.nf
+.in +0.5i
+.ft CW
+..
+.\" Pe - end of display text
+.de Pe
+.fi
+.in -0.5i
+.ft 1
+..
+.\"
+.TH TW.CONFIG 5 "October 5, 1992"
+.SH NAME
+tw.config \- configuration file for Tripwire
+.SH SYNOPSIS
+tw.config
+.SH DESCRIPTION
+The \fItw.config\fP file contains the list of files and
+directories to be scanned by Tripwire.  Information on these
+files is collected and stored in the \fItw.db\fP database file.
+Stored with each \fItw.config\fP entry is a \fIselection-mask\fP
+that describes what changes Tripwire can safely ignore without
+reporting to the user (e.g., access timestamp).
+.LP
+The first section in this manual page describes the entry format in
+\fItw.config\fP for the files monitored by Tripwire.  The second
+section describes the proprocessing directives that Tripwire
+provides.  These directives, which provide functionality similar to
+the C preprocessor and M4 macro processor, allow Tripwire to make
+bindings at run-time.  This allows system administrators to use common
+\fItw.config\fP files across multiple machines \- or even across an
+entire site.
+.SH ENTRY FORMAT
+.LP
+Each entry in \fItw.config\fP is a single line in the following form:
+.sp
+.RS
+\fBFormat\fP: 	\fI[!|=] entry [select-flags | template] [# comment]\fP
+.RE
+.RS
+.TP 12
+.I entry
+An \fIentry\fP is the absolute pathname of a file or a directory. 
+Without any prefixes, the \fIentry\fP is added to the list of files
+to be scanned.  
+.TP
+.I \ 
+Note that directories listed in the \fItw.config\fP file are
+recursively descended.  However, filesystems are never crossed.
+(I.e., if \fI/usr\fP and \fI/usr/local\fP are seperate filesystems, a
+\fI/usr\fP in \fItw.config\fP entry will not scan files that reside
+in the \fI/usr/local\fP filesystem.)
+.RS
+.TP
+.I !
+Inclusive prune.  Prunes \fIentry\fP from the list of files to be
+scanned.  If \fIentry\fP is a file, the file is removed from the list
+of files.  If \fIentry\fP is a directory, the directory and all of its
+children are removed from the list of files.
+.TP
+.I =
+Exclusive prune.  Does not prune \fIentry\fP, but does prune its
+children.  This has no effect if \fIentry\fP is a file.  This option
+is useful for monitoring directories with transient files (e.g., /tmp
+and /var/tmp).
+.RE
+.TP
+.I select-flags
+\fIselect-flags\fP describe inode and file attributes.
+\fIselect-flags\fP either specifies Tripwire to ignore changes in a
+specific attribute, or to report them.  \fIselect-flags\fP are
+provided in the form:
+.I
+[ [+|-][pinugsam123456789] ... ]
+.RS
+.TP 4
+.I -
+ignore the following attributes 	
+.TP
+.I +
+record and check the following attributes
+.TP
+.I p
+permission and file mode bits 	
+.TP
+.I i
+inode number			
+.TP
+.I n
+number of links (i.e., inode reference count)	
+.TP
+.I u
+user id of owner			
+.TP
+.I g
+group id of owner			
+.TP
+.I s
+size of file
+.TP
+.I a
+access timestamp
+.TP
+.I m
+modification timestamp
+.TP
+.I c
+inode creation/modification timestamp
+.TP
+.I 0
+signature 0 \- null signature
+.TP
+.I 1
+signature 1 \- MD5, the RSA Data Security, Inc. Message Digesting
+Algorithm.
+.TP
+.I 2
+signature 2 \- Snefru, the Xerox Secure Hash Function.
+.TP
+.I 3
+signature 3 \- CRC-32, POSIX 1003.2 compliant 32-bit Cyclic Redundancy
+Check.
+.TP
+.I 4
+signature 4 \- CRC-16, the standard (non-CCITT) 16-bit Cyclic
+Redundancy Check.
+.TP
+.I 5
+signature 5 \- MD4, the RSA Data Security, Inc. Message Digesting
+Algorithm.
+.TP
+.I 6
+signature 6 \- MD2, the RSA Data Security, Inc. Message Digesting
+Algorithm.
+.TP
+.I 7
+signature 7 \- SHA, the NIST Secure Hash Algorithm (NIST FIPS 180)
+.TP
+.I 8
+signature 8 \- Haval, a strong 128-bit signature algorithm
+.TP
+.I 9
+signature 9 \- null signature (reserved for future expansion)
+.RE
+.TP
+.I templates
+\fItemplate\fP are predefined sets of \fIselect-flags\fP that are
+commonly used by system administrators.
+.RE
+.LP
+The following templates have been pre-defined to make these long 
+\fIselect-masks\fP descriptions unnecessary.
+.RS
+.nf
+.TP 6
+.I R 
+[R]ead-only (+pinugsm12-ac3456789) \fI(default)\fP
+.TP
+.I L 
+[L]og file (+pinug-sacm123456789)
+.TP
+.I N
+ignore [N]othing (+pinusgsamc123456789)
+.TP
+.I E
+ignore [E]verything (-pinusgsamc123456789)
+.TP
+.I >
+monotonically growing file (+pinug>-samc1233456789) \- the ``>'' indicates
+that file changes are ignored only when the file is smaller than the last
+recorded size.  This is useful for log files that are expected to grow.
+.fi
+.RE
+.LP
+By default, Tripwire uses the R template.  Because it applies the
+set of \fIselect-flags\fP {+pinugsm12-a3456789}, Tripwire ignores
+those changed files where only the access timestamp changed.
+.LP
+You can combine the use of templates with \fIselect-flag\fP modifiers.
+The following entry monitors only changes in user-id and group-id
+information.
+.RS
+/etc/lp	E+ug
+.RE
+.SH ENTRY EXAMPLES
+.LP
+The following entry will scan all the files in /etc, and report
+any changes in mode bits, inode number, reference count, uid,
+gid, modification and creation timestamp, and the signatures.
+However, it will ignore any changes in the access timestamp.
+.RS
+/etc	+pinugsm12-a
+.RE
+.LP
+It is equivalent to:
+.RS
+/etc	R
+.RE
+.LP
+The following example shows a very simple \fItw.config\fP file that 
+monitors selected directories.
+.RS
+.nf
+/etc		R	# all system files
+!/etc/lp		R	# ...but not those logs
+=/tmp		N	# just the directory, not its files
+.fi
+.RE
+.LP
+Note the difference between pruning (via "!") and ignoring everything
+(via "N" template):  ignoring everything in a directory still monitors
+for added and deleted files, but pruning a directory will prevent Tripwire
+from even looking in the specified directory for any changes.
+.LP
+.I Hint: 
+Is Tripwire running too slowly?  Modify your \fItw.config\fP entries
+to use only a few signatures (e.g., signatures 1 and 5) when this
+computationally-exorbitant protection is not needed.  (See README and
+design document for further details.)
+.SH PREPROCESSOR
+.LP
+Tripwire incorporates a general purpose preprocessor that parses
+the \fItw.config\fP file in one-pass.  Available preprocessing directives
+include file inclusion, macro defines, conditionals based upon
+hostname or macros, and on-the-fly macro substitution.  These directives
+provide C-preprocessor and m4-like capabilities.
+.LP
+The Tripwire preprocessor was included to allow its scalable use at 
+large sites, allowing system administrators to reuse \fItw.config\fP files
+by either including component files or having multiple machines share a
+common \fItw.config\fI file.
+.RS
+.TP 30
+.I @@ifhost HOSTNAME	
+includes text until matching \fI@@endif\fP if the machine
+hostname matches the specified \fIHOSTNAME\fP.  Remember that you must use
+the exact hostname that \fIuname(1)\fP or \fIhostname(1)\fP returns.  
+This usually implies that you must use the fully qualified hostname
+(e.g., mentor.cc.purdue.edu).
+.TP
+.I @@ifnhost HOSTNAME
+includes text until matching \fI@@endif\fP if the machine
+hostname does not match the specified \fIHOSTNAME\fP.
+.TP
+.I @@else 
+provides if-else semantics to preprocessor.
+.TP
+.I @@define VAR STRING
+defines variable \fIVAR\fP to \fISTRING\fP.  If the second argument
+is not provided, then a null-string is assigned to \fIVAR\fP.
+.TP
+.I @@undef VAR
+clears the definition associated with variable \fIVAR\fP.
+.TP
+.I @@ifdef VAR
+includes text until the matching \fI@@endif\fP or \fI@@else\fP if the
+variable \fIVAR\fP has been defined.
+.TP
+.I @@ifndef VAR
+includes text until matching \fI@@endif\fP or \fI@@else\fP if the
+variable \fIVAR\fP has not been defined.
+.TP
+.I @@endif
+closes up \fI@@ifhost\fP, \fI@@ifnhost\fP, \fI@@ifdef\fP, and
+\fI@@ifndef\fP.
+.TP
+.I @@include ``PATHNAME''
+reads in the specified source file.  The double-quotes are optional.
+.TP
+.I @@VAR
+substitutes the definition of \fIVAR\fP with the \fI@@define\fP'ed
+value.
+.TP
+.I @@{VAR}
+substitutes the definition of \fIVAR\fP with the \fI@@define\fP'ed
+value.
+.RE
+.LP
+.I Example:
+A host-dependent inclusion can be specified many ways so \fItw.config\fP
+files can be shared among multiple machines.  So, if the machine 
+"mentor.cc.purdue.edu" is the only machine that has a certain file,
+you could use:
+.RS
+.nf
+@@ifhost mentor.cc.purdue.edu
+/etc/tw.log.mentor	R
+@@endif
+
+@@define ARCHIVE	R
+/etc/tw.log		@@ARCHIVE
+.fi
+.RE
+.SH CAVEATS
+.LP
+Although Tripwire provides hooks for ten different
+signature routines, using all ten would certainly be overkill in
+almost any imaginable situation.  However, having up to ten
+signature routines in your signature arsenal allows system
+administrators considerable flexibility in finding the balance
+between performance and security for their specific site.  This
+is the reason for supplying CRC-16 and CRC-32, which are trivially
+simple to spoof.  These routines are not secure, but they are
+faster than the message-digesting routines.
+.SH DATABASE VERSIONS
+.LP
+Tripwire v1.0 used database version 1.  Database version 2 changed the
+base-64 alphabet so that ``0'' retained its traditional value.
+.LP
+Database
+version 3 changed the base-64 encoding so that all the bits were packed,
+reducing the size of 160-bit signatures from 30 characters to 27
+characters.
+Tripwire v1.1 used database version 3.  The program
+\fItwconvert\fP is provided to convert from the older database formats
+to version 3.
+.LP
+Tripwire v1.2 uses database version 4, supporting signatures for
+symbolic links and more consistent handling of entry numbers.  (Note
+that \fItwconvert\fP cannot convert older database versions to
+database version 4.  These databases will have to be regenerated.)
+.SH SEE ALSO
+tripwire(8), twconvert(8)
+.SH AUTHOR
+.nf
+Gene Kim
+Purdue University
+gkim@cs.purdue.edu
+
+Eugene Spafford
+Purdue University
+spaf@cs.purdue.edu
+.fi
+

@@ -1,0 +1,24 @@
+#!/bin/sh
+
+#
+#	mk.config.in -- make a set of local Config.in files for busybox
+#
+#	This takes the "dist"ified Kconfig files and converts them back
+#	to original looking busybox Config.in files for the conf system
+#	to be able to process and generate the local headers needed to
+#	build busybox.
+#
+
+find -name Kconfig | while read FILE
+do
+	OUTFILE="`dirname $FILE`/Config.in"
+	chmod 0660 $OUTFILE
+	echo "$FILE -> $OUTFILE"
+	sed -e 's/USER_BUSYBOX_//g' \
+	    -e 's/..\/user\/busybox\///g' \
+	    -e 's/Kconfig/Config.in/g' \
+		< $FILE > $OUTFILE
+	chmod 0440 $OUTFILE
+done
+
+exit 0

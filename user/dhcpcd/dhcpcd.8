@@ -1,0 +1,152 @@
+.\" $Id: dhcpcd.8,v 1.1.1.1 1999-11-22 03:47:59 christ Exp $
+.\"
+.TH dhcpcd 8 "28 August 1997" "dhcpcd 0.70" "Linux System Manager's Manual"
+
+.SH NAME
+dhcpcd \- DHCP client daemon
+
+.SH SYNOPSIS
+.in +.5i
+.ti -.5i
+dhcpcd
+\%[\-c\ filename]
+\%[\-d]
+\%[-h\ hostname]
+\%[-i\ vendorClassIdentifier]
+\%[-I\ clientIdentifier]
+\%[\-k]
+\%[\-l\ leasetime]
+\%[\-r]
+\%[interface]
+.in -.5i
+.SH DESCRIPTION
+.B dhcpcd
+is an implementation of the DHCP client specified in
+.B RFC2131
+(when -r option is not specified) and
+.B RFC1541
+(when -r option is specified).
+
+It gets the host information (IP address, netmask, broadcast address,
+etc.) from a DHCP server and configures the network interface of the
+machine on which it is running. It also tries to renew the lease time
+according to
+.B RFC2131
+or
+.B RFC1541
+(obsolete).
+
+
+.SH OPTIONS
+.TP
+.BI \-c \ filename
+Specifies the command file which is invoked when
+.B dhcpcd
+successfully gets an IP address.
+.TP
+.BI \-d
+Forces
+.B dhcpcd
+to run in the foreground.
+.TP
+.BI \-h \ hostname
+specifies a string used for the hostname option field when
+.B dhcpcd
+sends DHCP messages. Some DHCP servers require the hostname option
+field containing a specific string in the DHCP messages from clients.
+.TP
+.BI \-i \ vendorClassIdentifier
+Specifies the vendor class identifier string.
+.B dhcpcd
+uses the default vendor class identifier string (system name, sytem release,
+and machine type) if it is not specified.
+.TP
+.BI \-I \ clientIdentifier
+Specifies the client identifier string.
+.B dhcpcd
+uses the default client identifier (Ethernet Address of the network
+interface) if it is not specified.
+.TP
+.BI \-k
+Sends a
+.B SIGTERM
+signal to the
+.B dhcpcd
+process that is currently running.
+.TP
+.BI \-l \ leasetime
+Specifies (in seconds) the recommended lease time to the server. (Note
+that the server can override this value if it sees fit). This value is
+used in the DHCPDISCOVER message.
+.TP
+.BI \-r
+Makes dhcpcd RFC1541 (obsolete) compliant. dhcpcd is RFC2131 compliant
+unless this option is specified.
+.TP
+.BI interface
+Specifies the network interface name (eth0, eth1, etc.).
+.B dhcpcd
+uses the network interface
+.I eth0
+unless an explicit name is specified.
+
+.SH FILES
+.PD 0
+.TP 25
+.B /etc/dhcpc
+directory used for storing files
+created by
+.B dhcpcd
+.TP 25
+.BI /etc/dhcpc/hostinfo\- interface
+file in which
+.B dhcpcd
+saves the host information. The word
+.I interface
+is actually replaced with the network interface name like
+.I eth0
+to which dhcpcd is attached.
+.TP 25
+.B /etc/dhcp/resolv.conf
+file created by
+.B dhcpcd
+when the client receives DNS and domain name options
+.TP 25
+.B /var/run/dhcpcd\-pid
+file containing the process id of
+.B dhcpcd
+.TP 25
+.BI /var/run/dhcpcd\-cache. interface
+cache file containing the previously assigned IP address. The word
+.I interface
+is actually replaced with the network interface name like
+.I eth0
+to which
+.B dhcpcd
+is attached.
+
+.SH SEE ALSO
+.I Dynamic Host Configuration Protocol,
+RFC2131 and RFC1541 (obsolete)
+.LP
+.I DHCP Options and BOOTP Vendor Extensions,
+RFC1533
+
+.SH BUGS
+.B dhcpcd
+uses
+.B time(3)
+to calculate the lease expiration time.  If the system time is changed
+while the client is running, the lease expiration time may not be
+predictable.
+
+.B dhcpcd
+does not support the DHCPINFORM message.
+
+.B dhcpcd
+cannot handle DHCP options (e.g. domain name) which have more than 255
+characters. All the DHCP options have to be less than or equal to 255.
+
+
+.SH AUTHOR
+Yoichi Hariguchi <yoichi@fore.com>

@@ -1,0 +1,120 @@
+# ###########################################################################
+#
+# Userspace GPL Speedtouch USB peer sample file
+#
+# This file could be rename but its place is under /etc/ppp/peers
+#
+# To connect to the Internet using this configuration file
+# $ pppd call adsl.ppp-peersample
+#
+# where "adsl.ppp-peersample" stands for the name of this file
+#
+# $Id: adsl.ppp-peersample,v 1.3 2004/04/03 09:09:17 papillau Exp $
+#
+############################################################################
+
+#
+# Put your ISP login name here and update your chap-secrets
+# (This example is a typical Wanadoo.fr login)
+#
+
+user "fti/xxxxxxx@fti"
+
+noauth
+
+#
+# PPPoA3 daemon is the default one but you can use the old PPPoA2
+#
+# To help you for your choice :
+#
+# pppoa3 is multithreaded, has more features, has a better design.
+# pppoa2 is simpler but is deprecated due to its limited design.
+#
+# pppoa2 is still in this driver set because BSD systems have a
+# problem with usb+multithreading but all GNU/Linux systems should
+# use pppoa3
+#
+
+#
+# Comment only one of those pty option
+#
+# Don't forget to adapt the vpi.vci couple to your ISP/country settings
+# Read the FAQ for some vpi.vci couples
+#
+# If you installed from a rpm or deb package the right path is /usr/sbin
+# instead of /usr/local/sbin
+#
+
+
+#pty "/usr/local/sbin/pppoa2 -vpi 8 -vci 35"
+pty "/usr/local/sbin/pppoa3 -c -m 1 -vpi 8 -vci 35"
+
+#
+# pppoa2 must run in sync mode, this option must be set.
+#
+# pppoa3 can run in either sync or async mode
+#
+# In order to use the async mode with pppoa3 :
+#   - comment this option
+#   - replace the pty "..." line with this one
+#     pty "/usr/local/sbin/pppoa3 -a -c -m 1 -vpi 8 -vci 35"
+#
+
+sync
+
+#
+# We don't need a default ip
+#
+
+noipdefault
+
+#
+# We don't want to negociate compression schemes at all
+#
+
+noaccomp
+nopcomp
+noccp
+novj
+
+#
+# Makes pppd "dial again" when the connection is lost
+#
+
+persist
+
+#
+# pppd will try to connect "maxfail" times and wait "holdoff" seconds
+# between each try.
+#
+
+holdoff 4
+maxfail 25
+
+#
+# Asks your ISP for its DNS ip
+# (look at the /etc/ppp/resolv.conf)
+#
+
+usepeerdns
+
+#
+# Makes this ppp link the default inet route
+# (route -n to check it)
+#
+
+defaultroute
+
+#
+# If something goes wrong try uncommenting this
+#
+
+#debug
+#kdebug 1
+
+#
+# LCP requests are not mandatory plus they fail
+# on some systems
+#
+#lcp-echo-interval 600
+#lcp-echo-failure 10

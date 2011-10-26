@@ -1,0 +1,209 @@
+#!/bin/sh
+#
+# ipsec.func	This file contains functions for use by klips/test
+#		shell scripts.
+# Version:	0.0
+#
+# Author:	Richard Guy Briggs, <rgb@conscoop.ottawa.on.ca>
+#
+# Default search path:
+export PATH="/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin"
+#
+# The following (environment) variables are expected to be set before
+# calling these functions as apropriate.
+#
+# net1=
+# net2=
+# gw1=
+# gw2=
+# h_mask=
+# n_mask=
+# ipsec_dev=
+# phys_dev=
+## iv=
+## esp_key=
+## ah_key=
+#
+# xform1a=
+# xform1b=
+# xform1c=
+# xform2a=
+# xform2b=
+# xform2c=
+#
+# spi1a=
+# spi1b=
+# spi1c=
+# spi2a=
+# spi2b=
+# spi2c=
+#
+
+# Setup module and interface
+#
+ipsec_setup() {
+	# Load the module
+	depmod -a
+	modprobe ipsec
+	# Attach and configure the interface
+	tncfg attach $ipsecdev $physdev
+	ifconfig $ipsecdev $gw1 
+}
+#
+# Clean up and unload the module
+ipsec_unload() {
+	ifconfig ipsec0 down
+	ifconfig ipsec1 down
+	rmmod ipsec
+}
+#
+# Display configuration from /proc/net/ipsec* filesystem.
+#
+ipsec_proc() {
+	echo /proc/net/ipsec-spi
+	cat /proc/net/ipsec-spi
+	echo
+	echo /proc/net/ipsec-route
+	cat /proc/net/ipsec-route
+}
+#
+# Setup a secure connection
+#
+ipsec_setconn() {
+case "$1" in
+	# Transport mode
+	trespah)
+		spi $gw1 $spi1a esp $xform1a i \
+			$iv $esp_key
+
+		route del $gw2
+		route add -host $gw2 dev ipsec0
+
+		eroute add $gw1 $hmask \
+			$gw2 $hmask \
+			$gw2 $spi2a
+		spi $gw2 $spi2a esp $xform2a i \
+			$iv $esp_key
+		;;
+	trespahdel)
+		spi $gw1 $spi1a del
+
+		spi $gw2 $spi2a del
+
+		eroute del $gw1 $hmask $gw2 $hmask
+
+		route del $gw2
+		;;
+	trah)
+		spi $gw1 $spi1a ah $xform1a $ah_key
+
+		route del $gw2
+		route add -host $gw2 dev ipsec0
+
+		eroute add $gw1 $hmask \
+			$gw2 $hmask \
+			$gw2 $spi2a
+		spi $gw2 $spi2a ah $xform2a $ah_key
+		;;
+	tresp)
+		spi $gw1 $spi1a esp $xform1a $iv $esp_key
+
+		route del $gw2
+		route add -host $gw2 dev ipsec0
+
+		eroute add $gw1 $hmask \
+			$gw2 $hmask \
+			$gw2 $spi2a
+		spi $gw2 $spi2a esp $xform2a $iv $esp_key
+		;;
+	# Tunnel mode
+	tu)
+		# return path
+		spi $gw1 $spi1b esp $xform1b $iv $esp_key
+		spi $gw1 $spi1c ah $xform1c $ah_key
+
+		route del $net2
+		route add -net $net2 dev ipsec0 gw $gw2
+
+		# forward path
+		eroute add $net1 $nmask \
+			$net2 $nmask \
+			$gw2 $spi2a
+
+		spi $gw2 $spi2a $xform2a \
+			$gw1 $gw2
+		spi $gw2 $spi2b esp $xform2b $iv $esp_key
+		spi $gw2 $spi2c ah $xform2c $ah_key
+
+		spigrp $gw2 $spi2a \
+			$gw2 $spi2b \
+			$gw2 $spi2c
+		;;
+	turoad)
+		# return path
+		spi $gw1 $spi1b esp $xform1b $iv $esp_key
+		spi $gw1 $spi1c ah $xform1c $ah_key
+
+		route del $gw2
+		route add -host $gw2 dev ipsec0 gw $gw2a
+
+		# forward path
+		eroute add $net1 $nmask \
+			$gw2 $hmask \
+			$gw2 $spi2a
+
+		spi $gw2 $spi2a $xform2a \
+			$gw1 $gw2
+		spi $gw2 $spi2b esp $xform2b $iv $esp_key
+		spi $gw2 $spi2c ah $xform2c $ah_key
+
+		spigrp $gw2 $spi2a \
+			$gw2 $spi2b \
+			$gw2 $spi2c
+		;;
+	turoad2)
+		# return path
+		spi $gw1 $spi1b esp $xform1b $iv $esp_key
+		spi $gw1 $spi1c ah $xform1c $ah_key
+
+		route del $net2
+		route add -net $net2 dev ipsec0 gw $gw2
+
+		# forward path
+		eroute add $gw1 $hmask \
+			$net2 $nmask \
+			$gw2 $spi2a
+
+		spi $gw2 $spi2a $xform2a \
+			$gw1 $gw2
+		spi $gw2 $spi2b esp $xform2b $iv $esp_key
+		spi $gw2 $spi2c ah $xform2c $ah_key
+
+		spigrp $gw2 $spi2a \
+			$gw2 $spi2b \
+			$gw2 $spi2c
+		;;
+	tugw)
+		# return path
+		spi $gw1 $spi1b esp $xform1b $iv $esp_key
+		spi $gw1 $spi1c ah $xform1c $ah_key
+
+		route del $gw2
+		route add -host $gw2 dev ipsec0
+
+		# forward path
+		eroute add $gw1 $hmask \
+			$gw2 $hmask \
+			$gw2 $spi2a
+
+		spi $gw2 $spi2a $xform2a \
+			$gw1 $gw2
+		spi $gw2 $spi2b esp $xform2b $iv $esp_key
+		spi $gw2 $spi2c ah $xform2c $ah_key
+
+		spigrp $gw2 $spi2a \
+			$gw2 $spi2b \
+			$gw2 $spi2c
+		;;
+esac
+}

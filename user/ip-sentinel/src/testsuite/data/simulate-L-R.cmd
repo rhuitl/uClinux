@@ -1,0 +1,2 @@
+--mac   LOCAL
+--llmac RANDOM

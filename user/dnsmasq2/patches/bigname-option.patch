@@ -1,0 +1,173 @@
+Date: 2006/11/11 02:49:29
+#11908
+
+Shrink the size of the cache record structure by dynamically allocating
+all name pointers for host entries, instead of having a 40 byte buffer
+in the record and using a pool of MAXDNAME (1k) sized entries for all
+other names.
+
+Index: dnsmasq2/src/cache.c
+===================================================================
+--- dnsmasq2.orig/src/cache.c	2009-03-11 14:00:25.000000000 +1000
++++ dnsmasq2/src/cache.c	2009-03-11 14:21:20.000000000 +1000
+@@ -19,8 +19,12 @@
+ static struct crec *cache_head = NULL, *cache_tail = NULL, **hash_table = NULL;
+ static struct crec *dhcp_spare = NULL, *new_chain = NULL;
+ static int cache_inserted = 0, cache_live_freed = 0, insert_error;
++#ifdef USE_BIGNAMES
+ static union bigname *big_free = NULL;
+ static int bignames_left, hash_size;
++#else
++static int hash_size;
++#endif
+ static int uid = 0;
+ static char *addrbuff = NULL;
+ 
+@@ -75,7 +79,9 @@ void cache_init(void)
+   if (daemon->options & OPT_LOG)
+     addrbuff = safe_malloc(ADDRSTRLEN);
+   
++#ifdef USE_BIGNAMES
+   bignames_left = daemon->cachesize/10;
++#endif
+   
+   if (daemon->cachesize > 0)
+     {
+@@ -187,8 +193,13 @@ static void cache_free(struct crec *crec
+   /* retrieve big name for further use. */
+   if (crecp->flags & F_BIGNAME)
+     {
++#ifdef USE_BIGNAMES
+       crecp->name.bname->next = big_free;
+       big_free = crecp->name.bname;
++#else
++      free(crecp->name.dyn_namep);
++      crecp->name.dyn_namep = NULL;
++#endif
+       crecp->flags &= ~F_BIGNAME;
+     }
+ }    
+@@ -222,7 +233,11 @@ static void cache_unlink (struct crec *c
+ char *cache_get_name(struct crec *crecp)
+ {
+   if (crecp->flags & F_BIGNAME)
++#ifdef USE_BIGNAMES
+     return crecp->name.bname->name;
++#else
++    return crecp->name.dyn_namep;
++#endif
+   else if (crecp->flags & F_DHCP) 
+     return crecp->name.namep;
+   
+@@ -357,7 +372,11 @@ struct crec *cache_insert(char *name, st
+ 			  time_t now,  unsigned long ttl, unsigned short flags)
+ {
+   struct crec *new;
++#ifdef USE_BIGNAMES
+   union bigname *big_name = NULL;
++#else
++  char *dyn_namep = NULL;
++#endif
+   int freed_all = flags & F_REVERSE;
+   int free_avail = 0;
+ 
+@@ -421,6 +440,7 @@ struct crec *cache_insert(char *name, st
+        If that fails, give up now. */
+     if (name && (strlen(name) > SMALLDNAME-1))
+       {
++#ifdef USE_BIGNAMES
+ 	if (big_free)
+ 	  { 
+ 	    big_name = big_free;
+@@ -434,6 +454,14 @@ struct crec *cache_insert(char *name, st
+ 	  }
+ 	else
+ 	  bignames_left--;
++#else
++	dyn_namep = malloc(strlen(name) + 1);
++	if (dyn_namep == NULL)
++	  {
++	    insert_error = 1;
++	    return NULL;
++	  }
++#endif
+ 	
+       }
+ 
+@@ -443,9 +471,17 @@ struct crec *cache_insert(char *name, st
+   }
+   
+   new->flags = flags;
++#ifdef USE_BIGNAMES
+   if (big_name)
++#else
++  if (dyn_namep)
++#endif
+     {
++#ifdef USE_BIGNAMES
+       new->name.bname = big_name;
++#else
++      new->name.dyn_namep = dyn_namep;
++#endif
+       new->flags |= F_BIGNAME;
+     }
+ 
+@@ -806,8 +842,13 @@ void cache_reload(int opts, char *buff, 
+ 	    *up = cache->hash_next;
+ 	    if (cache->flags & F_BIGNAME)
+ 	      {
++#ifdef USE_BIGNAMES
+ 		cache->name.bname->next = big_free;
+ 		big_free = cache->name.bname;
++#else
++		free(cache->name.dyn_namep);
++		cache->name.dyn_namep = NULL;
++#endif
+ 	      }
+ 	    cache->flags = 0;
+ 	  }
+Index: dnsmasq2/src/config.h
+===================================================================
+--- dnsmasq2.orig/src/config.h	2009-03-11 14:16:44.000000000 +1000
++++ dnsmasq2/src/config.h	2009-03-11 14:19:29.000000000 +1000
+@@ -29,7 +29,11 @@
+ #define PING_CACHE_TIME 30 /* Ping test assumed to be valid this long. */
+ #define DECLINE_BACKOFF 600 /* disable DECLINEd static addresses for this long */
+ #define DHCP_PACKET_MAX 16384 /* hard limit on DHCP packet size */
++#ifdef USE_BIGNAMES
+ #define SMALLDNAME 40 /* most domain names are smaller than this */
++#else
++#define SMALLDNAME 4  /* minimal size of struct crec */
++#endif
+ #ifndef ETC_DIR
+ #define ETC_DIR "/etc"
+ #endif
+Index: dnsmasq2/src/dnsmasq.h
+===================================================================
+--- dnsmasq2.orig/src/dnsmasq.h	2009-03-11 14:00:25.000000000 +1000
++++ dnsmasq2/src/dnsmasq.h	2009-03-11 14:19:29.000000000 +1000
+@@ -235,10 +235,12 @@ struct interface_name {
+   struct interface_name *next;
+ };
+ 
++#ifdef USE_BIGNAMES
+ union bigname {
+   char name[MAXDNAME];
+   union bigname *next; /* freelist */
+ };
++#endif
+ 
+ struct crec { 
+   struct crec *next, *prev, *hash_next;
+@@ -254,7 +256,11 @@ struct crec { 
+   unsigned short flags;
+   union {
+     char sname[SMALLDNAME];
++#ifdef USE_BIGNAMES
+     union bigname *bname;
++#else
++    char *dyn_namep;
++#endif
+     char *namep;
+   } name;
+ };

@@ -1,0 +1,437 @@
+.\" $Id: ip-sentinel.man,v 1.18 2005/03/08 14:05:55 ensc Exp $
+.\" Copyright (C) 2002,2003,2004,2005 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+.\"  
+.\" Permission is granted to make and distribute verbatim copies of
+.\" this manual provided the copyright notice and this permission notice
+.\" are preserved on all copies.
+.\"  
+.\" Permission is granted to process this file through groff/nroff and related
+.\" tools and print the results, provided the printed document carries copying
+.\" permission notice identical to this one except for the removal of this
+.\" paragraph (this paragraph not being relevant to the printed manual).
+.\"  
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a 
+.\" permission notice identical to this one.
+.\"  
+.\" Permission is granted to copy and distribute translations of this manual
+.\" into another language, under the above conditions for modified versions,
+.\" except that this permission notice may be stated in a translation
+.\" approved by the Free Software Foundation
+.\"
+..
+.de TQ
+.br
+.ns
+.TP \\$1
+..
+.TH ip-sentinel 8 "Dec 15 2004" "@PACKAGE@ 0.11"
+.\"
+.\" ====================
+.\"
+.SH NAME
+.PP
+ip-sentinel \- keeps your IP space clean
+.\"
+.\" ====================
+.\"
+.SH SYNOPSIS
+.B ip-sentinel
+.RB [ \-\-user | \-u
+.IR username ]
+.RB [ \-\-group | \-g
+.IR groupname ]
+.RB [ \-\-chroot | \-r
+.IR dir ]
+.RB [ \-\-ipfile | \-i
+.IR file ]
+.RB [ \-\-pidfile | \-p
+.IR file ]
+.RB [ \-\-logfile | \-l
+.IR file ]
+.RB [ \-\-errfile | \-e
+.IR file ]
+.RB [ \-\-mac
+.IR mac ]
+.RB [ \-\-llmac
+.IR mac ]
+.RB [ \-\-direction
+.IR dir ]
+.RB [ \-\-action
+.IR program ]
+.RB [ \-\-nofork | \-n ]
+.RB [ \-\-help | \-h ]
+.RB [ \-\-version ]
+.IR interface
+.\"
+.\" ====================
+.\"
+.SH DESCRIPTION
+.B ip-sentinel
+starts a daemon which tries to prevent unauthorized usage of IPs
+within an ethernet broadcastdomain by answering ARP requests. After
+receiving such a faked reply, the requesting party stores the MAC
+address in its ARP-table and will send future packets to this invalid
+MAC, rendering the IP unreachable.
+
+After startup it opens its logfiles, goes into a chroot jail, drops
+privileges and forks itself into background by default. The parameters
+of these operations can by changed by the options described below.
+
+.B Warning:
+.\"
+with an uncareful configuration, ip-sentinel can bring down the entire
+network and your physical presence at the ip-sentinel machine and/or
+the switch will be required to fix it. Some switches can show an
+unexpected behavior are even crash when the special \fI802.*\fR
+mac-addresses will be used.
+.\"
+.\" ====================
+.\"
+.SH OPTIONS
+.TP
+.BR \-\-user | \-u\ \fIusername\ \fRand\fB\ \-\-group | \-g\ \fIgroupname
+After doing basical initializations, the program will drop its
+privilegies by changing its user and group ID. The \fIusername\fR and
+\fIgroupname\fR parameters determine these new IDs and must be an
+alphanumeric username/groupname or a numeric uid/gid.
+
+.B Attention:
+.\"
+When having a dietlibc-compiled version in a system which uses remote
+NSS (e.g. LDAP, NIS) to make passwd-lookups, you will have to use
+numeric IDs.
+.\"
+.TP
+.BR \-\-chroot | \-r\ \fIdirname
+Specifies the directory where the program shall go into and call
+.B chroot()
+after finishing its initialization. By default it is the homedirectory
+of the user specified with the \fB\-\-user\fR option.
+.TP
+.BR \-\-ipfile | \-i\ \fIfilename
+Sets the name of the configuration file which contains the list of
+forbidden IPs. This name is relative to the chroot and is
+.BR ips.cfg
+by default. This file will be reread automatically after changes.
+.TP
+.BR \-\-pidfile | \-p\ \fIfilename
+Sets the file where the pid of the daemon will be written into. This
+filename is relative to the root-filesystem and is
+.BR /var/run/ip\-sentinel.run
+by default.
+.TP
+.BR \-\-logfile | \-l\ \fIfilename
+Sets the file where normal operations will be logged. Normal
+operations are e.g. an ARP-reply for a forbidden IP. This filename is
+relative to the root-filesystem and
+.BR /var/log/ip-sentinel.out
+by default.
+.TP
+.BR \-\-errfile | \-e\ \fIfilename
+Sets the file where error-conditions will be logged. Error-conditions
+are e.g. detected DOS attacks (bombing the ip-sentinel with
+ARP-requests) or errors in the configuration file. This filename is
+relative to the root-filesystem and
+.BR /var/log/ip-sentinel.err
+by default.
+.TP
+.BR \-\-nofork | \-n
+Prevents daemon from going into background after initialization. This
+option may be useful when using advanced init-concepts like minit
+(http://www.fefe.de/minit/).
+.TP
+.BR \-\-direction\ \fIdir
+ip-sentinel can answer both requests asking for an intruder's address,
+and requests coming from an intruder asking for official
+addresses. This parameter specifies which requests shall be
+answered. Possible values are \fIFROM\fR (requests from intruders),
+\fITO\fR (requests to intruders) and \fIBOTH\fR. The current default
+value is \fITO\fR, but will probably change to \fIBOTH\fR in future
+versions.
+.TP
+.BR \-\-mac\ \fImac
+Use \fImac\fR as the default faked mac-address; see below for possible
+values. This parameter can be overriden in the ipfile for each
+questionable IP. The default value is \fIRANDOM\fR.
+.TP
+.BR \-\-llmac\ \fImac
+Specifies the mac-address which will be used in the link-level headers
+when answering requests \fBfrom\fR intruders. Additionally to the
+values described below, ip-sentinel understands the \fISAME\fR string,
+which means that the address from the ARP-header will be used. When
+not using the \fIFROM\fR or \fIBOTH\fR directions, the assigned value
+will not have any effect. The default is \fILOCAL\fR.
+.TP
+.BR \-\-poison
+When an intruder sends a request \fBfrom\fR a registered ip address
+and this option is set, ip-sentinel will send ARP replies which are
+poisoning this ip. When the
+.I @!srcmac
+syntax is used for the questionable ip, the
+.I srcmac
+is used as the is-at mac. Else, the mac specified by the
+.I --mac
+option is used.
+
+This option takes an affect only when
+.I --destination BOTH \fRor\fI FROM
+is specified.
+.TP
+.BR \-\-action\ \fIprogram
+Execute \fBprogram\fR when a faked ARP reply will be generated. It
+will be called with 6 arguments:
+.RS
+.IP \(bu 2
+.IR type
+0 when an intruder sent the request, 1 when a protected IP was
+requested and -1 else (should never happen)
+.IP \(bu 2
+.IR spa
+the protocol address (IP) of the source
+.IP \(bu 2
+.IR sha
+the hardware address (MAC) of the source
+.IP \(bu 2
+.IR tpa
+the protocol address (IP) of the target
+.IP \(bu 2
+.IR tha
+the hardware address (MAC) of the target
+.IP \(bu 2
+.IR mac
+the generated MAC address
+.RE
+.RS
+
+The program will be executed only without evaluating its return value
+or something else. Please note, that the program will be executed in
+the chroot with restricted rights.
+.RE
+.TP
+.BR \-\-help | \-h
+Prints help message and exits.
+.TP
+.BR \-\-version
+Prints the version of the program and exits.
+.TP
+.I interface
+Specifies the network-interface where ip-sentinel listens for
+ARP-requests and sends ARP-replies. It is a name like "eth0"; aliases
+like "eth0:1" are not possible.
+.\"
+.\" ====================
+.\"
+.SH CONFIGURATION FILE
+The location of the configfile is relatively to the choosen
+chroot-directory. Its default is determined at compilation time but it
+can be overriden by the \fB\-\-ipfile\fR option.
+
+The content of this file has the following syntax:
+.\"
+.TP
+.IR  ip\  [ mac ]
+Specifies an IP which shall be blocked. "Blocked" means that
+ARP-replies will be generated telling that the IP address \fIip\fR has
+the MAC \fImac\fR. When the MAC parameter is not given, a random one
+will be choosen.
+
+.B Attention:
+.\"
+Assigning a MAC in a switched environment will not have the desired
+effect, because the switch will be confused when receiving ARP-replies
+for the same IP on different ports (this one of the bad-host and this
+one of the ip-sentinel host).
+
+Examples are: "192.168.42.23  11:22:33:44:55:66" or "10.0.0.0".
+.\"
+.TP
+.IB  ip @ [ ! ]srcmac\ [mac]
+Similarly to above, but when receiving ARP-requests, the entire
+sender-address (IP and MAC) will be compared against the \fIip\fR and
+\fIsrcmac\fR values. This setting affects packets \fBfrom\fR intruders
+only; ip-sentinel will not generate replies when \fIip\fR is
+requested.
+
+When the \fIsrcmac\fR is negated with "\fI!\fR", only addresses from
+this ip which are \fBnot\fR having this mac will be matching.
+
+Examples are: "10.0.0.1@0:1:2:3:4:5" or "10.0.0.2@!a:b:c:d:e:f".
+.\"
+.TP
+.BI *@ srcmac\ [mac]
+Every host using the srcmac will be blocked unless there is a matching
+\fIip@srcmac\fR specification. This option does \fBnot\fR support '!' 
+modifiers.
+.TP
+.IB net / mask\ \fR[ \fImac\fR]
+.TQ
+.IB net / mask @ [ ! ]srcmac\  \fR[ mac \fR]
+Specifies that IPs of an entiry network shall be blocked. See above
+for the meaning of "blocked". It is possible to specify a MAC address;
+else a random one will be generated.
+
+Examples are: "169.0.0.0/8", "192.168.8.15/255.255.65.31" or "192.168.23.42/26 a:b:c:d:e:f".
+.TP
+.BI ! ip
+.TQ
+.BI ! ip @ [ ! ]srcmac
+The given IP address \fIip\fR will be ignored. By default, any not
+specified address will be ignored but when having blocked netmasks it
+may be usefully to allow certain IPs.
+
+An example is: "!192.168.23.42"
+.TP
+.BI ! net / mask
+.TQ
+.BI ! net / mask @ [ ! ]srcmac
+Tells that IPs of the given network shall be ignored.
+
+Examples are: "!192.168.1.0/255.255.255.0" or "!0.0.0.0/0" (the
+default).
+.TP
+.BI #\  comment\ \fR(and\ \fRempty\ \fRlines)
+A comment; will be ignored
+
+.PP
+.\"
+To be switch-friendly, there are only a few random MACs possible which
+are having the format "de:ad:be:ef:00:XX". Within a short timespan
+only 32 values are possible for \fIXX\fR.
+
+When having overlapping networks and/or single IPs, this one with the
+most specified netmask (count of 1's) takes precedence. When netmasks
+are equal, networks which are using the "@srcmac" or "@!srcmac" syntax
+are taking precedence over those without source-macs. This "@..." rule
+\fBdoes not\fR apply to IPs. The behavior is unspecified when having
+overlapping networks with the same count of 1's and "@..." 
+specification, or when having duplicate IPs.
+
+.\"
+.SS PERFORMANCE
+.\"
+The lookup of single IPs has a complexity of O(log n) and this of
+netmasks a complexity of O(n).
+
+.\"
+.SS SPECIAL MAC ADDRESSES
+.\"
+Beside the usual hex-octets-delimited-by-colons mac addresses,
+ip-sentinel understands some special strings both on the commandline
+and in the configuration file:
+.TP
+.BR LOCAL
+expands to the mac-address of the used interface
+.TP
+.BR RANDOM
+means a random mac-address which is newly calculated on every usage
+.TP
+.BR 802.1d
+expands to 01:80:C2:00:00:00 which is the "Bridge Group Address".
+.TP
+.BR 802.3x
+expands to 01:80:C2:00:00:01 which is the "IEEE Std. 802.3x Full
+Duplex PAUSE operation". This MAC address will be blocked by a lot of
+switches and will probably become the default in future versions.
+.\"
+.PP
+The \fI802.*\fR addresses are having a special meaning for some
+switches and packets having them as destination-address will be
+dropped by the switch instead of flooding all ports. But it depends on
+the used switch how/if these macs are honored.
+
+Some switches can show an unexpected behavior are even crash if the
+special \fI802.*\fR mac-addresses will be used.
+.\"
+.SS RANGES
+.\"
+Except in comments, it is possible to specify ranges everywhere in the
+configuration file. These ranges are having the format "{from-to}" or
+"{item1,item2,...,itemN}". The first format includes any number
+beginning at "from" till "to" (inclusive), while the latter format
+expands to the listed items only. The expansion happens on a
+line-level and it is possible to use more than one range per line, so
+that
+
+.RS 0
+192.168.0.{1-3}     0:0:0:0:0:1
+.RS 0
+192.168.1.{1,3}     0:0:0:0:0:2
+.RS 0
+192.168.{2,4}.{1-3} 0:0:0:0:0:3
+
+is the same like writing
+
+.RS 0
+192.168.0.1         0:0:0:0:0:1
+.RS 0
+192.168.0.2         0:0:0:0:0:1
+.RS 0
+192.168.0.3         0:0:0:0:0:1
+.RS 0
+192.168.1.1         0:0:0:0:0:1
+.RS 0
+192.168.1.3         0:0:0:0:0:1
+.RS 0
+192.168.2.1         0:0:0:0:0:3
+.RS 0
+192.168.2.2         0:0:0:0:0:3
+.RS 0
+192.168.2.3         0:0:0:0:0:3
+.RS 0
+192.168.4.1         0:0:0:0:0:3
+.RS 0
+192.168.4.2         0:0:0:0:0:3
+.RS 0
+192.168.4.3         0:0:0:0:0:3
+
+Because there can be created very much entries with a single line
+(e.g. "{0-255}.{0-255}.{0-255}.{0-255}" would cover the entire IPv4
+internet), ranges should be used sparely. When possible, large ranges
+should be expressed with netmasks.
+
+.\"
+.SS EXAMPLE
+.RS 0
+0.0.0.0/0                 ## Block anything
+.RS 0
+!192.168.0.0/24           ## Allow IPs of the form 192.168.0.*
+.RS 0
+192.168.0.0               ## but block 192.168.0.0
+.RS 0
+192.168.0.1 a:b:c:d:e:f   ## use a special mac for 192.168.0.1
+.RS 0
+192.168.0.2 802.1d        ## and 01:80:C2:00:00:00 for 192.168.0.2
+.RS 0
+10.0.0.1@a:a:a:a:a:a
+.RS 0
+10.0.0.2@!1:1:1:1:1:1
+.RS 0
+*@b:b:b:b:b:b             ## block MAC b:b:b:b:b:b regardless of the IP
+
+This setup will not send ARP-replies for the IPs 192.168.0.{3-255} but
+when a host tries to use e.g. 169.254.145.213, ip-sentinel will tell
+that this IP has a MAC of "de:ad:be:ef:00:XX".
+
+When an intruder is at "10.0.0.1" and uses the mac "a:a:a:a:a:a:", a
+faked reply will be generated. Users at the same ip but another mac
+will be ignored.
+
+In opposite, users with ip "10.0.0.2" and mac "1:1:1:1:1:1" will be
+ignored but intruders with other macs (e.g. "2:2:2:2:2:2") are getting
+faked replies. When
+.I \-\-poision
+is used, ip-sentinel will generate a "10.0.0.2 is at 1:1:1:1:1:1"
+arp-reply to a broad address.
+.\"
+.\" ====================
+.\"
+.SH SEE ALSO
+.BR RFC\ 826 ,
+.BR IEEE\ Std\ 802.1D
+.\"
+.\" ====================
+.\"
+.SH AUTHOR
+Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>

@@ -1,0 +1,108 @@
+#! /bin/bash
+################################################################################
+#
+#	Startup script for Mbedthis AppWeb
+#	Copyright (c) Mbedthis LLC, 2003-2004. All Rights Reserved.
+#
+#	chkconfig: - 81 15
+#	description: Start Mbedthis AppWeb the embedded HTTP web server
+#
+################################################################################
+#
+#	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+#	The latest version of this code is available at http://www.mbedthis.com
+#
+#	This software is open source; you can redistribute it and/or modify it 
+#	under the terms of the GNU General Public License as published by the 
+#	Free Software Foundation; either version 2 of the License, or (at your 
+#	option) any later version.
+#
+#	This program is distributed WITHOUT ANY WARRANTY; without even the 
+#	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#	See the GNU General Public License for more details at:
+#	http://www.mbedthis.com/downloads/gplLicense.html
+#	
+#	This General Public License does NOT permit incorporating this software 
+#	into proprietary programs. If you are unable to comply with the GPL, a 
+#	commercial license for this software and support services are available
+#	from Mbedthis Software at http://www.mbedthis.com
+#
+###############################################################################
+
+. /etc/init.d/functions
+. /etc/sysconfig/network
+
+APPWEB_NAME="!!BLD_NAME!!"
+APPWEB=!!BLD_PRODUCT!!
+APPWEB_CMD=!!BLD_SBIN_PREFIX!!/$APPWEB
+INITLOG_ARGS=""
+RETVAL=0
+
+###############################################################################
+
+start() {
+	echo -n "Starting ${APPWEB_NAME}: "
+	RETVAL=0
+	#
+	#	MOB -- need this to properly daemonize and return status on failure
+	#	ie -d switch
+	#
+	daemon $APPWEB_CMD -d
+	RETVAL=$?
+	echo
+	[ ${RETVAL} = 0 ] && touch /var/lock/subsys/$APPWEB
+	return ${RETVAL}
+}
+
+###############################################################################
+
+stop() {
+	echo -n $"Stopping ${APPWEB_NAME}: "
+	killproc $APPWEB_CMD
+	RETVAL=$?
+	echo
+	[ ${RETVAL} = 0 ] && rm -f /var/lock/subsys/$APPWEB
+}
+
+###############################################################################
+#
+#	Main script
+#
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	status)
+		status $APPWEB_CMD
+		RETVAL=$?
+		;;
+	restart|reload)
+		stop
+		start
+		;;
+	condrestart)
+		if [ -f /var/lock/subsys/$APPWEB ]; then
+			stop
+			start
+		fi
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+		exit 1
+esac
+
+exit $RETVAL
+
+##
+##  Local variables:
+##  tab-width: 4
+##  c-basic-offset: 4
+##  End:
+##  vim:tw=78
+##  vim600: sw=4 ts=4 fdm=marker
+##  vim<600: sw=4 ts=4
+##

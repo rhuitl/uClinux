@@ -1,0 +1,87 @@
+The code in this directory is by Brian Edmonds <edmonds@cs.ubc.ca>.
+
+Here is the initial mail message Brian sent to the linux-diald mailing
+list about these scripts. 
+-------------------------------------------------------------------------------
+I've written a bunch of perl scripts which I use to monitor my SLIP
+usage with the diald account log.  They include both daily and weekly
+usage summaries, plus montly usage overviews with graphs of traffic
+in/out and time spent online.  Would people be interested in having them
+posted to the list?
+
+I've also made one change to the way diald operates in order to support
+them.  Each time it writes to the accounting log, I have it open the
+file, and close it immediately after.  This allows me to rotate the log
+files in the scripts so that they don't grow without bound.
+-------------------------------------------------------------------------------
+
+The scripts you find here are the scripts he refers to.
+This stuff is as is. You'll have to wade through it your self to get
+things to work. Each has been extracted from a mail message that gave
+a short bit of explanitory text. Just so people aren't too lost, here
+is the explanitory text Brian include with each of these files.
+If you really like this stuff you might want to ask Brian to turn
+it into a plug&play package.
+
+-------------------------------------------------------------------------------
+logreporter:
+-------------------------------------------------------------------------------
+I originally wrote the enclosed Perl (4.036) script to summarize syslog
+files, but it is sufficiently general that it works passably for diald
+accounting logs.  If you want to use it to do daily reporting on the
+contents of your syslog file, please feel free.  I log things fairly
+extensively, and as such have thousands of lines per day which my
+syslog.template routines reduces to one screen of mail each morning.
+
+The template file format may not be easily discernable from the script
+or even the comments I just added, but should be clarified by the
+templates that I'll be posting shortly.
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+runlogger:
+-------------------------------------------------------------------------------
+Ok, here's the simplest script.  I run this one daily from cron at
+midnight, and all it does is run logreporter over the accounting log
+from the last 24 hours, then append the data to the weekly logfile and
+truncate the accounting logfile.  Make sure that cron is mailing its
+output to you, and you'll get the daily summary in your mailbox.
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+diald.weekly:
+-------------------------------------------------------------------------------
+Here's the next more difficult script.  I run this one weekly from cron
+to summarize the week's total traffic.  Run it without arguments to
+simply mail the results to yourself.  I run it with -p to post to my
+local statistics newsgroup (you'll likely have to change the name).  It
+also rotates the weekly logfile unless the -n option is given.
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+diald.monthly:
+-------------------------------------------------------------------------------
+This is the last, and most complex (or is that rambling?) script.  It
+summarizes the weekly logs for the last month in the form of a number of
+wonderful (and probably useless) ASCII bar charts.  It picks whatever
+month it was 24 hours ago as the month to summarize for, so you should
+run it on the first day of each month to do the month before.  Again, no
+arguments to just mail it, and -p to post it.  You'll likely have to
+change where it finds the weekly log files, and if you're post, what
+group it posts to, and what injector it uses.
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+diald.template:
+-------------------------------------------------------------------------------
+This is /var/log/diald.template on my system, and accompanies where I
+have the diald accounting log, /var/log/diald.log.
+-------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
+syslog.template:
+-------------------------------------------------------------------------------
+This is a considerably more complex logreporter template.  It should
+exercise all the capabilities of the script, however.  You'll have to do
+a bit of customization in places to tweak this for your own system.
+-------------------------------------------------------------------------------

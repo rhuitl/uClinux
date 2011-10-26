@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -e
+
+acct=$1
+logacct=$2
+dir=$3
+webroot=$4
+myip=$5
+
+if test x$webroot = x; then
+  echo "fnord-conf: usage: fnord-conf acct logacct /fnord /webroot [ myip ]"
+  exit 1;
+fi
+
+# install stuff
+mkdir -p $dir
+echo "#!/bin/sh" > $dir/run
+echo "cd $webroot" >> $dir/run
+echo "exec envuidgid $acct tcpserver -RHl localhost ${myip:-0} 80 fnord 2>&1" >> $dir/run
+chmod 755 $dir/run
+
+# tell old daemontools that it should spawn a log process, too
+chmod a+t $dir
+
+# install logging stuff
+mkdir $dir/log
+echo "#!/bin/sh" > $dir/log/run
+echo "exec setuidgid $logacct multilog t ./main" >> $dir/log/run
+chmod 755 $dir/log/run
+
+mkdir $dir/log/main
+chown $logacct $dir/log/main

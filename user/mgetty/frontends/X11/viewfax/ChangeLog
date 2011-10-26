@@ -1,0 +1,377 @@
+--------------------
+Version 2.6 released
+--------------------
+
+2004-11-06  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.man: document mouse wheel and environment variables.
+	Update hylafax URL.
+
+2004-11-05  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.c: allow printing and editing with a simple interface
+	via getenv.  
+
+	* faxexpand.h: remember page number in the pagenode struct.
+
+	* Makefile: Update Copyright and VERS.  Default to linux rather
+	than solaris.  Add viewfax.tex and README.kde to filelist.
+
+	* Imakefile: add note about KDE.
+
+2004-04-24  Paolo
+
+	* viewfax.c: enable mouse wheel.
+
+2003-05-26  Jim Fohlin
+
+	* faxinput.c: add many warnings and error messages when parsing
+	tiff headers.
+
+2001-04-18  Wolfram Gloger
+
+	* viewfax.c (main), faxinput.c (notefile,getstrip): using -1 as an 
+	out-of-bounds value for vres fails on platforms where char is
+	unsigned.  Use 2 instead.
+
+--------------------
+Version 2.5 released
+--------------------
+
+2000-08-26  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Imakefile: cleaned up defaults.
+
+	* viewfax.man: updated URLs.
+
+2000-08-25  Paul Eggert  <eggert@twinsun.com>
+
+	* viewfax.c (drawline): Don't overrun the buffer.
+	
+1999-03-07  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* faxexpand.c (MHexpand): byte alignment at end of line was
+	broken (Marc Boucher).
+
+	* faxinput.c (getstrip), viewfax.c (GetImage): protect against
+ 	zero-length strip (Didier Gautheron).
+
+Thu Jun 12 12:11:58 1997  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.c (drawline): protect against a damaged fax expanding to
+		  more lines than claimed by the height parameter.
+
+--------------------
+Version 2.4 released
+--------------------
+
+Wed Nov 13 22:40:52 1996  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.c (NewImage): Set bitmap_unit to 32.  (Fixes garbled
+	  images on some 8/16-bit oriented servers - found by
+	  bod@tyndall.com.au (Brendan O'Dea)).
+
+Thu May  9 16:16:36 1996  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* All files: FSF address changed.
+
+	* viewfax.man: add URL for faxview.
+
+	* faxinput.c: need to include <sys/types.h>
+
+	* faxexpand.c (SKIP_EOL): eat one bit at a time while scanning for
+	EOL (reported by twells@cp10.es.xerox.com (Terry Wells)).
+
+--------------------
+Version 2.3 released
+--------------------
+
+Sun Oct 15 11:23:01 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.c (drawline): interpret LineNum parameter within strip.
+	(GetImage): iterate over strips of multistrip image.
+
+	* faxinput.c (notetiff): grab whole directory into memory.  Don't
+	treat non-fax tiffs as raw files.  Put strip info in an array
+	rather than a linked list.  Accept compression mode 2 (MH).
+	(getstrip): was getpage.
+
+	* faxinit.c: initialise table entries for extension codes.
+
+	* faxexpand.h: change strips in pagenode from list to array.
+	Declare MHexpand, getstrip.
+
+	* faxexpand.c (expand1d): detect and warn about extension codes.
+	   (I chickened out of actually processing them).
+	(expand2d): correct bug in EOL handling.
+	(MHexpand): new routine.
+	(g31expand, g32expand, g4expand): loop limit is rowsperstrip, mot
+	height.
+	(g4expand): semi-fix RTC detection (still does not allow for
+	padding).
+
+Sat Oct 14 11:27:03 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.man: faxview.tcl was viewfax.tcl (got hit by a global
+	replace).  Added Shift-Q, L, M, U keys.
+
+	* Imakefile: add definition for MANDIR.  The helpfile is nonexec.
+	Don't define local directories if freebsd.
+
+	* viewfax.c (ShowLoop): New keypress meanings:
+	Shift-Q - terminate with prejudice (requested by Ralph Schleicher).
+	Shift-L,M,U - rotate this and all following pages (requested by
+	Viet Hoang).
+
+--------------------
+Version 2.2 released
+--------------------
+
+Mon Sep 11 10:21:17 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.c (GetImage): this routine must return a status
+	indicating if getpage() failed.  Its callers must try again until
+	it succeeds (to deal with missing pages).
+
+Sun Sep 10 17:31:39 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* viewfax.man: update to reflect new functionality.
+
+	* viewfax.c (main): TIFF is no longer optional (the help page is a
+	tiff file).
+	(ShowLoop): display help page if requested.  Accept BackSpace key
+	for previous page.  Mirror image if requested.
+	(ZoomImage): the pb1 pointer could overrun the end of the Big
+	image by one word if an odd number of Big words fit in a Small
+	line.
+	(MirrorImage): new routine.
+
+	* faxexpand.h: keep a list of strip offsets in pagenodes instead
+	of a single offset to the fax data in a file.  Add the
+	mirror-image orientation flag.  Remove WITH_TIFF.
+
+	* faxinput.c (notetiff): handle all 8 orientations.  Handle
+        multi-strip tiff images.  Remove WITH_TIFF.
+
+	* faxexpand.c (SKIP_EOL): don't set a0 = lastx after an error, it
+	is a lie that prevents the line being properly filled out.
+	(g31expand & g32expand): report incorrect line length if verbose.
+
+	* Makefile (CFLAGS): remove -DWITH_TIFF - it is no longer
+	optional.  Add g3hack and the HELPFILE.  Add -ansi -pedantic to
+	gcc flags.
+
+	* Imakefile: remove WITH_TIFF, add HELPFILE.
+
+	* README: make / make depend in wrong order.  Remove comment about
+	WITH_TIFF.
+
+Wed Jun 21 09:44:25 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Updated the FSF address in all file headers.
+
+--------------------
+Version 2.1 released
+--------------------
+
+Wed Apr 12 11:24:34 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* faxexpand.c: simpified access to raw data by preprocessing it
+	into 16-bit lsb-first chunks.  Ensure all macros are either
+	expressions or statements (not blocks).
+
+	* faxinit.c: build tables for access with lsb-first bit order.
+
+	* faxinput.c: new source file containing routines moved from
+	viewfax.c.
+
+	* viewfax.c: moved the input file processing to a separate source
+	file (faxinput.c) in preparation for use with other utilities.
+	Eliminated G3desc and made the expansion routines use pagenodes.
+
+----------------------------------------------------------------
+Renamed again due to name conflict with hylafax/contrib/faxview.
+Now call viewfax.
+----------------------------------------------------------------
+
+Fri Apr  7 18:10:35 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 2.0 released.
+
+	* faxexpand.c: new expansion routines g32expand() and g4expand().
+	Caller provides a pointer to the line drawing routine for future
+	flexibility.
+
+	* faxview.c (main): new options -2 and -4.
+	(drawline): moved out of faxexpand.c.
+
+	* README: Mention g4, WITH_TIFF.
+
+----------------------------------------------------------------
+Renamed from g3view to faxview to reflect new functionality.
+----------------------------------------------------------------
+
+Sat Apr  1 21:06:55 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 1.9 released to testers.
+
+	* g3view.man: mention tiff and hylafax.  Document new keys for
+	previous/next page.
+
+	* g3view.c (notetiff): new function which figures out where the
+	raw image data is in a tiff file.
+
+Fri Mar 31 12:17:53 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* g3view.c (usleep): added to the list of systems which have
+	usleep in libc.
+	(SetupDisplay): restrict the initial window size to the physical
+	screen size even if the virtual root is bigger.
+	(ShowLoop): allow '-' as a synonym for previous page and '+' and
+	space as synonyms for next page.
+
+Sun Feb 26 15:31:53 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 1.8 released.
+
+	* g3view.c (getpage): report memused (in verbose mode) after
+	generating the new image.
+	(SetupDisplay): fixed problems with negative geometry coordinates.
+	(ShowLoop): improved the handling of user window-movement and
+	resizing.  Maintain image position when it is zoomed in a
+	constrained window size.
+
+Thu Feb 16 12:18:38 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* g3view.c: #define XLIB_ILLEGAL_ACCESS is required by SCO- (and
+	maybe other) systems in order to access the contents of the
+	Display structure.
+	(RotImage): fixed boundary problem.
+	(main): allow any abbreviation of -display and -geometry.
+	(ShowLoop): process all pending key- and button-presses before
+	updating display.  Ignore key and button presses while the window
+	is changing size, otherwise the image size and window size can get
+	out of sync.
+	(ShowLoop): don't jump to the top left if -geometry constrains
+	size but not position.
+
+Wed Feb 15 13:21:36 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 1.6 released.
+
+	* g3expand.c (G3init): finally killed the gentab -> g3tables
+	precomputing step, in favour of run-time initialisation.  Time for
+	G3init is down in the profiling noise.
+
+	* g3view.c (SetupDisplay): use the size of the root window rather
+	than the size of the screen as the maximum possible geometry.
+	(ShowLoop): use the user-specified geometry (default: entire root
+	window) to constrain the area available to g3view.
+
+	* g3view.man: get rid of -x and talk about window managers.
+
+Tue Feb 14 20:55:57 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* g3view.c (ShowLoop): another change to the window resizing
+	logic.  It now works as desired with all window managers except
+	fvwm.  Use g3view -x25 under fvwm until fvwm gets fixed.
+
+	* g3view.man: documented -r and -x
+
+Sun Feb 12 18:45:28 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* g3view.c: added command-line-settable display and geometry
+	values, dynamic bit-reversal of input files and warning bell
+	(audible/visible) when attempting to move to non-existent page.
+	Removed -m and -x window-manager kludges.  -m now gives limit to
+	image-memory cache size.
+	(getpage): delete the mmap() version.  We now always suck the
+	input file into memory so we can optionally bit-reverse it and so
+	we can add zeros at the end to prevent the expansion algorithm
+	over-running without having to check each byte.  Also survive
+	unreadable or empty files by removing them from the file list.
+	(GetVRoot): took this function from the comp.windows.x FAQ.  I
+	can't test it 'cos I don't have the solbourne virtual WM around
+	here.
+	(SetupDisplay): process user's geometry spec.
+	(ShowLoop): try to cooperate with the window manager by tracking
+	Reparent and Configure events.  Use NewImage() and FreeImage() to
+	manage cache size.  Give warning when there is no previous/next
+	page.  Allow zooming with z/Z.
+	(RotImage): provide faster version which does 4 rows at a time.
+
+	* g3expand.c: removed the compile-time REVERSE option (we now have
+	an equivalent at run-time). Removed 2D states from debug list.
+	(G3expand): Added line number to error messages.  Tightened up
+	end-of-data detection to prevent core dumps.
+	(G3count): Continue counting after spurious EOLs (for
+	efax-mutilated digifax files).
+
+	* g3.h: removed unused 2D state definitions.
+
+	* README: recommend Imakefile.
+
+	* Makefile: $(HAVE) is no longer needed.  Added -Wno-uninitialized
+	to suppress uninteresting warnings in new RotImage() code.  Added
+	Imakefile to FILES.
+
+	* g3view.man: renamed from g3view.1 to comply with Imake
+	convention.  Added documentation of new features.
+
+Mon Feb  6 12:42:14 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 1.4 released.
+
+	* Makefile: don't need _HAVE_XSETWMPROTOCOLS any more.
+
+	* g3view.c: added -m and -x flags.  Avoid using SetWMProtocols for
+	compatibility with ancient installations.  Release non-essential
+	memory and retry if a malloc or Xcall fails.
+
+	* g3view.1: documented -m and -x flags.
+
+Sat Feb  4 12:43:50 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* g3expand.c (G3expand): fixed a malloc bug (not enough memory
+	requested for run-length list).
+
+Fri Feb  3 11:10:48 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* g3view.c: Support a list of files on the command line rather
+	than just a single page.
+
+	* g3view.1: Updated to reflect new functionality.
+
+	* g3view.c (ZoomImage): still didn't work on little-endian
+	hosts. It now operates on 32 bit words and should be
+	architecture-independent (and faster).  Three versions are
+	available via #ifdef.
+	(SetupDisplay): it is unnecessary to constrain the minimum window
+	size.
+	(ShowLoop): changed the image scrolling method (middle mouse
+	button) to actively chew through the event queue instead of
+	waiting for motion hints.  The old method is still available if
+	USE_MOTIONHINT is defined.
+	(SetupDisplay): fix a rounding problem with the initial window
+	size.
+
+Thu Feb  2 23:00:00 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 1.2 released.
+
+	* Makefile: tar and shar targets added.
+
+	* g3view.1: update to reflect changed middle button handling.
+
+	* g3view.c: added version number and "COPYING" reference to usage
+	and verbose messages.  Removed arguments from getopt() prototype
+	(there is no consensus about if, where and how it is declared).
+	Fixed problem with window size constraints when running under mwm.
+	(ZoomImage): corrected packing order on little-endian hosts.
+	(ShowLoop): improved middle button handling (now it drags the
+	image rather than making it jump).
+	
+
+Tue Jan 31 18:00:00 1995  Frank D. Cringle  <fdc@cliwe.ping.de>
+
+	* Version 1.0 released.

@@ -1,0 +1,78 @@
+.\"             -*-Nroff-*-
+.\"
+.TH make.coverpg 1 "27 Oct 93" "greenie" "mgetty+sendfax manual"
+.IX make.coverpg
+.IX coverpg
+.SH NAME
+make.coverpg \- create a fax coverpg on stdout
+.SH SYNOPSIS
+make.coverpg [options] <pages> <sender-ID> <sender-NAME> <receiver-ID> <receiver-NAME> <date> <time>
+.SH DESCRIPTION
+.IX fax
+.I "make.coverpg "
+is called from faxspool(1) to generate a cover page for the just-processed
+fax. It has to create a proper G3 file (e.g. via pbm2g3(1) or
+hp2hig3(1) or ghostscript(1)) and output that on stdout. If the program doesn't
+exist, or can't be executed, the fax simply won't get a coverpage (so, if
+you don't want a fax coverpage, do not install it...)
+
+.I make.coverpg
+can put anything it wants on the page, but note that there are certain
+legal requirements in certain countries about the contents that *have* to
+be on the cover page, for example, the fax phone number of the sender and
+the recepient, the number of pages, or similar things.
+
+.I make.coverpg
+gets the informations about the fax to be sent from the command line, in
+the order listed above.
+
+If the environment variable
+.I normal_res
+is set to something non-empty, 
+.I faxspool
+requests that
+.I make.coverpg
+creates a cover page in normal resolution (98 lpi). Default is fine
+resolution (196 lpi).
+
+.B NO
+.I make.coverpg
+program is installed by default, since everyones needs differ too wildly.
+
+Some sample coverpage programs are provided in the mgetty source tree, in
+the samples/ subdirectory (coverpg.pbm shows how to do it with 
+"pbmtext|pbm2g3", coverpg.ps shows how I do it with ghostscript).
+
+In this directory, you can also find two shell scripts (fax and faxmemo)
+that will take advantage of one more esoteric feature of my coverpage
+programs: if called with the option "-m <memo-file>", the sample programs
+will put a text file "<memo-file>" on the cover page (used for short notes
+or such). To make use of it,
+.I faxspool
+is called with the option '-C "make.coverpg -m <memo-file>"' (the double
+quotes are needed!).
+
+.SH OPTIONS
+.TP
+none
+
+.PP
+.SH "Example"
+A five-page fax sent from me to my second number could result in a call like this:
+
+make.coverpg 5 "+49-89-3243328" "Gert Doering" "3244814" "myself" "Sep 15 94" "22:10:00"
+
+.SH FILES
+.TP
+.B @LIBDIR@/make.coverpg
+the program itself
+.fi
+
+.SH "SEE ALSO"
+faxspool(1), pbm2g3(1), ghostscript(1)
+
+.SH AUTHORS
+The idea behind
+.I make.coverpg
+is Copyright (C) 1993 by Gert Doering, <gert@greenie.muc.de>, the
+implementation will most likely have yours...

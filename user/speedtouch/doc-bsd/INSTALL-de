@@ -1,0 +1,130 @@
+$Id: INSTALL-de,v 1.5 2002/12/31 13:00:09 rogler Exp $
+François ROGLER, francois@rogler.org, 29/05/2001
+Michael Kohl, citizen428@cargal.org,  29/05/2002 (German translation)
+
+                         Speedtouch USB Treiber für *BSD
+                               Installationsanleitung
+
+--------------------------------------------------------------------------------
+
+1. Download des Treibers 
+2. Voraussetzungen
+3. Kompilieren & Installation
+4. Konfiguration
+5. Verbindung
+
+--------------------------------------------------------------------------------
+
+1. Download des Treibers
+
+Sie benötigen folgende Dateien:
+
+* speedtouch-1.1.tar.gz
+    on http://prdownloads.sourceforge.net/speedtouch/speedtouch-1.1.tar.gz
+    or http://www.xsproject.org/speedtouch/files/speedtouch-1.1.tar.gz
+* speedmgmt.tar.gz from Alcatel Site
+    http://www.speedtouchdsl.com/dvrdownload_lx.htm
+
+CVS-Zugriff:
+Alternativ können sie die Dateien auch mittels CVS von sourcerforge.net herunterladen. Dazu wird eine Internetverbindung 
+benötigt.
+
+cvs -z3 -r -d:pserver:anonymous@cvs.speedtch.sourceforge.net:/cvsroot/speedtch
+co speedtouch
+
+Dadurch wird ein Verzeichnis namens Speedtouch erstellt in dem sich der Sourcecode befindet. Diesen können sie später einfach
+mittels `cvs update` auf die neueste Version bringen. 
+
+2. Voraussetzungen
+
+Dieser Treiber funktioniert unter folgenden Betriebssystem-Versionen:
+     * FreeBSD : 4.2 bis 4.7 aber nicht bis 5.0
+     * OpenBSD : 2.9 bis 3.2
+     * NetBSD  : 1.5 bis 1.6
+
+Sie benötigen dafür USB-, ugen- und ppp-Unterstützung in ihrem Kernel (in den Standardeinstellungen enthalten) und alle 
+relevanten Einträge ihres USB-Controllers und Modems im Verzeichnis /dev.
+
+Für NetBSD benötigen sie zusätzlich meine user-ppp Version die sie bei folgender Adresse bekommen:
+         
+	 http://www.xsproject.org/speedtouch
+
+Außerdem werde ich das NetBSD-Team bitten das Programm in die Ports zu integrieren.
+
+3. Kompilieren & Installation
+
+Dieser Treiber ist GPL Software und wird daher als Sourcecode bereitgestellt. Das bedeutet dass sie ihn selbst kompilieren 
+müssen bevor sie ihn benutzen können.
+
+* Entpacken der Alcatel-Datei:
+
+tar -zxvf speedmgmt.tar.gz
+
+Danach kopieren sie die Datei 'mgmt.o' nach /usr/local/libdata (sie könne auch die Datei 'alcaudsl.sys' von der Windows-
+version des Treibers verwenden).
+
+* Entpacken, kompilieren und installieren des Treibers:
+
+tar -zxvf speedtouch-1.1.tar.gz
+cd speedtouch-1.1
+./configure
+make
+make install (nur als Benutzer 'root' möglich)
+
+Danach müssen sie die Konfigurationsdatei von ppp kopieren. Sichern sie zuvor ihre alte.
+
+cp /usr/local/share/doc/speedtouch/ppp.conf.sample /etc/ppp/ppp.conf
+chmod 600 /etc/ppp/ppp.conf
+
+4. Konfiguration
+
+Öffnen sie die Datei /etc/ppp/ppp.conf und passen sie folgende Werte an:
+     * <login>
+     * <password>
+     * <VPI> und <VCI> (siehe nachfolgende Erklärung)
+
+Bekannte vpi.vci Werte:
+     * 8.48 in Österreich
+     * 8.35 in Belgien
+     * 8.35 in Frankreich (oder 8.67 für Installationen vor Januar 2001)
+     * 8.48 in Island
+     * 8.35 in Italien
+     * 8.35 in Kuwait
+     * 8.48 in den Niederlanden
+     * 0.35 in Portugal
+     * 0.38 in Großbritannien
+     * 8.35 in den USA
+     (kontrollieren sie diese Werte unter Windows) 
+
+5. Verbindung
+
+Dafür können sie das beiliegende Skript adsl.sh.sample verwenden. 
+
+Normalerweise finden sie es unter /usr/local/etc/rc.d
+
+Um die Verbindung während des Bootvorgangs aufzubauen, müssen sie es in adsl.sh umbenennen.
+
+Wenn sie die Verbindung manuell starten wollen sind die beiden folgenden Schritte nötig:
+
+* Initialisierung
+
+Das Modem muss nach jedem Neustart oder nachdem es ab- und wieder angesteckt wurde initialisiert werden:
+
+    modem_run -f /usr/local/libdata/mgmt.o -m
+
+* Verbindungsaufbau mittels PPP
+
+    ppp -background adsl
+
+(mit `man ppp` bekommen sie mehr Information zu weiteren Optionen wie auto, natd, dial etc.)
+
+Sie sollten jetzt eine Internetverbindung haben. Mit
+
+    killall ppp (unter FreeBSD)
+
+können sie diese wieder beenden.
+
+Sollte etwas nicht funktionieren konsultieren sie bitte zuerst die FAQ.
+Bitte benutzen sie IRC oder die Mailingliste für ihr Feedback und Fragen.
+
+

@@ -1,0 +1,67 @@
+# $Id: Makefile.org,v 1.1.1.1 1999-11-22 03:47:59 christ Exp $
+
+TARGET=	dhcpcd
+BINDIR= /usr/sbin
+SRCS=	main.c if.c client.c options.c socket-if.c arp.c error-handler.c \
+	signal-handler.c daemon.c hostinfo.c memory.c
+OBJS=	$(SRCS:.c=.o)
+TARFILES= *.c *.h Makefile README* ACK Changes dhcpcd.8 dhcpcd.lsm
+TARDIRS= pcmcia rc.d
+
+#CFLAGS=	-g -Wall -DNEED_BCAST_RESPONSE
+CFLAGS=	-g -Wall
+
+$(TARGET): $(OBJS)
+	$(CC) -o $(TARGET) $(LFLAGS) $(OBJS)
+
+install:
+	mkdir -p /etc/dhcpc
+	install -cs -m 500 $(TARGET) $(BINDIR)
+
+main.c:		if.h dhcp.h signal-handler.h error-handler.h daemon.h
+if.c:		if.h dhcp.h error-handler.h
+client.c:	dhcp.h dhcp-options.h socket-if.h arp.h error-handler.h \
+		hostinfo.h client.h
+options.c:	dhcp.h dhcp-options.h
+socket-if.c:	dhcp.h dhcp-options.h error-handler.h
+arp.c:		dhcp.h if.h arp.h socket-if.h error-handler.h
+daemon.c:	daemon.h error-handler.h
+hostinfo.c:	hostinfo.h dhcp.h dhcp-options.h error-handler.h \
+		signal-handler.h
+error-handler.c:	error-handler.h
+signal-handler.c:	dhcp.h if.h signal-handler.h error-handler.h
+
+
+tags:
+	etags *.[ch]
+
+tar:
+	tar cvf - $(TARFILES) $(TARDIRS) | gzip -9 > dhcpcd-src.tar.gz
+
+distrib:
+	@if [ "$(VERSION)" ]; then \
+	  if [ -d "../dhcpcd-$(VERSION)" ]; then \
+	    echo "dhcpcd-$(VERSION) already exists"; \
+	    exit 1; \
+	  fi; \
+	  mkdir ../dhcpcd-$(VERSION); \
+	  cp -r $(TARFILES) $(TARDIRS) ../dhcpcd-$(VERSION); \
+	  (cd ..; tar cvf - dhcpcd-$(VERSION) | gzip -9 >dhcpcd-$(VERSION).tar.gz); \
+	  rm -rf ../dhcpcd-$(VERSION); \
+	else \
+	  echo "specify the macro VERSION"; \
+	fi
+
+clean:
+	rm -f *.o *~ */*~ core
+
+seed:
+	@if [ "$(VERSION)" ]; then \
+	  ident $(TARFILES) | egrep 'Id:' >Seed-$(VERSION); \
+	  chmod 444 Seed-$(VERSION); \
+	else \
+	  echo "specify the macro VERSION"; \
+	fi
+
+snap:
+	  @ident $(TARFILES) | egrep 'Id:'

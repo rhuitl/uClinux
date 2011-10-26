@@ -1,0 +1,48 @@
+Should I configure frox with --enable-transparent-data?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The short answer is that if everything works without it (and it
+probably will) then better not. If some ftp clients have trouble
+connecting through frox you should try it. The downside is a bigger
+and slightly less secure binary.
+
+The long answer:
+~~~~~~~~~~~~~~~~
+An FTP session consists of a control connection which carries the
+commands, and optionally a data connection which carries any files
+which you transfer. According to the standard the client should allow
+any host to make the data connection to it - not just the ftp server
+to which it connected. We take advantage of this by making the data
+connection from the proxy to the client.
+
+However some ftp clients (although I have not tested any which do) may
+for their own security only allow the ftp server to which they
+connected to make the data connection. In that case the proxy needs to
+do network address translation in order to fool the client into
+thinking its data connection is with the ftp server and not the proxy.
+The downside of this is that:
+
+   a) This requires root privileges. We fork off a process which runs
+      as root to do the privelged tasks for us, and this poses a small
+      extra security risk.
+
+   b) Under kernel 2.4 we need to use the libiptc library in order to
+      do the address translation. Linking with this nearly triples the
+      size of the frox binary.
+
+To switch it on:
+~~~~~~~~~~~~~~~~
+  o configure with --enable-transparent-data
+  o add the --enable-libiptc configure option if you use a 2.4.x
+    linux kernel.
+  o set TransparentData to "yes" in the config file.
+  o You'd better set SameAddress to "yes" too if you are at all worried
+    about security.
+  o You need Listen defined in the config file - this is due to a bug I
+    haven't got round to fixing yet.
+  o If using kernel 2.4.x you also need to set up the iptables chains 
+    it needs with:
+                    iptables -t nat -N froxsnat
+                    iptables -t nat -N froxdnat
+                    iptables -t nat -I POSTROUTING 1 -j froxsnat
+                    iptables -t nat -I PREROUTING  1 -j froxdnat

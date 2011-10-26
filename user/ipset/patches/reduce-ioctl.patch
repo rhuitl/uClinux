@@ -1,0 +1,149 @@
+Change the iptables set match/target kernel API to use set names rather
+than set indices.  This avoids the need for a separate sockopt to convert
+between the index and the name.  This gives significant speed increases.
+eg an 'iptables -L -nv' went from 0.55 seconds to 0.15 seconds.
+
+(Requires an iptables patch too.)
+
+Index: ipset/kernel/ip_set.c
+===================================================================
+--- ipset.orig/kernel/ip_set.c	2010-08-24 13:09:35.421296615 +1000
++++ ipset/kernel/ip_set.c	2010-08-24 13:11:31.181928983 +1000
+@@ -1180,36 +1180,6 @@ ip_set_sockfn_get(struct sock *sk, int o
+ 				   sizeof(struct ip_set_req_version));
+ 		goto done;
+ 	}
+-	case IP_SET_OP_GET_BYNAME: {
+-		struct ip_set_req_get_set *req_get = data;
+-
+-		if (*len != sizeof(struct ip_set_req_get_set)) {
+-			ip_set_printk("invalid GET_BYNAME (want %zu, got %d)",
+-				      sizeof(struct ip_set_req_get_set), *len);
+-			res = -EINVAL;
+-			goto done;
+-		}
+-		req_get->set.name[IP_SET_MAXNAMELEN - 1] = '\0';
+-		index = ip_set_find_byname(req_get->set.name);
+-		req_get->set.index = index;
+-		goto copy;
+-	}
+-	case IP_SET_OP_GET_BYINDEX: {
+-		struct ip_set_req_get_set *req_get = data;
+-
+-		if (*len != sizeof(struct ip_set_req_get_set)) {
+-			ip_set_printk("invalid GET_BYINDEX (want %zu, got %d)",
+-				      sizeof(struct ip_set_req_get_set), *len);
+-			res = -EINVAL;
+-			goto done;
+-		}
+-		req_get->set.name[IP_SET_MAXNAMELEN - 1] = '\0';
+-		index = ip_set_find_byindex(req_get->set.index);
+-		strncpy(req_get->set.name,
+-			index == IP_SET_INVALID_ID ? ""
+-			: ip_set_list[index]->name, IP_SET_MAXNAMELEN);
+-		goto copy;
+-	}
+ 	case IP_SET_OP_ADT_GET: {
+ 		struct ip_set_req_adt_get *req_get = data;
+ 
+Index: ipset/kernel/ipt_SET.c
+===================================================================
+--- ipset.orig/kernel/ipt_SET.c	2010-08-24 13:09:35.000000000 +1000
++++ ipset/kernel/ipt_SET.c	2010-08-24 13:15:51.891797326 +1000
+@@ -160,22 +160,28 @@ checkentry(const struct xt_tgchk_param *
+ 	}
+ #endif
+ 
+-	if (info->add_set.index != IP_SET_INVALID_ID) {
+-		index = ip_set_get_byindex(info->add_set.index);
++	if (*info->add_set.setname) {
++		index = ip_set_get_byname(info->add_set.setname);
+ 		if (index == IP_SET_INVALID_ID) {
+-			ip_set_printk("cannot find add_set index %u as target",
+-				      info->add_set.index);
++			ip_set_printk("cannot find add_set %s as target",
++				      info->add_set.setname);
+ 			return CHECK_FAIL;	/* error */
+ 		}
++		info->add_set.index = index;
++	} else {
++		info->add_set.index = IP_SET_INVALID_ID;
+ 	}
+ 
+-	if (info->del_set.index != IP_SET_INVALID_ID) {
+-		index = ip_set_get_byindex(info->del_set.index);
++	if (*info->del_set.setname) {
++		index = ip_set_get_byname(info->del_set.setname);
+ 		if (index == IP_SET_INVALID_ID) {
+-			ip_set_printk("cannot find del_set index %u as target",
+-				      info->del_set.index);
++			ip_set_printk("cannot find del_set %s as target",
++				      info->del_set.setname);
+ 			return CHECK_FAIL;	/* error */
+ 		}
++		info->del_set.index = index;
++	} else {
++		info->del_set.index = IP_SET_INVALID_ID;
+ 	}
+ 	if (info->add_set.flags[IP_SET_MAX_BINDINGS] != 0
+ 	    || info->del_set.flags[IP_SET_MAX_BINDINGS] != 0) {
+Index: ipset/kernel/ipt_set.c
+===================================================================
+--- ipset.orig/kernel/ipt_set.c	2010-08-24 13:09:35.000000000 +1000
++++ ipset/kernel/ipt_set.c	2010-08-24 13:17:20.862011176 +1000
+@@ -170,11 +170,11 @@ checkentry(const struct xt_mtchk_param *
+ 	}
+ #endif
+ 
+-	index = ip_set_get_byindex(info->match_set.index);
++	index = ip_set_get_byname(info->match_set.setname);
+ 		
+ 	if (index == IP_SET_INVALID_ID) {
+-		ip_set_printk("Cannot find set indentified by id %u to match",
+-			      info->match_set.index);
++		ip_set_printk("Cannot find set named %s to match",
++			      info->match_set.setname);
+ 		return CHECK_FAIL;	/* error */
+ 	}
+ 	if (info->match_set.flags[IP_SET_MAX_BINDINGS] != 0) {
+@@ -182,6 +182,7 @@ checkentry(const struct xt_mtchk_param *
+ 		return CHECK_FAIL;	/* error */
+ 	}
+ 
++	info->match_set.index = index;
+ 	return CHECK_OK;
+ }
+ 
+Index: ipset/kernel/include/linux/netfilter_ipv4/ip_set.h
+===================================================================
+--- ipset.orig/kernel/include/linux/netfilter_ipv4/ip_set.h	2010-08-24 13:09:35.421296615 +1000
++++ ipset/kernel/include/linux/netfilter_ipv4/ip_set.h	2010-08-24 13:11:31.181928983 +1000
+@@ -140,16 +140,6 @@ union ip_set_name_index {
+ 	ip_set_id_t index;
+ };
+ 
+-#define IP_SET_OP_GET_BYNAME	0x00000006	/* Get set index by name */
+-struct ip_set_req_get_set {
+-	unsigned op;
+-	unsigned version;
+-	union ip_set_name_index set;
+-};
+-
+-#define IP_SET_OP_GET_BYINDEX	0x00000007	/* Get set name by index */
+-/* Uses ip_set_req_get_set */
+-
+ #define IP_SET_OP_VERSION	0x00000100	/* Ask kernel version */
+ struct ip_set_req_version {
+ 	unsigned op;
+Index: ipset/kernel/include/linux/netfilter_ipv4/ipt_set.h
+===================================================================
+--- ipset.orig/kernel/include/linux/netfilter_ipv4/ipt_set.h	2010-08-24 13:09:35.000000000 +1000
++++ ipset/kernel/include/linux/netfilter_ipv4/ipt_set.h	2010-08-24 13:11:31.181928983 +1000
+@@ -6,6 +6,7 @@
+ struct ipt_set_info {
+ 	ip_set_id_t index;
+ 	u_int32_t flags[IP_SET_MAX_BINDINGS + 1];
++	char setname[IP_SET_MAXNAMELEN];
+ };
+ 
+ /* match info */

@@ -1,0 +1,28 @@
+# Makefile for Zortech C
+
+OBJ1=parse.obj scan.obj memory.obj main.obj hash.obj execute.obj code.obj\
+  da.obj error.obj init.obj bi_vars.obj cast.obj print.obj bi_funct.obj\
+  kw.obj jmp.obj array.obj field.obj  split.obj re_cmpl.obj zmalloc.obj\
+  fin.obj files.obj  scancode.obj matherr.obj fcall.obj version.obj\
+  dosexec.obj
+
+#OBJ2=rexp\rexp.obj rexp\rexp0.obj rexp\rexp1.obj rexp\rexp2.obj\
+#  rexp\rexp3.obj  rexp\rexpdb.obj
+
+OBJ2=rexp.obj rexp0.obj rexp1.obj rexp2.obj\
+  rexp3.obj rexpdb.obj
+
+CFLAGS=-ml -bx -o -A- -DLARGE -DMAWK -DHAVE_SMALL_MEMORY=0
+
+LFLAGS = -L/ST:32768
+
+.c.obj:
+	ztc -c $(CFLAGS) $<
+
+bmawkztc.exe:	$(OBJ1) $(OBJ2)
+	ztc $(LFLAGS) -obmawkztc $(OBJ1) $(OBJ2)
+
+$(OBJ1): BI_FUNCT.H BI_VARS.H CODE.H FIELD.H FILES.H INIT.H JMP.H MEMORY.H\
+  PARSE.H PATCHLEV.H REGEXP.H REPL.H SCAN.H SIZES.H SYMTYPE.H TYPES.H\
+  ZMALLOC.H CONFIG.H FIN.H MAWK.H
+$(OBJ2):	rexp.h

@@ -1,0 +1,86 @@
+RELEASE_DIR:=/tmp
+
+include @top_builddir@Rules.make
+VPATH = @srcdir@
+CFLAGS+=-I@top_srcdir@/libipulog/include -I@top_srcdir@/include
+
+SUBDIRS=conffile libipulog extensions doc
+
+ifeq (x@MYSQLINCLUDES@,x)
+else
+SUBDIRS+=mysql
+endif
+
+ifeq (x@PGSQLINCLUDES@,x)
+else
+SUBDIRS+=pgsql
+endif
+
+ifeq (x@HAVE_PCAP_H@,x)
+else
+SUBDIRS+=pcap
+endif
+
+
+ULOGD_VERSION=1.23
+OLD_ULOGD_VERSION=1.22
+
+ifeq (x@SQLITE3INCLUDES@,x)
+else
+SUBDIRS+=sqlite3
+endif
+
+#  Normally You should not need to change anything below
+
+all: recurse ulogd
+
+.PHONY: distclean
+distclean: clean
+	@for d in $(SUBDIRS); do if ! make -C $$d $@; then exit 1; fi; done
+	rm -f Makefile config.cache config.log config.status Rules.make
+
+.PHONY: docbuild
+docbuild:
+	make -C doc distrib
+
+.PHONY: distrib
+distrib: docbuild distclean delrelease $(RELEASE_DIR)/ulogd-$(ULOGD_VERSION).tar.bz2 diff
+
+.PHONY: delrelease
+delrelease:
+	rm -f $(RELEASE_DIR)/ulogd-$(ULOGD_VERSION).tar.bz2
+
+$(RELEASE_DIR)/ulogd-$(ULOGD_VERSION).tar.bz2:
+	cd .. && ln -sf ulogd ulogd-$(ULOGD_VERSION) && tar cvf - --exclude CVS --exclude .svn ulogd-$(ULOGD_VERSION)/. | bzip2 -9 > $@ && rm ulogd-$(ULOGD_VERSION)
+
+.PHONY: diff
+diff: $(RELEASE_DIR)/ulogd-$(ULOGD_VERSION).tar.bz2
+	@mkdir /tmp/diffdir
+	@cd /tmp/diffdir && tar -x --bzip2 -f $(RELEASE_DIR)/ulogd-$(ULOGD_VERSION).tar.bz2
+	@set -e; cd /tmp/diffdir; tar -x --bzip2 -f $(RELEASE_DIR)/ulogd-$(OLD_ULOGD_VERSION).tar.bz2; echo Creating patch-ulogd-$(OLD_ULOGD_VERSION)-$(ULOGD_VERSION).bz2; diff -urN ulogd-$(OLD_ULOGD_VERSION) ulogd-$(ULOGD_VERSION) | bzip2 -9 > $(RELEASE_DIR)/patch-ulogd-$(OLD_ULOGD_VERSION)-$(ULOGD_VERSION).bz2
+
+recurse: 
+	@for d in $(SUBDIRS); do if ! make -C $$d; then exit 1; fi; done
+
+ulogd: ulogd.c $(LIBIPULOG) include/ulogd/ulogd.h conffile/conffile.o $(LIBIPULOG)/libipulog.a ulogd.conf
+	$(CC) $(CFLAGS) -rdynamic $< conffile/conffile.o $(LIBIPULOG)/libipulog.a -o $@ $(LIBS)
+
+edit = sed -e 's,@libdir\@,$(ULOGD_LIB_PATH),g'
+
+ulogd.conf: ulogd.conf.in
+	$(edit) $< > ulogd.conf
+
+clean:
+#	rm -f ulogd *.o extensions/*.o extensions/*.so conffile/*.o
+	rm -f ulogd ulogd.o ulogd.conf
+	@for d in $(SUBDIRS); do if ! make -C $$d $@; then exit 1; fi; done
+
+install: all
+	@for d in $(SUBDIRS); do if ! make -C $$d $@; then exit 1; fi; done
+	@[ -d $(DESTDIR)$(BINDIR) ] || mkdir -p $(DESTDIR)$(BINDIR)
+	@INSTALL@ -D -m 755 ulogd $(DESTDIR)$(BINDIR)/ulogd
+	@[ -d $(DESTDIR)$(ETCDIR) ] || mkdir -p $(DESTDIR)$(ETCDIR)
+	@[ -f $(DESTDIR)$(ETCDIR)/ulogd.conf ] || @INSTALL@ -D -m 600 ulogd.conf $(DESTDIR)$(ETCDIR)/ulogd.conf
+	
+doc:
+	$(MAKE) -C $@

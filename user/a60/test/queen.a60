@@ -1,0 +1,75 @@
+
+'begin'
+	'comment'
+		Find a solution for the `eight queen' problem.
+		The eight rows for the eight columns are printed.
+		(got the algorithm from a Modula program from
+		 Martin Neitzel).
+	;
+
+	'integer' 'array' column [1 : 8];
+	'boolean' 'array' empcol [1 : 8];
+	'boolean' 'array' empup [-7 : 7];
+	'boolean' 'array' empdo [2 : 16];
+	'integer' i;
+
+	'procedure' print;
+	'begin'
+		'integer' i;
+
+		outstring (1, `see: ') ;
+		'for' i := 1 'step' 1 'until' 8 'do'
+			outinteger (1, column [ i ]) ;
+		outstring (1, `\n')
+	'end';
+
+
+	'procedure' set (x);
+	'value' x;
+	'integer' x;
+	'begin'
+		'integer' y;
+	
+		'for' y := 1 'step' 1 'until' 8 'do'
+		'begin'
+	    		'if' empcol [ y ] 'and' empup [ x-y ] 
+					'and' empdo [ x+y ] 'then'
+			'begin'
+				column [ y ] := x ;
+				empcol [ y ] := 'false' ;
+				empup [ x-y ] := 'false' ;
+				empdo [ x+y ] := 'false' ;
+				'if' x = 8 'then'
+					'goto' gotone
+				'else'
+					set ( x + 1 ) ;
+				empdo [ x+y ] := 'true' ;
+				empup [ x-y ] := 'true' ;
+				empcol [ y ] := 'true' ;
+				column [ y ] := 0
+			'end';
+		'end';
+	'end';
+
+Main start:
+
+	'for' i := 1 'step' 1 'until' 8 'do'
+	'begin'
+		 column [ i ] := 0 ;
+		 empcol [ i ] := 'true'
+	'end';
+
+	'for' i := -7 'step' 1 'until' 7 'do'
+		 empup [ i ] := 'true' ;
+
+	'for'  i := 2 'step' 1 'until' 16 'do'
+		 empdo [ i ] := 'true' ;
+
+	outstring (1, `starting:\n');
+	set ( 1 ) ;
+
+gotone:
+	print;
+	outstring (1, `done.\n')
+'end'
+

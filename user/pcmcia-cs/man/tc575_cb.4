@@ -1,0 +1,73 @@
+.\" Copyright (c) 1998 Donald Becker and David Hinds.
+.\" tc575_cb.4 1.8 2001/06/22 01:12:38
+.\"
+.TH 3C575_CB 4 "2001/06/22 01:12:38" "pcmcia-cs"
+.SH NAME
+3c575_cb \- 3Com 3c575 Etherlink XL 10/100 CardBus device driver
+
+.SH SYNOPSIS
+.B insmod 3c575_cb.o
+[\fBdebug=\fIn\fR]
+[\fBrx_copybreak=\fIn\fR]
+[\fBmax_interrupt_work=\fIn\fR]
+[\fBuse_hw_csums=\fIn\fR]
+[\fBdown_poll_rate=\fIn\fR]
+[\fBauto_polarity=\fIn\fR]
+
+.SH DESCRIPTION
+\fB3c575_cb\fR is the low-level Card Services driver for the 3Com
+3c575 EtherLink XL CardBus series ethernet adapters.  When this driver
+is attached to a card, it allocates the next available ethernet device
+(\fBeth0\fR..\fBeth#\fR).  This information for this card will be
+reported in the kernel log file, and the device name passed on to
+\fBcardmgr\fR(8).
+.PP
+The driver uses the N-Way autonegotiating transceiver to negotiate the
+speed and duplex of the network link.  If the link partner does not
+support negotiation only the link speed is detected.
+.PP
+If the on-card EEPROM is programmed for a full-duplex (FD) link, only
+FD media types are advertised and the link is assumed to be full-duplex.
+
+.SH PARAMETERS
+.TP
+.BI rx_copybreak= n
+Set the breakpoint for copying incoming frames into reduced-sized
+packet buffers.  The default value of 200 bytes is reasonable for most
+systems. 
+.TP
+.BI max_interrupt_work= n
+This option selects the maximum amount of work handled during each
+interrupt.  Each received packet counts as one unit of work, as does
+updating statistics counters and handling errors.  The default value
+of 32 should only need to be increased on very slow machines.  An
+occasional "too much work in interrupt" message is not a problem.
+.TP
+.BI use_hw_csums= n
+Controls use of an adapter's on-board TCP/IP checksum verification for
+incoming packets.  This is on by default; setting to 0 disables
+hardware checksums.  It may be useful to disable hardware checksums if
+it is suspected that something is corrupting data on its way from the
+card to the CPU.
+.TP
+.BI down_poll_rate= n
+For Cyclone and Tornado chipsets, this is the rate at which the card
+polls the transmit ring for new packets.  The value is in units of 320
+ns; a value of 0 disables polling.  The default is 20 (6.4 us), and
+the maximum allowed value is 127.  Polling is more efficient but can
+consume a significant amount of PCI bus bandwidth.
+.TP auto_polarity= n
+This flag can be used to control the transceiver's auto polarity
+detection capability.  Some Cisco Catalyst switches are known to
+interact badly with this feature in 10baseT mode.  It defaults to 1
+(enabled).
+
+.SH AUTHOR
+This driver: Donald Becker \- becker@scyld.com
+.PP
+Linux PC Card control software: David Hinds \-
+dahinds@users.sourceforge.net et al.
+
+.SH "SEE ALSO"
+cardmgr(8), pcmcia(5).
+

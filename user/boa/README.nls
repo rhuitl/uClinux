@@ -1,0 +1,70 @@
+Boa supports since 0.93.15g simple "on the fly" codepage conversion. There are
+three methods, how boa decides which codepage send to client. 
+
+1) Codepage is specified in URL (/asc/test.html) - User manually selected 
+		codepage
+2) Client sent Accept-charset header - this is good, but not supported by 
+		many browsers.
+3) CodepageByBrowser
+
+There are some benchmarks (on my 486DX/40/8MB RAM):
+
+
+------------------ boa without on-the-fly codepage conversion --------------
+Document Path:          /matfyzak.html
+Document Length:        50483 bytes
+
+Concurency Level:       10
+Time taken for tests:   3.736 seconds
+Complete requests:      100
+Failed requests:        0
+Total transfered:       5069300 bytes
+HTML transfered:        5048300 bytes
+Requests per seconds:   26.77
+Transfer rate:          1356.88 kb/s
+
+Connnection Times (ms)
+           min   avg   max
+Connect:     1     6    32
+Total:     170   362   545
+-------------- boa with on-the-fly codepage conversion, not used -----------
+Document Path:          /matfyzak.html
+Document Length:        50483 bytes
+
+Concurency Level:       10
+Time taken for tests:   3.585 seconds
+Complete requests:      100
+Failed requests:        0
+Total transfered:       5069300 bytes
+HTML transfered:        5048300 bytes
+Requests per seconds:   27.89
+Transfer rate:          1414.03 kb/s
+
+Connnection Times (ms)
+           min   avg   max
+Connect:     0    18   112
+Total:      84   337   603
+----------------- boa with on-the-fly codepage conversion used -------------
+Document Path:          /asc/matfyzak.html
+Document Length:        50483 bytes
+
+Concurency Level:       10
+Time taken for tests:   6.572 seconds
+Complete requests:      100
+Failed requests:        0
+Total transfered:       5069100 bytes
+HTML transfered:        5048300 bytes
+Requests per seconds:   15.22
+Transfer rate:          771.32 kb/s
+
+Connnection Times (ms)
+           min   avg   max
+Connect:     2     3    26
+Total:     349   626   713
+---------------------------------------------------------------------------
+
+When On-the-fly codepage conversion used, boa is about twice slower. Optimize,
+optimize and optimize!
+
+Martin Hinner <martin@tdp.cz>
+

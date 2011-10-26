@@ -1,0 +1,35 @@
+
+Debugging Applications with gdb
+-------------------------------
+
+
+Debugging uClinux/ColdFire applications with gdb is a little tricky.
+Here is some instructions from Mark Abbate <mabbate@videonics.com> on
+how this can be done.
+
+
+-----------------------------------------------------------------------------
+
+In other words, I'm actually doing full source level symbolic debugging =
+on the user app. It boiled down to a few things:
+
+(1) For HMI and SDS, use -gdwarf.
+(2) Re-link the -r elf specifiying -Ttext xxxxxx -Tdata yyyyyy -Tbss =
+zzzzzz as reported by the binfmt_flat loader. Use this resulting elf as =
+the source of symbols for the debugger.
+(3) Set bit 10 of the CSR.
+(4) If using HMI, set SR to 0x2700 after first break, and restore to 0x0 =
+before a continue.
+(5) Put a couple second long while loop at the top of main. When the app =
+starts up, manually hit Stop in the debugger. Then software breakpoints =
+can be set.
+
+Hopefully nothing else will crawl out of the woodwork and we'll get some =
+serious debugging completed. I'll let you know if we get the DDD/gdb bdm =
+running.
+
+Regards,
+Mark Abbate
+
+
+-----------------------------------------------------------------------------

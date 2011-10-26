@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# system startup.
+
+# set up the hostname
+hostname mod5272
+
+# mount & setup the ramdisk
+mount -n -t ramfs ramfs /var
+mkdir /var/tmp
+mkdir /var/log
+mkdir /var/run
+mkdir /var/lock
+mkdir /var/empty
+
+# Mount the proc filesystem
+mount -t proc proc /proc
+
+# Configure local loopback:
+ifconfig lo 127.0.0.1 netmask 255.0.0.0
+
+# Configure internal 10/100 ethernet controller:
+# ifconfig eth0 inet 192.168.1.200 netmask 255.255.255.0
+dhcpcd eth0
+
+# Configure CrystalLan 10base-T controller:
+# ifconfig eth1 inet 192.168.2.200 netmask 255.255.255.0
+# or:
+# /bin/dhcpcd eth1 &
+
+# Uncomment this line to add a default gateway
+# route add -net 0.0.0.0 netmask 0.0.0.0 gw 192.168.1.100
+
+# Uncomment these lines to automatically mount an nfs filesystem:
+# /bin/portmap &
+# /bin/mount 192.168.1.100:/tftpboot /mnt
+portmap &

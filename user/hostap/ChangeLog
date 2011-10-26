@@ -1,0 +1,1165 @@
+ChangeLog for Host AP driver for Intersil Prism2/2.5/3
+
+2004-10-03 - v0.2.5
+	* fixed card enabling after firmware download in case any of the
+	  netdevs were up when the download was started
+	* fixed netif_carrier_on/off() calls to leave carrier on for Master
+	  mode; previously this may have been left off in some cases which
+	  could prevent packet bridging with new kernel versions
+
+2004-07-17 - v0.2.4 (beginning of 0.2.x stable releases)
+	* fixed wlan#/wifi# interface packet counters (both are supposed to see
+	  data packets once; wlan# was counting TX twice and wifi# did not
+	  count TX or RX at all for most cases)
+	* fixed compilation with PRISM2_NO_STATION_MODES defined
+	* fixed MAC address changing to update address for wifi# interface
+	  (without this, at least Master mode did not work correctly when MAC
+	  address was changed for wlan#)
+	* fixed inner-BSS bridge (ap_bridge_packets=1) not to bridge packets
+	  to unauthorized ports when IEEE 802.1X/WPA is used (i.e., require
+	  that the STA completes authentication before capturing packets in
+	  the inner bridge); previously, only association status was used and
+	  an attacker could have capture packets to any MAC address even
+	  without having proper credentials for using the network (although,
+	  the packets were dropped because the controlled port for the STA was
+	  unauthorized)
+
+2004-06-20 - v0.2.3
+	* merged CryptoAPI versions of WEP/TKIP/CCMP from the wireless-2.6
+	  BitKeeper tree (not used by default, can be enabled by defining
+	  HOSTAP_USE_CRYPTO_API)
+
+2004-05-31 - v0.2.2
+	* fixed a buffer overflow in TKIP encryption (hostap_crypt_tkip
+	  module) on big endian hosts
+
+2004-05-06 - v0.2.1
+	* allow hostapd to send encrypted frames using wlan#ap interface
+	* fixed get_key for TKIP to return the sequence number of the last
+	  transmitted frame, not the seq# of the next frame
+	* added driver support for hostapd WPA Authenticator
+	* fixed TKIP get sequence number
+	* clear IFF_RUNNING and generate linkwatch events based on association
+	  status in Managed mode
+	* added alternative TKIP implementation which uses Michael MIC
+	  implementation in CryptoAPI instead of Host AP specific
+	  implementation
+	* fixed a bug in TKIP Phase1 key caching for the case when ICV
+	  verification fails
+	* added support for RSN (IEEE 802.11i/WPA2)
+	* removed (or added rate limitation to) some of the printk debug
+	  messages to reduce the size of the kernel log
+	* fixed byte order for CCMP packet number get/set
+
+2004-02-15 - v0.2.0
+	* dropped support for Linux 2.2.x and old Linux 2.4.x kernels
+	  (only the latest Linux 2.4.x and Linux 2.6.x versions are "officially
+	  supported", older version may work; Host AP v0.1.x branch can be used
+	  with older kernel versions)
+	* fixed WDS interface selection to not select non-WDS interface. This
+	  fixes cases in which frames from not associated STAs were accepted
+	  because the driver thought it was a WDS frame. In addition, this
+	  meant that the STA was not notified about it not being associated and
+	  consequently, STA did not associate again (this could happen, e.g.,
+	  after driver/AP restart).
+	* fixed hostap_cs unregistration when PC Card is removed while Host AP
+	  interfaces are still up
+	* restructured Linux net device use to be more like IEEE 802.1q VLAN
+	  (add a master IEEE 802.11 radio netdev (wifi#) and make all other
+	  devices virtual; only one netif queue is used; share all IEEE 802.11
+	  handling for all packets using wlan#, wlan#ap, wlan#sta, wlan#wds#
+	  interfaces)
+	* cleaned up encryption to use separate function to encrypt skb's
+	* moved hardware independent TX code (Ethernet -> IEEE 802.11 header
+	  conversion, etc.) into a separate file, hostap_80211_tx.c;
+	  most hardware independent generic code has now been moved away from
+	  hostap_hw.c
+	* disable wlan hardware when radio netdev (wifi#) is down (i.e.,
+	  beacons will not be sent in Host AP mode and STA will not associate
+	  in Managed mode when this interface is down) (this used to be
+	  configurable option, but disabled by default)
+	* register wlan#sta interface only when assoc_ap_addr is configured
+	* remove prism2_params ptype, getptype, txpower, and gettxpower because
+	  these can be replaced with iwpriv set_rid_word (with iwpriv reset 2),
+	  hostap_rid get, and iwpriv readmif/writemif
+	* fixed Shared Key authentication when using host_decrypt and kernel
+	  driver based IEEE 802.11 management
+	* changed Host AP crypto modules to use skb's instead of raw data
+	  buffer
+	* added crypto hooks for full MSDU encrypt/decrypt (or MIC/de-MIC) for
+	  encryption algorithms like TKIP which calculates MIC over the full
+	  MSDU
+	* fixed RTS and Fragmentation thresholds to be restored after hw
+	  reset
+	* modified reading of communications quality values (Managed and Ad-Hoc
+	  modes):
+	  - read Prism2 values every 10 second and when get_wireless_stats()
+	    is called in suitable (non-atomic) context
+	  - use new dBm CommsQuality RID when STA f/w version is 1.3.1 or newer
+	* fixed Managed/Ad-hoc mode authentication with Open System algorithm
+	  when using old (e.g., version 0.6.2) STA firmware
+	* fixed iwspy support with Linux wireless ext v16 (previous version
+	  caused kernel crashes and memory corruption due to local->spy_data
+	  not being in fixed offset from all dev->priv pointers anymore); only
+	  wlan# device should be used for spy entries because other devices
+	  will not receive statistics updates
+	* fixed IEEE 802.11 defragmentation when using host-based WEP
+	  decryption and bridging packets between two associated STAs
+	  (this caused a kernel crash in dev_queue_xmit())
+	* support cards without firmware in flash memory by allowing
+	  initialization to continue even if card reset times out (also useful
+	  to recover from corrupted primary firmware image)
+	* added workaround for fragmentation threshold setting for some cases
+	  that returned to default value (fragmentation disabled)
+	* fixed STA specific RX statistics for Repeater mode
+	* changed last_rx_signal and _silence to use dBm
+	* use cnfDbmAdjust RID (STA f/w 1.3.1 or newer) to configure RSSI->dBm
+	  conversion
+	* added driver support for WPA Authenticator/Supplicant:
+	  - requires STA f/w 1.7.0 or newer
+	  - collect BSSID list (including WPA IE) in Managed mode
+	  - added new encryption algorithm: TKIP (hostap_crypt_tkip module)
+	    (TKIP = Michael MIC and WEP with per-packet temporal keys)
+	  - added new encryption algorithm: CCMP (hostap_crypt_ccmp module)
+	    (CCMP = AES-CCM, i.e., Counter with CBC-MAC)
+	  - added prism2_params for WPA use: wpa, privacy_invoked,
+	    tkip_countermeasures, drop_unencrypted
+	  - added hostapd sub-ioctl for configuring generic IEEE 802.11
+	    information element for Beacon/ProbeResp/(Re)AssocReq frames
+	  - note: to be useful, this needs additional user space daemon for
+	    key management (WPA Supplicant/Authenticator)
+	* fixed a race condition in registering wlan#ap and receiving
+	  management frames (this could cause kernel panic if a management
+	  frame was received before wlan#ap initialization was completed)
+	* added minimal support for ethtool (reporting of driver info and
+	  firmware version)
+	* report WDS peer address when SIOCGIWAP is used on a WDS device
+	* do not show SSID for WDS devices (SIOCGIWESSID, SIOCSIWESSID)
+	* fixed iwpriv wds_add to allow addition of special pre-allocated WDS
+	  interfaces with 00:00:00:00:00:00
+
+2003-10-14 - v0.1.0
+	* fixed wlan#wds#, wlan#ap, and wlan#sta netdevice unregistration
+	  with Linux 2.6.x by using dev->destructor to delaying the freeing of
+	  allocate memory area
+	* added PCI ID for Prism3 mini-PCI [hostap_pci]
+	* fixed yield() backward compatibility code for Linux 2.4.0 .. 2.4.18
+	* added support for 32-bit CommTallies (if STA f/w >= 0.8.2); these
+	  do not wrap around as easily as 16-bit tallies and this should
+	  eliminate some InfDrop events during high load
+	* update counters used for /proc/net/hostap/wlan#/stats periodically
+	  (every 10 seconds) even if there are no unsolicited CommTallies
+	* fixed CommTallies handling on big endian platforms
+	* added support for merging two srec file (Primary and Secondary(STA)
+	  firmware) into one non-volatile (flash) download
+	  (both file names are given on prism2_srec command line)
+	* added support for volatile download of Primary firmware using
+	  Genesis mode (this is available only for hfa3842; hfa3841, i.e., old
+	  Prism2 cards, require hardware changes for similar function)
+	  ('-g' command line option in prism2_srec)
+	* added support for Primary-only mode, i.e., let card be initialized
+	  to minimal state if secondary image is not present; this mode allows
+	  downloading secondary image both to flash and RAM (this and/or
+	  Genesis mode can be used to fix cards that do not work due to
+	  incorrect/corrupted secondary image); enabled Primary download to
+	  flash since such operation does not anymore make cards unusable with
+	  the Host AP driver
+	* fixed failure handling in PCI probe not to crash kernel [hostap_pci]
+	* reduced verbosity of prism2_srec (use '-v' or '-vv' options to get
+	  more details, if needed)
+	* merged hostap_crypt module into hostap module; Note: old
+	  hostap_crypt module should be removed since it prevents loading of
+	  the new hostap module
+	* separated different components (driver, hostapd, and utils) into
+	  their own tarballs; new versions the these tarballs can be released
+	  separately in the future
+	* fixed inactivity polling of stations that are in power saving mode
+	  (this worked with hostapd, but was broken when kernel-based 802.11
+	  management was used)
+	* modified scanning (in Managed mode; iwlist wlan0 scan) to use
+	  HostScan request if firmware supports it (STA f/w >= 1.3.1);
+	  improved scan result reporting (both SIOCGIWSCAN and
+	  /proc/net/hostap/wlan#/scan_results use the latest scan results);
+	  reduced debug messages in kernel log for scanning since all
+	  information is now available through better interfaces; generate
+	  "Scan request completed" iwevents even when host_roaming=0
+	* added persistent mode for volatile download (keep firmware data in
+	  kernel memory and automatically download images to the card in case
+	  of hw_reset; without this, card would return to the firmware images
+	  that are stored in flash); this mode is enabled by adding '-p' flag
+	  to prism2_srec command line when loading primary and secondary
+	  firmware into RAM
+	* added support for sending interim accounting updates to RADIUS
+	  Accounting server (hostapd.conf: radius_acct_interim_interval)
+
+2003-07-27 - v0.0.4
+	* moved non-hardware specific RX code from hostap_hw.c into a new file,
+	  hostap_80211_rx.c and removed Prism2 RX descriptor dependency from
+	  hostap_ap.c
+	* fixed number of compilation issues (RH9 kernel, *.mod files to local
+	  directory, 2.4.x compilation with CONFIG_MODVERSIONS, external
+	  pcmcia-cs)
+	* removed extra tasklet that was used with TX callback handler
+	* update basic rate set automaticallyt when changing supported rate set
+	* fixed compilation without Linux Wireless Extensions
+	  (CONFIG_NET_RADIO)
+	  (this is not recommended, but should work now; it will limit driver
+	  functionality)
+	* use less aggressive transmit rate decreasing algorithm
+	* fixed inactivity expiration of stations using power saving mode
+	* fixed sending of IEEE 802.1X frames to buffer them if STA is in power
+	  saving mode
+	* removed backward compatibility code for Linux Wireless Extensions
+	  versions older than ver 9
+	* added module parameter 'dev_template' for setting the device name
+	  template (default: 'wlan%d'); this is for hostap_{cs,pci,plx}.o
+	* changed monitor mode to use pseudo-IBSS mode instead of Host AP mode
+	  to avoid sending out Beacon and ProbeResp frames
+	* fixed enh_sec setting (hide SSID) to reset Port0 so that the changes
+	  to the beacon are taken into use immediately
+	* added support for selection which authentication algorithm to use
+	  in station mode (prism2_param 'ap_auth_algs', 1 = open system,
+	  2 = shared key (requires WEP), 3 = both, default)
+	  (ap_auth_algs was previously used only in AP/Master mode, but it is
+	  now also used for STA mode configuration)
+	* added support for manual scan and roaming mode (managed/ad-hoc);
+	  prism2_param host_roaming 2; this disabled automatic IEEE 802.11
+	  scans and gives more control to user space programs using Linux
+	  wireless extensions (see 'Roaming in station mode' section in
+	  README file for more information)
+	* process beacon frames in kernel driver even when hostapd is used
+	  (this updates AP tables and allows automatic WDS link generation)
+	* removed TX power controlling (iwconfig txpower) since the
+	  experimental algorithm in the driver did not include any feedback
+	  from the measured TX power and could allow TX power values that cause
+	  interference or signal quality issues; now only txpower 'off' and
+	  'auto' are allowed. TX power controlling will be returned after
+	  proper algorithm using feedback loop has been implemented.
+
+2003-05-18 - v0.0.3
+	* redesigned RADIUS client implementation
+	  - share same client code for all Authentication and Accounting
+	    functionality
+	  - support retransmission
+	  - support multiple servers
+	* redesigned configuration of hostapd vs. kernel driver management
+	  - include support for hostapd operations in all builds, i.e., do
+	    not require PRISM2_HOSTAPD definition
+	  - support for both kernel side and hostapd management is included in
+	    the default build (kernel code will be used automatically, if
+	    hostapd is not running)
+	  - kernel implementation (hostap_ap.c) of IEEE 802.11 management can
+	    be removed by defining PRISM2_NO_KERNEL_IEEE80211_MGMT
+	  - new prism2_param for setting hostapd mode (hostapd will
+	    automatically use this)
+	  - wlan#ap interface will be created only when in hostapd mode and it
+	    will be removed when disabling this mode
+	* fixed a race condition in local->event_loop vs. IntEn register
+	  read/write (fixes a kernel hang caused by interrupt loop)
+	* fixed a race condition in local->hw_ready/hw_resetting writes and
+	  event unmasking to resolve some issues with card resets during
+	  heavy traffic load
+	* fixed number of problems with hw reset during high traffic load
+	* disable shared interrupts during COR sreset to avoid host system
+	  crashes
+	* modified encryption configuration _not_ to reset Port0 when in
+	  Managed mode to avoid looping with some IEEE 802.1X Authenticators
+	  (port reset causes Prism2 to re-authenticate (IEEE 802.11))
+	* simplified build process for Linux 2.4.x and Linux 2.5.x:
+	  'make' and 'make install' (as root) can be used to build and install
+	  modules for all support hardware versions
+	* updated hostap_cs module for new Linux 2.5 pcmcia API
+	* fixed __MOD_{INC,DEC}_USE_COUNT use (do not use them when driver is
+	  compiled into the kernel)
+	* use longer timeout values for command and BAP busy to avoid some
+	  timeout issues (firmware seems to be still alive in some cases, where
+	  previous version of the driver would report a timeout error and
+	  abort the operation)
+	* fixed WDS links to accept frames when IEEE 802.1X PAE is used
+	  (however, please do note that bridging WDS interfaces with no or
+	  minimal encryption together with an interface using dynamic,
+	  individual keys will weaken the security of the system)
+
+2003-05-03 - v0.0.2
+	* fixed iwconfig 'rate' command to change supported rates element
+	  in beacon frames
+	* added support for setting basic rate set with new prism2_param
+	  'basic_rates' and operational rates with 'oper_rates'
+	* added support for new AVS (linux-wlan-ng) monitoring header
+	  (patch from Gerald Britton)
+	* fixed TX rate controlling for Repeater/WDS mode
+	* fixed power saving mode updating on PS Poll frames
+	* optimized AP management frame handling by removing not anymore needed
+	  RX packet queue since AP code is not called in hw IRQ context anymore
+	* added support for wireless extensions v16 iwspy operations (based on
+	  patch from Jean Tourrilhes)
+	* improved hostapd event logging (stdout and/or syslog)
+	* fixed Linux 2.2.x compatibility code for monitor mode with Prism2
+	  headers (monitor_type 1)
+	* fixed CRC-16 (signature stamp) generation in prism2_srec (this is
+	  needed for writing flash upgrade)
+	* added support for non-volatile download, i.e., flash upgrade
+	  (based on patch from Pavel Roskin)
+	  Note! This has _not_ yet been tested thorougly and the current
+	  version of code should not be used unless you are prepared to
+	  facing corrupted flash and killed cards.. The code is commented out
+	  in default build and can be enabled by defining
+	  PRISM2_NON_VOLATILE_DOWNLOAD.
+	* fixed IEEE 802.11 defragmentation when using host-based WEP
+	  decryption (this caused a kernel crash in netif_rx())
+	* fixed host-based WEP decryption not to leave 8 extra octets in the
+	  end of the frame
+	* added support for IEEE 802.11 Shared Key Authentication when using
+	  hostapd (new hostapd.conf field 'auth_algs' for configuring supported
+	  algorithms)
+	* fixed race condition in get/set RID operations that seemed to have
+	  caused BAP timeouts and RID read failures (e.g., 'RID len mismatch'
+	  on get_rid and problems with host_roaming)
+	* fixed automatic WDS addition to schedule a process context task for
+	  registering the new device to avoid crashing kernel
+	* added automatic WDS link addition on reception of 4-addr WDS frame
+	  from unknown transmitter (if autom_ap_wds is set)
+	* fixed handling of non-WDS frames from a STA in 'AP client' mode
+	  (do not assume that they are bogus WDS frames if STA has associated)
+	* added support for Session-Timeout Attribute in RADIUS messages
+	  (both IEEE 802.11 ACL and IEEE 802.1X)
+
+2003-04-05 - v0.0.1
+	* added support for IEEE 802.11 standard compliant WDS (4 addresses)
+	  frames for Host AP mode
+	  - this requires station firmware version 1.5.x or newer
+	  - standard compliant vs. bogus 3-addr format can be selected with
+	    bit2 of prism2_param wds_type; it is automatically enabled, if
+	    station firmware is version 1.5.0 or newer
+	* added new prism2_param 'hostscan' for requesting scanning of APs and
+	  IBBSs from all channels; this requires STA f/w 1.3.1 or newer; in
+	  Master mode, this command moves to Managed mode for a second to
+	  perform to scan, so normal AP functionality is disturbed; at the
+	  moment, the results are shown only in the kernel ring buffer
+	  ('dmesg')
+	* added experimental version of passive AP scanning functionality for
+	  Host AP mode:
+	  - driver can be instructed to scan other channels passively, i.e.,
+	    by listening to beacon frames from other APs
+	  - prism2_param 'ap_scan' is used to set the interval (in seconds)
+	    between scan attempts on different channels; 0 = passive scanning
+	    disabled (default)
+	  - prism2_param 'other_ap_policy' should be set to at least 1
+	    (2 or 3 would probably be more useful) in order to record the
+	    found APs
+	  - changing channels will cause some disturbance on normal
+	    functionality and using very small values of ap_scan is not
+	    recommended
+	* added new procfs file /proc/net/hostap/<device>/ap to provide
+	  compact information about other APs found (other_ap_policy must be
+	  set for this)
+	* added support for TX callbacks
+	  - driver code can register callback that will receive status of
+	    selected TX frame (i.e., whether they were ACKed or not)
+	  - modified AP management to mark stations authenticated/associated
+	    only after they have acknowledged the response frame (previously,
+	    stations were marked auth/assoc when sending the frame)
+	* moved a lot of code from hardware interrupt context to tasklets
+	  (software IRQ)
+	  - RX, Info, TX and TX Exc event handling is now in tasklets instead
+	    of performing data copying and all computation in hardware IRQ
+	    handler (this includes host-based decryption)
+	  - this should make the driver behave better especially with low
+	    performance CPUs that might have lost interrupts and systems that
+	    need timely IRQ delivery for other devices
+	  - AP code in hostap_ap.c is from now never called in hard IRQ
+	    context, so lighter spinlocks can be used; most of the other code
+	    can also use lighter locks (e.g., with baplock)
+	  - as an extra bonus, RX code path is now more readable than before
+	* added new kernel patch for including Host AP driver into Linux 2.5.47
+	  - new kernel configuration items for selecting hostapd and firmware
+	    download support
+	* added station (Managed/Ad-hoc) mode support for promiscuous mode and
+	  multicast frames (using promiscuous mode with kernel side packet
+	  filtering); Note! This is currently commented out due to problems
+	  with various station firmware versions.
+	* modified Host AP (Master) mode to honor TX rate configuration
+	  (e.g., 'iwconfig wlan0 rate 11M')
+	* fixed kernel AP management code to change station status from AP to
+	  STA when no beacons have been received from the AP for some time and
+	  a station using same hwaddr tries to authenticate with us
+	* fixed monitor mode setting with the old, now deprecated, interface
+          (iwpriv wlan0 monitor #)
+	* changed Buffer Access Path (BAP) usage
+	  - use only one BAP (BAP0) for all wlan card memory access (RX, TX,
+	    info frame, configuration)
+	  - there have been lot of problems with using two BAPs concurrently
+	    even though hardware should support it; in addition, PCI Prism2.5
+	    has a known problem that would require sleeping for some time
+	    between BAP0 and BAP1 accesses (with recommended workaround to use
+	    only one BAP)
+	  - from now on, BAP accesses are fully protected with local->baplock
+	    and this should remove all issues related to concurrent (or "almost
+	    concurrent") BAP0/BAP1 accesses
+	  - very experimental PCI bus mastering code is still using BAP1, but
+	    it is not enabled in default configuration (and anyway, it has not
+	    even been tested with the latest versions of the driver)
+	* added SIOCSIWSCAN ('iwlist wlan0 scan') support also to Host AP mode
+	* updated EAPOL state machines to use IEEE 802.1aa/D4
+	  (note! order of EAP Success and EAPOL-Key packets has been reverted
+	  back to IEEE 802.1x due to compatibility problems with WinXP
+	  Supplicant)
+	* added support for WEP rekeying into hostapd (IEEE 802.1x)
+	* added preliminary (and so far minimal) support for IEEE 802.11f
+	  (IAPP) to hostapd
+	* added preliminary support for RADIUS Accounting to hostapd
+	* added preliminary support for station functionality into hostapd:
+	  - associate as a client to another AP while simultaneously operating
+	    as an AP (must use same channel as the other AP)
+	  - hostapd can wait for beacons from one AP (command line argument -C)
+	    and then authenticate and associate with it
+	  - new netdevice (wlan#sta) will be used for data frames to and from
+	    this BSS
+	  - this link can be used instead of WDS link, e.g., to extend range
+	    of an AP or to remove need for wired uplink; however, client
+	    connection does _not_ support layer 2 bridge operations (i.e.,
+	    IP routing or ProxyARP must be used)
+	  - Note! Simultaneous client operation seems to work with station
+	    firmware version 0.6.2, 0.7.6, and 0.8.0, but not with 1.?.?.
+	    With new firmware versions, promiscuous mode can be used to work
+	    around this ('iwpriv wlan0 set_rid_word 64645 1')
+	* added '-B' command line argument for hostapd to fork it into
+	  a background process
+	* moved hostapd configuration from command line arguments into a
+	  configuration file (see hostapd/hostapd.conf for an example)
+	* added hostapd configuration file reloading on SIGHUP (not yet fully
+	  implemented)
+	* added hostapd support for MAC address based ACLs in IEEE 802.11
+	  authentication
+	  - accept/deny lists in configuration file
+	  - optional query to external RADIUS Authentication server
+	    (User-Name and User-Password are set to station MAC address;
+	    default format (RADIUS_ADDR_FORMAT in hostapd/radius.h has no
+	    delimiters and uses lower case hex characters, e.g.,
+	    00123456789a (= 00:12:34:56:78:9a); this shares the same RADIUS
+	    server configuration with IEEE 802.1X
+	* added support for S3 firmware info records that span multiple lines
+	  and for multiple variant,bottom,top triplets (prism2_srec)
+	* added new prism2_param 'enh_sec' for hiding SSID in beacon frames
+	  and ignoring clients configured with "ANY" (broadcast) SSID
+	  (note: this requires STA f/w ver 1.6.3 or newer)
+	* added a workaround for STA f/w version 1.6.3 (and possibly other
+	  1.6.x or newer) to operate in Host AP mode
+	* fixed TX rate controlling and statistics gathering for WDS links that
+	  are generated manually (i.e., not based on received beacon) and for
+	  AP client mode; this should improve WDS performance for cases where
+	  the maximum rate seemed to be 1 or 2 Mbps
+
+2002-10-12
+	* added utils/hostap_diag tool for showing diagnostics information
+	  about wireless LAN card
+	  - moving debugging related code from kernel driver to user space
+	  - this replaces previously used
+	    /proc/net/hostap/wlan#/{rids,unknown_rids}
+	  - replaces utils/dump_mmi_dev0_status (hostap_diag -b wlan#)
+	* added configuration option for TX/RX antenna selection
+	  - prism2_param antsel_tx and antsel_rx
+	  - 0 = do not touch (default), 1 = use antenna diversity,
+	    2 = force AntSel Low, 3 = force AntSel High
+	* changed monitor mode configuration style
+	  - 'iwconfig wlan0 mode monitor' (this requires wireless tools
+ 	    versions 25 or newer) is now used to setup monitor mode
+	  - 'prism2_param wlan0 monitor_type <0/1>' configures which headers
+	    are included (0 = IEEE 802.11, 1 = Prism2 + IEEE 802.11)
+	  - old method 'iwpriv wlan0 monitor <2/3>' is now implemented as a
+	    wrapper for iwconfig mode command to provide backward compatibility
+	    (however, iwpriv command 'monitor' is now deprecated and it may be
+ 	    removed in the future versions)
+	* changed host_encrypt default in Host AP mode to be based on the
+	  station firmware version; f/w 1.4.9 seems to fix a bug that prevented
+	  firmware-based WEP encryption (although, decryption was working) to
+	  be used in Host AP mode; from now on, this can be configured with
+	  prism2_param also when using Host AP mode; the default is to use
+ 	  firmware-based encryption if f/w version is 1.4.9 or newer
+	* added new WDS frame options:
+	  - new prism2_param wds_type bitmap:
+ 	    bit0: 0 = use unicast RA/BSSID for broadcast/multicast frames to
+		  WDS link
+		  1 = use broadcast RA/BSSID for broadcast/multicast frames
+ 		      (Note! Prism2 firmware has limitations on this)
+	    bit1: AP client mode - if AP client mode is enabled and device is
+		  in Managed mode (i.e., associated to an AP), driver accepts
+		  4-addr WDS frames from current AP. In addition, outgoing
+		  frames that have a foreign source address in the Ethernet
+		  header are sent using 4-addr WDS frame to the AP. This allows
+		  station mode to perform layer 2 bridgeing. Please note, that
+		  due to firmware limitations Host AP in Master mode cannot
+		  operate with such station.
+	* fixed ap_bridge_packets to send broadcast/multicast packets back to
+	  wireless interface only in Master mode
+
+2002-09-12
+	* hostapd improvements: implemented ioctl() for controlling kernel
+	  driver from hostapd; this version is able to add stations (and
+	  flush list on exit/startup) and remove expired stations so operations
+ 	  with user space handling of management frames is starting to be
+ 	  usable
+	* cleaned up RX and TX paths by moving AP related operations from
+ 	  prism2.c into prism2_ap.c
+	* added new monitor mode 3 (like mode 2, but also include linux-wlan-ng
+	  style Prism2 header and use ARPHRD_IEEE80211_PRISM) and removed
+	  monitor mode 1 (netlink)
+	  - new libpcap and Ethereal knows how to use device with type
+	    ARPHRD_IEEE80211_PRISM so netlink version is not needed anymore
+	    for getting signal levels and rate
+	  - removed prism2ethereal since Ethereal can directly capture packets
+	    with Prism2 header
+	  - netlink mode did not fully support more than one interface
+	* fixed couple of bugs causing timeouts while setting RID (TIM) in
+ 	  power saving mode with PRISM2_USE_CMD_COMPL_INTERRUPT
+	* record SSID and channel of the monitored APs and show it in procfs
+ 	  file
+	* fixed AP data expiration (timer was not initialized)
+	* cleanup of TX buffering for power saving stations:
+	  - got rid of 'struct sta_buffer_frame' and use kernel routines for
+ 	    queueing skb instead
+	  - use prism2_tx() to send buffered frames instead of using copied
+ 	    code in prism2_ap.c (skb->cb is used to indicate that the packet
+ 	    was buffered)
+	* fixed WEP with PS stations (buffered frames were not encrypted
+ 	  before)
+	* added optional defines for removing unneeded parts of the driver
+	  (e.g., to limit the size of the kernel module); see the end of
+	  prism2_config.h for more information; defining all PRISM2_NO_*
+ 	  defines seem to reduce module size about 30% on Intel x86 platforms
+	* added generic callback function to make it easier to add platform
+	  specific operations, like activity led blinking, without needing to
+	  change Host AP driver source code. If PRISM2_CALLBACK is defined,
+	  external file, hostap_callback.c, is included and it must define
+	  prism2_callback() that will be called on events like card
+	  enable/disable and RX/TX.
+	* converted wireless extension ioctls to new API (based on patch from
+	  Jean Tourrilhes)
+	* added support for wireless events (wireless ext >= 14)
+	  - IWEVTXDROP, SIOCGIWAP, SIOCGIWSCAN (Jean Tourrilhes)
+	  - IWEVREGISTERED, IWEVEXPIRED (wireless ext >= 15)
+	* improved AP scanning support:
+	  - moved ScanResult debug messages into
+ 	    /proc/net/hostap/wlan#/scan_results
+	  - send wireless SIOCGIWSCAN event when receiving ScanResult info
+ 	    frame
+	  - added SIOCSIWSCAN and SIOCGIWSCAN for wireless extensions ver >= 13
+	    (i.e., 'iwlist scan' can be used to perform AP scanning; currently
+ 	    only in station modes) (based on patch from Jean Tourrilhes)
+	* added support for host-based roaming decision for Managed mode
+	  (default is to use firmware-based roaming; use new prism2_param
+	  'host_roaming' to enable driver-based selection)
+	* added support for SIOCSIWAP (iwconfig wlan0 ap <preferred AP BSSID>)
+	  when using host_roaming (this can be used to implement user space
+ 	  roaming daemon (scan request with SIOCSIWSCAN, get results using
+ 	  SIOCGIWSCAN, and select AP with SIOCSIWAP)
+	* fixed a bug in AP management queue handling (noticed by
+ 	  Tiebing Zhang)
+	  - if AP management frame queue had more than one item, only the last
+ 	    one was processed; other items were dropped with memory leak
+	* fixed priv ioctls wds_add, wds_del, addmac, delmac, and kickmac to
+ 	  use copy_from_user() when referencing wrq->u.data.pointer
+	* added support for wireless extensions sub-ioctls
+ 	  - an optional replacement for prism2_param wrapper
+	  - these are included for WIRELESS_EXT >= 15 or if
+ 	    PRISM2_USE_WE_SUB_IOCTLS is defined (WIRELESS_EXT >= 12 is
+ 	    required in any case)
+ 	  - new iwpriv version is required (ver 25 or higher; older versions
+ 	    segfault due to long private ioctl list)
+	* added support for IW_PRIV_TYPE_ADDR (replace old 18*char with user
+	  space parsing of MAC address). This requires iwpriv ver >= 25. This
+	  will be automatically included for WIRELESS_EXT >= 15; defining
+	  PRISM2_USE_WE_TYPE_ADDR will force this to be used even with older
+	  WIRELESS_EXT versions.
+	* added detection for interrupt delivery problems (enabled only for
+	  hostap_cs.o)
+	* added PCI suspend/resume support to hostap_pci.o (patch from
+ 	  Gerald Britton)
+	* added support for changing MAC address (also BSSID in Host AP mode)
+	  with 'ifconfig wlan0 hw ether <new addr>'
+	* added WDS support for non-Host AP modes and IEEE 802.11 compliant
+	  4 address frame
+	  - removed PRISM2_STA_HAS_NO_HOSTAP_WDS_BUG define and include code
+ 	    for both IEEE 802.11 standard compliant WDS frame with 4 addresses
+ 	    and "bogus" format with 3 addresses in the header and 4th after
+ 	    payload
+	  - RX of both WDS formats seems to work in all modes
+	  - Host AP mode cannot send standard compliant WDS frames so it uses
+ 	    own format; other modes try to send standard compiliant WDS frames
+	  - some station firmware versions seems to be able to send valid WDS
+ 	    frames in pseudo ad-hoc mode, but some versions zero addr3 (= DA)
+	  - setting porttype to WDS seems to allow sending correct addr3
+	  - started to use 'Repeater' mode as WDS (i.e., 'iwconfig wlan0 mode
+ 	    Repeater'); this seems to be the best choice for WDS links needing
+	    standard compliant frame format
+	* modularized encryption/decryption support
+	  - redesigned WEP code to allow easy addition of other algorithms as
+	    loadable kernel modules; new module, hostap_crypt.o is used to
+	    register these modules and it will be used by
+	    hostap_{cs,plx,pci}.o; modprobe should be able to load this
+	    automatically after depmod has been run; use 'make crypt' to build
+	    encryption related modules (they will be installed with
+	    'make install_{pccard,plx,pci}')
+	  - moved WEP implementation from hostap_{cs,plx,pci}.o into
+	    hostap_crypt_wep.o; this is _not_ loaded automatically and it will
+	    need to be loaded before WEP can be used (e.g., from the script
+	    that sets the keys)
+	  - added support for key mappings, i.e., individual keys for each
+	    station
+	  - added new prism2_param 'bcrx_sta_key' for selecting whether
+	    individual is used also for broadcast frames (IEEE 802.11 specifies
+	    that it is not used and this is the default)
+	  - added a tool, utils/hostap_crypt_conf, for setting encryption
+	    algorithms and individual keys (iwconfig can still be used to setup
+	    default WEP keys)
+	  - fixed host_decrypt to not accept unencrypted frames unless open_wep
+	    is set
+	* module structure reorganization
+	  - moved prism2_ap.c, prism2_ioctl.c, prism2_proc.c, and some
+	    functions from prism2.c into new hostap.o module that exports
+	    symbols shared by hostap_{cs,plx,pci}.o; more will probably follow
+	    later so that hostap_{cs,plx,pci}.o will end up having only code
+	    that is hardware model dependent
+	  - renamed all exported functions to use hostap_ prefix in their names
+	* renamed /proc/net/prism2 directory to /proc/net/hostap and fixed
+	  concurrent use of different hostap_{cs,plx,pci}.o modules to use the
+	  same directory instead of making two directories with the same name
+	* renamed driver/prism2.mk to driver/hostap.mk, driver/modules/prism2_*
+	  to driver/modules/hostap_*, and driver/modules/prism2.c to
+	  driver/modules/hostap_hw.c, i.e., use 'hostap' prefix with all file
+	  names
+	* redesigned command completion waiting
+	  - do not use busy waiting
+	  - use a driver queue for pending commands to guarantee string order
+	    and serialization of the commands; if command queue is empty, new
+	    commands will be issued immediately, otherwise the pending
+ 	    commands will be issued from command completion event of the
+ 	    previous command
+	  - use command completion event (interrupt) for all commands
+ 	    (previously this was only used for transmit command)
+	  - remove PRISM2_USE_CMD_COMPL_INTERRUPT definition (there is no
+	    alternative version for busy waiting to keep the code cleaner)
+	  - hfa384x_cmd() can from now on only be called from user context;
+	    it will sleep (instead of busy waiting) for the command completion
+	    event (wake up from interrupt handler); same limit applies to
+	    get_rid/set_rid
+	  - hfa384x_callback() is a new method for performing commands, both
+	    from user and interrupt context; it registers a callback function
+	    that will be called when the command has finished; this cleans up
+	    transmit and bus mastering code a lot
+	  - HW reset (prism2_hw_reset) cannot be called from interrupt context
+	    anymore (these calls are replaced with scheduled task that calls
+	    prism2_hw_reset() from user context
+	  - AP's TIM setting has been replaced with scheduled task and a queue
+	    of entries to be set to avoid using set_rid from interrupt context
+	* modified (kernel driver) AP code to send management frames using
+	  netif queue to make sure that TX operations are not used
+ 	  concurrently; this should fix some problems with high load cases;
+	  this also means, that management frames are _not_ anymore sent unless
+	  device is UP (i.e., no auth/assoc happens before device is set up;
+	  however, beacons and probe responses are sent if the device is
+ 	  enabled)
+	* added support for TMD7160-based National Datacomm NCP130
+ 	  (PCI ID 15e8:0131) to hostap_plx.o
+	* fixed iwpriv readmif and writemif on big endian platforms
+	* added IEEE 802.1X support:
+	  - Port access entity (in the kernel driver) control authorized/
+	    unauthorized port access
+	  - Authenticator in hostapd user space daemon (kernel driver needs
+ 	    to be compiled with EXTRA_CFLAGS=-DPRISM2_HOSTAPD)
+	  - minimal authentication server included in hostapd for test use
+	    (does not check any keys etc.)
+	  - support for external authentication server using RADIUS (e.g.,
+ 	    FreeRadius and EAP/TLS)
+	  - automatic WEP key setting for default/broadcast and individual
+	    unicast keys
+	* changed TXEXC RetryErr debug logging to be configurable (default:
+	  do not print); this can be set with bit2 (= 4) of prism2_param
+ 	  'dump'
+	* improved ordering of debug printing in auth/assoc frame handlers to
+	  avoid spending too much time before replying the message and causing
+	  failed auth/assoc (TXEXC RetryErr)
+
+2002-05-19
+	* fixed dev_name setting for Linux 2.2 systems using hostap_cs.o
+	* fixed odd length BAP transfer with hostap_cs.o and hostap_plx.o
+	* added initial version of experimental firmware download support.
+ 	  This is not included in default compilation (enabled by defining
+ 	  PRISM2_DOWNLOAD_SUPPORT in prism2_config.h):
+ 	  - /proc/net/prism2/wlan#/pda for accessing PDA
+	  - volatile (i.e., RAM) download is implemented and can be used to
+	    load tertiary firmware image into the card
+	  - non-volatile (i.e., flash) download is not yet implemented
+	  - user space tool (utils/prism2_srec) for downloading images
+	* removed old packet injection code and inject utility (it did not
+	  support more than one interface and wlan0ap can be used for injecting
+	  packets)
+
+2002-05-16
+	* fixed a kernel crash with hostap_cs.o if no valid cftable entries
+	  were found
+	* fixed a kernel panic with hostap_cs.o if PC Card was removed when
+	  netdevice was UP (there were two problems, one new and one quite
+ 	  old); from now on, if the netdevice is UP when PC Card is removed
+	  (or 'cardctl eject' is run), the driver will not finish shutdown
+	  routines before the netdevice is set down
+	* fixed 104-bit WEP key setup for firmware-based encryption
+	  (firmware seems to require that all keys must be set to the same
+ 	  keylength, from now on, the keylength of default TX key is used;
+ 	  host driver based WEP does not have this kind of limitation)
+	* cleaned up BAP setup and copy functions
+	* changed baplock to use spin_lock_irqsave() instead of spin_lock_bh()
+	  and take baplock also during BAP1 setup to prevent some concurrency
+	  problems and packet corruption/card timeouts
+	* added experimental support for PCI bus mastering (hostap_pci.o)
+	  - this code is very experimental and may not work on all platforms
+	    (Intersil does not support bus mastering in current hardware/
+	    firmware version and this implementation is based on guesses and
+	    experiments)
+	  - initial tests seems to indicate that host CPU load drops from
+	    about 40-45% to 5-10% when using bus mastering while sending or
+	    receiving data at about maximum throughput (6 Mbps)
+	  - bus mastering is not enabled on default compilation; it can be
+	    enabled by defining PRISM2_BUS_MASTER in
+ 	    driver/modules/prism2_config.h
+	  - RX path seems to work quite fine, but TX path has problems for
+ 	    which there is a workaround (PRISM2_ENABLE_BEFORE_TX_BUS_MASTER);
+ 	    in addition, TX side does not yet implement full locking for BAP0
+ 	    (e.g., configuration changes during packet transmit can cause
+ 	    packet corruption, etc. problems)
+	  - new prism2_param values 'bus_master_threshold_rx' and
+	    'bus_master_threshold_tx' can be used to control which frames are
+	    copied using bus mastering (if frame payload is equal to or larger
+	    than threshold, bus mastering will be used; if threshold is set to
+	    larger than maximum packet length, e.g., 5000, no frames will use
+	    bus mastering)
+	* added support for Bridge-Tunnel encapsulation and clarified
+	  snap_header usage (RFC1042) based on IEEE 802.1H
+	  (mainly for IPX support)
+
+2002-05-02
+	* converted module parameters to array format (e.g., channel=1,5,9)
+	  to allow multiple cards to be configured with different values;
+	  the first value is used as the default if other values are not
+ 	  present; this is used only with hostap_pci.o and hostap_plx.o
+	  (hostap_cs.o uses only the first value for all cards since PC Cards
+	  can be removed/added quite freely)
+	* added new module parameters: other_ap_policy, ap_max_inactivity,
+ 	  ap_bridge_packets, autom_ap_wds
+	* added support for delayed MAC port enable (until netdev UP) and
+	  automatic port disable (on netdev DOWN). These may be enabled
+ 	  with module parameters 'delayed_enable' and 'disable_on_close'
+	  (i.e., default: 0 = do not use)
+	* improved station inactivity timeout handling
+	  - one timer per station instead of timer per AP (no need for
+ 	    periodic searches through station list)
+	  - simplified timeout handling code
+	  - poll station with data frame (and check if it is ACKed), before
+	    trying to disassociate the station (Windows 2000 and Windows XP
+	    report disassociation bit too loudly..)
+	* removed couple of unneeded spin locks from txfid handling (TX path
+	  should be a bit faster than before)
+	* fixed couple of potential concurrency problems with
+ 	  PRISM2_USE_CMD_COMPL_INTERRUPT; however, it is still not used in
+	  the default compilation due to some issues with BAP usage on SMP
+	  platforms
+	* added support for MAC address-based restrictions on station
+ 	  authentication
+ 	  - based on patch from Benedikt 'Hunz' Heinz, Hans Freitag, and
+	    Håkan Lennestal <Hakan.Lennestal@brfsodrahamn.se>
+	  - new iwpriv commands:
+	    * maccmd <val>:
+		0 = open policy (default), 1 = allow policy, 2 = deny policy,
+		3 = flush MAC list, 4 = kick all authenticated stations
+	    * addmac <MAC addr>
+	    * delmac <MAC addr>
+	    * kickmac <MAC addr>
+	  - new proc file /proc/net/prism2/wlan0/ap_control
+	* added optional host decryption
+	  - new prism2_params: host_encrypt and host_decrypt
+	  - if host_decrypt is set, station firmware is instructed not to
+ 	    decrypt received frames and the driver takes care of that whenever
+ 	    it gets a frame with ISWEP flag
+	  - host decryption (and encryption) can be used to overcome
+ 	    performance problems with slow WEP handling on some Prism2 cards;
+	    in addition, it may be used for 104-bit WEP even if the station
+ 	    firmware/card does not support it
+	  - host_encrypt can be used to force host encryption in other than
+ 	    Host AP mode (Host AP mode uses host encryption regardless of this
+ 	    parameter)
+	* changed TX path to use command completion interrupt instead of busy
+	  waiting after transmit command as the default compilation option
+	  (old behavior can be returned by commenting out
+ 	  '#define PRISM2_USE_CMD_COMPL_INTERRUPT' in
+ 	  driver/modules/prism2_config.h)
+
+2002-04-24
+	* fixed a bug in hostap_pci.o and hostap_plx.o uninitialization
+	  (incorrect order of proc entry removal could cause kernels crashes)
+	* fixed some compilation problems
+	* added optional method for compiling hostap_cs.o outside pcmcia-cs
+	  tree even when not using kernel-tree PCMCIA modules (PCMCIA_PATH
+	  needs to be set in Makefile)
+	* fixed endianness issues with hostap_pci.o on PowerPC platforms
+	* fixed kernel crash on Linux 2.2 platform
+
+2002-04-21
+	* added support for Prism2.5-based native PCI cards and PC Cards
+	  in PLX9052-base PCI adapters
+	  - new module names (to avoid duplicates with linux-wlan-ng):
+	    PC Card version: hostap_cs.o
+	    PCI version for Prism2.5: hostap_pci.o
+	    PLX version: hostap_plx.o
+	  - please note, that /etc/pcmcia/prism2.conf is renamed to
+	    hostap_cs.conf and you may need to manually remove old prism2.conf
+	    from /etc/pcmcia
+	* fixed BAP setup problems (BAP0 and BAP1 cannot apparently be setup
+	  correctly, even though they can be used concurrently for
+ 	  reading/writing)
+	  - this removes at least some corruption problems (e.g., "no SNAP?"
+	    messages)
+	  - this fixes some card hangs (which would usually cause
+ 	    "hfa384x_setup_bap - timeout3" messages)
+	* re-organized driver source code (see driver_source.txt for details)
+	* do not allow "Any" (i.e., zero-len) SSID to be set when in Host AP
+	  mode (this seems to kill the card)
+	* fixed byte order bugs in SIOCSIWMODE, SIOCSIWFREQ, and SIOCSIWRATE
+ 	  handlers (affecting big endian platforms)
+	* fixed WEP configuration to return valid configuration after card
+	  reset
+
+2002-04-13
+	* fixed compilation on Linux 2.2 kernels
+	* 'iwpriv wlan0 reset 2' performs port reset
+ 	  (disable and enable port 0)
+	* added support for shared key authentication (this requires WEP);
+	  allowed authentication algorithms can be configured with
+	  'prism2_param wlan0 ap_auth_algs <val>':
+	  0: none (no authentication will succeed), 1: only open,
+	  2: only shared key, 3: open or shared key (default)
+	* added new prism2_param 'monitor_allow_fcserr' to control whether
+	  frames with FCS errors are passed to user space monitor (default:
+ 	  FCS errors are dropped)
+	* fixed packet sending with WEP in non-Host AP modes
+	* take nick name (iwconfig wlan0 nick <name>) into use by resetting
+	  the port and save it in driver for possible card resets
+	  (this is used in diagnostics programs, like ORiNOCO Client Manager's
+	  link test to identify AP)
+
+2002-04-10
+	* fixed compilation with older Linux wireless extension versions
+ 	  (at least version 9 is now required for most wireless extensions)
+	* kernel driver AP functionality code cleanup
+	* try to send broadcast deauthentication frames when shutting down
+	* use smaller default inactivity timeout with stations (5 min)
+	* send disassociation when 3/4 of inactivity timeout has passed and
+	  deauthentication when full timeout has passed
+	* added support for WEP in Host AP mode
+	  - card firmware is used to decrypt frames (it seems to work fine)
+	  - encryption is performed in host driver since firmware does not
+	    seem to want to encrypt frames correctly when in Host AP mode
+	  - use 'restricted' as default WEP mode instead of 'open'
+	  - WEP keys are saved in driver data, so SIOCGIWENCODE is now
+ 	    returning real values and not the bogus values firmware returned
+	  - 40-bit and 104-bit WEP seems to now be working properly in Host AP
+ 	    mode (both with stations and with WDS links); (note that if
+	    104-bit WEP is used, station firmware on AP must support 104-bit
+ 	    WEP in order to decrypt frames)
+	* fixed a bug in fake-WDS frame generation
+	  - if payload len was odd, the addr4 was broken in RX frames
+	* drop RX packets that have ToDS flag but wrong BSSID and RX packets
+	  that have FromDS flag (these frames are usually broadcast/multicast
+	  frames in other BSSes)
+
+2002-04-07
+	* fixed a bug in fake-WDS frame generation
+	  - if payload len was odd, the last byte was broken when adding
+	    fourth address to the end of the buffer
+	* use 8 (was 16) pre-allocated TX buffers to free RAM on Wireless LAN
+	  card
+	* added preliminary (not yet fully operational) version of use space
+	  daemon to handle management frames instead of kernel driver; this
+	  version of the kernel driver includes code for both methods and
+	  previously used driver-based handling of management frames is the
+	  default (PRISM2_HOSTAPD definition is used to enable user space
+ 	  daemon); management frames are sent using new netdevice wlan#ap
+	  between kernel and user spaces; user space daemon is in new
+	  hostapd subdirectory
+	* implemented optimized code path for transmit command use
+	  - use command completion interrupt instead of busy waiting for
+ 	    transmit command completion; i.e., replace even 150 usec busy wait
+ 	    per TX frame with one interrupt
+	  - prism2_transmit() is devided into two parts; the first one
+ 	    (prism2_transmit) executes transmit command and the second part
+ 	    (prism2_cmd_ev) consists of code that was previously run after the
+ 	    busy wait in prism2_transmit()
+	  - this code is not yet thoroughly tested, so the previous method
+ 	    using busy waiting is still the default one; new version can be
+ 	    enabled by uncommenting PRISM2_USE_CMD_COMPL_INTERRUPT definition
+ 	    in prism2.c
+	* stop/wake all used netdevices (i.e., also the WDS devices) when
+ 	  stopping a queue because there is no more room for new packets
+
+2002-04-05
+	* implemented radio (both RX and TX) enable/disable to iwconfig
+	  'txpower' command ('iwconfig wlan0 txpower off' to turn radio off
+	  and 'iwconfig wlan0 txpower auto' to turn in on)
+	* added 'iwpriv wlan0 writemif <CR*2> <value>' command (see HFA386x
+	  baseband processor datasheet (http://www.intersil.com/data/FN/FN4/
+	  FN4856/FN4856.pdf) for information about configuration registers)
+	* private ioctl() (used with iwpriv) reorganization:
+	  - replaced separate private ioctls with one generic routine to save
+	    ioctl numbers
+	  - some ioctl numbers were changed; from now on, PRISM2_IOCTL_*
+	    definitions in prism2_wlan.h should be used
+	  - new command 'iwpriv wlan# prism2_param <param#> <value>'
+	  - changed 'iwpriv wlan# ...':
+	    'ptype <value>' -> 'prism2_param 1 <value>'
+	    'txratectrl <value>' -> 'prism2_param 2 <value>'
+	    'beacon_int <value>' -> 'prism2_param 3 <value>'
+	    'pseudo_ibss <value>' -> 'prism2_param 4 <value>'
+	    'alc <value>' -> 'prism2_param 5 <value>'
+	    'txpower <value>' -> 'prism2_param 6 <value>'
+	    'dump <value>' -> 'prism2_param 7 <value>'
+	  - new configurable parameters:
+	    8: other AP policy for received beacon handling:
+		0 = skip all beacons, 1 = accept beacons with our SSID,
+		2 = accept beacons from all APs,
+		3 = accept all beacons (even from IBSS)
+		(default 0)
+	    9: AP max station inactivity time in seconds
+ 	       (default 1800 seconds = 30 minutes)
+	    10: AP bridge packets directly between associated stations (0 or 1)
+	        (default 1=yes)
+	    11: DTIM period (default 1)
+	    12: data::nullfunc ACK workaround
+		(default 1 with STA f/w 0.8.0 and 0 otherwise)
+	    13: max number of WDS connections (default 16)
+	    14: automatic WDS connections for neighboring APs
+		(default 0 = do not add automatically)
+	  - added utils/prism2_param: a wrapper for 'iwpriv wlan# prism2_param'
+	    command (shows usage information when run without any arguments;
+	    allows symbolic names to be used for setting parameters)
+	* new module parameters:
+	  'beacon_int': initial beacon interval (1 = 1024 usec), default 100
+	  'dtim_period': DTIM period, i.e., number of beacon intervals between
+		successive delivery traffic identification maps (DTIMs),
+		used for power saving and multicast/broadcast delivery,
+		default 1 (this was previously always hardcoded to 3)
+	* optimizations to interrupt handling:
+	  - masked TX events since they cause an extra interrupt for each TX
+	    frame and Alloc event can be used to increment tx_packets counter
+	    (old behavior can be restored by defining PRISM2_USE_TX_INTERRUPT)
+	  - use WTERR (Wait Time-out) only if final_version is not defined
+	  - removed DTIM and Tick event handling since they were not used for
+	    anything (and DTIM event would require AP f/w anyway)
+	  - these changes should make the interrupt handler somewhat faster
+ 	    and reduce the number of interrupts; this should help especially
+	    on platforms with low performance and/or high interrupt latency
+	* fixed HW shutdown not to disable HFA384x just after sreset (it would
+	  not succeed) or when the card is going to be enabled immediately
+ 	  (e.g., reset after timeout).
+	* converted workaround for data::nullfunc ACKs with stations using PS
+	  mode to be run-time configurable (previously, it was set with
+	  compile time definition PRISM2_NULLFUNC_ACK); current default is to
+ 	  use this workaround with station firmware version 0.8.0, but rely on
+ 	  firmware on all other versions; 'iwpriv wlan0 prism2_param 12 1' can
+ 	  be used to enable this workaround with other versions
+	* AP now rejects nullfunc frames with no ToDS flag from not associated
+	  stations to speed up re-association after AP restart (this seems to
+	  help at least when stations are using Lucent firmware; previously,
+	  these frames were silently dropped)
+	* fixed prism2_rx() to decrease sta->users on couple of error
+ 	  conditions
+	* fixed prism2_interrupt() to first check whether hardware is ready
+	  before trying to reset the card in order to avoid bogus
+ 	  initialization when using 'cardctl eject'
+	* added preliminary WDS (wireless distribution system) support
+	  - this is loosely based on driver modifications done by
+	    Simon Barber <simon@instant802.com> of Instant802 Networks Inc.
+ 	    for AP-AP mesh used in OpenAP project
+ 	    (http://opensource.instant802.com/)
+	  - the driver can now parse received beacon frames and keep records
+	    about neighboring APs (similarily to associated stations)
+	  - 'other AP policy' ('iwpriv wlan# prism2_param 8 <val>', see above)
+ 	    is used to select, which beacons are processed
+	  - WDS connections can be added with 'iwpriv wlan# wds_add <other end
+	    hwaddr>' and removed with similar wds_del command. hwaddr
+ 	    00:00:00:00:00:00 can be used as a special address to pre-allocate
+	    netdevices. These entries are used when adding the real WDS link,
+	    e.g., when a new AP is detected. Pre-allocated devices can be
+	    included in a bridging configuration and set into UP state before
+	    knowing the real AP address.
+	  - each WDS connection creates a new netdevice (wlan0wds0,
+ 	    wlan0wds1, ..) and every frame received from that WDS connection
+ 	    is seen coming from that device and not wlan0; all frames destined
+ 	    to the WDS connection, are to be sent to the corresponding
+ 	    netdevice (either by using a proper routing table entry or
+ 	    bridging configuration)
+	  - /proc/net/prism2/wlan#/wds lists configured WDS connections
+ 	    (device name and remote end hwaddr)
+	  - WDS frames use 4-address 802.11 frames which allow the original
+ 	    source and destination hwaddresses to be preserved over the
+ 	    connection;
+ 	    Note! Due to a bug in Prism2 station firmware real IEEE 802.11
+ 	    frame format cannot be used in Host AP mode. This version of the
+ 	    driver uses a bit different (i.e., incompatible) format in which
+ 	    the fourth address is sent after the frame payload to overcome
+ 	    this problem. In other words, this works only if the other end
+ 	    knows how to use this kind of frames. The frame format should be
+	    identical to one used in OpenAP project. ode for using real format
+ 	    is present in prism2.c, but it is commented out since there is no
+ 	    working version of the station firmware available.
+	  - new prism2_param parameter 13 is used to set maximum number of
+ 	    allowed WDS connections (i.e., it can be set during normal
+ 	    operations)
+	  - new prism2_param parameter 14 is used to control whether WDS
+	    connections are automatically established for neighboring APs
+	    (removing these entries automatically when AP information expires
+	    does not work in this version, i.e., the entries need to be
+ 	    removed manually with 'iwpriv wlan0 wds_del <addr>')
+	* added support for setting retry limit manually, e.g., with
+ 	  'iwconfig wlan0 retry 3'); initially, driver uses firmware defaults
+	  and this mode can be restored by setting retry value to -1;
+	  value 0 means that packets are sent only once (i.e., 0 retries)
+
+2002-03-27
+	* use larger command and BAP busy timeouts (some cards seemed to
+	  timeout these even though operation would have succeeded a bit
+	  later)
+	* fixed various byte order bugs (problems on big endian machines)
+	  in iwpriv command handlers
+	* fixed four address (WDS) data frame handling in 'iwpriv wlan0
+	  monitor 2' mode
+	* fixed a bug in 'iwpriv wlan0 monitor' changed: ether_setup() changes
+	  various netdevice fields and these were not restored correctly;
+	  this could, among other things, cause module use counter to remain
+	  >0, i.e., the module could not be unloaded after this
+	* /proc/net/prism2/wlan*/rids:
+	  - do not show RIDs that could not be read
+	  - show RID number for each entry
+	  - updated RID lists
+	  - added /proc/net/prism2/wlan*/unknown_rids for unknown new rids;
+	    please let me know if you know what the UNKNOWN# rids in
+	    'rids' are or if you can find new rids from 'unknown_rids' (lists
+	    should be quite complete for station firmwares upto 1.3.4)
+	* added 'dump_mmi_dev0_status' shell script for parsing BBP control
+	  registers (from 'iwpriv wlan* readmif' values)
+
+2002-02-13
+	* small optimizations into interrupt handler
+	* enable interrupts only after setting hw_ready = 1 to avoid interrupt
+	  handler from catching possible interrupts too early
+	* fixed a bug in station authentication handling after an explicit
+	  deauthentication
+	* optimized version of hfa384x_{from,to}_bap() (use insw()/outsw())
+	* separated sta->last_rxtx into last_rx and last_tx
+	* reorganized distribution tarball structure: get rid of
+	  prism2-0.0.0.tar.gz and "double-tarring"; root directory Makefile
+	  can now be used to build kernel-tree version and the contents of
+	  'driver' subdirectory can be copied for external pcmcia-cs
+	  compilation
+	* send disassociation frame to stations that are removed due to
+	  inactivity (this will allow stations to automatically reassociate
+	  if they are still within the AP's range)
+	* added support for new wireless extensions: SIOCGIWRETRY,
+	  SIOCSIWRTS, SIOCSIWFRAG, and following for non-AP modes:
+	  SIOCSIWPOWER, SIOCGIWPOWER, SIOCSIWRATE, SIOCGIWRATE
+	* added channel list verification (i.e., do not accept illegal
+	  channels)
+	* added channel frequency list into SIOCGIWRANGE
+	* prism2_ioctl() cleanup: moved all non-trivial ioctl handlers into
+	  separate functions
+
+2002-01-03
+	* fixed a bug in STA list traversal (ap_handle_timer()) that could
+	  cause kernel panics when stations were expired
+	* fixed a bug in STA counter (it was not decremented when stations
+	  were expired)
+	* fixed hardware reset to maintain channel configuration (previously
+	  the channel was always set to the default given when module was
+	  loaded even if it was changed with iwconfig)
+	* added new module parameter 'iw_mode' for setting initial
+	  operation mode (master/managed/adhoc)
+	* added new module parameter 'ignore_cis_vcc' to ignore broken Vcc
+	  configuration some wireless LAN cards (mainly D-Link)
+	* added experimental support for manual TX power controlling:
+	  SIOCSIWTXPOW, SIOCGIWTXPOW: 'iwconfig wlan0 txpower' command,
+	  current mapping: minimum power with 'iwconfig wlan0 txpower -43'
+	  and maximum with 'iwconfig wlan0 txpower 20'
+
+2001-12-18
+	* fixed multiple reads of pointers to 32/16-bit value
+	* added example program and brief instructions for injecting arbitrary
+	  802.11 frames ('inject' directory)
+	* added support for additional Linux Wireless Extension ioctls:
+	  SIOCGIWSENS, SIOCSIWSENS (get/set AP density)
+
+2001-12-10
+	* added SMP definitions when using kernel-tree pcmcia-cs and
+	  CONFIG_SMP is set
+	* added new iwpriv command 'reset' for manual card resetting;
+	  'iwpriv wlan0 reset 0': disable and re-initialize card firmware
+	  'iwpriv wlan0 reset 1': reset card using COR sreset
+	* replaced CardServices ResetCard call with own function that performs
+	  COR sreset since ResetCard cannot be called from hard IRQ handler
+	* improved HFA384x operation completion waiting: added separate timeout
+	  values for different operations and use small udelay()s instead of
+	  flooding I/O registers in busy wait loops
+	* modified prism2_rx() to queue packets through a local queue before
+	  passing them to dev_queue_xmit(). This is apparently needed since
+	  prism2_rx() is running in hard IRQ context and dev_queue_xmit()
+	  seems to call prism2_tx() (dev->hard_start_xmit) directly. Local
+	  queue is handled after hard IRQ handler has exited.
+	  (this should fix problems that seem to occur with high-load between
+	  two stations associated to the same AP or from multicast/
+	  broadcast flood)
+	* fixed prism2_rx() to use dev_kfree_skb_irq() instead of
+          dev_kfree_skb() in hard IRQ context.
+
+2001-11-10
+	* fixed Host AP mode setting when the driver is loaded/reseted
+	* fixed compilation for kernels that use CONFIG_MODVERSIONS and
+	  kernel-tree pcmcia modules
+
+2001-11-05
+	* fixed a bug in AP's station list handling that may have resulted in
+ 	  kernel crashes
+	* added RX rate statistics to AP's station information
+	* disabled WEP in Host AP mode since it does not work without
+	  host driver implementation
+	* re-reset port when initializing card to fix some problems
+	  with, e.g., D-Link DWL-650 with STA f/w 0.7.6 that did not start
+ 	  Host AP mode correctly
+	* removed spin_lock for BAP1 since it is not really needed
+	* added code to support Linux kernel 2.2.x versions
+	* improved card reseting (it now uses COR software reset and
+	  sets up proper port type after reset); this time I have even tested
+	  reset code once ;-)
+	* added debug code to check BAP usage; I have seen odd error
+	  scenarios with Compaq WL200 under high load (BAP becoming busy in
+ 	  the middle of read sequence, read returning 0x8000 all the time even
+ 	  though offset register is not busy, etc.); this debug code seems to
+ 	  fix some problems and in addition it provides more debugging info
+
+2001-09-27
+	* fixed bugs in AP resource releasing when card configuration fails
+	* fixed SIOCGIWESSID length setting for Managed and Ad-hoc modes
+	* fixed a bug in SIOCSIWFREQ ('iwconfig wlan0 freq' did not work)
+	* try to reset card on timeout situations
+	* added support for SIOCSIWNICKN and SIOCGIWNICKN
+	* added support for dumping RX/TX frame headers
+ 	  ('iwpriv wlan0 dump <bitfield>')
+	* added host-based TX rate control for Host AP mode
+	  (STA f/w (at least v0.8.0) does not seem to handle TX rates properly,
+	  so now the driver has an optional host-based mechanism for setting
+	  TX rate for packets from DS to STAs.
+	* added preliminary support for IWSPY when in Host AP mode
+	* added (very) preliminary implementation of SIOCGIWRANGE
+	* added example tools for handling monitored packets (sniff directory)
+	* added support for ARPHDR_IEEE80211 type netdevice (e.g., for real
+	  time 802.11 layer packet sniffing with Ethereal)
+	* added support for systems using kernel tree PCMCIA
+
+2001-07-11
+	* First public release of the driver

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+mount -t proc none /proc
+mount -t ramfs none /var
+
+hostname dpcm
+
+mkdir /var/files /var/tmp /var/run /var/etc /var/lock /var/bin
+
+# Always extract the default configuration before the saved 
+# configuration (saved configuration files will overwrite, i.e. 
+# override default configuration files anyway); this both completely 
+# loads the default configuration if no saved configuration does exist
+# yet and also allows us to add new configuration files with new 
+# firmwares
+load_default_config
+load_config
+
+# Configuration is done through a bunch of shell scripts; the idea
+# is that each shell script can be modified by a web configuration
+# page (which still need to be written) seperately; of course these
+# scripts can hold *any* command if you edit them with vi, but we
+# should keep them seperate so we can add web configuration pages
+# later.
+/etc/sysconfig/ethernet_interfaces
+/etc/sysconfig/ip_routes
+/etc/sysconfig/dns_dhcp
+/etc/sysconfig/firewall
+/etc/sysconfig/firewall_extended
+echo \#\!/bin/sh >/var/bin/connect_to_isp
+/etc/sysconfig/ppp
+chmod 755 /var/bin/connect_to_isp
+
+boa -c /etc/boa &
+inetd &
+
+# We are a router so we route! :-)
+echo 1 >/proc/sys/net/ipv4/ip_forward
+
+# We use 'exec' here so that the current program (which is sh)
+# gets replaced and doesn't waste memory
+exec /sbin/buttond

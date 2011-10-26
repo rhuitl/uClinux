@@ -1,0 +1,361 @@
+dnl    This is part of frox: A simple transparent FTP proxy
+dnl    Copyright (C) 2000 James Hollingshead
+
+dnl    This program is free software; you can redistribute it and/or modify
+dnl    it under the terms of the GNU General Public License as published by
+dnl    the Free Software Foundation; either version 2 of the License, or
+dnl    (at your option) any later version.
+
+dnl    This program is distributed in the hope that it will be useful,
+dnl    but WITHOUT ANY WARRANTY; without even the implied warranty of
+dnl    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+dnl    GNU General Public License for more details.
+
+dnl    You should have received a copy of the GNU General Public License
+dnl    along with this program; if not, write to the Free Software
+dnl    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(src/ftp-cmds.h)
+AM_INIT_AUTOMAKE(frox, 0.7.18)
+AM_CONFIG_HEADER(include/config.h)
+AC_PREREQ(2.52)
+
+AC_CANONICAL_HOST
+case "$host_os" in
+  linux*) HOST_FILE="linux.o" ;;
+  *bsd*) HOST_FILE="bsd.o" ;;
+  solaris*)
+       CFLAGS="$CFLAGS -DBSD_COMP"
+       HOST_FILE="bsd.o"
+       ARCH_LIBS="-lsocket -lnsl -lresolv"
+       ;;
+  *) AC_MSG_WARN("Unknown system type. Trying bsd.c"); HOST_FILE="bsd.o" ;;
+esac
+AC_SUBST(ARCH_LIBS)
+AC_SUBST(HOST_FILE)
+
+dnl Compiler flags
+AC_MSG_CHECKING(whether to include debugging stuff)
+AC_ARG_ENABLE(debug,
+	[  --enable-debug	  Output debuggging info],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			CFLAGS="$CFLAGS -DDEBUG -g"
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			CFLAGS="$CFLAGS -O2"
+			;;
+	esac],
+	[AC_MSG_RESULT(no)
+	CFLAGS="$CFLAGS -O2"]
+)
+
+AC_MSG_CHECKING(whether to compile in profiling info)
+AC_ARG_ENABLE(profile,
+	[  --enable-profile	  Compile in profiling info],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			CFLAGS="$CFLAGS -pg"
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	AC_MSG_RESULT(no)
+)
+
+AC_MSG_CHECKING(whether to compile with warnings)
+AC_ARG_ENABLE(warnings,
+	[  --enable-warnings	  Compile with warnings flags],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			CFLAGS="$CFLAGS -Wall -Wpointer-arith  -Wstrict-prototypes"
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to use IPFilter)
+AC_ARG_ENABLE(ipfilter,
+	[  --enable-ipfilter	  Use IPFilter],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(IPFILTER,1, 
+			          [Whether to use Ipfilter
+				   (for non-linux ports)])
+			AC_SUBST(IPFILTER)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+dnl Options
+
+AC_MSG_CHECKING(whether to use an external cache)
+AC_ARG_ENABLE(http-cache,
+	[  --enable-http-cache     Allow use of an external cache],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(USE_CACHE,1,
+			          [Whether to support use of a cache])
+			AC_DEFINE(USE_HCACHE,1,
+			          [Whether to support caching via http])
+			CACHE_STUFF="cache.o"
+			HCACHE_STUFF="httpcache.o"
+			AC_SUBST(CACHE_STUFF)
+			AC_SUBST(HCACHE_STUFF)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to use a local cache)
+AC_ARG_ENABLE(local-cache,
+	[  --enable-local-cache    Allow use of a local cache],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(USE_CACHE,1,
+			          [Whether to support use of a cache])
+			AC_DEFINE(USE_LCACHE,1,
+			          [Whether to support local caching])
+			CACHE_STUFF="cache.o"
+			LCACHE_STUFF="localcache.o cachemgr.o"
+			AC_SUBST(CACHE_STUFF)
+			AC_SUBST(LCACHE_STUFF)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to do virus scanning)
+AC_ARG_ENABLE(virus-scan,
+	[  --enable-virus-scan     Allow use of an external virus scanner -- experimental],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(DO_VSCAN,1,
+			          [Whether to support virus scanning])
+			VSCAN_STUFF="vscan.o"
+			AC_SUBST(VSCAN_STUFF)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to support ssl/tls)
+AC_ARG_ENABLE(ssl,
+	[  --enable-ssl     Allow frox to make encrypted SSL/TLS connections],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(DO_SSL,1,
+			          [Whether to support SSL])
+			SSL_STUFF="ssl.o"
+			LIBSSL="-lssl -lcrypto"
+			AC_SUBST(SSL_STUFF)
+			AC_SUBST(LIBSSL)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to compile in transparent proxying of data connections)
+AC_ARG_ENABLE(transparent-data,
+	[  --enable-transparent-data    Transparent proxying of data connections],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(TRANS_DATA,1,
+			          [Whether to support transparent proxying 
+				   of data connections])
+			TD_STUFF="transdata.o"
+			AC_SUBST(TD_STUFF)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to use libiptc for transparent data connection proxying)
+AC_ARG_ENABLE(libiptc,
+	[  --enable-libiptc        Use libiptc for transparent data connection proxying],
+	[case "$enableval" in
+		yes)
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(USE_LIBIPTC,1,
+			          [Whether to use libiptc for transparent
+				   data connection proxying])
+			LIBIPTC_DIR=libiptc
+			LIBIPTC="-liptc"
+			AC_SUBST(LIBIPTC_DIR)
+			AC_SUBST(LIBIPTC)
+			;;
+		*)
+			AC_MSG_RESULT(no)
+			;;
+	esac],
+	[AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to support ftp-proxy style command control programs)
+AC_ARG_ENABLE(ccp,
+       [  --enable-ccp            Enable ftp-proxy style command control programs],
+       [case "$enableval" in
+               yes)
+                       AC_MSG_RESULT(yes)
+                       AC_DEFINE(USE_CCP,1, 
+		                 [Whether to allow ftp-proxy style command
+				  control programs])
+                       CCP_STUFF=ccp.o
+                       AC_SUBST(CCP_STUFF)
+                       ;;
+               *)
+                       AC_MSG_RESULT(no)
+                       ;;
+       esac],
+       [AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(whether to compile in non transparent proxying)
+AC_ARG_ENABLE(ntp,
+       [  --disable-ntp           Disable use of non transparent proxying],
+       [case "$enableval" in
+               yes)
+                       AC_MSG_RESULT(yes)
+                       AC_DEFINE(NON_TRANS_PROXY,1,
+		                 [Whether to support use of non-transparent
+				  proxying])
+                       NTP_STUFF=ntp.o
+                       AC_SUBST(NTP_STUFF)
+                       ;;
+               *)
+                       AC_MSG_RESULT(no)
+                       ;;
+       esac],
+       [AC_MSG_RESULT(yes)
+        AC_DEFINE(NON_TRANS_PROXY,1,
+	          [Whether to support use of non-transparent proxying])
+        NTP_STUFF=ntp.o
+        AC_SUBST(NTP_STUFF)]
+)
+
+AC_MSG_CHECKING(whether to allow running as root)
+AC_ARG_ENABLE(run-as-root,
+       [  --enable-run-as-root    Allow running as root],
+       [case "$enableval" in
+               yes)
+                       AC_MSG_RESULT(yes)
+                       ;;
+               *)
+                       AC_DEFINE(ENFORCE_DROPPRIV,1,
+		                 [Whether to enforce dropping priveliges])
+                       AC_MSG_RESULT(no)
+                       ;;
+       esac],
+       [AC_MSG_RESULT(no)
+        AC_DEFINE(ENFORCE_DROPPRIV,1,[Whether to enforce dropping priveliges])]
+)
+
+AC_MSG_CHECKING(whether to enable changing proc name)
+AC_ARG_ENABLE(procname,
+       [  --enable-procname    Enable changing of proc name],
+       [case "$enableval" in
+               yes)
+                       AC_MSG_RESULT(yes)
+                       AC_DEFINE(ENABLE_CHANGEPROC,1,
+		                 [Whether to enable changing of proc name])
+                       ;;
+               *)
+                       AC_MSG_RESULT(no)
+                       ;;
+       esac],
+       [AC_MSG_RESULT(no)]
+)
+
+AC_MSG_CHECKING(what to use as the default config file)
+AC_ARG_ENABLE(configfile,
+	[  --enable-configfile=ARG Location of default config file ],
+	[case "$enableval" in
+		*)
+			AC_MSG_RESULT("${enableval}")
+			AC_DEFINE_UNQUOTED(CONFIG_FILE, "${enableval}",
+			                  [Default location of the config file])
+			CONFIG_FILE="${enableval}"
+			AC_SUBST(CONFIG_FILE)
+			;;
+	esac],
+	[AC_MSG_RESULT(/usr/local/etc/frox.conf)
+	CONFIG_FILE="/usr/local/etc/frox.conf"
+	AC_SUBST(CONFIG_FILE)
+	AC_DEFINE(CONFIG_FILE, "/usr/local/etc/frox.conf",
+	          [Default location of the control file])]
+)
+
+dnl Checks for programs.
+AC_PROG_AWK
+AC_PROG_LN_S
+AC_PROG_INSTALL
+AC_PROG_CC
+AC_PROG_RANLIB
+AC_CHECK_PROGS(BZIP2, bzip2)
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(fcntl.h strings.h sys/ioctl.h sys/time.h syslog.h unistd.h)
+AC_CHECK_HEADERS(linux/netfilter_ipv4.h, , , [#include <limits.h>])
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+dnl AC_C_BIGENDIAN
+AC_TYPE_UID_T
+AC_TYPE_PID_T
+AC_CHECK_TYPES([u_int32_t, u_int16_t])
+
+AC_MSG_CHECKING(whether socklen_t is defined)
+AC_TRY_COMPILE( [
+               #include <sys/types.h>
+               #include <sys/socket.h>
+       ], [
+               socklen_t len;
+               len=0;
+       ], AC_MSG_RESULT(yes),
+       [AC_MSG_RESULT(no)
+       AC_DEFINE(socklen_t, unsigned int, [Whether socklen_t is defined])])
+
+AC_HEADER_TIME
+
+dnl Checks for library functions.
+AC_PROG_GCC_TRADITIONAL
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(select socket strtol nanosleep setenv)
+
+AC_OUTPUT(Makefile src/Makefile lib/Makefile lib/sstrlib/Makefile lib/libiptc/Makefile doc/Makefile)

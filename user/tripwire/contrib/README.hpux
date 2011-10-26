@@ -1,0 +1,80 @@
+From boehmer@dso037.sch.ge.com Thu Feb 10 12:13:58 1994
+Received: from optima.CS.Arizona.EDU by quercus.cs.arizona.edu; Thu, 10 Feb 1994 12:13:57 MST
+Received: from ns.ge.com by optima.CS.Arizona.EDU (5.65c/15) via SMTP
+	id AA10403; Thu, 10 Feb 1994 12:13:43 MST
+Received: from [3.10.240.61] by ns.ge.com (5.65/GE Gateway 1.18) with SMTP
+	 id AA05843; Thu, 10 Feb 94 14:02:26 -0500
+Message-Id: <9402101902.AA05843@ns.ge.com>
+Received: by dso037.sch.ge.com(1.37.109.4/16.2) id AA27790; Thu, 10 Feb 94 14:13:05 -0500
+Date: Thu, 10 Feb 94 14:13:05 -0500
+From: Eric M. Boehm <boehmer@dso037.sch.ge.com>
+To: spaf@cs.purdue.edu
+Cc: gkim@cs.arizona.edu
+In-Reply-To: <199401281556.KAA22495@uther.cs.purdue.edu> (message from Gene Spafford on Fri, 28 Jan 94 10:56:30 -0500)
+Subject: Re: Problems with tripwire-1.1
+Status: OR
+
+>>>>> "Gene Spafford" == Gene Spafford <spaf@cs.purdue.edu> writes:
+
+    Gene Spafford> The clue may be that it is being done on an HP.  There is a
+    Gene Spafford> bug in the HP compiler such that if you compile with
+    Gene Spafford> optimization, some of the routines no longer work.
+
+    Gene Spafford> Eric should ensure that he is using the right config file
+    Gene Spafford> and that he is compiling with optimization turned off.
+    Gene Spafford> Let's see if that works.
+
+Well, I tried again with gcc-2.5.8.u5 (Utah port of gcc) and still get the
+following:
+
+    gcc -O           -c dbase.update.c
+    In file included from ../include/config.h:20,
+		     from dbase.update.c:15:
+    ../include/../configs/conf-hpux.h:15: warning: `_HPUX_SOURCE' redefined
+    *Initialization*:1: warning: this is the location of the previous definition
+    lex config.pre.l
+    lex: warning: Cannot read message catalog; using default language
+    mv lex.yy.c config.lex.c
+    yacc config.pre.y
+    sed 's/lex\.yy\.c/config.lex.c/' < y.tab.c > config.pre.c 
+    rm y.tab.c
+    gcc -O           -c config.pre.c
+    In file included from ../include/config.h:20,
+		     from config.pre.y:40:
+    ../include/../configs/conf-hpux.h:15: warning: `_HPUX_SOURCE' redefined
+    *Initialization*:1: warning: this is the location of the previous definition
+    config.lex.c: In function `__yy__unused':
+    In file included from config.pre.y:385:
+    config.lex.c:219: too few arguments to function `main'
+    make[1]: *** [config.pre.o] Error 1
+    make[1]: Leaving directory `/wk0/net/src/tripwire-1.1/src'
+    make: *** [all] Error 1
+
+As a reminder here are the status updates from a previous message (all are
+with HP cc).
+
+   Compiled without -O
+   === test.update.sh: BEGIN ===
+   ../src/tripwire -loosedir -c /tmp/twtest/tw.config -d /tmp/twtest/tw.db -i all
+   ../src/tripwire: /tmp/twt: disappeared.  Skipping...
+
+   Compiled with -O
+   === test.update.sh: BEGIN ===
+   ../src/tripwire -loosedir -c /tmp/twtest/tw.config -d /tmp/twtest/tw.db -i all
+   ../src/tripwire: : disappeared.  Skipping...
+
+   Compiled without -O and with -g
+   === test.update.sh: BEGIN ===
+   ../src/tripwire -loosedir -c /tmp/twtest/tw.config -d /tmp/twtest/tw.db -i all
+   === test.update.sh: testing GROWING (safe) files ===
+   === test.update.sh: testing GROWING (unsafe) files ===
+
+In summary, I have tried cc with and without -O (did not work); gcc with and
+without -ansi (versions 2.4.5 and 2.5.8), with flex and bison, lex and yacc
+(none worked). The only thing that did work was HP cc with lex and yacc,
+without -O and with -g.
+
+I don't know what it all means but I thought you might like to know.
+--
+Eric
+

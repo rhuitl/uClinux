@@ -1,0 +1,152 @@
+#!/usr/bin/perl
+# logreporter - Brian Edmonds <edmonds@cs.ubc.ca> 94Oct27
+
+# template file directives:
+#
+# [IGNORE]
+#   - all lines matching patterns until the next directive are ignored.
+#
+# [REPORT -> report message here]
+#   - if the pattern following this directive matches a line, the
+#     report message will be output; $d is bound to the first 15
+#     characters of the matched line (the timestamp for syslog) when
+#     the report message is evaluated.
+#
+# [COUNT -> report message here]
+#   - the number of lines in the file which match the pattern following
+#     this directive will be reported using the given report message,
+#     if greater than zero; $n is bound the the number of matching lines
+#     when the report message is evaluated.
+#
+# [SUM $X -> report message here]
+#   - the numeric subfield $X (e.g. $1, $2, etc) of lines which match
+#     the pattern following this directive will be summed and reported
+#     using the given report message; $s is bound to the sum, and $n is
+#     bound to the number of matching lines when the report message is
+#     evaluated
+#
+# Remember that pattern lines are Perl regular expressions.  In
+# particular remember to escape the special characters $^()[]+* or you
+# won't get the effect you want.
+
+# check our args
+require 'getopts.pl'; $usage = "usage: $0 template [logfile]";
+&Getopts( 'd' ) || die "$usage\n";
+$#ARGV >= 0 || die "$usage\n";
+
+# init
+$state = 0;
+$ignore = 0; $ignored = 0;
+@count = ();
+$reports = ""; $unknown = "";
+
+# read the template
+open( TEMPLATE, "<".shift ) || die "fatal: cannot read template\n";
+while( $line = <TEMPLATE> ) {
+    $line !~ /^\s*#|^\s*$/ || next;
+    chop $line;
+
+    # log entries to ignore
+    if( $line =~ /^\[IGNORE\]/ ) {
+	$state = "IGNORE";
+    }
+
+    # report on this line
+    elsif( $line =~ /^\[REPORT -> (.*)\]/ ) {
+	$state = "REPORT";
+	$stmsg = $1;
+    }
+
+    # count occurances of this line
+    elsif( $line =~ /^\[COUNT -> (.*)\]/ ) {
+	$state = "COUNT";
+	$stmsg = $1;
+    }
+
+    # sum a number in this line
+    elsif( $line =~ /^\[SUM (\S*) -> (.*)\]/ ) {
+	$state = "SUM";
+	$sumvar = $1; $stmsg = $2;
+    }
+
+    # ooh, real data
+    else {
+	if( $state eq "IGNORE" ) {
+	    if( $ignore ) { $ignore .= "|" . $line }
+	    else { $ignore = $line }
+	} elsif( $state eq "REPORT" ) {
+	    $repmsg[++$#repmsg] = $stmsg . "\n";
+	    $repregex[++$#repregex] = $line;
+	} elsif( $state eq "COUNT" ) {
+	    $countmsg[++$#countmsg] = $stmsg . "\n";
+	    $countregex[++$#countregex] = $line;
+	    eval "\$count$#countregex = 0";
+	} elsif( $state eq "SUM" ) {
+	    $summsg[++$#summsg] = $stmsg . "\n";
+	    $sumregex[++$#sumregex] = $line;
+	    $sumvar[++$#sumvar] = $sumvar;
+	    eval "\$sumcount$#sumregex = 0";
+	    eval "\$sumsum$#sumregex = 0";
+	}
+    }
+}
+close TEMPLATE;
+
+# print out our regexps
+if( $opt_d ) {
+    print "Ignore regex:\n$ignore\n\n";
+    print "Count rexexps ($#countregex):\n";
+    for( $i=0 ; $i<=$#countregex ; $i++ ) {
+	print $countregex[$i], "\n";
+	print " -> ", $countmsg[$i];
+    }
+    print "\n";
+}
+
+# do the log
+loop: while( $line = <> ) {
+    $done = 0;
+
+    for( $i=0 ; $i<=$#countregex ; $i++ ) {
+	next unless $line =~ /$countregex[$i]/;
+	eval "\$count$i++"; $done = 1;
+    }
+
+    for( $i=0 ; $i<=$#sumregex ; $i++ ) {
+	next unless $line =~ /$sumregex[$i]/;
+	eval "\$sumsum$i += $sumvar[$i]";
+	eval "\$sumcount$i++"; $done = 1;
+    }
+
+    for( $i=0 ; $i<=$#repregex ; $i++ ) {
+	next unless $line =~ /$repregex[$i]/;
+	$d = substr( $line, 0, 15 );
+	$reports .= "  " . eval "\"$repmsg[$i]\"";
+	$done = 1;
+    }
+
+    if( ! $done ) {
+	if( $line =~ /$ignore/o ) { $ignored++ }
+	else { $unknown .= $line }
+    }
+}
+
+$count = "  $ignored routine messages ignored\n";
+for( $i=0 ; $i<=$#countregex ; $i++ ) {
+    if( $n = eval "\$count$i" ) {
+	$count .= "  " . eval "\"$countmsg[$i]\"";
+    }
+}
+for( $i=0 ; $i<=$#sumregex ; $i++ ) {
+    if( $n = eval "\$sumcount$i" ) {
+	$s = eval "\$sumsum$i";
+        $count .= sprintf( "  " . eval "\"$summsg[$i]\"", $s );
+    }
+}
+
+# generate report
+print "\nSummary reports:\n$count";
+if( $reports ) { print "\nIndividual reports:\n$reports" }
+if( $unknown ) { print "\nUnknown entries:\n$unknown" }
+
+# EOF

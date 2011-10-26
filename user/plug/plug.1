@@ -1,0 +1,86 @@
+.TH PLUG 1 FIREWALL
+.SH NAME
+plug -- Plug proxy daemon.
+.SH SYNOPSIS
+.B plug
+.B -V
+<br>
+.B plug
+.I [-f]
+.I [-l]
+.I [-P pidfile]
+.I [-k]
+.I [-d[d]]
+.I [-i sourceaddr]
+.I [-p proxyaddr]
+.I [-t timeout]
+.I [-V]
+.B sourceport
+.BI destaddr [:destport]
+.I [destaddr[:destport]]...
+.SH DESCRIPTION
+.B Plugdaemon
+acts as a "dumb proxy", forwarding a TCP/IP stream from a port on one host
+to a possibly different port on a separate host. It runs as a daemon to
+reduce latency in setting up a connection, and optionally logs every
+connection via
+.I syslog.
+.SH OPTIONS
+.TP
+-f
+Forces a given client address to continue to connect to the same host on
+subsequent attempts, for proxying HTTP connections so that subsequent hits
+will be on the same mirror.
+.TP
+-k
+Turns on SO_KEEPALIVE on the plug. You want to use this on frequent short
+term connections like HTTP requests where response time is more important
+than reliability on flakey links, and leave it off on long-term connections
+that may go a long time without transferring data.
+.TP
+-l
+turns on connection logging.
+.TP
+-P pidfile
+maintains a file that contains the process ID of the master plug daemon,
+followed by the process IDs of all the active children. This can be used
+for cleanup or monitoring. The file is deleted when the parent process
+exits.
+.TP
+-d
+turns on debugging output and stops
+.B plug
+from running as a daemon or logging errors to syslog. Errors in this mode
+are displayed on standard error.
+Additional -d options add more output.
+.TP
+-i interface
+Bind the plug to the named interface, for use on multi-homed hosts.
+.TP
+-p interface
+Bind the source port of the proxied connection to the named interface,
+for use on multi-homed hosts.
+.TP
+-t timeout
+Timeout for forced connections, after no attempts in this period
+it will connect to a new (pseudo-)randomly selected server. The
+default is 1 hour.
+.TP
+-V
+Prints version and exits.
+.SH EXAMPLES
+To proxy an NNTP connection through a firewall to a host at 10.0.3.15:
+.P
+plug -i 192.168.0.14 119 10.0.3.15
+.SH BUGS
+.B Plugdaemon
+only accepts numeric IP addresses and services.
+.SH "SECURITY FEATURES"
+.B Plugdaemon
+only accepts numeric IP addresses and services.
+.SH LICENSE
+.B Plugdaemon
+is released under a "Berkeley" style license. See the file LICENSE for details.
+(tip me if you like this program, e-gold account 172426)
+.SH AUTHOR
+Peter da Silva <peter@taronga.com>

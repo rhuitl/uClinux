@@ -1,0 +1,89 @@
+#
+# (C) Tenable Network Security
+#
+# This plugin text was extracted from Mandrake Linux Security Advisory MDKSA-2005:084
+#
+
+
+if ( ! defined_func("bn_random") ) exit(0);
+if(description)
+{
+ script_id(18273);
+ script_version ("$Revision: 1.3 $");
+ script_cve_id("CVE-2005-1431");
+ 
+ name["english"] = "MDKSA-2005:084: gnutls";
+ 
+ script_name(english:name["english"]);
+ 
+ desc["english"] = "
+The remote host is missing the patch for the advisory MDKSA-2005:084 (gnutls).
+
+
+
+Two vulnerabilities were discovered in the GnuTLS library. The first is a
+vulnerability in the way GnuTLS does record packet parsing; the second is a
+flaw in the RSA key export functionality. These could be exploited by a remote
+attacker to cause a Denial of Service to any program using the GnuTLS library.
+
+The provided packages have been patched to correct these issues.
+
+
+
+Solution : http://wwwnew.mandriva.com/security/advisories?name=MDKSA-2005:084
+Risk factor : High";
+
+
+
+ script_description(english:desc["english"]);
+ 
+ summary["english"] = "Check for the version of the gnutls package";
+ script_summary(english:summary["english"]);
+ 
+ script_category(ACT_GATHER_INFO);
+ 
+ script_copyright(english:"This script is Copyright (C) 2005 Tenable Network Security");
+ family["english"] = "Mandrake Local Security Checks";
+ script_family(english:family["english"]);
+ 
+ script_dependencies("ssh_get_info.nasl");
+ script_require_keys("Host/Mandrake/rpm-list");
+ exit(0);
+}
+
+include("rpm.inc");
+if ( rpm_check( reference:"gnutls-1.0.13-1.1.101mdk", release:"MDK10.1", yank:"mdk") )
+{
+ security_hole(0);
+ exit(0);
+}
+if ( rpm_check( reference:"libgnutls11-1.0.13-1.1.101mdk", release:"MDK10.1", yank:"mdk") )
+{
+ security_hole(0);
+ exit(0);
+}
+if ( rpm_check( reference:"libgnutls11-devel-1.0.13-1.1.101mdk", release:"MDK10.1", yank:"mdk") )
+{
+ security_hole(0);
+ exit(0);
+}
+if ( rpm_check( reference:"gnutls-1.0.23-2.1.102mdk", release:"MDK10.2", yank:"mdk") )
+{
+ security_hole(0);
+ exit(0);
+}
+if ( rpm_check( reference:"libgnutls11-1.0.23-2.1.102mdk", release:"MDK10.2", yank:"mdk") )
+{
+ security_hole(0);
+ exit(0);
+}
+if ( rpm_check( reference:"libgnutls11-devel-1.0.23-2.1.102mdk", release:"MDK10.2", yank:"mdk") )
+{
+ security_hole(0);
+ exit(0);
+}
+if (rpm_exists(rpm:"gnutls-", release:"MDK10.1")
+ || rpm_exists(rpm:"gnutls-", release:"MDK10.2") )
+{
+ set_kb_item(name:"CVE-2005-1431", value:TRUE);
+}

@@ -1,0 +1,2 @@
+# Removed
+exit(0);

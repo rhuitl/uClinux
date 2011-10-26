@@ -1,0 +1,107 @@
+
+#include  <zmalloc.h>
+
+extern unsigned hash() ;
+
+/* An array A is a pointer to an array of struct array,
+   which is two hash tables in one.  One for strings
+   and one for doubles.
+
+   each array is of size A_HASH_PRIME.
+
+   When an index is deleted via  delete A[i], the
+   ANODE is not removed from the hash chain.  A[i].cp
+   and A[i].sval are both freed and sval is set NULL.
+   This method of deletion simplifies for( i in A ) loops.
+
+   On the D_ANODE list, we use real deletion and move to the
+   front on access.
+
+   Separate nodes (as opposed to one type of node on two lists)
+   to
+     (1) d1 != d2, but sprintf(A_FMT,d1) == sprintf(A_FMT,d1)
+         so two dnodes can point at the same anode.
+     (2) Save a little data space(64K PC mentality).
+
+   the cost is an extra level of indirection.
+
+   Some care is needed so that things like
+     A[1] = 2 ; delete A["1"] work .
+*/
+
+#define  _dhash(d)    (((int)(d)&0x7fff)%A_HASH_PRIME)
+#define  DHASH(d)     (last_dhash=_dhash(d))
+static  unsigned  last_dhash ;
+
+/*        switch =======;;;;;;hhhh */
+
+static  ANODE *find_by_sval(A, sval, cflag)
+  ARRAY  A ;
+  STRING *sval ;
+  int  cflag ; /* create if on */
+{ 
+   char *s = sval->str ;
+   unsigned h = hash(s) % A_HASH_PRIME ;
+   register ANODE *p = A[h].link ;
+   ANODE *q = 0 ; /* holds first deleted ANODE */
+
+   while ( p )
+   {
+     if ( p->sval )
+     { if ( strcmp(s,p->sval->str) == 0 )  return p ; }
+     else /* its deleted, mark with q */
+     if ( ! q )  q = p ;  
+
+     p = p->link ;
+   }
+
+   /* not there */
+   if ( cflag )
+   {
+       if ( q )  p = q ; /* reuse the deleted node q */
+       else
+       { p = (ANODE *)zmalloc(sizeof(ANODE)) ;
+         p->link = A[h].link ; A[h].link = p ;
+       }
+
+       p->sval = sval ;
+       sval->ref_cnt++ ;
+       p->cp = (CELL *) zmalloc(sizeof(CELL)) ;
+       p->cp->type = C_NOINIT ;
+   }
+   return p ;
+}
+
+
+/* on the D_ANODE list, when we find a node we move it
+   to the front of the hash chain */
+
+static D_ANODE  *find_by_dval(A, d, cflag)
+  ARRAY  A ;
+  double d ;
+  int cflag ;
+{
+  unsigned h = DHASH(d) ;
+  register D_ANODE *p = A[h].dlink ;
+  D_ANODE *q = 0 ; /* trails p for move to front */
+  ANODE *ap ;
+
+   while ( p )
+       if ( p->dval == d )
+       { /* found */
+         if ( ! p->ap->sval ) /* but it was deleted by string */
+         { if ( q )  q->dlink = p->dlink ;
+           else A[h].dlink = p->dlink ;
+           zfree(p, sizeof(D_ANODE)) ;
+           break ; 
+         }
+         /* found */
+         if ( !q )  return  p ; /* already at front */
+         else /* delete to put at front */
+         { q->dlink = p->dlink ; goto found ; }
+       }
+       else
+       { q = p ; p = p->dlink ; }
+
+void (*signal())() ;
+

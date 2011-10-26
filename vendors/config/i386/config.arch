@@ -1,0 +1,229 @@
+############################################################################
+#
+#  A Generic i386 config.arch that can be included by other platforms
+#  to reduce the number of places that need to be edited when something
+#  common changes.  If you include this file you may provide:
+#
+#  VENDOR_CFLAGS       - vendor specific flags to pass to the compiler
+#  DISABLE_SHARED_LIBS - set this to 1 to disable shared libraries
+#  LOPT                - library optimisation flags
+#  UOPT                - user optimisation flags
+#
+#  David McCullough <davidm@snapgear.com>
+#
+############################################################################
+#
+# Possible provided Vendor specific settings
+#
+
+ifndef CONSOLE_BAUD_RATE
+CONSOLE_BAUD_RATE = 9600
+endif
+
+ifndef HW_PRODUCT
+  HW_PRODUCT = $(CONFIG_PRODUCT)
+endif
+
+ifndef HW_VENDOR
+  HW_VENDOR = $(CONFIG_VENDOR)
+endif
+
+ifndef LINUXTARGET
+LINUXTARGET = bzImage
+endif
+
+ifndef VENDOR_CFLAGS
+VENDOR_CFLAGS = -DCONFIG_SECUREEDGE -DCONFIG_NETtel -DCONFIG_X86
+endif
+
+ifndef VERSIONPKG
+VERSIONPKG = 2.0.1b
+endif
+
+ifndef BOOTFLAGS
+BOOTFLAGS = -DCONFIG_AMD_BOOT=1
+endif
+
+ifndef VERSIONSTR
+VERSIONSTR = $(CONFIG_VENDOR)/$(CONFIG_PRODUCT) Version $(VERSIONPKG)
+endif
+
+ifndef RELFILES
+  RELFILES = boot/x86/sc520-bios.bin,.sgb images/bzImage images/nbi,.sgr images/flash.bin,.sgu
+endif
+
+ifndef NFIMAGE
+  NFIMAGE=flash.bin
+endif
+
+ifndef EXTRA_MODULE_DIRS
+ifeq ($(ROOTDIR)/modules,$(wildcard $(ROOTDIR)/modules))
+ifneq ($(filter-out linux-2.0% linux-2.2% linux-2.4%, $(LINUXDIR)),)
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules/
+else
+EXTRA_MODULE_DIRS = $(ROOTDIR)/modules
+endif
+endif
+endif
+
+ifndef VENDOR_TOPDIRS
+ifeq ($(ROOTDIR)/boot,$(wildcard $(ROOTDIR)/boot))
+VENDOR_TOPDIRS = boot
+endif
+endif
+
+############################################################################
+
+#
+# The makefiles need to know how to do things in different contexts
+# To save some pain we put it all here
+#
+# First settings we always want for all build
+#
+
+# ARCH = kernel,  TARGET_ARCH = uClibc
+
+ENDIAN        = little
+MACHINE       = i386
+ARCH          = i386
+ifneq ($(shell which i386-linux-20070808-gcc),)
+CROSS_COMPILE ?= i386-linux-20070808-
+else
+CROSS_COMPILE ?= i386-linux-
+endif
+CROSS         = $(CROSS_COMPILE)
+CONFIGURE_HOST = i386-linux
+
+CC        = $(ucfront_cc) $(CROSS_COMPILE)gcc $(CPUFLAGS)
+AS        = $(CROSS_COMPILE)as $(CPUFLAGS)
+CXX       = $(ucfront_cxx) $(CROSS_COMPILE)g++ $(CPUFLAGS)
+AS86      = as86
+AR        = $(CROSS_COMPILE)ar
+LD        = $(ucfront_ld) $(CROSS_COMPILE)ld
+LD86      = ld86
+OBJCOPY   = $(CROSS_COMPILE)objcopy
+RANLIB    = $(CROSS_COMPILE)ranlib
+STRIPTOOL = $(CROSS_COMPILE)strip
+STRIP     = $(STRIPTOOL)
+
+############################################################################
+#
+# have we set a special config below
+
+UCLINUX_BUILD_SET = 0
+
+# These can be used by configure.
+# Either configure $(CONFIGURE_OPTS)
+# or     configure --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+#
+TARGETARCH    := i386-linux
+HOSTARCH      := $(shell sh $(ROOTDIR)/tools/config.guess)
+CONFIGURE_OPTS := --host=$(TARGETARCH) --build=$(HOSTARCH) --target=$(TARGETARCH)
+
+############################################################################
+# Setup crt* appropriately for each libc
+# CRT? are used for regular executables
+# CXX_CRT? are used for building C++ executables
+# SH_CRT? are used for building shared libraries
+############################################################################
+ifeq ($(findstring glibc,$(LIBCDIR)),glibc)
+	CRTI     = -nostartfiles $(ROOTDIR)/lib/crt1.o \
+				$(ROOTDIR)/lib/crti.o \
+				$(GCC_DIR)/$(MACH_DIR)/crtbegin.o
+	SH_CRTI  = -nostartfiles $(ROOTDIR)/lib/crti.o \
+				$(GCC_DIR)/$(MACH_DIR)/crtbeginS.o
+	CRTN     = $(ROOTDIR)/lib/ld-linux.so.2 \
+				$(GCC_DIR)/$(MACH_DIR)/crtend.o \
+				$(ROOTDIR)/lib/crtn.o \
+				$(GCC_DIR)/libgcc.a
+	SH_CRTN  = $(GCC_DIR)/$(MACH_DIR)/crtendS.o $(ROOTDIR)/lib/crtn.o
+else
+	# This means we are using uClibc
+	CRTI     = -nostartfiles $(ROOTDIR)/lib/crt1.o \
+				$(ROOTDIR)/lib/crti.o
+	CRTN     = $(ROOTDIR)/lib/crtn.o
+
+	CXX_CRTI = -nostartfiles $(ROOTDIR)/lib/crt1.o \
+				$(ROOTDIR)/lib/crti.o \
+				$(GCC_DIR)/$(MACH_DIR)/crtbegin.o
+
+	CXX_CRTN = \
+				$(GCC_DIR)/$(MACH_DIR)/crtend.o \
+				$(ROOTDIR)/lib/crtn.o
+endif
+
+############################################################################
+#
+# General purpose lib building rules,  uClibc.config uses these when
+# possible
+#
+
+ifdef UCLINUX_BUILD_LIB
+  ifeq ($(findstring glibc,$(LIBCDIR)),glibc)
+	GLIBC_TARGET_OPTS = --host=i386-redhat-linux
+  endif
+  ifdef CONFIG_LIB_DEBUG
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(LOPT),$(LOPT),-O1) -g -fomit-frame-pointer
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+	CFLAGS  += $(VENDOR_CFLAGS) -DEMBED
+	# don't want all the CFLAGS for uClibc/Config
+	ARCH_CFLAGS := $(CFLAGS)
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# Settings for building user apps
+#
+
+ifdef UCLINUX_BUILD_USER
+  ifdef CONFIG_USER_DEBUG
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-O1) -g
+  else
+	CFLAGS  :=  $(if $(UOPT),$(UOPT),-O1) -g -fomit-frame-pointer
+  endif
+	CFLAGS  += -pipe
+	CFLAGS  += -fno-common -fno-builtin -Wall #-Werror
+
+	CFLAGS  += $(VENDOR_CFLAGS) -DEMBED
+
+	CXXFLAGS = $(CFLAGS) -nostdinc++
+	CXXSUP := $(shell $(CXX) -print-file-name=libsupc++.a)
+
+	FLTFLAGS :=
+	export FLTFLAGS
+
+	# for anyone still using it
+	CONVERT = /bin/true
+
+	UCLINUX_BUILD_SET=1
+endif
+
+############################################################################
+#
+# fall through,  do other config options perhaps
+#
+
+ifeq ($(UCLINUX_BUILD_SET),1)
+	ifdef DISABLE_SHARED_LIBS
+		LDFLAGS += -Wl,-Bstatic
+		#LDFLAGS += -static-libgcc
+	endif
+
+	EXTRA_CFLAGS := $(CPUFLAGS)
+
+	CXXLIBS =
+  	 
+	LDLIBS = $(LIBBIND)
+
+	ucfront_cc  := ucfront-gcc
+	ucfront_cxx := ucfront-g++
+	ucfront_ld  := ucfront-ld
+endif
+
+############################################################################

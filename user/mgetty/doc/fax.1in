@@ -1,0 +1,185 @@
+.TH fax 1 "23 Nov 02" "greenie" "mgetty+sendfax manual"
+.IX fax
+.SH NAME
+fax \- fax sending and receiving with mgetty+sendfax
+.SH SYNOPSIS
+.B faxspool
+.RB [options]
+.RI phone-number
+.RI file
+...
+
+.B faxrm
+.RI job-id
+
+.B faxq
+.RB [options]
+
+.B faxrunq
+.RB [options]
+
+.B faxrunqd
+.RB [options]
+
+.B sendfax
+.RB [options]
+.RI phone-number
+.RI file
+...
+
+.B mgetty
+.RB [options]
+.RI tty
+
+.B pbm2g3
+.RB [options]
+.RI [pbm-file]
+
+.B g32pbm
+.RB [options]
+.RI [pbm-file]
+
+.B g3cat
+.RB [options]
+.RI [g3-file(s)]
+
+.SH DESCRIPTION
+This manpage very briefly describes every program from the mgetty+sendfax
+fax/modem software suite. For details, see the manpages for each program.
+
+.I faxspool
+is used to queue jobs for later transmission by fax.
+.I faxspool
+accepts different input formats, converts them into the proper format
+required by
+.I sendfax
+and places the jobs into the outgoing spool directory.
+
+.I faxq
+displays the current FAX work queue.
+
+.I faxrm
+removes one or more jobs from the current fax work queue. You have to
+specify the job id (returned by faxq) on the command line.
+
+.I faxrunq
+processes all the faxes in the fax work queue, and sends them one-by-one.
+If transmission isn't possible, the job will be retried later. While meant
+to be run from 
+.I cron,
+.I faxrunq
+can as well be started from the shell (but you must have access to the fax 
+queue and the modems, which means you must be 'root' or '@FAX_OUT_USER@')
+
+.I faxrunqd
+is a replacement for 
+.I faxrunq
+to be used in environments that send a high number of faxes per day, or
+need more flexibility.
+
+.I sendfax
+is the backend used by faxrunq for actually sending the fax. It is not
+meant to be ever called directly, but can be used in own applications.
+
+.I faxq-helper
+is a helper program that is used by
+.I faxspool,
+.I faxq
+and
+.I faxrm
+to access the fax spool directory (which is not world-writeable since
+mgetty version 1.1.29).
+
+
+.sp
+.I mgetty
+is the part of the program suite that handles incoming calls. Data calls
+are handled as 
+.I getty
+does it (login, shell), while fax calls are handled internally. The
+received faxes are stored in @FAX_SPOOL_IN@. See the mgetty(1) manpage for
+details.
+.I mgetty 
+can not be called directly, it must be called by /etc/init.
+
+.sp
+.I pbm2g3 
+is used to convert portable bitmaps to G3 fax data (for sendfax). Do not
+use the pbmtog3 program from the pbmplus or netpbm toolkit, it will create
+broken G3 data.
+
+.I g32pbm
+is used to convert received faxes (which are stored in G3 format) to
+portable bitmap format. PBM can be converted to other formats with the
+named pbmplus toolkit.
+
+.I g3cat
+is used to concat multiple G3 files, as
+.I cat
+does with text files.
+
+.SH FILES
+.TP
+.B @FAX_SPOOL_OUT@/
+outgoing fax spool directory
+.TP
+.B @FAX_SPOOL_IN@/
+incoming faxes
+.TP
+.B @LIBDIR@/
+The cover page program, faxq-helper, and a few font files live here.
+.TP 
+.B @CONFDIR@/
+most configuration files for mgetty and sendfax live here.
+.TP
+.B @SBINDIR@
+mgetty, sendfax and faxrunqd live here
+.TP
+.B @BINDIR@
+all the other programs
+.TP
+.B @CONFDIR@/faxaliases
+global fax alias file
+.TP
+.B $HOME/.faxnrs
+private fax alias file
+.TP
+.B @CONFDIR@/fax.allow
+list of allowed users
+.TP
+.B @CONFDIR@/fax.deny
+list of denied users
+.TP
+.B @CONFDIR@/faxheader
+fax page header
+.TP
+.B @LIBDIR@/make.coverpg
+program to create fax cover page (see coverpg(1)).
+.TP
+.B @CONFDIR@/login.config
+login configuration file for mgetty.
+.TP
+.B @CONFDIR@/dialin.config
+caller ID setup file for mgetty (optional).
+.TP
+.B @CONFDIR@/mgetty.config
+runtime configuration file for mgetty (not implemented yet).
+.TP
+.B @CONFDIR@/sendfax.config
+runtime configuration file for sendfax (optional).
+.fi
+
+.SH BUGS
+Look into the responding man pages.
+
+.SH "SEE ALSO"
+faxspool(1), faxq(1), faxrunq(1), faxrunqd(8), sendfax(8), faxrm(1), mgetty(8),
+pbm2g3(1), g32pbm(1), g3cat(1), faxqueue(5), mgettydefs(4), coverpg(1)
+
+mgetty.info
+.SH AUTHOR
+The
+.I mgetty+sendfax
+program suite is Copyright (C) 1993-2002 by Gert Doering, <gert@greenie.muc.de>. 
+Parts of the programs kindly donated by Chris Lewis, Paul Sutcliffe,
+Klaus Weidner, and numerous others.

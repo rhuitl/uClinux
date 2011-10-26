@@ -1,0 +1,70 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+ <META NAME="GENERATOR" CONTENT="LinuxDoc-Tools 0.9.21">
+ <TITLE>Frox FAQ: Virus scanning</TITLE>
+ <LINK HREF="FAQ-6.html" REL=next>
+ <LINK HREF="FAQ-4.html" REL=previous>
+ <LINK HREF="FAQ.html#toc5" REL=contents>
+</HEAD>
+<BODY>
+<A HREF="FAQ-6.html">Next</A>
+<A HREF="FAQ-4.html">Previous</A>
+<A HREF="FAQ.html#toc5">Contents</A>
+<HR>
+<H2><A NAME="s5">5.</A> <A HREF="FAQ.html#toc5">Virus scanning</A></H2>
+
+<P>You can configure frox to run a virus scanner on downloaded
+files between downloading them to the proxy and them being
+forwarded to the client. You need to <CODE>./configure</CODE> with
+<CODE>--enable-virus-scan</CODE>, and set the config file variable
+VirusScanner to something like <CODE>'&quot;/usr/local/bin/yourviruscanner&quot;
+&quot;--options&quot; &quot;%s&quot;'</CODE>. You no
+longer need to be doing local caching for this to work - it
+will work with caching through squid or with no caching at
+all.</P>
+<P>Note that the whole variable is enclosed in single quotes
+('), while the individual arguments within are enclosed with
+double quotes (&quot;). The <CODE>&quot;%s&quot;</CODE>
+will be replaced by the name of the file to scan. NB. unlike
+all the other paths in the config file, any pathnames or
+filenames in VirusScanner will <EM>not</EM> be stripped in the
+case that you are running in a chroot jail. If your virus
+scanner exits with a value other than 0 when a file is scanned
+and is virus free you will need to set VSOK to that value.</P>
+<P>There are currently some problems with this:
+<UL>
+<LI>Only file downloads are scanned.</LI>
+<LI>If the file contains a virus then the file will
+not be sent to the user, even if your virus scanner is
+able to clean the virus from the file.</LI>
+<LI>The user will see a delay before the file starts
+to download as the whole thing must be downloaded to
+the proxy and be scanned before any of it can be
+passed to the client.</LI>
+</UL>
+</P>
+<P>If the <CODE>VSProgressMsgs</CODE> option is set to something
+other than <CODE>0</CODE> then every time that number of seconds
+passes during the delay a progress message will be sent to the
+client. On the plus side these may be displayed to users of
+command line ftp clients, and will probably prevent clients
+from giving up and timing out. On the down side the progress
+messages could confuse some ftp clients (I think they do with
+some Mozilla builds).</P>
+<H2><A NAME="ss5.1">5.1</A> <A HREF="FAQ.html#toc5.1">Can I redirect requests to a virus scanning http proxy?</A>
+</H2>
+
+<P>Probably not. Most of these proxies send various http progress
+messages back to the client. Frox is unable to parse these without
+giving it a more extensive http implementation, and so it will
+probably fail. Also there will be a delay before the client starts
+to get the file, and it may well time out during this period. There
+is interest in being able to do this though, so if anyone wants to
+try coding it then they are welcome.</P>
+<HR>
+<A HREF="FAQ-6.html">Next</A>
+<A HREF="FAQ-4.html">Previous</A>
+<A HREF="FAQ.html#toc5">Contents</A>
+</BODY>
+</HTML>

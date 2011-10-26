@@ -1,0 +1,24 @@
+#
+# Makefile for pppd under Solaris 2.
+# $Id: Makefile.sol2,v 1.1.1.1 1999-11-22 03:47:54 christ Exp $
+#
+
+include ../svr4/Makedefs
+
+CFLAGS = -DSVR4 -I../include $(COPTS)
+LIBS = -lsocket -lnsl
+
+all: pppd
+
+OBJS = main.o magic.o fsm.o lcp.o ipcp.o upap.o chap.o md5.o ccp.o \
+	auth.o options.o demand.o utils.o sys-svr4.o
+
+pppd:	$(OBJS)
+	$(CC) -o pppd $(OBJS) $(LIBS)
+
+install:
+	$(INSTALL) -f $(BINDIR) -m 4755 -u root pppd
+	$(INSTALL) -f $(MANDIR)/man8 -m 444 pppd.8
+
+clean:
+	rm -f $(OBJS) pppd *~ core y.tab.c y.tab.h

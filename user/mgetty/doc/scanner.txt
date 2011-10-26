@@ -1,0 +1,183 @@
+From:	caz@shoki.caztech.ashiya.hyogo.jp
+To:	gert@greenie.muc.de
+Subject: the connection when using external fax as a scanner
+Status: RO
+
+To clarify how to connect fax modem and fax machine when we use
+external fax machine as a scanner. Because I don't understand how to do it
+when I read "3.7 Using an external fax as a scanner" of mgetty.texi, I wrote.
+
+Following is the connection in normal operation. I.e. Receiving fax
+by Fax modem, sending fax by fax machine, make phone call, etc.
+
+        +-------------------+  +----------------+
+        |    Fax Modem      |  |     Sharp      |
+        |     (U1496E)      |  |     UX-5       |
+        |                   |  |                |        +--------+
+        |  Line     Phone   |  |  Line    Phone |        | Phone  |
+        +-------------------+  +----------------+        +--------+
+Telecom      |        |             |       |                 |
+company  ----+        +-------------+       +-----------------+
+
+
+In operation of using external fax as a scanner, the connection is follow.
+
+        +-------------------+  +----------------+
+        |    Fax Modem      |  |     Sharp      |
+        |     (U1496E)      |  |     UX-5       |
+        |                   |  |                |        +--------+
+        |  Line     Phone   |  |  Line    Phone |        | Phone  |
+        +-------------------+  +----------------+        +--------+
+             |        |             |       |                 |
+             +----------------------+       +-----------------+
+                      |
+Telecom               |
+company  -------------+
+
+The procedure of sending picture from UX-5 to Fax modem is follow.
+
+1. put the paper to send on Fax machine.
+2. pick up Phone hand set(Hang on)
+3. push start button of Fax machine.
+4. push data/voice button of Fax modem.
+
+Of course you should set up mgetty for the terminal port of Fax modem as
+follows.
+
+/usr/local/sbin/mgetty -x 9 ttym0
+
+As you know, "push data/voice button of Fax modem" can be substituted by
+kill -USR1 <mgetty-pid>.
+The fax machine which has dialing funtion does not need phone.
+I need picking up phone hand set because UX-5 fax machine does not
+recognize fax start by pushing start button of Fax machine.
+If your fax machine has dialing funtion, you should dial any digit
+without "2. pick up Phone hand set(Hang on)", and
+"3. push start button of Fax machine." as described in mgetty.texi.
+
+My environment
+Computer	Panasonic (Matsushita Electric industry) BE workstation
+Fax modem	ZyXEL U1496E V 6.01 M
+Fax		Sharp UX-5, For personal use, No dialers i.e. needs phone.
+
+Following is the log file when I receive a picture from fax machine.
+
+07/03 17:56:29 m0  check for lockfiles
+07/03 17:56:29 m0  checklock: stat failed, no file
+07/03 17:56:29 m0  locking the line
+07/03 17:56:29 m0  makelock(ttym0) called
+07/03 17:56:29 m0  do_makelock: lock='/usr/spool/locks/LCK..ttym0'
+07/03 17:56:30 m0  lock made
+07/03 17:56:30 m0  lowering DTR to reset Modem
+07/03 17:56:30 m0  clean_line() not available on MEIBE
+07/03 17:56:30 m0  send: \d\d\d+++\d\d\d[0d]\dATQ0V1H0[0d]
+07/03 17:56:34 m0  waiting for ``OK''
+07/03 17:56:34 m0  got: +++[0d]
+07/03 17:56:34 m0  CND: +++ATQ0V1H0[0d]
+07/03 17:56:34 m0  CND: ATQ0V1H0[0d][0a]OK ** found **
+07/03 17:56:34 m0  send: ATS0=0Q0&D3&H3&N0&K4[0d]
+07/03 17:56:34 m0  waiting for ``OK''
+07/03 17:56:34 m0  got: [0d]
+07/03 17:56:34 m0  CND: OK[0a]ATS0=0Q0&D3&H3&N0&K4[0d]
+07/03 17:56:34 m0  CND: ATS0=0Q0&D3&H3&N0&K4[0d][0a]OK ** found **
+07/03 17:56:34 m0  fax_send: 'AT+FCLASS=2.0'
+07/03 17:56:34 m0  got:[0d][0a]AT+FCLASS=2.0[0d]
+07/03 17:56:34 m0  mdm_command: string 'AT+FCLASS=2.0'
+07/03 17:56:34 m0  got:[0d][0a]ERROR[0d]
+07/03 17:56:34 m0  mdm_command: string 'ERROR' -> ERROR
+07/03 17:56:34 m0  fax_send: 'AT+FCLASS=2'
+07/03 17:56:34 m0  got:[0a]AT+FCLASS=2[0d]
+07/03 17:56:34 m0  mdm_command: string 'AT+FCLASS=2'
+07/03 17:56:34 m0  got:[0d][0a]OK[0d]
+07/03 17:56:34 m0  mdm_command: string 'OK' -> OK
+07/03 17:56:34 m0  fax_send: 'AT+FCLASS=0'
+07/03 17:56:34 m0  got:[0a]AT+FCLASS=0[0d]
+07/03 17:56:34 m0  mdm_command: string 'AT+FCLASS=0'
+07/03 17:56:34 m0  got:[0d][0a]OK[0d]
+07/03 17:56:34 m0  mdm_command: string 'OK' -> OK
+07/03 17:56:34 m0  fax_send: 'AT+FAA=1;+FCR=1'
+07/03 17:56:34 m0  got:[0a]AT+FAA=1;+FCR=1[0d]
+07/03 17:56:34 m0  mdm_command: string 'AT+FAA=1;+FCR=1'
+07/03 17:56:34 m0  got:[0d][0a]OK[0d]
+07/03 17:56:34 m0  mdm_command: string 'OK' -> OK
+07/03 17:56:34 m0  fax_send: 'AT+FBOR=0'
+07/03 17:56:34 m0  got:[0a]AT+FBOR=0[0d]
+07/03 17:56:34 m0  mdm_command: string 'AT+FBOR=0'
+07/03 17:56:34 m0  got:[0d][0a]OK[0d]
+07/03 17:56:34 m0  mdm_command: string 'OK' -> OK
+07/03 17:56:35 m0  fax_send: 'AT+FLID="+81-797-23-6813"'
+07/03 17:56:35 m0  got:[0a]AT+FLID="+81-797-23-6813"[0d]
+07/03 17:56:35 m0  mdm_command: string 'AT+FLID="+81-797-23-6813"'
+07/03 17:56:35 m0  got:[0d][0a]OK[0d]
+07/03 17:56:35 m0  mdm_command: string 'OK' -> OK
+07/03 17:56:35 m0  fax_send: 'AT+FDCC=1,5,0,2,0,0,0,0'
+07/03 17:56:35 m0  got:[0a]AT+FDCC=1,5,0,2,0,0,0,0[0d]
+07/03 17:56:35 m0  mdm_command: string 'AT+FDCC=1,5,0,2,0,0,0,0'
+07/03 17:56:35 m0  got:[0d][0a]OK[0d]
+07/03 17:56:35 m0  mdm_command: string 'OK' -> OK
+07/03 17:56:35 m0  clean_line() not available on MEIBE
+07/03 17:56:35 m0  removing lock file
+07/03 17:56:35 m0  waiting...
+07/03 17:57:09 m0  select returned 1
+07/03 17:57:09 m0  checking lockfiles, locking the line
+07/03 17:57:09 m0  makelock(ttym0) called
+07/03 17:57:09 m0  do_makelock: lock='/usr/spool/locks/LCK..ttym0'
+07/03 17:57:09 m0  lock made
+07/03 17:57:09 m0  waiting for ``RING''
+07/03 17:57:09 m0  got: [0d]
+07/03 17:57:09 m0  CND: OK[0a]+FCON
+07/03 17:57:09 m0  found action string: ``+FCON''
+07/03 17:57:09 m0  start fax receiver...
+07/03 17:57:09 m0  fax receiver: entry
+07/03 17:57:09 m0  fax_wait_for(OK)
+07/03 17:57:09 m0  got:[0a][0d][0a][0d][0a]+FTSI:                     [0d]
+07/03 17:57:11 m0  fax_wait_for: string '+FTSI:                     '
+07/03 17:57:11 m0  fax_id: '+FTSI:                     '
+07/03 17:57:11 m0  got:[0a][0a][0d][0a][0a]+FDCS:1,3,0,2,0,0,0,3[0d]
+07/03 17:57:11 m0  fax_wait_for: string '+FDCS:1,3,0,2,0,0,0,3'
+07/03 17:57:11 m0  transmission par.: '+FDCS:1,3,0,2,0,0,0,3'
+07/03 17:57:11 m0  got:[0a][0d][0a]OK[0d]
+07/03 17:57:11 m0  fax_wait_for: string 'OK'** found **
+07/03 17:57:11 m0  fax_send: 'AT+FDR'
+07/03 17:57:11 m0  fax_wait_for(CONNECT)
+07/03 17:57:11 m0  got:[0a]AT+FDR[0d]
+07/03 17:57:11 m0  fax_wait_for: string 'AT+FDR'
+07/03 17:57:11 m0  got:[0d][0a]+FCFR[0d]
+07/03 17:57:13 m0  fax_wait_for: string '+FCFR'
+07/03 17:57:13 m0  got:[0a][0d][0a]+FTSI:                     [0d]
+07/03 17:57:13 m0  fax_wait_for: string '+FTSI:                     '
+07/03 17:57:13 m0  fax_id: '+FTSI:                     '
+07/03 17:57:13 m0  got:[0a][0a][0d][0a][0a]+FDCS:1,3,0,2,0,0,0,3[0d]
+07/03 17:57:13 m0  fax_wait_for: string '+FDCS:1,3,0,2,0,0,0,3'
+07/03 17:57:13 m0  transmission par.: '+FDCS:1,3,0,2,0,0,0,3'
+07/03 17:57:13 m0  got:[0a][0d][0a]CONNECT[0d]
+07/03 17:57:14 m0  fax_wait_for: string 'CONNECT'** found **
+07/03 17:57:14 m0  sending DC2
+07/03 17:57:14 m0  fax_get_page_data: wait for EOL, got: [0a][00]
+07/03 17:57:14 m0  fax_get_page_data: receiving /usr/spool/fax/incoming/ffe167d6am0.01...
+07/03 17:58:40 m0  fax_get_page_data: page end, bytes received: 104447
+07/03 17:58:40 m0  fax_wait_for(OK)
+07/03 17:58:40 m0  got:[0d][0a][0d][0a]+FPTS:1[0d]
+07/03 17:58:40 m0  fax_wait_for: string '+FPTS:1'
+07/03 17:58:40 m0  page status: +FPTS:1
+07/03 17:58:40 m0  got:[0a][0d][0a]+FET:2[0d]
+07/03 17:58:46 m0  fax_wait_for: string '+FET:2'
+07/03 17:58:46 m0  got:[0a][0d][0a]OK[0d]
+07/03 17:58:46 m0  fax_wait_for: string 'OK'** found **
+07/03 17:58:46 m0  fax_send: 'AT+FDR'
+07/03 17:58:46 m0  fax_wait_for(CONNECT)
+07/03 17:58:46 m0  got:[0a]AT+FDR[0d]
+07/03 17:58:46 m0  fax_wait_for: string 'AT+FDR'
+07/03 17:58:46 m0  got:[0d][0a]+FHNG:000[0d]
+07/03 17:58:49 m0  fax_wait_for: string '+FHNG:000'
+07/03 17:58:49 m0  connection hangup: '+FHNG:000'
+07/03 17:58:49 m0  (Normal and proper end of connection)** found **
+07/03 17:58:49 m0  fax receiver: hangup & end
+07/03 17:58:49 m0  fax_notify_mail: sending mail to: faxadmin
+07/03 17:58:51 m0  notify: '/usr/local/lib/mgetty+sendfax/new_fax 0 '                     ' 1  /usr/spool/fax/incoming/ffe167d6am0.01 >/dev/console 2>&1 </dev/null'
+07/03 17:58:51 ##### fax dev=ttym0, pid=1342, caller=none, name='', id='                     ', +FHNG=000, pages=1, time=00:01:35
+
+
+07/03 17:58:51 m0  removing lock file
+-caz
+

@@ -1,0 +1,337 @@
+.\" $Id: tripwire.8,v 1.14 1994/07/21 00:56:35 gkim Exp $
+.\"
+.\" Macros added by addw@phcomp.co.uk for those systems where the an
+.\" troff macro package doesn't know about .Ps & .Pe.
+.\" Note it is assumed that CW is a constant width font.
+.\" Ps - Start display text
+.de Ps
+.nf
+.in +0.5i
+.ft CW
+..
+.\" Pe - end of display text
+.de Pe
+.fi
+.in -0.5i
+.ft 1
+..
+.\"
+.TH TRIPWIRE 8 "October 14, 1992"
+.SH NAME
+tripwire \- a file integrity checker for UNIX systems
+.SH SYNOPSIS
+.B tripwire
+[ 
+.I options \fP...\fI
+] 
+.SH DESCRIPTION
+.LP
+Tripwire is a file integrity checker \- a utility that compares a
+designated set of files and directories against information stored in
+a previously generated database.  Added or deleted files are flagged
+and reported, as are any files that have changed from their previously
+recorded state in the database.  When run against system files on a
+regular basis, any file changes would be spotted when Tripwire is next
+run, giving system administrators information to enact damage control
+measures immediately.
+.LP
+Using Tripwire, system administrators can conclude with an
+extremely high degree of certainty that a given set of files and directories
+remain untouched from unauthorized modifications, provided the
+program and database are appropriately protected (e.g., stored on
+read-only media).  Note that reports of changed files indicate a 
+change from the time of the last Tripwire database installation or
+update.  For best effect, the files being monitored should be
+reinstalled from known good sources.  (See the Tripwire design
+document for further details.)
+.LP
+Tripwire uses message-digest algorithms (one-way hash functions)
+to detect changes in a hard-to-spoof manner.  This should be able
+to detect significant changes to critical files, including those
+caused by insertion of backdoors or viruses.  Tripwire also
+monitors changes to file permissions, modification times, and
+other significant changes to inodes as selected by the system
+administrator on a per-file/directory basis.
+.LP
+Tripwire runs in one of four modes: Database Generation,
+Database Update, Integrity Checking, or Interactive Update mode.  In
+Database Generation mode, Tripwire initializes the database based upon
+the entries enumerated in the \fItw.config\fP file.  Database
+Update mode provides incremental database update functionality on a
+per-file/directory basis.  This obviates having to regenerate the entire
+database every time a file or set of files change.  The Integrity
+Checking mode generates a report of added, deleted, or changed files,
+comparing all the files described by the \fItw.config\fP file against
+the files residing on the filesystem.  Lastly, the Interactive Update mode
+reports added, deleted, and changed files and prompts the user
+whether those database entries should be updated.
+.LP
+The Interactive Update mode provides a simple and thorough method for
+system administrators to keep Tripwire databases ``in sync'' with 
+filesystems that change.
+.SH OPTIONS
+.LP
+When run without any arguments, \fItripwire\fP runs in Integrity
+Checking mode.
+.TP 20
+.B \-initialize
+Database Generation mode.  Creates the database which is used for
+all subsequent Integrity Checking runs.
+.TP
+.B -update pathname/entry ...
+Database Update mode.  This mode updates the specified \fIpathname\fP or
+\fIentry\fP in the database.  If the argument provided is a file, only
+that file is updated.  If the argument is a directory, that directory
+and all of its children are updated.  If the argument is an \fPentry\fP
+in the \fItw.config\fP file, the entire entry in the database is
+updated.
+.TP
+.B \-interactive
+Interactive Integrity Checking.  Tripwire first reports all added,
+deleted, and changed files, then prompting the user whether the entry
+should be updated in the database.
+.sp 0
+Note that Tripwire opens up /dev/tty instead of using \fIstdin\fP.
+This prevents automating interactive updates, reducing the chance of
+system administrators inadvertently updating entries.  Updating the
+database should always be done with care and deliberation.
+.TP
+.B \-loosedir
+Loosens checking rules for directories in Integrity Checking modes so
+changes in size, nlink, modification and creation times no longer are
+reported.  This significantly quiets Tripwire reports, at the possible
+risk of missing important changes.
+.TP
+.B \-d dbasefile
+Reads the database information from the specified file
+\fIdbasefile\fP.  \fIstdin\fP can specified by ``-d -''.
+.TP
+.B \-c configfile
+Read the configuration information from the specified file
+\fIconfigfile\fP.  \fIstdin\fP can specified by ``-c -''.
+.TP
+.B \-cfd openfd
+Read the configuration information from the open file descriptor
+\fIopenfd\fP.  This option allows programs outside of Tripwire to
+supply services such as networking, compression, and encryption.
+.TP
+.B \-dfd openfd
+Read the database file from the open file descriptor
+\fIopenfd\fP.  This option allows programs outside of Tripwire to
+supply services such as networking, compression, and encryption.
+.TP
+.B \-D\fIvar\fP=\fIvalue\fP
+Defines the \fItw.config\fP variable \fIvar\fP to \fIvalue\fP.  (As if
+\fI@@define\fP were used.)
+.TP
+.B \-U\fIvar\fP
+Undefine the \fItw.config\fP variable \fIvar\fP.  (As if \fI@@undef\fP
+were used.)
+.TP
+.B \-i [#|all]
+Ignore the specified signature, and skip it when comparing against
+database entries.  If \fIall\fP is specified, no signatures are
+collected or compared.
+.TP
+.B \-E
+Prints out preprocessed \fItw.config\fP file to \fIstdout\fP.
+.TP
+.B \-preprocess
+Same as -E option.
+.TP
+.B \-q
+Quiet mode.  In this mode, Tripwire prints only one line reports for
+each added, changed, or deleted file.  Phase 5 is skipped, which prints
+all the pairs of expected and observed file attribute values.
+.TP
+.B \-v
+Verbose mode.  Prints out filenames as they are being scanned during
+signature computation.
+.TP
+.B \-help
+Print out inode interpretation message (for parsing messages when
+files have changed).
+.TP
+.B \-version
+Prints out version information.
+.SH DATABASE GENERATION MODE
+.LP
+In Database Generation mode, \fItripwire\fP creates the
+database file based upon the entries in \fItw.config\fP.  The
+name of this database file is defined at compile-time in
+\fIconfig.h\fP \- it defaults to \fItw.db_[hostname]\fP.  The
+generated database is placed in the \fB./databases\fP directory, and
+must be moved to the target directory manually.
+.LP
+Note that you must manually move this file to your database
+directory.  This is because the default database directory should
+be a read-only file system.  
+.SH DATABASE UPDATE MODE
+.LP
+In Database Update mode, \fItripwire\fP updates the specified files,
+directories, or entries in the database.  The old database is saved in
+the \fB./databases\fP directory with the \fI.old\fP suffix.  The new,
+updated database is also written to the \fB./databases\fP directory.
+As in the Database Generation mode, the new database must be manually
+moved to the Tripwire database directory.
+.LP
+\fItripwire\fP in Database Update mode requires at least one argument,
+which is used as an \fIentry\fP.  The \fIentry\fP argument specifies
+which file or directory is to be updated, and is interpreted similar
+to \fItw.config\fP entries.  If the argument is a filename, only that
+file is updated in the database.  Similarly, if the argument is a
+directory name, the directory and its children are updated.  If the
+argument is also an entry in the \fItw.config\fP file, the entire
+entry is updated.
+.LP
+Database updates yield a new database file with added, deleted, or
+changed entries.  This functionality is provided to allow Tripwire
+databases to be updated in a controlled manner to reflect filesystem
+changes, obviating the need to regenerate the entire database again.
+.SH INTEGRITY CHECKING MODE
+.LP
+In Integrity Checking mode, \fItripwire\fP reads in the
+\fItw.config\fP file, and rebuilds a new database to reflect the
+current files.  Tripwire then compares the new database with the
+existing Tripwire database stored on the filesystem, reporting added
+or deleted files, as well as those files that have changed.
+.LP
+The \fItw.config\fP file, in addition to the list of files and
+directories, also lists which attributes can change and be safely
+ignored by Tripwire.  Tripwire applies these \fIselect-flags\fP to 
+decide which changes can be safely unreported.
+.LP
+Each file that differs from the information stored in the database
+is considered ``changed.''  However, only the changes that remain 
+after the \fIselect-flags\fP are applied are displayed.  For each change,
+the expected and actual information is printed.  For instance:
+.LP
+.RS
+.nf
+.ps -2
+.vs -2
+2:30am (mentor) 985 % tripwire
+### Phase 1:   Reading configuration file
+### Phase 2:   Generating file list
+### Phase 3:   Creating file information database
+### Phase 4:   Searching for inconsistencies
+###
+###                     Total files scanned:            82
+###                           Files added:              0
+###                           Files deleted:            0
+###                           Files changed:            80
+###
+###                     After applying rules:
+###                           Changes discarded:        79
+###                           Changes remaining:        1
+###
+changed: -rw------- genek        4433 Oct 13 02:30:34 1992 /tmp/genek/tripwire-0.92/config.h
+### Phase 5:   Generating observed/expected pairs for changed files
+###
+### Attr        Observed (what it is)         Expected (what it should be)
+### =========== ============================= =============================
+/tmp/genek/tripwire-0.92/config.h
+       st_size: 4441                          4433
+    md5 (sig1): 0aqL1O06C3Fj1YBXz3.CPdcb      0cPX1H.DYS.s1vZdKD.ELMDR
+ snefru (sig2): 0PcgcK/MZvEm.8pIWe.Gbnn/      /8VoJv1JcoUA0NvoGN.k3P6E
+  crc32 (sig3): .EHA6x                        /OuGNV
+  crc16 (sig4): ...9/q                        ...6yu
+    md4 (sig5): /hQ0sU.UEbJo.UR4VZ/mNG/h      .UR4VZ/mNG/h/VSG/W/Z643k
+    md2 (sig6): .hLwjb.VRA0O.Z72y90xTYqA      1LR0Gg1l.vqB0.1g330Pi8/p
+.ps
+.vs
+.RE
+.fi
+.LP
+Tripwire in 
+Interactive Update mode will look similar.  However, for each added,
+deleted, or changed file, the user is prompted whether the entry
+corresponding to the file or directory should be updated.  The user
+can answer with either ``y'', ``n'', ``Y'', or ``N''.  The first two
+answers are simply ``yes, update the specified file'' and ``no, don't
+update the file'' respectively. 
+.LP
+Answering ``Y'' not only updates the specified file or directory, but
+all other files or directories that share the same \fIentry\fP in the
+\fItw.config\fP file.  For example, if ``Y'' were answered for /etc,
+then all the files generated by the /etc entry will also be updated.
+Answering ``N'' is similar, but skips all files and directories
+corresponding to the specified entry.
+.LP
+A possible Tripwire session running in Interactive Update mode may
+look like:
+.RS
+.nf
+.ps -2
+.vs -2
+3:34pm (flounder) tw/src 5 %%% tripwire -interactive
+### Phase 1:   Reading configuration file
+### Phase 2:   Generating file list
+### Phase 3:   Creating file information database
+### Phase 4:   Searching for inconsistencies
+###
+###			Total files scanned:		49
+###			      Files added:		0
+###			      Files deleted:		0
+###			      Files changed:		49
+###
+###			After applying rules:
+###			      Changes discarded:	48
+###			      Changes remaining:	1
+###
+changed: -rw------- genek        7893 May  5 15:30:37 1993 /homes/genek/research/tw/src/databases/tw.db_flounder.Eng.Sun.COM.old
+### Phase 5:   Generating observed/expected pairs for changed files
+###
+### Attr        Observed (what it is)	      Expected (what it should be)
+### =========== ============================= =============================
+/homes/genek/research/tw/src/databases/tw.db_flounder.Eng.Sun.COM.old
+      st_mtime: Wed May  5 15:30:37 1993      Wed May  5 15:24:09 1993
+      st_ctime: Wed May  5 15:30:37 1993      Wed May  5 15:24:09 1993
+---> File: '/homes/genek/research/tw/src/databases/tw.db_flounder.Eng.Sun.COM.old'
+---> Update entry?  [YN(y)nh?] y
+
+### Updating database...
+###
+### Phase 1:   Reading configuration file
+### Phase 2:   Generating file list
+### Phase 3:   Updating file information database
+### Phase 3:   Updating file information database
+###
+### Old database file will be moved to `tw.db_barnum.cs.purdue.edu.old'
+###            in ./databases.
+###
+### Updated database will be stored in './databases/tw.db_barnum.cs.purdue.edu'
+###            (Tripwire expects it to be moved to '/tmp/genek'.)
+###
+3:34pm (flounder) tw/src 6 %%% 
+.ps
+.vs
+.RE
+.fi
+.SH DIAGNOSTICS
+Tripwire exit status is 1 for any error condition.  Otherwise, the exit
+status is the logical OR'ing of the following:  2 for files added, 4 for
+files deleted, and 8 for files changed.  (e.g., if Tripwire exits with
+status code 10, then files were added and change.  8 + 2 = 10.)
+.SH ENVIRONMENT
+None.
+.SH BUGS
+This manual page is not self-contained \- users are referred to the
+Tripwire design document to better understand the issues of integrity
+checking.
+.SH SEE ALSO
+tw.config(5)
+.sp
+.IR "The Design and Implementation of Tripwire: A UNIX File Integrity Checker"
+by Gene Kim and Eugene Spafford.  Purdue Technical Report CSD-TR-93-071.
+.SH AUTHORS
+.nf
+Gene Kim
+Purdue University
+gkim@cs.purdue.edu
+
+Eugene Spafford
+Purdue University
+spaf@cs.purdue.edu
+.fi
+

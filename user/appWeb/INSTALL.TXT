@@ -1,0 +1,317 @@
+INSTALL.TXT -- Building and Installing the Mbedthis AppWeb Source Code.
+--------------------------------------------------------------------------------
+
+This file describes how to get and build the Mbedthis AppWeb source code.
+You can read more about building from source and other topics in the HTML 
+documentation under:
+
+    doc/appWeb/index.html
+
+
+Getting the Source Code
+-----------------------
+
+You can get the source code from the Mbedthis web site at:
+
+    http://www.mbedthis.com/downloads/appWeb/
+
+The web site contains source code for the latest stable or development builds. 
+Alternatively, you can check out the current source code from the main 
+Mbedthis Subversion source code repository. This will contain the latest 
+features but in an untested and ongoing development status. See "Building
+from the Repository" at the end of this document more details.
+
+If you are wanting to build on a supported platform, use the following steps 
+to build the source code. If you are wanting to port to a new platform, please
+read doc/appWeb/source/porting.html.
+
+
+Development Environment Platform Support
+----------------------------------------
+
+If you wish to build the samples or rebuild Mbedthis AppWeb from source code, 
+you will need to use a C++ compiler and associated development tools. Several 
+development environments are supported. You may choose any of the following 
+to compile and build samples and source code.
+
+    * Linux GNU tools
+    * Windows Visual Studio 6 or Windows Visual Studio .NET
+    * Windows Cygwin GNU emulation
+
+On Windows, you can use the supplied Microsoft Visual Studio projects under the 
+VisualStudio directory for building and debugging, but the projects cannot
+alter the configured features or modules. To use the "./configure" program,
+you will need to install the Cygwin GNU emulation software.
+
+The Mbedthis build system is a cross-platform build mechanism that supports 
+Unix and Windows. To use the build system on Windows requires that the Cygwin 
+UNIX emulation environment be installed. The build system still uses the 
+Microsoft Visual Studio compiler and debugger, but it relies on the cygwin 
+make and other utilities to perform batch compiles and to control which
+modules are built. To get Cygwin, go to:
+
+    http://www.cygwin.com
+
+On windows, AppWeb requires Microsoft Visual Studio 6.0 service pack 5 or later.
+AppWeb will build on any Linux 2.4 or later release.
+
+
+Setup the Environment
+---------------------
+
+On UNIX, you will need to setup your environment if you wish to debug programs
+directly in your build tree. If you only wish to build and install without
+running in the build tree, you do not need to modify your environment.
+
+Set the LD_LIBRARY_PATH environment variable to include the bin directory in
+the source directory. This overrides the library search path compiled into the
+various AppWeb executables which is normally set to the build prefix
+(/etc/appWeb). LD_LIBRARY_PATH has a format similar to PATH and can be set via 
+the command:
+
+    export LD_LIBRARY_PATH=/usr/src/appWeb-VERSION/bin:$LD_LIBRARY_PATH
+
+This command may vary if you specify a non-default source installation
+directory, but normally this is location is:
+
+    /usr/src/appWeb-VERSION/bin
+
+If you have installed AppWeb in a non-default location, replace the path with
+the current installation directory for the source. You may wish to include
+these commands in your .profile or .bashrc login script to the environment is
+correctly setup each time you login.
+
+
+Configuring the Build
+---------------------
+
+If you are using Linux or the GNU/Cygwin tools on Windows, you have the
+options of configuring and controlling the build process via the configure
+script. This script is similar to the Linux autoconf and libtools configure
+programs. We do not use the GNU tools, as we support operating systems that do
+not easily run them (e.g. Windows). The configure script will create and
+modify the build control files config.make, config.sh and config.h. These 
+"magic" files are included by make files, shell scripts and also by C/C++ 
+source files to control the build process. To read more about the Mbedthis
+build system, read doc/appWeb/source/building.html.
+
+To create the build control files, the configure program will parse the
+template.config.make, template.config.sh and template.config.h files which
+serve as templates for the resulting config control files. These template
+files may be edited if required when porting the source to a new platform.
+
+If you are using Windows Visual Studio, you will need to manually edit the
+config.* configuration files if you wish to modify the configuration defaults. 
+NOTE: this should not be necessary unless you wish to customize the feature 
+set. If you are using Microsoft Visual Studio please see the Hand Editing 
+section at the end of these notes. Also note that if you are building using 
+the supplied Microsoft Visual Studio project files, some configuration options 
+are restricted such as the ability to create statically linked libraries and
+executables.
+
+
+Running Configure
+-----------------
+
+The "configure" program is the master AppWeb configuration tool. It is a
+script that will create/modify the AppWeb configuration files that conrol the
+build settings. You may run configure with no options to accept the "factory"
+defaults, which is a good starting point.
+
+To run the configure program, type:
+
+    configure
+
+or supply options, for example:
+
+    configure --type=RELEASE --enable-static --host=sparc-sun-solaris2 \
+        --disable-access-log 
+
+Configure will remember the settings each time it is run in a a cache file,
+called conf/config.cache file and it will reuse these settings if a feature 
+or option is not explicitly mentioned on the next invocation.
+
+For full details on all the configure options, type:
+
+	configure --help
+
+Some example configuration options follow. To enable multi-threaded operation:
+
+	configure --enable-multi-thread
+
+To set an alternative installation directory:
+
+	configure --prefix=/home/myDir
+
+To enable storing all web pages and configuration files in ROM:
+
+	configure --enable-rom-fs
+
+To build a fully static AppWeb:
+
+	configure --disable-shared --enable-static
+
+If you wish to cross-compile (Canadian-cross), configure will also listen to
+the settings of the AR, CC, CC_FOR_BUILD, LD, LD_FOR_BUILD, RANLIB, CFLAGS,
+IFLAGS and LDFLAGS environment variables and will pass their values into the
+build system. You can define the architecture of the hosting system via the
+--host switch. For example:
+
+    CC=gccPPC configure
+
+Configure will remember the environment variable settings for subsequent
+builds. The build system will ignore environment if these variables are passed 
+directly into make. You must define them via configure.
+
+The configure program will use the default configuration supplied in the
+conf/config.default file when first configuring your build. After running, it
+will save the current configuration in the config/config.cache file and will
+save the command line used to invoke configure in the config/config.args file.
+You can edit the config.default file to modify the defaults to suit your
+requirements. Once modified, run configure --reset to reparse the defaults
+file and update your configuration.
+
+When configure runs, it uses template files to create the config.make,
+config.sh and config.h files. These template files are stored in
+conf/template.config.*. You should not edit these files unless you are porting
+AppWeb to a new platform.
+
+For full details about the configure program run configure --help or read the
+documentation under: doc/appWeb/source/building.html.
+
+
+Building on Linux
+-----------------
+
+Once the build configuration is complete, you can proceed to build by typing:
+
+	make 
+
+This will first build the bootstrap utilities and will then generate the make 
+dependencies before compiling the code.
+
+Other make targets of interest are: "make clean", "make depend", and 
+"make compile", "make install", "make uninstall".
+
+To install the built product at its configured location (see the configure
+switch --prefix), use "make install". To uninstall, use "make uninstall".
+
+To understand more about the make system, read about the AppWeb make system
+below.
+
+
+Building on Windows
+-------------------
+
+Mbedthis AppWeb is supplied with both Visual Studio 6.0 project files. These 
+can also be read and upgraded by Visual Studio.NET. If you are using the 
+Cygwin environment please consult the Running Configure section above.
+
+
+Building with Visual Studio
+---------------------------
+
+AppWeb includes several project files for building various sections of the
+AppWeb server.
+
+    * appWebServer     Builds all files necessary for the appWeb program. 
+                       Includes building all loadable modules.
+    * appWebClient     Builds the HTTP client.
+    * appWebUtils      Builds various utilities.
+
+To build using Visual Studio 6 open the workspace files located in the
+visualStudio directory with a "dsw" extension. To build using Visual
+Studio.NET, open the workspace files and upgrade them to Visual Studio.NET
+solution files.
+
+The appWebServer project will build a command line version of the server
+called appWeb. It will also build a windows executable called winAppWeb if
+you set it as the active project under Visual Studio.
+
+
+Building on Windows with Cygwin
+-------------------------------
+
+The procedure for building with Cygwin is the same as the Linux procedure.
+
+
+Hand Editing Configuration Files
+--------------------------------
+
+For Microsoft Visual Studio users who wish to customize the features of the
+AppWeb server, you will need to edit the config.make, config.sh and config.h
+header files. Key constants and settings are defined here and these files are
+included by C source, Makefiles and scripts. Many constants are repeated in
+two or three of the configuration files so be very careful and make sure you
+change each setting in every place it is mentioned. You must maintain
+consistency between the files. When editing be very careful to preserve quotes
+where they appear. Any changes made to the configuration files may also require
+manual changes to the build projects.
+
+It is recommended that if you wish to change the configuration, that you
+install the cygwin environment.
+
+
+Building from the Repository
+----------------------------
+
+To get a latest copy of AppWeb source code, you will need to have installed
+the Subversion source code control client. Subversion is similar to CVS, only
+better. Most major linux distributions now include the client. To download a
+copy, go to:
+
+    http://subversion.tigris.org/
+
+Once you have the Subversion client installed, you will need to send email
+to dev@mbedthis.com to receive a login name and password so you can access
+the repository. Once you have these details, you can checkout a copy of the
+AppWeb source code via:
+
+    svn checkout https://209.180.205.165/svn/appWeb/main
+
+
+Initializing the Tree
+---------------------
+
+Before making the first time, you must initialize the tree with the correct
+configuration defaults. To do this, run:
+
+	./configure
+
+This will ask you to select a default configuration. A safe choice is 
+appWebNormal.defaults. You can also supply configure command line options
+to tailor your build. To see the list of possible options, use:
+
+	./configure --help | more
+
+Once configured, you can use "make" or "make compile" to build. Other 
+useful targets include "make depend" to refresh the makefile dependencies, 
+"make clean" to remove all generated objects, executables, libraries and 
+intermediate files, "make install" to install the product on the local system,
+"make packge" to make a new installable package.
+
+
+See Also
+--------
+Other important files to read:
+
+README.TXT -- Introductory readme.
+LICENSE.TXT -- License details.
+PORTING.HTML -- License details.
+
+
+--------------------------------------------------------------------------------
+Copyright (c) 2003-2004 Mbedthis Software, LLC. All Rights Reserved.
+Mbedthis and AppWeb are trademarks of Mbedthis Software, LLC. Other 
+brands and their products are trademarks of their respective holders.
+
+See LICENSE.TXT for software license details.
+
+--------------------------------------------------------------------------------
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim:tw=78
+# vim600: sw=4 ts=4 fdm=marker
+# vim<600: sw=4 ts=4

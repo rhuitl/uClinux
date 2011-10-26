@@ -1,0 +1,66 @@
+#
+# Makefile for GSM-AMR Codec Plugin
+#
+# Copyright (C) 2004 MX Telecom Ltd.
+#
+# $Id: Makefile.in,v 1.1 2005/06/07 03:22:23 csoutheren Exp $
+
+PREFIX=@INSTALLPREFIX@
+exec_prefix = ${PREFIX}
+LIBDIR=@LIBDIR@
+H323_GSMAMR_NB_FLOAT=@H323_GSMAMR_NB_FLOAT@
+
+CC=@CC@
+CXX=@CXX@
+LDSO=@LDSO@
+
+ifndef PREFIX
+PREFIX=/usr/local
+endif
+
+SONAME	= gsmamrcodec
+
+SRCS	= amrcodec.c \
+	interf_enc.c \
+	interf_dec.c \
+	sp_dec.c \
+	sp_enc.c
+
+OBJDIR	= ./obj
+SRCDIR  = ./src/c-code
+
+vpath	%.o $(OBJDIR)
+vpath	%.c $(SRCDIR)
+
+CCFLAGS += -I../../../include -I$(SRCDIR)
+CCFLAGS += -DIF2
+
+PLUGIN	= ./$(SONAME)_pwplugin.so
+
+$(OBJDIR)/%.o : %.c
+	@mkdir -p $(OBJDIR) >/dev/null 2>&1
+	$(CC) -g -c $(CCFLAGS) -o $@ $<
+
+OBJECTS	= $(addprefix $(OBJDIR)/,$(patsubst %.c,%.o,$(notdir $(SRCS))))
+
+
+ifeq ($(H323_GSMAMR_NB_FLOAT),1)
+$(PLUGIN): $(OBJECTS)
+	$(CC) $(LDSO)$(SONAME) -o $@ $^
+
+install:
+	mkdir -p $(DESTDIR)$(LIBDIR)/pwlib/codecs/audio/
+	cp $(PLUGIN) $(DESTDIR)$(LIBDIR)/pwlib/codecs/audio/
+
+uninstall:
+	rm -f $(DESTDIR)$(LIBDIR)/pwlib/codecs/audio/$(PLUGIN)
+else
+install:
+uninstall:
+endif
+
+
+clean:
+	rm -f $(OBJECTS) $(PLUGIN)
+
+###########################################

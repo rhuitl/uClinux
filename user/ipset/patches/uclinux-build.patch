@@ -1,0 +1,113 @@
+Link ipset into the uClinux build system.
+
+Includes some fixes for older compilers:
+
+-Wno-missing-field-initializers is not supported by older compilers
+
+ipset.h:121: warning: declaration of 'optarg' shadows a global declaration
+
+
+Index: ipset/Makefile
+===================================================================
+--- ipset.orig/Makefile	2010-08-24 13:09:35.401502574 +1000
++++ ipset/Makefile	2010-08-24 13:10:45.721920903 +1000
+@@ -22,7 +22,7 @@ endif
+ 
+ IPSET_VERSION:=4.3
+ 
+-PREFIX:=/usr/local
++PREFIX:=
+ LIBDIR:=$(PREFIX)/lib
+ BINDIR:=$(PREFIX)/sbin
+ MANDIR:=$(PREFIX)/man
+@@ -35,7 +35,6 @@ RELEASE_DIR:=/tmp
+ COPT_FLAGS:=-O2
+ WARN_FLAGS:=-Wall
+ EXTRA_WARN_FLAGS:=\
+-	-Wextra \
+ 	-Waggregate-return \
+ 	-Wbad-function-cast \
+ 	-Wcast-align \
+@@ -56,7 +55,6 @@ EXTRA_WARN_FLAGS:=\
+ 	-Wswitch-enum \
+ 	-Wundef \
+ 	-Wwrite-strings \
+-	-Wno-missing-field-initializers \
+ 	-Werror
+ 
+ ifndef NO_EXTRA_WARN_FLAGS
+@@ -72,6 +70,12 @@ SETTYPES+=iptree iptreemap
+ SETTYPES+=iphash nethash ipporthash ipportiphash ipportnethash
+ SETTYPES+=setlist
+ 
++lower=$(shell echo $(1) | tr [:upper:] [:lower:])
++upper=$(shell echo $(1) | tr [:lower:] [:upper:])
++TEST_CONFIG_VAL=$(patsubst $(3)_%,%,$(filter $(3)_%,$(foreach i,$(1),$(CONFIG_$(2)_$(i))_$(i))))
++TEST_CONFIG=$(call TEST_CONFIG_VAL,$(1),$(2),y) $(call TEST_CONFIG_VAL,$(1),$(2),m)
++SETTYPES:=$(call lower,$(call TEST_CONFIG,$(call upper,$(SETTYPES)),IP_NF_SET))
++
+ PROGRAMS=ipset
+ SHARED_LIBS=$(foreach T, $(SETTYPES),libipset_$(T).so)
+ INSTALL=$(DESTDIR)$(BINDIR)/ipset $(DESTDIR)$(MANDIR)/man8/ipset.8
+@@ -88,6 +92,15 @@ binaries: $(PROGRAMS) $(SHARED_LIBS)
+ 
+ binaries_install: binaries $(INSTALL)
+ 
++binaries_romfs: binaries
++	$(ROMFSINST) /bin/ipset
++	for type in $(SETTYPES) ; do \
++		$(ROMFSINST) -d /lib/ipset/libipset_$${type}.so; \
++	done
++
++binaries_clean:
++	rm -rf $(PROGRAMS) $(SHARED_LIBS) *.o *~ tests/*~
++
+ patch_kernel:
+ 	cd kernel; ./patch_kernel $(KERNEL_DIR)
+ 
+@@ -103,8 +116,7 @@ modules_install: modules
+ 
+ install: binaries_install modules_install
+ 
+-clean: $(EXTRA_CLEANS)
+-	rm -rf $(PROGRAMS) $(SHARED_LIBS) *.o *~ tests/*~
++clean: binaries_clean $(EXTRA_CLEANS)
+ 	[ -f $(KERNEL_DIR)/net/ipv4/netfilter/Config.in ] || (cd kernel; make -C $(KERNEL_DIR) M=`pwd` clean)
+ 
+ release: clean
+Index: ipset/ipset.h
+===================================================================
+--- ipset.orig/ipset.h	2010-08-24 13:09:35.401502574 +1000
++++ ipset/ipset.h	2010-08-24 13:10:45.721920903 +1000
+@@ -116,7 +116,7 @@ struct settype {
+ 	u_int32_t adt_size;
+ 
+ 	/* Function which parses command options */
+-	ip_set_ip_t (*adt_parser) (int cmd, const char *optarg, void *data);
++	ip_set_ip_t (*adt_parser) (int cmd, const char *arg, void *data);
+ 
+ 	/*
+ 	 * Printing
+Index: ipset/makefile
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ipset/makefile	2010-08-24 13:10:45.721920903 +1000
+@@ -0,0 +1,18 @@
++all:
++	$(MAKE) -f Makefile binaries
++
++romfs:
++	$(MAKE) -f Makefile binaries_romfs
++
++clean:
++	$(MAKE) -f Makefile binaries_clean
++
++.PHONY: kernel
++kernel:
++	cp kernel/*.c ../../linux-2.6.x/net/ipv4/netfilter/
++	cp kernel/include/linux/netfilter_ipv4/*.h ../../linux-2.6.x/include/linux/netfilter_ipv4/
++
++.PHONY: iptables
++iptables:
++	cp kernel/include/linux/netfilter_ipv4/ipt_set.h ../iptables/include/linux/netfilter_ipv4/
++

@@ -1,0 +1,181 @@
+Simple Quick Install Guide
+
+This install guide is simply a quick helper to let people start testing the new
+version.  It will be replaced soon with more thourough documentation.
+
+Installation
+------------
+
+This version of the linux-igd is written in C as opposed to previous version 
+that was written in C++.  This was done at the requests of many embedded 
+developers, as well as some of our developers.  The upnp sdk we now use
+from Intel is libupnp-1.3.1, and is written in C as well.  Everything is a 
+little more uniform now, and should create a smaller, leaner, faster device.
+
+Step 1 -- Download and install libupnp-1.3.1 source from 
+http://www.sourceforge.net/projects/upnp.  Please install with source 
+only as we haven't tested against any precompiled versions.  Also, as 
+the "make install" doesn't quite work as expected, please follow these 
+instructions to install it properly.
+
+(Note: See below regarding installing on Fedora Core 5!)
+
+1. tar -xvzf libupnp-1.3.1.tar.gz
+2. cd libupnp-1.3.1
+3. ./configure
+4. make
+5. make install
+
+This process should install libupnp-1.3.1 to our liking (maybe not 
+someone else's ;-)
+
+Step 2 -- Obtain the linux-igd software (if for some reason you're reading 
+this outside the package you should have already gotten, 
+http://linux-igd.sourceforge.net)
+
+1. tar -xvzf linuxigd-1.0.tgz    (or whatever the version you have is, or CVS)
+2. To compile using the iptables command to manipulate netfilter
+tables, just say:
+
+   make 
+
+To compile with libiptc (part of iptables-devel) to manipulte
+netfilter tables, say: 
+
+   make HAVE_LIBIPTC=1
+
+If libiptc is installed in a different directory than /usr/lib,
+e.g. /usr/local/lib, set LIBIPTC_PREFIX:
+
+   make HAVE_LIBIPTC=1 LIBIPTC_PREFIX=/usr/local
+
+If libupnp is installed in a different directory than /usr/lib, e.g. /usr/local/lib,
+set LIBUPNP_PREFIX:
+
+   make LIBUPNP_PREFIX=/usr/local
+
+3. make install				(if CVS, remove etc/CVS directory, then do)
+
+This will install linux-igd as /usr/sbin/upnpd. To install somewhere else,
+set PREFIX:
+
+   make PREFIX=/usr/local install
+
+
+System Preparation before starting 
+----------------------------------
+
+1. In order for device discovery to function properly, you must add a 
+multicast route to the internal interface like so:
+
+# route add -net 239.0.0.0 netmask 255.0.0.0 eth0      (or whatever your internal
+							interface name is - here
+							eth0)
+
+2. If your internal interface is firewalled, then allow multicast packets, eg:
+
+# iptables -t filter -I INPUT 1 -s 224.0.0.0/4 -j ACCEPT
+# iptables -t filter -I INPUT 1 -d 224.0.0.0/4 -j ACCEPT
+
+-- Also, if you'd like to see debug information, and please do, as it helps us 
+resolve your conflicts, perform the following steps:
+
+A. Add the following lines to bottom of your /etc/syslog.conf file
+
+# UPnP IGD messages
+local6.!=debug						/var/log/messages
+local6.*						/var/log/upnpd
+
+This will send all non-debug output to /var/log/messages, and all output including
+debug output to /var/log/upnpd. Modify as you like.
+
+B.  service syslog restart  
+		 (or on your system, maybe:
+				 /etc/rc.d/init.d/syslog restart
+		  or 
+				killall -HUP syslog
+
+
+Daemon Startup
+--------------
+
+Now you should be ready to run the daemon.  At this time, your FORWARD rule in 
+iptables should be set to ACCEPT.  We'll add the forwarding rules back right 
+away, but first someone needs to tell me what they are, my FORWARD is always 
+accept.
+ 
+Start the daemon with the following:
+
+upnpd <ext_ifname> <int_ifname>
+
+Example: upnpd eth1 eth0          -- Where eth1 is my external interface name
+					 and eth0 is my internal interface name.
+
+Where the deamon isn't starting correctly, or exiting soon after with an
+error, you can start it with 'upnpd -f <ext_ifname> <int_ifname>',
+preventing it daemonizing into the background; error messages will be sent
+to stderr also - this is good for testing, but don't forget to have the
+multicast route setup for it to accept multicast requests.
+
+To check and see if everything starts up ok, in /var/log/debug you should see 
+a few debug messages followed by Advertisements Sent, and possibly some 
+GetNATRSIPStatus and other messages.
+
+Another way to check this is to look in your Windows XP client under Network 
+Conections.  You should see an Icon for Internet Connection set to enabled 
+in there.  If for some reason you don't, first try restarting the daemon.  If 
+this doesn't work post a message to the forums and we'll try to help you.
+
+
+REMINDERS and THANK YOUS
+------------------------
+Truth is I can't remember everyone to thank, but I especially want to thank 
+both Henri Manson and Anders Betner for their development and testing work.  
+Also Eric Wirt, for helping us test, and providing the winning comments for 
+switching to C, alongside many others contributing patches and help.
+
+This is a work in progress.  This code is simply released now for others to 
+help us debug some problems we are having.  Please, help us out by checking 
+the forums, answering problems, and giving any advice and suggestions you can 
+to the open source community.
+
+Thanks a lot to the users, and to the over 10,000 downloads, and countless 
+CVS checkouts.  If it weren't for the interest in the program, we wouldn't be 
+touching it (ok maybe i would, when i got bored or something) :-)
+
+Cheers all
+
+Dime
+
+
+-----------------------------------------------------------------------
+Notes: Installing on Fedora Core 5
+
+For Fedora Core 5 there are RPMs available for libupnp 1.3.1 and
+iptables 1.3.5:
+
+# yum install iptables-devel libupnp libupnp-devel
+
+The files are installed in /usr/lib and /usr/include.
+
+One thing about iptables-devel is that it includes libiptc.a, but not
+the corresponding header files: ipt_kernel_headers.h and
+libiptc.h. You will have to get hold of them from a source tarball,
+e.g.
+http://www.netfilter.org/projects/iptables/files/iptables-1.3.5.tar.bz2.
+
+Unpack the source, find the two header files, and place them in an
+include directory beside linux-igd, like this:
+
+$ ls ../include/libiptc/
+ipt_kernel_headers.h  libiptc.h
+
+After that all you have to do is compile upnpd:
+
+$ make HAVE_LIBIPTC=1
+
+And as root:
+
+# make install
+
+/Magnus

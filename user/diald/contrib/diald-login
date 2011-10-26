@@ -1,0 +1,59 @@
+#!/bin/sh
+# Original script Copyright (c), 1995 by Mike Jagdis
+# Modifications, Copyright (c), 1995 by Eric Schenk
+# Further modifications, Copyright (c), 1996 by Bruce Toback
+#
+# This script was originally submitted by Mike Jagdis
+# <jaggy@purplet.demon.co.uk> along with patches to diald to
+# allow a simple external command interface to diald.
+# I expanded the command interface into the fifo option for diald,
+# and the mucked with Mike's script to make it work with my
+# fifo implementation as opposed to his original one.
+# 
+# This script is intended to be used to have diald rendezvous with
+# an incoming PPP or SLIP call.
+# If the script is being run by the user "foo" it assumes that the
+# diald you want to rendezvous with has been run with the
+# option "fifo /etc/diald/foo".
+# Note that the user foo must have permission to write to /etc/diald/foo
+# and diald must have permission to read /etc/diald/foo.
+# I suggest the following scheme.
+# Create a group "diald" and add root to the group. Run diald from
+# /etc/rc* as usual.
+# Create the necessary FIFO's ahead of time with mkfifo.
+# The owner of each FIFO should be the user that will write
+# to it, and the group owner of each fifo should be "diald".
+# Each fifo should be set to permission mode "0240".
+# This script can now be run as the login shell of the user
+# who is rendezvousing with diald.
+
+DIALDDIR=/etc/diald
+
+if [ -n "${LOGNAME}" ]; then
+	user="${LOGNAME}"
+else
+	user=`whoami`
+fi
+tty=`tty`
+
+if [ -n "${user}" -a -n "${tty}" -a -p "${DIALDDIR}/${user}" ]; then
+	echo "connect $$ ${tty}" > "${DIALDDIR}/${user}"
+
+        # The next line is used to alert the dialin caller that we're about
+        # to go into SLIP mode; it's a positive acknowedgement that the
+        # login was successful. Change or remove as needed to suit
+        # the dialin user.
+
+        echo SLIP
+
+	# It's this process that holds the lock on the serial line not
+	# whatever diald is doing so we have to wait around until diald
+	# kills us.
+	while true
+	do
+		sleep 36000
+	done
+else
+	# diald may not be running?
+	pppd passive
+fi

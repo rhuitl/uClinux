@@ -1,0 +1,224 @@
+## $id: ip-sentinel.spec.in,v 1.3 2003/05/26 21:53:02 ensc Exp $		--*- rpm-spec -*--
+
+# Copyright (C) 2004,2005 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de>
+#  
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#  
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#  
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+
+## This package understands the following switches:
+## --without dietlibc	     ...   disable usage of dietlibc
+## --without minit	     ...   disable creation of 'minit' subpackage
+## --with    fedora	     ...   enable fedora.us specific parts
+## --define  username\ name  ...   set the name of the user running the daemon
+
+%define uid		1
+%define useradd		/usr/sbin/%{?_with_fedora:fedora-}useradd  %{?_with_fedora:%uid }
+%define groupadd	/usr/sbin/%{?_with_fedora:fedora-}groupadd %{?_with_fedora:%uid}
+%define userdel		/usr/sbin/%{?_with_fedora:fedora-}userdel
+%define groupdel	/usr/sbin/%{?_with_fedora:fedora-}groupdel
+
+%{!?username:%define username	ip-sentinel}
+%define service		ip-sentinel
+%define homedir		%_var/lib/ip-sentinel
+%define minitdir	%_sysconfdir/minit
+%define minitsvcdir	%minitdir/services/%name
+
+Summary:	Tool to prevent unauthorized usage of IP addresses
+Name:		ip-sentinel
+Version:	0.12
+Release:	0
+License:	GPL
+Group:		System Environment/Daemons
+URL:		http://www.tu-chemnitz.de/~ensc/ip-sentinel
+Source0:	http://www.tu-chemnitz.de/~ensc/ip-sentinel/files/%name-%version.tar.bz2
+BuildRoot:	%_tmppath/%name-%version-%release-buildroot
+Requires:		init(ip-sentinel)
+
+%{!?_without_dietlibc:BuildRequires:	dietlibc}
+
+## The Requires(...) which depend on the '--with fedora' switch
+%{!?_with_fedora:Requires(pre):		/usr/sbin/useradd /usr/sbin/groupadd}
+%{!?_with_fedora:Requires(postun):	/usr/sbin/userdel /usr/sbin/groupdel}
+%{?_with_fedora:Requires(pre):		fedora-usermgmt}
+%{?_with_fedora:Requires(postun):	fedora-usermgmt}
+
+
+%package sysv
+Summary:		SysV initscripts for ip-sentinel
+Group:			System Environment/Base
+Provides:		init(ip-sentinel)
+Requires(preun):	%name = %version-%release
+Requires(postun):	%name = %version-%release
+Requires(preun):	initscripts
+Requires(postun):	initscripts
+Requires(post):		/sbin/chkconfig
+Requires(preun):	/sbin/chkconfig
+
+
+%package minit
+Summary:		minit initscripts for ip-sentinel
+Group:			System Environment/Base
+Provides:		init(ip-sentinel)
+Requires:		%name = %version-%release
+Requires(pre):		minit-setup
+Requires(postun):	minit-setup
+
+
+
+%description
+IP Sentinel is a tool that tries to prevent unauthorized usage of
+IP addresses within an ethernet broadcast domain by answering ARP
+requests. After receiving faked replies, requesting parties store
+the MAC in their ARP tables and will send future packets to this
+invalid MAC, rendering the IP unreachable.
+
+
+%description sysv
+IP Sentinel is a tool that tries to prevent unauthorized usage of IP
+addresses.
+
+This package provides the scripts which can be used to start ip-sentinel
+with a SysV initconcept.
+
+
+%description minit
+IP Sentinel is a tool that tries to prevent unauthorized usage of IP
+addresses.
+
+This package provides the scripts which can be used to start ip-sentinel
+with the minit initconcept.
+
+
+%prep
+%setup -q
+
+
+%build
+%configure --enable-release \
+	   --with-initrddir=%{_initrddir} \
+	   --with-username=%username %{?_without_dietlibc:--disable-dietlibc}
+%__make %{?_smp_mflags} all
+
+
+%install
+rm -rf $RPM_BUILD_ROOT
+
+%__make DESTDIR=$RPM_BUILD_ROOT install install-contrib
+%__install -m750 -d $RPM_BUILD_ROOT%homedir
+
+%{?_without_minit:rm -rf $RPM_BUILD_ROOT%minitsvcdir}
+
+
+%check
+%__make check
+
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+
+%pre
+%groupadd -r %username &>/dev/null || :
+%useradd  -r -s /sbin/nologin -M -d %homedir		\
+	  -c 'IP sentinel user' -g %username %username &>/dev/null || :
+
+%postun
+if test "$1" = "0"; then
+	%userdel  %username &>/dev/null || :
+	%groupdel %username &>/dev/null || :
+fi
+
+
+%post sysv
+/sbin/chkconfig --add %service
+
+%preun sysv
+if test "$1" = "0"; then
+	%_initrddir/%service stop >/dev/null
+	/sbin/chkconfig --del %service
+fi
+
+%postun sysv
+test "$1" = 0 || %_initrddir/%service condrestart &>/dev/null
+
+
+%files
+%defattr(-,root,root,-)
+%doc AUTHORS COPYING ChangeLog NEWS README THANKS
+%_mandir/*/*
+%_sbindir/*
+%attr(-,root,%username) %homedir
+
+
+%files sysv
+%defattr(-,root,root,-)
+%config %_initrddir/*
+%config(noreplace) %_sysconfdir/sysconfig/*
+
+
+%if 0%{!?_without_minit:1}
+
+%files minit
+%defattr(-,root,root,-)
+%dir %minitsvcdir
+%minitsvcdir/run
+%minitsvcdir/respawn
+%config(noreplace) %minitsvcdir/params
+
+%endif
+
+
+%changelog
+* Thu Aug 19 2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> - 0:0.10.2-0
+- added support for 'fedora-usermgmt' (enabled with '--with fedora' switch)
+
+* Thu Jun 17 2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> - 0:0.10.1-0
+- conditionalized building of -minit subpackage
+
+* Wed Jun 16 2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> - 0:0.9.2-0
+- updated minit filelist
+- moved /etc/sysconfig/* files into -sysv subpackage; they are not
+  used for 'minit' anymore
+
+* Sat Mar 20 2004 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> - 0:0.9-0
+- workaround https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=118773
+
+* Thu Dec  4 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> - 0:0.8-0
+- use 'install-contrib'
+
+* Tue Sep  9 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0:0.7-1
+- removed more unneeded curlies
+
+* Tue Aug  5 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0:0.6-1
+- version 0.6
+- added minit support
+- removed unneeded curlies
+
+* Thu Jul 17 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0:0.5-2
+- removed %%doc attribute from %%mandir-entries
+
+* Thu Jul 10 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0:0.5-1
+- moved 'make check' into the %%check section
+
+* Sat May 24 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0:0.4-1
+- removed dependencies on /sbin/service
+- removed packager tag
+- create and remove group explicitely
+
+* Wed May 21 2003 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0:0.3-1
+- applied fedora.us naming scheme
+- cleanups
+
+* Fri Nov 15 2002 Enrico Scholz <enrico.scholz@informatik.tu-chemnitz.de> 0.1-1
+- initial build

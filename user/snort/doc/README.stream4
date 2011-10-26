@@ -1,0 +1,243 @@
+Overview
+========
+The Stream4 module provides TCP stream reassembly and stateful
+analysis capabilities to Snort. Robust stream reassembly
+capabilities allow Snort to ignore "stateless" attacks
+(which include the types of attacks that Stick and Snot produce).
+Stream4 also gives large scale users the ability to track many
+simultaneous TCP streams. Stream4 is set to handle 8192 simultaneous
+TCP connections in its default configuration; however, it scales to
+handle over 100,000 simultaneous connections.
+Stream4 can also do UDP session tracking.  To enable UDP session
+tracking the --enable-stream4udp option must be passed to configure.
+
+transport protocols
+-------------------
+TCP sessions are identified via the classic TCP "connection".  UDP
+sessions are established as the result of a series of UDP packets
+from two end points via the same set of ports.
+
+Stream4 supports the Stream API allowing other protocol
+normalizers/preprocessors to dynamically configure reassembly
+behaviour as required by the application layer protocol, identify
+sessions that may be ignored (large data transfers, etc), and
+update the identifying information about the session
+(application protocol, direction, etc) that can later be used by rules.
+
+anomaly detection
+-----------------
+TCP protocol anomalies, such as data on SYN packets, data received
+outside the TCP window, etc are configured via the detect_state_problems
+option to the global configuration.
+
+
+Configuration
+=============
+
+Global Configuration
+--------------------
+
+- Preprocessor name: stream4
+- Options:
+
+    asynchronous_link       - Uses state transitions based only on one-sided
+                              conversation (no tracking of acknowledge/sequence
+                              numbers).
+    cache_clean_sessions <num of sessions>
+                            - Purges this number of least-recently used sessions
+                              from the session cache. Default is 5.
+    detect_scans            - Turns on alerts for portscan events.
+    detect_state_problems   - Turns on alerts for stream events of note, such as
+                              evasive RST packets, data on the SYN packet, and out
+                              of window sequence numbers.
+    enforce_state           - Enforces statefulness so that sessions aren't picked
+                              up mid-stream.
+    keepstats [machine|binary]
+                            - Records session summary information in
+                              <logdir>/session.log. If "binary", unified
+                              stats will be logged to <logdir>/snort-unified.stats
+                              as well. If no options are specified, output is
+                              human readable. 
+    log_flushed_streams     - Log the packets that are part of reassembled stream (useful for debug).
+    disable_evasion_alerts  - Turns off alerts for events such as TCP overlap.
+    timeout <seconds>       - Amount of time to keep an inactive stream in the state
+                              table; sessions that are purged will automatically be
+                              picked up again (midstream) if more activity is seen. The default
+                              value is 30 seconds.
+    memcap <bytes>          - Sets the number of bytes used to store packets for
+                              reassembly. Default is 8 MB.
+    max_sessions <num sessions>
+                            - Sets the maximum number of simultaneous sessions.
+                              Default is 8192.
+    noinspect               - Disables stateful inspection.
+    ttl_limit <count>       - Sets the delta value that will set off an evasion alert.
+                              Default is 5.
+    self_preservation_threshold <number>
+                            - Set limit on number of sessions before entering
+                              self-preservation mode (only reassemble data on the
+                              default ports). Default is 50 sessions/sec.
+    self_preservation_period <number>
+                            - Set length of time (seconds) to remain in
+                              self-preservation mode. Default is 90 seconds.
+    suspend_threshold <number>      
+                            - Sets limit on number of sessions before entering
+                              suspend mode (no reassembly). Default is
+                              200 sessions/sec.
+    suspend_period <number> - Sets length of time (seconds) to remain in suspend mode.
+                              Default is 30 seconds.
+    server_inspect_limit <number>
+                            - Restricts inspection of server traffic to this many
+                              bytes until another client request is seen
+                              (ie: client packet with data).
+    state_protection        - Protects self against DoS attacks.
+
+If --enable-stream4udp is passed to configure, the following additional options for UDP
+are defined:
+    
+    enable_udp_sessions     - Enable UDP session tracking.
+    max_udp_sessions <number>
+                            - The maximum number of UDP sessions to be tracked.
+                              Default is 8192 is UDP sessions are enabled.
+    udp_ignore_any          - Ignore traffic on port without port-specific rules.
+                              The result of this is that NO rules (include IP
+                              only rules) are applied to UDP traffic that has
+                              a source/destination port that is listed in a
+                              port-specific ruls.
+
+If inline mode is being used, the following additional options are defined:
+
+    enforce_state drop      - Drop stateless packets
+    midstream_drop_alerts   - Drop on inline alerts for midstream pickups
+    disable_session_blocking
+                            - Disable blocking of TCP sessions in inline mode.
+
+
+Reassembly Configuration
+------------------------
+
+- Preprocessor name: stream4_reassemble
+- Options:
+
+    clientonly              - Provides reassembly for the client side of a
+                              connection only.
+    serveronly              - Provides reassembly for the server side of a
+                              connection only.
+    both                    - Reassemble for client and server sides of connection.
+    noalerts                - Won't alert on events that may be insertion or
+                              evasion attacks.
+    favor_old               - Favor old segments based on sequence number over
+                              a new segments.
+    favor_new               - Favor new segments based on sequence number over
+                              a old segments.
+    flush_on_alert          - Flush a stream when an individual packet causes
+                              an alert.
+    flush_behavior random|default|large_window
+                            - Use specified flush behavior. "default" means use
+                              old static flush points. "large_window" means use
+                              new larger flush points.  "random" means use random
+                              flush points defined by flush_base, flush_seed
+                              and flush_range.
+    flush_base <number>     - Lowest allowed random flush point. The default value
+                              is 512 bytes. Only used if flush_behavior is "random".
+    flush_range <number>    - Space within random flush points are generated. The
+                              default value is 1213. Only used if flush_behavior
+                              is "random".
+    flush_seed <number>     - Random seed for flush points. The default value is
+                              computed from Snort PID + time. Only used if
+                              flush_behavior is "random".
+    overlap_limit <number>  - Alert when the number of overlapping data bytes
+                              reaches a threshold.
+    ports <portlist>        - Provides reassembly for a whitespace-separated list
+                              of ports. By default, reassembly is performed for
+                              ports 21, 23, 25, 42, 53, 80, 110, 111, 135, 136, 137,
+                              139, 143, 445, 513, 1443, 1521, and 3306. To perform
+                              reassembly for all ports, use all as the port list.
+    emergency_ports <portlist>
+                            - Emergency ports are those which we ALWAYS do reassembly
+                              when in 'self-preservation' mode. They are used to
+                              have a lowest level when snort is under duress because
+                              of high traffic rates. The default ports are the same
+                              as for the ports option.
+    flush_data_diff_size <number>
+                            - minumum size of a packet to zero out the empty
+                              space in a rebuilt packet.
+    zero_flushed_packets    - Zero out any space that is not filled in when flushing
+                              a rebuilt packet.
+    large_packet_performance
+                            - Do not buffer and reassemble consecutive large
+                              packets (larger than twice the flush point). The
+                              chances of catching an attack that spans those
+                              large packets is small, compared to the CPU & memory
+                              utilization to copy and re-copy the large packet.
+
+
+
+Example configurations
+======================
+
+preprocessor stream4: disable_evasion_alerts
+preprocessor stream4_reassemble  
+
+This is the default configuration in snort.conf.  It uses the defaults listed above
+and turns off the possibly noisy mitigation of overlapping sequences
+(disable_evasion_alerts).  The defaults for stream4 are 5 cache_clean_sessions
+(the 5 least recently used sessions), a 30 second inactive stream timeout, an 8 MB
+memory cap, 8192 maximum simultaneous sessions, a delta ttl_limit of 5, a
+50 session/sec self_preservation_threshold, a 90 second self_preservation_period,
+a 200 session/sec suspend_threshold and a suspend_period of 30 seconds and if in
+inline mode, session blocking is enabled.  The defaults for stream4_reassemble are
+to only reassemble the client side of sessions, to alert on events that may be
+insertion or evasion attacks but not to flush the stream, to favor old segments
+over new ones, to use the default flush_behavior and to reassemble only for sessions
+where server port is one of the default ports (both ports and emergency_ports options -
+see above).
+
+
+Configuration using ports option for the stream4_reassemble preprocessor:
+
+preprocessor stream4_reassemble: ports 21 25 80 445 8080, emergency_ports 21 25 80 8080
+
+
+Configuration using UDP support with rest of defaults:
+
+preprocessor stream4: enable_udp_sessions, max_udp_sessions 16384
+
+
+Configuration using 32K max_sessions and 35MB memcap with rest of defaults:
+
+preprocessor stream4: max_sessions 32768, memcap 36700160
+
+
+
+Alerts
+======
+Stream4 uses generator ID 111.
+
+The list of SIDs is as follows:
+
+ 1 STEALTH ACTIVITY (unknown) detection
+ 2 Possible EVASIVE RST detection
+ 3 Possible RETRANSMISSION detection
+ 4 WINDOW VIOLATION detection
+ 5 DATA ON SYN detection
+ 6 STEALTH ACTIVITY (Full XMAS scan) detection
+ 7 STEALTH ACTIVITY (SAPU scan) detection
+ 8 STEALTH ACTIVITY (FIN scan) detection
+ 9 STEALTH ACTIVITY (NULL scan) detection
+10 STEALTH ACTIVITY (XMAS scan) detection
+11 STEALTH ACTIVITY (Vecna scan) detection
+12 NMAP FINGERPRINT (stateful) detection
+13 STEALTH ACTIVITY (SYN FIN scan) detection
+14 FORWARD OVERLAP detection
+15 TTL LIMIT Exceeded
+16 TCP CHECKSUM CHANGED ON RETRANSMISSION (possible fragroute) detection
+17 TCP TOO FAST RETRANSMISSION WITH DIFFERENT DATA SIZE (possible fragroute) detection
+18 Multiple Acked Packets (possible fragroute)
+19 Shifting to Emergency Session Mode
+20 Shifting to Suspend Mode
+21 TCP Option Timestamp value of 0
+22 TCP stream too many overlapping packets
+23 Packet in Established TCP stream missing ACK
+24 Possible EVASIVE FIN detection
+25 SYN on established session detection, resetting reassembly queue
+

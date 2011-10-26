@@ -1,0 +1,201 @@
+.\" Copyright (c) 2000 Benjamin C. Reed <breed@almaden.ibm.com>
+.\" airo.c.4
+.\"
+.TH AIRO 4 "10/25/00" "IBM Almaden Research Center"
+
+.SH NAME
+airo \- Driver for the Aironet 802.11 ISA/PCI/PCMCIA 4500 & 4800 and Cisco 340
+
+.SH SYNOPSIS
+.B insmod airo.o
+.RB [ io=\c
+.IR i,j,... ]
+.RB [ irq=\c
+.IR i,j,... ]
+.RB [ basic_rate=\c
+.IR n ]
+.RB [ rates=\c
+.IR i,j,... ]
+.RB [ ssids=\c
+.IR i,j,... ]
+.RB [ adhoc=\c
+.IR 1 ]
+.RB [ aux_bap=\c
+.IR 1 ]
+.RB [ auto_wep=\c
+.IR 1 ]
+.RB [ maxencrypt=\c
+.IR n ]
+
+.SH DESCRIPTION
+This driver is for Cisco 340 and 
+Aironet 4500 and 4800 ISA/PCI/PCMCIA cards and 2.0
+or 2.2 kernels.  Just for fun, I tested a 3500 for a total of 2
+minutes and it seemed to work more or less.  (The configuration
+information displayed in the Config file seemed a bit messed up.)
+
+The card will create an ethX device for each wireless card.  An entry
+for each device will be created under /proc/aironet/ethX with entries
+to view the status of the card and configure it.
+
+.SH /proc/aironet
+In the /proc/aironet partition there will be a subdirectory for each
+aironet interface. In that subdirectory are four files: Status,
+Config, WepKey, and SSID.
+
+.TP   
+.BI Status
+Most of the fields in the Status file are self describing.  The Mode:
+field is a bitmask.  Here is the description from the programmer's
+manual:
+   
+   Bit Meaning
+   0x0001 Configured
+   0x0002 MAC Enabled
+   0x0004 Receive Enabled
+   0x0010 In Sync
+   0x0020 Associated
+   0x8000 Error
+   
+I'm not sure what the units are in the Signal: field.
+
+.TP   
+.BI Config
+The Config file is mode up of fields separated by newlines.  When
+setting the fields, they can occur in any order.  If the values are
+in error, a sane default will be used.  Note, there must be exactly
+one space between the colon and the value.
+
+.TP
+.BI   Mode:
+can be "adhoc" or "ESS".  Defaults to ESS.
+
+.TP
+.BI   NodeName:
+Can be up to 16 characters in length
+
+.TP
+.BI   PowerMode:
+Can be CAM (Constantly Awake Mode), PSP (Power Saving
+something...), PSPCAM (you guess...).  CAM is default.
+
+.TP
+.BI   DataRates:
+Must be separated by exactly 1 space.  The units are 500 kps.  So 2 is
+1 mbs.  There can be up to 8 rates specified.  The basic rate set by
+setting the high bit (bit 7).
+
+.TP
+.BI   Channel:
+Don't know anything about this except that you can set it...
+
+.TP
+.BI   XmitPower:
+Transmit power in milliwatts.
+
+.TP
+.BI   WEP:
+Can be open, encrypt, and shared, meaning no authentication, 
+encrypted data only, shared key authentication and encryption.
+Note that when WEP is enabled the current cards (as of 9/9/99)
+do not allow data rates above 2 mbs.
+
+.TP
+.BI   Modulation:
+Can be cck or mok.  Sets the modulation type for speeds above 2mbs.
+
+.TP
+.BI WepKey
+This file allows all four wep keys to be set. 
+The key is set by writing the index (0 == first key) of the key to be set,
+followed by a space,
+followed by the key as a string
+to the file.  Each octet must be written in hexadecimal with
+leading zeros and separated by colons.  For security reasons the key
+cannot be read from the card.  Writing to this file sets both the
+permanent and temporary key.  (Anyone have a need for being able
+to write them separately?)  For example:
+
+     echo 0 12:04:78:9a:bc > /proc/aironet/eth0/WepKey
+   
+When the file is read, it shows the length of the keys that are set and
+the index of the key that is set as the transmit key.
+.TP
+.BI APList
+Contains the list of MACs of the preferred APs.  Each MAC address must be
+separated by a delimiter and each octet of the MAC should be separated by a
+delimiter and each octet should have two digits.  01:02:03:04:05:06 and 
+01-02-03:04:05,06 are valid.  1:2:3:4:5:6 is not.  I usually separate the
+MACs by linefeeds but any character works.
+
+.TP
+.BI SSID
+The SSID file has the list of usable SSIDs. If the list is empty, it
+will associate with any access point that it can find. The SSIDs are
+separated by line feeds. This file may also be written to to change
+the list.
+
+.TP
+.BI Stats/StatsDelta
+Basically a dump of all the statistics of the card.  The source has
+provisions for all the statistics even though by default a lot of them
+are turned off.  Stats give the statistics from the time the card was
+powered up.  StatsDelta gives the statistics from the time the statistics
+were last reset.  The statistics are reset by opening the StatsDelta file
+for writing.
+
+.\"
+.\" PARAMETER part
+.\"
+.SH PARAMETERS
+.TP
+.BI io= i,j,...
+Specifies the set of ioports used by the driver.  This is only used
+for ISA cards.  The irq to be used will match the irq in the same
+position in the irq list.  So basically ioport at index i will be used 
+with the irq at index i.
+.TP
+.BI irq= i,j,...
+Specifies the set of interrupts are used by the driver.
+.TP
+.BI rates= i,j,...
+A comma separated list of rates.  There are up to 8 of them.  They are
+specified in 512 kps units.
+.TP
+.BI basic_rate= n
+Sets the basic rate of the card.  Same units as the rates.  (It must
+be one of the rates.)
+.TP
+.BI ssids= i,j,k
+A comma separated list of ssids.  There can be up to 3.  They are a
+maximum of 32 characters.
+.TP
+.BI maxencrypt= n
+Sets the maximum speed of the card when doing encryption.  If zero (the
+default), it is not used.  Units are in 512kbs.  Older cards could only
+do 2mbs (n=4) when doing encryption, even though they could do 11 mbs
+without encryption.
+.TP
+.BI auto_wep = n
+Turns on logic to cycle through the different WEP settings until the card
+is able to associate.  It will also cycle through the wep keys.  n is the
+number of keys to cycle through.  Note, it only cycles through the keys
+for shared mode.  When encrypt is tried, it will use the permanent key
+index.  (See WepKey.)
+.TP
+.BI aux_bap = 1
+Enables logic that gets around bus timing problems on older cards with
+some boards.  The timing problem manifests itself when receiving packets
+bigger than 70 bytes.
+
+.SH SPECIFIC NOTES
+When used with PCMCIA cards, it must be used with the airo_cs module.
+
+.SH AUTHOR
+Benjamin C. Reed \- breed@almaden.ibm.com
+
+.SH SEE ALSO
+.BR airo_cs (4),
+.BR cardmgr (8),
+.BR pcmcia (5),
+.BR insmod (1),

@@ -1,0 +1,53 @@
+#
+#	appWeb.files - Copy appWeb files for the binary install
+#
+#	Copyright (c) Mbedthis LLC, 2003-2004. All Rights Reserved.
+#
+
+# NOTE: Usage: cpmod src dest [perm] [owner.group]
+
+SrcD=${BLD_BIN_DIR}
+DestD=${BLD_SBIN_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/appWeb.exe ${DestD} 755
+cpmod ${SrcD}/winAppWeb.exe ${DestD} 755
+
+#
+#	Create a dummy error log file for zip installs so it gets created
+#
+DestD=${BLD_PREFIX}/logs
+mkdir -p ${DestD}
+>${DestD}/error.log
+
+SrcD=${BLD_TOP}/appWeb/web
+DestD=${BLD_WEB_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/index.html ${DestD}
+
+SrcD=${BLD_TOP}/bin/${BLD_TYPE}
+DestD=${BLD_PREFIX}/bin
+mkdir -p ${DestD}
+cpmod ${SrcD}/libappWeb.dll ${DestD} 755
+
+SrcD=${BLD_TOP}/appWeb
+DestD=${BLD_PREFIX}
+mkdir -p ${DestD}
+cpmod ${SrcD}/mime.types
+cpmod ${SrcD}/appWeb.ico
+
+if [ "$BLD_FEATURE_PHP4_MODULE" = 1 -o "$BLD_FEATURE_PHP5_MODULE" ]
+then
+	cpmod ${SrcD}/php.ini
+fi
+if [ "$BLD_FEATURE_SSL_MODULE" = 1 ]
+then
+	cpmod ${SrcD}/server.key
+	cpmod ${SrcD}/server.key.pem
+	cpmod ${SrcD}/server.crt
+fi
+if [ "$BLD_CLEAN_INSTALL" = 1 ]
+then
+	cpmod ${SrcD}/install.conf ${DestD}/appWeb.conf
+else
+	cpmod ${SrcD}/install.conf ${DestD}/new.conf
+fi

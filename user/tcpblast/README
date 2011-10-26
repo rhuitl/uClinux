@@ -1,0 +1,104 @@
+WARNING: tcpblast is really crude and measures the throuput by sending as much
+data as possible. USE CAREFULLY. For much more subtle bandwidth measurements
+use Van Jacobson's pathchar if it is available for your system (he promised to
+show the sources in May 1997, looks like somewhat delayed...)
+
+New version of tcpblast is based on several versions floating around, mostly on
+FreeBSD version (signed: Daniel Karrenberg <dfk@nic.eu.net>). Can be compiled
+on Linux with
+
+cc -o tcpblast tcpclast.c
+
+or
+
+make tcpblast
+
+or
+
+make <system>
+
+(try just make to see the list).
+
+Can be (sym)linked to udpblast to make sending UDP data default.
+
+
+usage: tcpblast [options] destination nblocks
+
+tcpblast/udpblast is a simple tool for probing network and estimating its
+throughoutput. It sends nblocks of 1024 B blocks of data to specified
+destination host
+
+Options:
+-b nnn         socket buf size (default: -1, don't change)
+-c             display speed continuously
+-d nnn         print dot every nnn blocks, 0 disables (default 1)
+-e             add experimental way of calculating throuput
+-h, --help     this help
+-p nnn         use port # nnn instead of default 9
+-r             send random data
+-s nnn         block size (default 1024 bytes)
+-t             use TCP (default)
+-u             use UDP (default if named udpblast)
+-V, --version  version
+destination    host name or address
+nblocks        number of blocks (1..9999)
+
+
+Changes:
+
+- setting TCP/UDP
+- setting block size
+- setting buffer size
+- sending random data
+19960224 version released
+19960926 setting port # 
+         uploaded to sunsite.unc.edu
+19961001 option for setting # of dots per block sent 
+         some cleanup
+19961002 better description of -b in usage()
+         corrected bug in setsockopt (buffer wasn't set)
+         for -r buffer still wasn't filled with random data (Pratip K. Banerji <pbanerji@bbn.com>)
+         version 961002a
+19961003 usage_small() used in same cases instead of usage()
+         some help/error messages rearangement
+19961028 getopt from GNU libc 961017 included
+         #include <errno.h>
+         compiles+links on Solaris 0.5
+         more files, Makefiles and such
+19970119 -c option for continuous speed display
+         either port # or name can be used with -p
+         SunOS (4.1.3) compile target works
+19981108 included DEC OSF/1 changes from Arun Moorthy <moorthy@cs.iitm.ernet.in> (sent Feb 97,  sorry..)
+         getsockopt() should know how much space can it use for returned parameter, so size must be 4
+         output shows data/time and (data-bufsize)/time. far from perfect, take a look
+         y2k problem in version number (:
+         install target
+19981109 printresult in a loop arguments corrected
+         -e(xperimental) option
+         default port now properly printed
+19981112 dist Makefile target
+         changed . into - in the package name
+
+TODO:
+- port to other unices (it may compile out of the box on some, especially
+  GNUish ones - any information welcome)
+  Solaris 0.5 done, linked with GNU getopt
+  SunOS 4.1.3 done, linked with GNU getopt, +1 dirty hack - how to make it nicer?
+  OSF/1 - maybe works
+- add even more options
+  - sending file contents - -f
+- learn more theory and think how to improve accuracy of bandwidth
+  measurement (maybe it could be corrected for the buffer size.. - doesn't help much 19981108)
+  (-b 1024 gives more reasonable results)
+- summarize on ^C (anyway, not needed when -c option used)
+- after making it really portable and complicated use autoconf; learn autoconf, it is your chance! (:
+- constant display of the averaged speed _of_last_NN_KB_
+- man page?
+- integrate tcpblast-dfk.tar.gz functionality - two way stream via echo port
+
+
+BUGS: (send to the address below if found)
+- I'm a perfectly bad and careless maintainer
+
+
+rzm@icm.edu.pl

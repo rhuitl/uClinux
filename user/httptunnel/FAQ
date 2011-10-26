@@ -1,0 +1,94 @@
+Q: I'm not real sure what httptunnel can be used for exactly?
+
+A: It's a generic tool for sending data in and out through an HTTP proxy.
+   This is not very useful in itself, so you must run another program
+   which uses this data "tunnel".  For example, you could use telnet
+   to log in on a computer ouside the proxy.
+
+Q: httptunnel craches my SuSE 5.3 box, why?
+
+A: I don't know, but upgrading to 6.0 seems to help.
+
+Q: I'm responsible for network security in our company.  My question
+   is: are there any characteristics of the communication that may be
+   detected at the proxy?
+
+A: Maybe.  I make no guarantees.  Use the source.
+
+Q: I wrote 'hts -d /dev/ptyq1' but 'cat </dev/ptyq1' returns an error.
+
+A: Use 'cat </dev/ttyq1' instead.
+
+Q: My friend runs hts at port 8888, but when I try to connect to it,
+   there is no response.
+
+A: As for now, hts can't handle multiple tunnels.  You must run your
+   own instance of hts listening to another port.
+
+Q: Is there a Windows/95/98/NT version?
+
+A: It's possible to build and run httptunnel in the Cygwin environment.
+   See http://sourceware.cygnus.com/cygwin/.
+
+Q: Are there binaries of httptunnel for win32(Windows/95/98/NT) anywhere?
+
+A: On the homepage, there is a link to someone maintaining
+   win32 binaries.
+
+Q: Is there a Macintoch version?
+
+A: Not that I know of.
+
+Q: My firewall requires HTTP user authentication (which is currently
+   not supported by httptunnel). Do you plan to add something like
+   that?
+
+A: Yes.
+
+Q: How hard would it be to implement "hts" as a cgi running on a
+   normal web server?
+
+A: hts can't be called directly from the HTTP server, because hts will
+   service many connections during the lifetime of the tunnel.  If the
+   HTTP server executed a new instance of hts every time a new request
+   was made, each new hts wouldn't have access to the prior state of
+   the tunnel.
+
+   However, a CGI proxy which forwards the requests to a normal hts
+   listening to a port != 80 whould most probably be quite trivial to
+   implement.
+
+Q: Have you thought of using HTTPS?
+
+A: It has been suggested, but I'd rather avoid all the nasty export
+   restrictions.  You can use external software to get an encrypted
+   tunnel.
+
+Q: On REMOTE (brugd.ctrl-c.liu.se) I do the following:
+   hts -F localhost:23 8888
+
+   This worked the first time, but never since... now I only get:
+   hts: couldn't create tunnel
+
+A: The first hts is still running in the background.
+
+Q: On LOCAL (dhcp-XXX.enea.se) I do:
+   htc -F 2323 -P http://internwebb/proxy2.pac:8000 brugd.ctrl-c.liu.se:8888
+
+   Now, I try:
+   [root@localhost httptunnel-1.101]# telnet localhost 2323
+   Trying 127.0.0.1...
+   telnet: Unable to connect to remote host: Connection refused
+
+A: [Christian Brideau] http://internwebb/proxy2.pac:8000 is not
+   exactly the proxy's adress.  This is the location of the
+   Proxy-Auto-Configure (PAC) file.  This file contains the adress of
+   the proxy server.  To discover the real adress, just go to an
+   external web page using a browser and then use netstat to figure
+   out what adress your browser is using.
+
+Q: Why does 'configure' fail on HP-UX?
+
+A: Because you haven't installed gcc.  If
+	CFLAGS=-O ./configure
+   doesn't work, you must get gcc, or at least an ANSI C compiler.

@@ -1,0 +1,46 @@
+SECURITY OF THE PROXY
+
+    The proxy runs with dropped priviledges, and chrooted.
+    It can also be set to run on just one interface. All the string
+    handling is done through the functions in str.c on sstr structures
+    rather than raw buffers. Potential buffer overflows should be
+    limited to that file.
+
+DoS:
+
+    Each client is served in a separate process which dies after a
+    period of inactivity (using SIGALRM). Config file options exist
+    for the maximimum number of clients and the maximum number of
+    connections from a single IP.
+
+
+Sanitising data that passes through the proxy
+
+    Not much is done here. We only allow printable ascii characters
+    through the control stream which should make sending buffer
+    overflow code through the proxy pretty difficult. FTP commands are
+    all forced to be in the format "XXXX [argument]", and replies in
+    the form "nnn[-] Message". Bear in mind that FTP is a
+    fundamentally insecure protocol, and that there is not much
+    difference that a proxy can make to many aspects of that. I'd
+    suggest turning on "BounceDefend", "SameAddress", and "APConv" in
+    the config file.
+
+Can someone use the proxy to make a hole in the firewall?
+
+    Not from the outside (I hope:). It would be fairly easy to write a
+    program to tunnel IP through the proxy if you had access to
+    machines on both sides, but then again this is true of most
+    protocols.
+
+Transparent data connection proxying / libiptc [Kernel 2.4 only]
+
+    If you are using transparent data connections then there is some
+    code in linux.c which is forked off and runs as root in order to
+    add and remove iptables entries. The amount of code here is very
+    small, but in the case of an exploit in the main part of the code
+    an attacker might be able to use this to add and delete fairly
+    arbitrary iptables rules. If your ftp clients don't mind receiving
+    data connections which are not from the ftp-server (all clients I
+    have tested are OK with this, and it is the rfc compliant
+    behaviour) then I suggest you leave this setting off.

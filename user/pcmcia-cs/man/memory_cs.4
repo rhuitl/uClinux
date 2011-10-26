@@ -1,0 +1,107 @@
+.\" Copyright (C) 1998 David A. Hinds -- dahinds@users.sourceforge.net
+.\" memory_cs.4 1.12 2000/06/12 21:24:48
+.\"
+.TH MEMORY_CS 4 "2000/06/12 21:24:48" "pcmcia-cs"
+.SH NAME
+memory_cs \- MTD-aware PCMCIA memory card driver
+.SH SYNOPSIS
+.B insmod memory_cs.o
+[\fBpc_debug=\fIn\fR]
+[\fBmem_speed=\fIn\fR]
+[\fBword_width=\fIn\fR]
+[\fBforce_size=\fIn\fR]
+
+.SH DESCRIPTION
+\fBMemory_cs\fR is the Card Services driver for PCMCIA memory cards,
+and also provides direct memory access for other types of cards.  It
+provides character-mode and block-mode for accessing any card's
+attribute and common memory address spaces, analogous to
+\fI/dev/mem\fR.  \fBMemory_cs\fR will allocate a free major device
+number when it is loaded.  It provides two types of minor devices:
+"direct" character-mode devices for raw access a card's entire PCMCIA
+common and attribute memory spaces, and "indirect" devices for
+accessing specific memory partitions via an appropriate Memory
+Technology Driver.  The bitwise layout of minor device numbers is
+'ddddxarr'.  'dddd' is the device number, with one card counting as
+one memory device.  'x' is set if this is a direct-access device, 'a'
+is set for attribute memory, and 'rr' is the region number (for
+indirect devices).  When \fBmemory_cs\fR is bound to a card, it will
+report its major and minor device numbers to \fBcardmgr\fR(8).
+.PP
+The default memory card initialization script creates character
+special device files for the direct common memory and attribute memory
+devices.  It also creates character special devices for accessing the
+first attribute and common memory partitions, and a block device for
+accessing the first common memory partition.  These devices have the
+following names:
+
+.TP
+.I /dev/mem#c
+Common memory direct access, character special device.
+.TP
+.I /dev/mem#a
+Attribute memory direct access, character special device.
+.TP
+.I /dev/mem#c0c
+Common memory region 0, character special device.
+.TP
+.I /dev/mem#c0b
+Common memory region 0, block special device.
+.TP
+.I /dev/mem#a0c
+Attribute memory region 0, character special device.
+.PP
+The block special device for a card's common memory can be used to
+create a filesystem on a card, and the device can be mounted in much
+the same way as a floppy disk.  In some cases, you may need to
+explicitly specify the card's capacity when creating a filesystem.
+.PP
+The character special devices can be used to read and write arbitrary
+numbers of bytes to arbitrary locations.  For devices that need to be
+explicitly erased before writing, if a write request is aligned and
+sized on erase block boundaries for the target memory card, the driver
+will erase the target region before writing to the card.
+.PP
+Since any PCMCIA card can be accessed as a memory card, \fBmemory_cs\fR
+can be bound to any card regardless of function, and regardless of
+what other drivers might also be bound to that card.  For example,
+this driver can be bound to a card and then used to read out the
+contents of the card's attribute memory.
+
+.SH PARAMETERS
+.TP
+.BI pc_debug= n
+Selects the PCMCIA debugging level.  This parameter is only available
+if the module is compiled with debugging enabled.  A non-zero value
+enables debugging.
+.TP
+.BI mem_speed= n
+Sets the access speed of the shared memory window for direct access
+devices, in nanoseconds.  The default is 0 (i.e., no extra wait
+states).  Values of up to 1000 are legal.
+.TP
+.BI word_width= n
+A flag indicating if direct access devices should be configured for
+8-bit (if 0) or 16-bit (if 1) transfers.  The default is 1 (16-bit).
+.TP
+.BI force_size= n
+Explicitly specifies the size of a simple SRAM card, skipping the
+default (and sometimes unreliable) size check.
+
+.SH IOCTLS
+These are defined in \fB<pcmcia/memory.h>\fR.
+.TP
+.B MEMGETINFO
+This takes an argument of type \fB(region_info_t\ *)\fR, defined in
+\fB<pcmcia/bulkmem.h>\fR.  The structure will be filled in with memory
+region information for  this device, such as access speed, erase block
+size, and JEDEC identifiers.  
+.TP
+.B MEMERASE
+This takes an argument of type \fB(erase_info_t\ *)\fR, specifying the
+offset and length of a memory region to be erased.
+
+.SH AUTHOR
+David Hinds \- dahinds@users.sourceforge.net
+.SH "SEE ALSO"
+cardmgr(8), pcmcia(5), memory_cb(4).

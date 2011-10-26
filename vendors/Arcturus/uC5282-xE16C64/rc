@@ -1,0 +1,48 @@
+#!/bin/sh
+
+echo ------------------------
+echo - Example uC5282 image -
+echo ------------------------
+
+# system startup.
+mount -t ramfs none /var
+# Building the read write directories
+mkdir /var/tmp
+mkdir /var/usr
+mkdir /var/run
+mkdir /var/conf
+mkdir /var/dhcpc
+
+# Import uCbootloader environment variables we need
+printbenv -q -e HOSTNAME        >  /etc/profile
+printbenv -q -e IPADDR0         >> /etc/profile
+printbenv -q -e GATEWAY         >> /etc/profile
+printbenv -q -e NAMESERVER      >> /etc/profile
+printbenv -q -e SEARCHPATH      >> /etc/profile
+printbenv -q -e NFSMOUNT        >> /etc/profile
+printbenv -q -e RCLOCAL         >> /etc/profile
+
+. /etc/profile
+
+# echo Mounting proc file system ...
+mount -t proc proc /proc
+
+# set up the hostname
+if [ "$HOSTNAME" != "(null)" ]; then
+    hostname $HOSTNAME
+else
+    hostname uC5282
+fi
+
+# Run network setup
+. /etc/rc.d/rc.net
+
+
+if [ "$RCLOCAL" != "(null)" ]; then
+    if [ -x $RCLOCAL ]; then
+        echo Running $RCLOCAL
+        $RCLOCAL
+    fi
+fi
+
+exit 0

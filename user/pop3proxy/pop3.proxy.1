@@ -1,0 +1,333 @@
+.de ES
+.sp
+.in +0.5i
+..
+.de EE
+.in -0.5i
+.sp
+..
+.de EX
+.sp
+.in +0.5i
+\\$1
+.in -0.5i
+.sp
+..
+.TH POP3.PROXY 1 "05 December 1999"
+.SH NAME
+pop3.proxy \- POP3 proxy server
+.SH SYNOPSIS
+\fBpop3.proxy\fR [\fIoptions\fR] \fIserver\fR
+.SH DESCRIPTION
+.I pop3.proxy
+is a proxy server for the POP3 protocol.
+It forwards traffic between a client and a server watching that client and
+server fullfill the protocol specification.
+.PP
+.I pop3.proxy
+is usually started from a TCP superserver like
+.IR inetd (1)
+or
+.IR tcpproxy (1).
+.SS "Protocol Support"
+.I pop3.proxy
+supports the following POP3 commands:
+.PP
+.RS
+USER, PASS
+.br
+LIST, STAT, RETR, UIDL, DELE, TOP, LAST
+.br
+NOOP, RSET, QUIT
+.br
+.PP
+.RE
+Unsupported POP3 commands result in a syslog message without forwarding the
+command to the server.
+A maximum number of 5 unsupported commands per session is allowed before
+the connection is terminated by the proxy.
+This happens also in case of an invalid login.
+.PP
+If the server doesn't respond with either an `+OK' or `-ERR' the connection
+is immediatly terminated.
+.PP
+.RE
+.SS Server Selection
+If the \fB-e\fR switch is given on the command line the proxy allows
+the client to select the POP3 server by supplying a login username of the
+form
+.EX \fIuser\fR@\fIserver\fR
+If \fB-e\fR is given twice \fIpop3.proxy\fR expects a default server as
+option argument.
+This default server is then used if the user doesn't supply a POP3 server
+with his login.
+.PP
+The set of available servers might be restricted with the \fB-s\fR option.
+This option defines a comma separated list of selectable servers.
+To match a server on the list the client has to supply the name as it's
+on the list.
+If a server is defined by it's IP number the IP number must be also used
+in the USER command.
+\fIpop3.proxy\fR won't do any lookups to see if a given IP number matches
+a server name on the list.
+.PP
+A different set of username/server delimeters can be set with the \fB-c\fR
+option.
+.PP
+Notice that it's an error to specify a server command line argument with
+server selection.
+.SS "Access Control"
+An external access control program (acp) can be set with the \fB-a\fR switch.
+If set it is called immediatly before the connection to the server is
+made.
+The program receives the following environment variables:
+.br
+.TP
+\fBPOP3_INTERFACE\fR, \fBPOP3_PORT\fR
+interface and port where the client is connected to the proxy.
+.TP
+\fBPOP3_CLIENT\fR
+IP number of the connected client.
+.TP
+\fBPOP3_SERVER\fR, \fBPOP3_SERVERPORT\fR
+POP3 server name and port as given by the client.
+.TP
+\fBPOP3_SERVERLOGIN\fR
+the supplied username for the POP3 server.
+.TP
+\fBPOP3_USERNAME\fR, \fBPOP3_PASSWD\fR
+supplied username and password for usage of the proxy server.
+.PP
+The values for \fBPOP3_USERNAME\fR and \fBPOP3_PASSWD\fR are taken from
+the supplied remote username and password if they contain a colon `:'.
+In this case the local authentication data is taken from the left side of
+the colon and the remaining right side is passed on to the server.
+.PP
+The acp's standard output is connected to the POP3 client and it's stderr goes
+to the syslog.
+The acp should return an exit code of zero to grant and any other to deny
+access for the client.
+.SS "Proxy Authentication"
+\fIpop3.proxy\fR supports proxy authentication in conjunction with an acp.
+Login information of the form
+.ES
+USER \fBproxy-user\fR:\fBserver-user\fR[@\fBserver\fR]
+.br
+PASS \fBproxy-pass\fR:\fBserver-pass\fR
+.EE
+is processed in the obious way and given to the acp which has to verify
+the proxy login.
+.SS "Client Logging"
+Beside of the messages that go to syslog \fIpop3.proxy\fR can record the
+last succesful login from a client in the directory given with the \fB-l\fR
+option.
+This file contains the time, client, username and POP3 server of the last
+succesful server login.
+These files can be either used for quick debugging or in conjunction with
+\fIsmtp.proxy\fR(1) to grant access to the SMTP service.
+.SS "Virus Scanning"
+\fIpop3.proxy\fR scans every e-mails using \fIclamav\fR as scan engine if
+the \fB-z\fR option is set.
+In this mode \fIpop3.proxy\fR spools first every e-mail from the server
+to a temporary file which is scanned by \fIclamd\fR.
+If it's clean it's sent to the client and
+replaced with a short virus notification otherwise.
+If \fIpop3.proxy\fR can't connect to \fIclamd\fR or \fIclamd\fR behaves
+strange, \fIpop3.proxy\fR refuses to work.
+.PP
+To configure virus scanning \fIclamav\fR's scan daemon \fIclamd\fR must
+run and listen on the local TCP/IP port 3310 for service requests.
+Furthermore \fIpop3.proxy\fR must be started with the \fI-z\fR option.
+The \fB-u\fR option can be used to start \fIpop3.proxy\fR with the
+same user as \fIclamd\fR to give the scanner read access to the
+temporary mail file.
+.PP
+If the \fB-z\fR is given twice on the command line \fIpop3.proxy\fR
+expects a directory where it then quarantines infected e-mail.
+Otherwise \fIpop3.proxy\fR will simply delete virulent mails.
+Notice that succesful quarantining requires that the quarantine
+directory is on the same harddisk partition as \fIpop3.proxy\fR's
+directory for temporary files.
+Use the \fB-T\fR option to adjust it's location.
+.SS "Connection Redirection"
+\fIpop3.proxy\fR can handle redirected connection request, that is
+requests that were originally not destined for it.
+This is done by an iptables/NAT rule like
+.ES
+ # iptables -t nat -A PREROUTING --protocol TCP \\
+     --dport 110 -j REDIRECT --to-port 8100
+.EE
+In this example all connections requests going to port 110 will be
+redirected to the machine's local port 8100.
+The destination port 8100 is not of importance as long a \fIpop3.proxy\fR
+is listening on it.
+.PP
+\fIpop3proxy\fR accepts such requests wether configured for it or not.
+However, explicit support can be configured with the \fB-r\fR option.
+The \fB-r\fR option expects an argument for the redirection mode.
+Possible values are
+.TP
+\fBnone\fR
+turns off any special redirect handling, this is the default.
+.TP
+\fBaccept\fR
+puts the original requested server data into the \fBPOP3_ORIGDST\fR
+variables, connects the client to the configured server,
+does not redirect to the requested server.
+.TP
+\fBforward\fR
+puts the original requested server data into the \fBPOP3_ORIGDST\fR
+variables and connects the client to the requested server.
+.TP
+\fBforward-only\fR
+like \fRforward\fR but drops connections which are not redirected.
+.PP
+Redirection support is actually only available for Linux.
+.SS "Connection Status Files"
+\fIpop3.proxy\fR can write information about it's current connections
+to status files, one for each connection.
+Each status file contains the following, space separated, information:
+.IP - 2
+program name, is always \fIpop3.proxy\fR,
+.IP - 2
+the name of the \fIpop3.proxy\fR executable (also used as logname),
+default is \fIpop3.proxy\fR,
+.IP - 2
+the proxy's process id,
+.IP - 2
+time in seconds since 01.01.1970 when the process started,
+.IP - 2
+IP number and port of the proxy's incoming interface,
+.IP - 2
+client's IP number and name,
+.IP - 2
+IP number and port of the server,
+.IP - 2
+IP number and port of the original requested server if the connection
+was redirected, otherwise `0.0.0.0:0'.
+.IP - 2
+logged in username
+.IP - 2
+last client POP3 command.
+.PP
+To enable status files a directory must be given with the \fB-o\fR
+option where the status files should go.
+The status file are automatically removed when \fIpop3.proxy\fR
+terminates.
+.SS "Daemon Mode"
+\fIpop3.proxy\fR can run as standalone daemon (binding and listening on
+the service port on it's own) if the \fB-D\fR option is set.
+If \fB-D\fR is given twice the service port can be set on the command
+line.
+When running in daemon mode \fIpop3.proxy\fR forks automatically into
+the background if the debug \fI-d\fR option is not set.
+.SS Logging
+The way \fIpop3.proxy\fR writes it's syslog has changed in version 1.3.0.
+Prior version wrote their log data always to syslog.
+Since version 1.3.0 the loglines are written to stderr if \fIpop3.proxy\fR
+runs in debug mode and to syslog else.
+.SH OPTIONS
+The following options are available:
+.TP
+\fB-a\fR \fIacp\fR
+set pathname of the access control program.
+.TP
+\fB-c\fR \fIcharset\fR
+define \fIcharset\fR for the username/server delimeter, default is `@'.
+.TP
+\fB-e\fR | \fB-ee\fR \fIdefault-server\fR
+enables server selection by the client.
+A default server can be specified with a second \fB-e\fR.
+.TP
+\fB-l\fR \fIdir\fR
+if the client logs succesfully into the server \fIpop3.proxy\fR creates
+the file \fIdir\fR/\fIclientip\fR.
+.br
+Notice that \fIdir\fR must be writable be the userid under which
+\fIpop3.proxy\fR is started.
+If \fIpop3.proxy\fR is started by root it will change it's uid/gid to
+65535/65534.
+.TP
+\fB-m\fR
+reduce the number of syslog messages.
+.TP
+\fB-o\fR \fIstatdir\fR
+defines the directory where \fIpop3.proxy\fR writes it's session
+status files.
+.TP
+\fB-q\fR \fIsrcip\fR
+sets the source IP-number of the outgoing connection to the POP3 server.
+.TP
+\fB-s\fR \fIserverlist\fR
+defines a comma separated list of POP3 servers that can be selected by
+the client.
+The characters `?' and `*' may be used as wildcards.
+\fB-e\fR must also be specified.
+.TP
+\fB-t\fR \fItimeout\fR
+sets a different POP3 timeout in seconds than the default of 600
+(10 minutes).
+.TP
+\fB-u\fR \fIuser\fR
+sets the username under which \fIpop3.proxy\fR should run.
+The default is `nobody'.
+.TP
+\fB-v\fR \fIprefix\fR
+sets a different variable \fIprefix\fR for the acp than \fBPOP3_\fR.
+.TP
+\fB-y\fR | \fB-yy\fR \fIpath-to-spamc\fR
+turns spam tagging using \fIspamassassin\fR's \fIspamc\fR on.
+.TP
+\fB-z\fR | \fB-zz\fR \fIdirectory\fR
+turns virus scanning on.
+Specifying a second \fB-z\fR sets a directory where \fIpop3.proxy\fR
+puts virulent e-mails together with their info files.
+.TP
+\fB-D\fR | \fB-DD\fR [\fIinterface:\fR]\fIport\fR
+starts \fIpop3.proxy\fR as standalone server.
+If \fB-D\fR is given twice \fIpop3.proxy\fR expects the server port where
+it should listen for incoming requests.
+.TP
+\fB-T\fR \fIdirectory\fR
+sets the directory for \fIpop3.proxy\fR's temporary files.
+.PP
+.SH "EXAMPLES"
+To start \fIpop3.proxy\fR from \fIinetd\fR you can add a line like
+
+    pop3 stream tcp nowait nobody \\
+      /usr/local/sbin/pop3.proxy pop3.proxy \fIserver\fR
+
+to \fI/etc/inetd.conf\fR.
+Notice that the packed \fImakefile\fR installs \fIpop3.proxy\fR under
+\fI/usr/local/sbin\fR.
+In this case you have to put the full path into \fIinetd.conf\fR.
+.PP
+If you are running an application gateway firewall and you have local users
+connecting to external POP3 servers and external users connecting to local
+POP3 servers you might want to prefer to start \fIpop3.proxy\fR from
+\fItcpproxy\fR (or another superserver with interface depending configuration)
+to define different proxy configurations for different interfaces.
+.PP
+If your local interface has the IP number 192.168.1.1 and your external
+is 140.77.194.1 you can set up your \fItcpproxy.conf\fR like
+.ES
+ port 110
+   interface 192.168.1.1
+     exec /usr/local/sbin/pop3.proxy -e
+   interface 140.77.194.1
+     exec /usr/local/sbin/pop3.proxy local-pop3
+.EE
+and configure \fIinetd\fR with
+.EX "pop3 stream tcp nowait nobody tcpproxy tcpproxy"
+to do the job.
+.SS "Daemon Mode"
+Type
+.EX "pop3.proxy -D"
+at the command prompt to start \fIpop3.proxy\fR as standalone daemon
+listening on POP3's standard port 110.
+.EX "pop3.proxy -d -D"
+starts \fIpop3.proxy\fR in debug mode.
+.SH "SEE ALSO"
+.IR inetd (1),
+.IR tcpproxy (1).
+

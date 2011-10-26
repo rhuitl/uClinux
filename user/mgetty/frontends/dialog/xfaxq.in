@@ -1,0 +1,116 @@
+#!/bin/sh -
+#
+# xfaxq program
+#
+# Interactive faxq program for X-windows
+#
+# NOTE: You need the "dialog" shell tool and the viewfax FAX display program.
+#
+# This program was hacked together by Tony Leneis.  It is not meant to be
+# pretty or elegant - it just has to get the job done.
+
+FAX_SPOOL_OUT=@FAX_SPOOL_OUT@
+
+#
+# echo program that will accept escapes (bash: "echo -e", sun: /usr/5bin/echo)
+#
+echo="@ECHO@"
+
+#
+# an awk that is not stone-old-brain-dead (that is, not oawk...)
+#
+AWK=@AWK@
+
+
+if cd $FAX_SPOOL_OUT 2>/dev/null
+then :
+else
+    $echo "cannot chdir to $FAX_SPOOL_OUT..." >&2
+    exit 1
+fi
+
+usage="Usage: $0 [options]
+Options:
+\t-o\tshow all jobs (include old jobs already sent)"
+
+jobs=*/JOB
+while getopts :o option
+do
+    case $option in
+	o) jobs=*/JOB*;;
+	*) $echo "unknown option: $OPTARG" >&2
+	   $echo "$usage" >&2
+	   exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1`
+if [ $# -ne 0 ]
+then
+    $echo "too many arguments" >&2
+    $echo "$usage" >&2
+    exit 1
+fi
+
+if [ -z "`ls $jobs 2>/dev/null`" ]; then
+  $echo "No jobs."
+  exit 0
+fi
+
+exec $AWK '
+  $1=="phone"	    { idx++;
+		      phone[idx] = substr ($0,7);
+		      dir[idx] = FILENAME;
+		      sub("/JOB.*$","",dir[idx]);
+		      status[idx] = FILENAME;
+		      sub("^.*/JOB","",status[idx]);
+		      sub("^\.","",status[idx]);
+		      if (status[idx] == "")
+			status[idx] = "pending"; }
+  $1=="user"	    { user[idx] = substr ($0,6);  }
+  $1=="verbose_to"  { to[idx] = substr ($0,12); }
+  $1=="pages"	    { count[idx] = NF - 1; }
+  /^Status.*successfully sent$/ { stamp[idx] = $4 "-" $3 "-" $7 "  " $5; }
+  END {
+    getline pid <"/dev/pid";
+    close ("/dev/pid");
+    tmpfile = "/tmp/xfaxq." pid;
+
+    menu = "dialog --title \"Outgoing FAX Queue\" --menu "
+    menu = menu "\"                 Please choose the FAX you wish to view\n"
+    menu = menu "     sender    date         time   phone number         pages  status\"";
+    menu = menu " 22 78 14 ";
+    for (f = 1; f <= idx; f++) {
+	menu = menu sprintf(" \"%-3.3s\" \"%-8.8s  %-18.18s  %-19.19s  %-5.5s  %-9.9s\"", f, user[f], stamp[f], phone[f], count[f], status[f]);
+    }
+    menu = menu " 2>" tmpfile;
+
+    prtq = "dialog --title \"Print Requestor\" --yesno "
+    prtq = prtq "\"Print current FAX?\" 5 24; echo $? >" tmpfile;
+
+    prti = "dialog --infobox \"Printing FAX...\" 3 24";
+
+    for (;;) {
+      system (menu);
+      if ((getline choice <tmpfile) == 0)
+	break;
+      close (tmpfile);
+      sub (" *$","",choice);
+
+      # Suppress error messages so X-inhibited people like me can use this
+      # program as a convenient way to report FAXes in the outgoing queue.
+      system ("viewfax "dir[choice]"/*.g3 2>/dev/null");
+
+      system (prtq);
+      if ((getline prtme <tmpfile) == 0)
+	break;
+      close (tmpfile);
+ 
+      if (prtme == 0) {
+	system (prti);
+	system ("printfax " dir[choice] "/*.g3");
+      } else if (prtme != 1)
+	break; 
+    }
+    system ("rm -f " tmpfile);
+  }
+' $jobs

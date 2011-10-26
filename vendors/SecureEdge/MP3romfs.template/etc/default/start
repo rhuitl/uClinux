@@ -1,0 +1,14 @@
+UNIT=`ifconfig eth0 | grep HWaddr | cut -b 48,49,51,52,54,55`
+hostname MP3-$UNIT
+ifconfig lo 127.0.0.1
+route add -net 127.0.0.0 lo
+dhcpcd -p -a eth0 &
+mixer pcm 80
+mixer line 80
+echo "Self-Check" > /dev/lcdtxt
+echo -n "in progress" > /dev/lcdtxt
+e2fsck -p -y /dev/hda1
+e2fsck -p -y /dev/hda2
+echo "" > /dev/lcdtxt
+mount -a
+nmbd -nMP3-$UNIT -D &

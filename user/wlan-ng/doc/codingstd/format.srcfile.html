@@ -1,0 +1,311 @@
+<HTML>
+<HEAD>
+    <TITLE>AVS C Source file format</TITLE>
+</HEAD>
+<BODY>
+<H1>1. C Source file format</H1>
+<P>
+The following defines the common C source file format for linux-wlan.
+Most of the C-code formatting rules come from the linux kernel
+document <CODE>CodingStyle</CODE>.
+
+<H1>2. Characters and Code layout</H1>
+<H2>2.1. Character Set</H2>
+<P>
+For all source files, we'll stick to the US character set and avoid all 
+trigraphs.
+
+<H2>2.2. Indentation</H2>
+<P>
+All indentation will be done using tab characters which are mapped to a 
+spacing of eight characters.
+
+<H2>2.3. Braces</H2>
+<P>
+Braces will be placed according to the format originally established
+in Kernighan and Ritchie's book "The C Programming Language".  Here
+are some example statements:
+<P>
+<TABLE border=1><TR><TD><PRE>
+
+for ( i= 0; i &lt; N; i++) {
+   .
+   .
+   .
+}
+
+if ( a &lt; b ) {
+   .
+   .
+   .
+} else {
+   .
+   .
+   .
+}
+
+do {
+   .
+   .
+   .
+} while ( i &gt> 0 );
+</PRE></TABLE>
+
+
+
+<H1>3. Naming and Definition Conventions</H1>
+
+<H2>3.1. Preprocessor Elements</H2>
+<P>
+All elements defined via the C preprocessor (constants and macros) are
+named using all capital letters.  An exception is for macros that are
+either wrapping function calls for portability or for macros that are
+inline replacements for code that would normally be in a function.
+
+<H2>3.2. Types</H2>
+<P>
+All programmer defined types must have single word type names
+defined using the <PRE>typedef</PRE> statement.  All type names
+should be identified with an <PRE>_t</PRE> suffix.  This is
+particularly important for function pointers that are members of
+structures or arguments to functions.
+
+<P>
+Anonymous types are not allowed.  All struct, union, and enum
+types shall be named and typedef'd.
+
+
+<H2>3.3. Variables</H2>
+The following conventions should be followed for variable
+declaration and naming:
+	<UL>
+		<LI>Variables should be named using meaningful names.
+		<LI>Avoid variables with static lifetimes.
+		<LI>If static lifetime variables must be used, use file
+		scoped static variables and avoid static lifetime
+		variables with visibility beyond file scope. 
+		<LI>All static lifetime variables should be declared in
+		the "Local Statics" section near the top of a given
+		source file.
+	</UL>
+
+<H2>3.4. Functions</H2>
+The following conventions should be followed for function
+declaration and definition:
+	<UL>
+		<LI><B>All</B> functions must be declared above the point
+		where they are called.
+		<LI>Any functions that are only intended to be called
+		within a given source file should be declared static
+		within that file.
+		<LI>Functions defined within a common source file that are 
+		visible across source file boundaries should be named
+		using a prefix that is unique to that source file.
+	</UL>
+
+<H1>4. File Layout</H1>
+<P> 
+Each file should be layed out using a common format.  The
+following shows a complete file with all its major sections.
+
+<P>
+Each major section within the file is begun with a comment of the
+form:
+<PRE>
+/*================================================================*/
+/* [Section Name] */
+</PRE>
+
+<P>
+Subsections within a major section are denoted using:
+<PRE>
+/*----------------------------------------------------------------*/
+/*  [Subsection Name]  */
+</PRE>
+
+<P>
+<TABLE border=1><TR><TD>
+<PRE>
+/* [filename]: [one line description of the file]
+* --------------------------------------------------------------------
+*
+* [Project Name]
+*
+* [License Statement]
+*
+* [Warranty Statement]
+*
+* [Initial Author Statement]
+*   
+* --------------------------------------------------------------------
+*
+* [Initial Author Contact]
+*
+* --------------------------------------------------------------------
+*
+* [File Description]
+*
+* [Implementation and Usage Notes]
+*
+* --------------------------------------------------------------------
+*/
+
+/*================================================================*/
+/* System Includes */
+
+
+/*================================================================*/
+/* Project Includes */
+
+
+/*================================================================*/
+/* Local Constants */
+
+
+/*================================================================*/
+/* Local Macros */
+
+/*----------------------------------------------------------------*/
+/*  [A subsection]  */
+
+/*================================================================*/
+/* Local Types */
+
+
+/*================================================================*/
+/* Local Static Definitions */
+
+
+/*================================================================*/
+/* Local Function Declarations */
+
+
+/*================================================================*/
+/* Function Definitions */
+
+</PRE>
+</TABLE>
+
+<H2>4.1. System  Includes Section</H2>
+<P>
+Preprocessor <CODE>#include</CODE> statements that are including
+<I>system</I> includes shall be placed in this section.  System
+includes are those include files that are <B>not</B> part of the
+managed source for this project.
+
+<H2>4.2. Project Includes Section</H2>
+<P>
+Preprocessor <CODE>#include</CODE> statements that are including
+<I>project</I> includes shall be placed in this section.  Project 
+includes are those include files that are a part of the
+managed source for this project.
+
+<H2>4.3. Local Constants Section</H2>
+<P>
+Preprocessor "manifest" constants that are local to this file shall be
+placed in this section.  "Manifest" constants are preprocessor macros
+that take no arguments.
+
+<H2>4.4. Local Macros Section</H2>
+<P>
+Proprocessor macros that accept arguments shall be placed in this
+section.
+
+<H2>4.5. Local Types Section</H2>
+<P>
+Programmer defined types that are only used within the scope of this
+file shall be defined in this section.  Programmer defined types that
+are used in more than one source file should be defined in a header
+file.
+
+<H2>4.6. Local Static Definitions Section</H2>
+<P>
+Variables with static extent that are defined within this file shall
+be placed in this section.  Whether a variable has scope beyond this
+file will be apparent based on the presence or absence of the
+<CODE>static</CODE> keyword in the declaration.  If a variable is
+declared without the <CODE>static</CODE> keyword, there should be an
+<CODE>extern</CODE> declaration for that variable in a header file.
+
+<H2>4.6. Local Function Declarations Section</H2>
+<P>
+Functions that are only used within this file should be declared
+(prototyped) in this section.  Additionally, these functions should be
+declared using the <CODE>static</CODE> keyword.  This avoids polluting
+the global namespace with function names that need not be
+<CODE>extern</CODE>.
+
+<P>
+Any functions defined in this file that <I>are</I> called from outside
+this file should be declared (prototyped) in a header file.
+
+<H2>4.6. Function Definitions Section</H2>
+<P>
+This section contains the definitions of the functions in this file.
+Each function (or group of strongly related functions) will be
+preceded by a function header comment (see below).
+
+<H1>5. Comments</H1>
+<H2>5.1. File Header</H2>
+<P>
+Each source file will have a header comment containing information
+about the file as a whole.  That comment shall be formatted:
+<P>
+<TABLE border=1><TR><TD><PRE>
+/* [filename]: [one line description of the file]
+* --------------------------------------------------------------------
+*
+* [Project Name]
+*
+* [License Statement]
+*
+* [Warranty Statement]
+*
+* [Initial Author Statement]
+*   
+* --------------------------------------------------------------------
+*
+* [Initial Author Contact]
+*
+* --------------------------------------------------------------------
+*
+* [File Description]
+*
+* [Implementation and Usage Notes]
+*
+* --------------------------------------------------------------------
+*/
+</PRE>
+</TABLE>
+
+<H2>5.2. Function Header</H2>
+<P>
+Each function (or group of closely related functions) will be preceded 
+by a function comment header.  The <CODE>Side effects</CODE> and
+<CODE>Call context</CODE> sections are optional.
+<P>
+<TABLE border=1><TR><TD><PRE>
+/*----------------------------------------------------------------
+* [function name]
+*
+* [description]
+*
+* Arguments:
+*	[argument list]
+*
+* Returns: 
+*	[return value list]
+*
+* Side effects:
+*	[description of function side effects]
+*
+* Call context:
+*	[description of calling context]
+----------------------------------------------------------------*/
+</PRE>
+</TABLE>
+
+
+</BODY>
+</HTML>
+

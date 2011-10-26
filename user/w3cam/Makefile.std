@@ -1,0 +1,46 @@
+CC = cc
+prefix=/usr/local
+exec_prefix=${prefix}
+sbindir=${exec_prefix}/sbin
+cgibindir=$(prefix)/cgi-bin
+bindir=${exec_prefix}/bin
+
+CFLAGS = -O2 -Wall  -DHAVE_LIBM=1 -DHAVE_LIBZ=1 -DHAVE_LIBPNG=1 \
+	-DHAVE_LIBJPEG=1  -DVIDEO_DEV=\"/dev/video\"
+LDFLAGS = 
+LIBS = -ljpeg -lpng -lz -lm 
+
+OBJ = w3cam.o cgi.o
+
+default: w3cam.cgi vidcat w3camd/w3camd
+
+w3cam.cgi: $(OBJ)
+	$(CC) $(LDFLAGS) -o $@ $(OBJ) $(LIBS)
+
+vidcat: cgi.o vidcat.o
+	$(CC) $(LDFLAGS) -o $@ vidcat.o cgi.o $(LIBS)
+
+w3camd/w3camd:
+	cd w3camd && make
+
+install: w3cam.cgi
+	install w3cam.cgi $(cgibindir)/
+	test -f $(cgibindir)/w3cam.cgi.scf || \
+		install w3cam.cgi.scf $(cgibindir)/
+	install vidcat $(bindir)/
+
+clean:
+	rm -f *.o w3cam.cgi vidcat
+	cd w3camd && make clean && rm -f w3camd
+
+msproper: clean
+	rm -f config.status config.log config.cache
+
+README: index.html
+	lynx -dump http://www/~rasca/w3cam/index.html | \
+		sed "s%/www/%/home.pages.de/%g" > README
+
+tarball: clean
+	rm -f config.status config.log config.cache Makefile
+	cd .. && tar -czvf w3cam07.tgz w3cam/
+

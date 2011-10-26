@@ -1,0 +1,123 @@
+#! /bin/sh
+#
+# network 1.10 1995/12/28 19:55:19 (David Hinds)
+#
+# $Id$
+#
+# Initialize or shutdown a PCMCIA ethernet adapter
+#
+# This script should be invoked with two arguments.  The first is the
+# action to be taken, either "start", "stop", or "restart".  The
+# second is the network interface name.
+#
+# Changes by Yoichi
+# 09/12/96 added DHCP option
+# 05/17/97 added check if there is a network device or not
+#
+
+usage()
+{
+    echo "usage: network [action] [device name]"
+    echo "  actions: ident start check stop suspend resume"
+    exit 1
+}
+
+if [ $# -lt 2 ] ; then usage ; fi
+action=$1
+device=$2
+
+# Load site-specific settings
+. /etc/pcmcia/network.opts
+
+case "$action" in
+
+'ident')
+    ADDR=`/sbin/ifconfig $device | sed -n -e 's/.*addr \(.*\)/\1/p'`
+    echo "Hardware address = $ADDR"
+    ;;
+
+'start')
+	if ! cat /proc/net/dev | egrep $device >/dev/null ; then
+		exit 1
+	fi
+    if [ "$DHCP" = "y" -o "$DHCP" = "Y" ] ; then
+        if [ "$DHCPSTF" ] ; then
+            /usr/sbin/dhcpcd -c $DHCPSTF ${device}
+        else
+            /usr/sbin/dhcpcd ${device}
+        fi
+    elif [ "$BOOTP" = "y" -o "$BOOTP" = "Y" ] ; then
+	/sbin/ifconfig $device up
+	/sbin/route add default dev $device
+	eval `/sbin/bootpc --bootfile '' --dev $device`
+	/sbin/route del default
+	if [ "$GATEWAYS" = "" ] ; then
+	    set - $GATEWAYS ; GATEWAY=$1
+	fi
+    fi
+
+    if [ "$IPADDR" != "" ] ; then
+
+	# Basic network setup
+	/sbin/ifconfig $device up $IPADDR broadcast $BROADCAST \
+            netmask $NETMASK
+	/sbin/route add -net $NETWORK netmask $NETMASK
+	if [ "$GATEWAY" != "" ] ; then
+	    /sbin/route add default gw $GATEWAY metric 1
+	fi
+
+	# Configure nameservers
+	if [ "$DNSSRVS $DNS_1 $DNS_2 $DNS_3" != "   " ] ; then
+	    cp /etc/resolv.conf /etc/resolv.new
+	    echo "# $device begin" >> /etc/resolv.new
+	    for DNS in $DNSSRVS $DNS_1 $DNS_2 $DNS_3 ; do
+		echo "nameserver $DNS" >> /etc/resolv.new
+	    done
+	    echo "# $device end" >> /etc/resolv.new
+	    mv /etc/resolv.new /etc/resolv.conf
+	fi
+    fi
+    ;;
+
+'stop')
+    if [ "$DHCP" = "y" -o "$DHCP" = "Y" ] ; then
+		`mount | awk '/type nfs/ { print "umount " $3 }'`
+        /usr/sbin/dhcpcd -k
+    elif [ "$IPADDR" != "" ] ; then
+	if [ "$GATEWAY" != "" ] ; then
+	    /sbin/route del default
+	fi
+	/sbin/route del $NETWORK
+	/sbin/ifconfig $device down
+
+	# Remove nameservers
+	awk "/# $device begin/ { p = 1 }		\
+	    { if (!p) print }				\
+	    /# $device end/ { p = 0 }"			\
+	    < /etc/resolv.conf > /etc/resolv.new &&	\
+	    mv /etc/resolv.new /etc/resolv.conf
+    fi
+    ;;
+
+'check')
+    # This is crude -- it checks for any external network activity
+    netstat -ntuw | tail +3 | awk '{ print $5 }' | \
+	grep -v 127.0.0.1 > /dev/null && exit 1
+    ;;
+
+'restart')
+    if [ "$IPADDR" != "" ] ; then
+	/sbin/ifconfig $device down up
+    fi
+    ;;
+
+'suspend'|'resume')
+    ;;
+
+*)
+    usage
+    ;;
+
+esac
+
+exit 0

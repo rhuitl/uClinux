@@ -1,0 +1,231 @@
+#!/bin/sh
+#
+# faxv - display faxes in incoming spool directory using ``dialog''
+#
+#
+# IMPORTANT: needs the ``dialog'' shell tool in the $PATH. If you don't
+#            have it, check sunsite.unc.edu:/pub/Linux/utils/shell/dialog*
+#
+#
+tmp=/tmp/faxv.$$
+tmp2=/tmp/faxv.c.$$
+trap "rm $tmp $tmp2 2>/dev/null" 0 1 15
+
+# customization
+#
+# a program that can display "pbm" files
+X11_VIEWER=xloadimage
+X11_VIEWER_SCALED="xloadimage -zoom 60"
+#
+# if G3view is installed, it will be used instead
+G3VIEW=/usr/local/bin/viewfax
+#
+# how to print faxes (file names on the command line)
+FAX_PRINT=/usr/local/bin/printfax
+
+#
+# incoming fax dir
+FAX_SPOOL_IN=@FAX_SPOOL_IN@
+
+#
+# sub menus / functions
+#
+
+# display fax, 100% size
+fv_view_100()
+{
+    faxid=$1
+    if [ -x "$G3VIEW" ] ; then
+	cd $FAX_SPOOL_IN
+	$G3VIEW -v $faxid*
+    else
+	for i in $FAX_SPOOL_IN/$faxid*
+	do
+	    g32pbm $i >/tmp/$faxid.`expr $i : ".*\.\([^.]*\)$"`
+	done
+	$X11_VIEWER /tmp/$faxid.*
+	rm /tmp/$faxid.*
+    fi
+}
+
+# display fax, scaled down to 60% 
+fv_view_60()
+{
+    faxid=$1
+    if [ -x "$G3VIEW" ] ; then
+	cd $FAX_SPOOL_IN
+	$G3VIEW -v $faxid*
+    else
+	for i in $FAX_SPOOL_IN/$faxid*
+	do
+	    g32pbm $i >/tmp/$faxid.`expr $i : ".*\.\([^.]*\)$"`
+	done
+	$X11_VIEWER_SCALED /tmp/$faxid.*
+	rm /tmp/$faxid.*
+    fi
+}
+
+# print using $PRINTFAX
+fv_print()
+{
+    faxid=$1
+    $FAX_PRINT $FAX_SPOOL_IN/$faxid*
+}
+
+# delete fax
+fv_delete()
+{
+    faxid=$1
+    if [ ! -w $FAX_SPOOL_IN ]
+    then
+	dialog --msgbox "Cannot delete, no write permissions on $FAX_SPOOL_IN." 7 42
+	return 1
+    else
+	dialog --yesno "really delete $faxid?" 5 38 &&
+	    rm $FAX_SPOOL_IN/$faxid*
+    fi
+}
+
+# rename "sender id" part
+fv_chg_sender()
+{
+    faxid=$1
+    if [ ! -w $FAX_SPOOL_IN ]
+    then
+	dialog --msgbox "Cannot rename, no write permissions on $FAX_SPOOL_IN." 7 42
+    else
+	dialog --inputbox "Change sender ID of $faxid to what?" \
+	       8 42 2>$tmp2 || return
+	new=`cat $tmp2 | tr " */()|&" ".+-...."`
+	for i in $FAX_SPOOL_IN/$faxid* 
+	do
+	    mv $i `expr $i : "\(.*/[^/]\{11\}\)[^/]*"`-$new.`expr $i : ".*\.\([^.]*\)[^.]*"`
+	done
+    fi
+}
+
+# move the fax to another location
+fv_move()
+{
+    faxid=$1 ; fullname=$2
+    if [ ! -w $FAX_SPOOL_IN ]
+    then
+	dialog --msgbox "Cannot mv away, no write permissions on $FAX_SPOOL_IN." 7 44
+	return 1
+    else
+	dialog --inputbox "Where do you want to move the fax $fullname.* to? (warning: the path you enter is relative to your current working directory!)" \
+	       10 42 2>$tmp2 || return
+	new=`cat $tmp2 | tr " *()|&" ".+...."`
+
+	test -d $new && new="$new/$fullname"
+
+	for i in $FAX_SPOOL_IN/$fullname*
+	do
+	    echo mv $i $new.`expr $i : ".*\.\([^.]*\)$"` 
+	    mv $i $new.`expr $i : ".*\.\([^.]*\)$"` 2>&1
+	done
+	echo "press <return>" ; read null
+    fi
+}
+
+#
+# process a selected fax (view, print, rename, move, delete, ...)
+#
+fv_do_something()
+{
+filename=$1
+# loop. Will be exited with "return"
+while :
+do
+
+    fullname=`ls $FAX_SPOOL_IN/$filename*.01`
+    fullname=`basename $fullname .01`
+
+    dialog --title "Fax Viewer" --menu "$fullname..." 15 40 8 \
+	    v "View (full size)" \
+	    6 "View (scaled to 60%)" \
+	    p "Print" \
+	    d "Delete" \
+	    c "Change Sender ID" \
+	    m "MV away" \
+	    b "back to selection" \
+	    x "exit program" 2>$tmp2
+
+    test $? -eq 0 || return 1
+    
+    action=`cat $tmp2`
+
+    case $action in
+	v) fv_view_100 $filename ;;
+	6) fv_view_60 $filename ;;
+	p) fv_print $filename ;;
+	d) fv_delete $filename && return 0;;
+	c) fv_chg_sender $filename ;;
+	m) fv_move $filename $fullname && return 0;;
+	b) return 0;;
+	x) exit 0;;
+	*) echo "Huh? Dunno that!" ;;
+    esac
+done
+}
+
+
+
+#
+# create main selection menu
+#
+
+# loop. Leave with exit.
+
+while :
+do
+    echo "dialog --title \"Fax Viewer\" --menu \\" >$tmp
+    echo "\"Please choose the fax you want to view" >>$tmp
+    echo "   faxid       sender                          date rcvd     pgs resl.\" \\" >>$tmp
+    echo "22 78 15 \\" >>$tmp
+
+    ls -lt $FAX_SPOOL_IN | \
+	awk 'BEGIN {pages=0; lname=""}
+	     { name=$NF
+	       if ( substr(name,1,11) != substr(lname,1,11) )
+	       {
+		 if ( substr(lname,1,1) == "f" )    # if it *is* a fax...
+		 {
+		   if ( substr(lname, 2,1 ) == "n" ) res="normal";
+						else res="fine  "
+		   printf "%s \"%-32.32s %s %4d %s\" \\\n", \
+			  substr( lname, 1, 11 ), \
+			  substr( lname, 13, length(lname)-15 ), \
+			  substr( lfull, 42,12 ), pages, res
+		 }
+		 pages=1
+		 lname=name
+		 lfull=$0
+	       }
+	       else pages++;
+	     }
+	     END { if ( substr(lname,1,1) == "f" )
+		   {
+		     if ( substr(lname,2,1) == "n" ) res="normal";
+						else res="fine  "
+		     printf "%s \"%-32.32s %s %4d %s\" \n", \
+			  substr( lname, 1, 11 ), \
+			  substr( lname, 13, length(lname)-15 ), \
+			  substr( lfull, 42,12 ), pages, res
+		    }
+	     }' - |head -50 >>$tmp
+
+    echo "" >>$tmp
+
+    @SHELL@ $tmp 2>/$tmp2
+
+    # <esc> or <abort>? -> exit
+    test $? -eq 0 || exit 0
+
+    filename=`cat $tmp2`
+
+    fv_do_something $filename
+
+done
+
+rm $tmp $tmp2 2>/dev/null

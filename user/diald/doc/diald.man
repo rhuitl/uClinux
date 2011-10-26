@@ -1,0 +1,1128 @@
+.\" manual page [] for diald 0.15
+.\" SH section heading
+.\" SS subsection heading
+.\" LP paragraph
+.\" IP indented paragraph
+.\" TP hanging label
+.TH DIALD 8 "DIALD 0.16 - 1997.01.28"
+.SH NAME
+diald \- demand dialing daemon for IP links over phone lines
+.SH SYNOPSIS
+.B /usr/sbin/diald
+[device1 ...] \fR[\fIoptions\fR...] [-- [\fIpppd options\fR...]]
+
+.SH DESCRIPTION
+.LP
+External IP network connections that go over phone lines,
+either via SLIP or PPP on a serial modem, or via PPP on an ISDN line,
+are normally explicitly turned on or off by operator intervention.
+.B Diald
+can be used to automatically bring a link up when there are Internet packets
+to be sent to another site, and to close the link down when it is idle.
+.LP
+.B Diald
+operates by starting a SLIP link on a pseudo tty and setting up a route
+to the resulting interface. This interface is called the \fIproxy\fR.
+.B Diald
+monitors the proxy to determine when to bring up a real communications
+link. When a real link is up
+.B diald
+routes packets from the proxy to the real link and
+monitors the real link to decide if it needs to be shut down.
+As well, if the link goes down unexpectedly
+.B diald
+will attempt to reestablish the link.
+The rules for controlling these operations are extensively configurable in
+run time startup files.
+
+This manual page is the reference manual for diald. It documents
+all of the configuration options that diald can be given.
+Reading this manual page may not be the easiest way to get
+started with diald. The
+.B diald-examples
+manual page provides a serials of worked configuration examples
+to help you get started
+using
+.B diald.
+The
+.B dctrl
+manual page should be consulted for a program that will help you control
+a running copy of diald using a graphical interface.
+In addition the
+.B diald-control
+and
+.B diald-monitor
+manual pages should be consulted for details of the commands that
+dctrl can send to diald, and the data that diald can return to dctrl.
+
+.SH COMMAND LINE ARGUMENTS
+.B Diald
+is normally configured by the use of configuration files.
+For historical reasons almost everything that can be placed into a
+configuration file can appear on the command line. However, with the
+exception of passing
+.B diald
+an option to tell it which file to load
+its configuration from, passing arguments on the command line is
+never necessary. The use of command line arguments is depreciated.
+
+On startup
+.B diald
+reads options first from /usr/lib/diald/diald.defs,
+then from /etc/diald.conf and then from the command line.
+Additional files to be read may be specified on the command line,
+or within the options files themselves.
+The initial portion of the command line is a list
+of zero or more serial devices. Note that diald supports the
+use of ISDN devices that appear as Ethernet devices,
+but these cannot be specified in this initial portion of
+the command line. This feature is strictly for backward
+compatibility with existing installations.
+It is preferable to specify devices using the "device" option,
+documented in the configuration section of this manual.
+
+The first argument to the command line that is not a serial
+device marks the start of a sequence of 0 or more diald
+configuration options. All of the diald configuration options
+documented below, except the "pppd-options" option,
+can appear on the command line.
+Each of these options takes a fixed number of arguments, which
+must immediately follow the option on the command line.
+For example, the "-f" command takes a single argument that is a file name.
+On the command line this might appear as:
+.IP
+        diald -f /etc/diald/config.18
+.LP
+This command line tells
+.B diald
+to get additional configuration options from the file /etc/diald/config.18.
+In fact, this is the only configuration option that ever need appear
+on the command line. Furthermore, unless you are running multiple
+.B diald
+processes,
+.B diald
+can be run without any command line arguments.
+This is done by placing the configuration options into the
+file /etc/diald.conf, which is always read by
+.B  diald.
+
+Any options after a "--" are options for
+.B pppd
+and are passed on to
+.B pppd
+whenever it is executed by diald.
+These options can also be placed into the /etc/ppp/options file
+or specified in a configuration file using the "pppd-options" command.
+If you make use of this ability you should read the important warning
+note in the section below that documents the "pppd-options" command.
+
+.SH CONFIGURATION FILES
+As mentioned before, on startup
+.B diald
+reads options first from /usr/lib/diald/diald.defs,
+then from /etc/diald.conf and then from the command line.
+Additional files to be read may be specified on the command line,
+or within the options files themselves.
+
+Note that the file /usr/lib/diald/diald.defs is intended to
+contain only
+.B var
+and
+.B prule
+options. This is not enforced, but it should never be necessary to
+violate this convention. Furthermore, in all but the most extreme cases
+the distributed diald.defs file will not need to be changed.
+In fact, changing the rules specified in this file changes
+the language recognized by diald in later configuration files.
+The need to do this should be carefully considered before proceeding.
+
+Within configuration files commands must appear one to a line.
+Each line is parsed into a series of words delimited
+by whitespace (space and tab characters).
+Words can be quoted with (") or (') to include whitespace in them.
+Within a quoted word the sequences (\\") and (\\') can be used
+to enter a (") or (') character.
+Other escape sequences are interpreted as in the language C.
+Blank lines are ignored, as are lines where the first
+non whitespace character is the (#) character.
+
+.SS General Configuration
+The following commands control the general behavior of diald.
+This includes the files it reads its configuration options from,
+the path names to important files or programs, and a few other
+commands that are less easily categorized.
+
+.TP
+.B -f \fI<f>
+Read the file \fI<f>\fR for additional commands.
+.TP
+.B -file \fI<f>
+This is a synonym for the
+.B -f
+command.
+.TP
+.B include \fI<f>
+This is another synonym for the
+.B -f
+command.
+Note that these commands can be used within a file to
+include another file.
+
+.TP
+.B mode \fI<m>
+Set the operation mode to \fI<m>\fR.
+Valid choices are:
+.IP
+\fBslip\fR	SLIP mode.
+.br
+\fBcslip\fR	Compressed SLIP mode.
+.br
+\fBslip6\fR	6 BIT SLIP mode.
+.br
+\fBcslip6\fR	Compressed 6 bit SLIP mode.
+.br
+\fBaslip\fR	Adaptive SLIP mode.
+.br
+\fBppp\fR	PPP mode.
+.br
+\fBdev\fR	Ethernet device mode.
+.br
+.IP
+All but the last of these modes operate over a serial device.
+The last mode is for use with ISDN adaptors that appear to be Ethernet
+devices. These adaptors will dial out on demand, but do so for all packets
+without and policy decisions being made. This option mode allows
+.B diald
+to act as a front end for these devices and provide a more sophisticated
+control mechanism.
+.IP
+The directory "contrib/isdn4linux" in the diald
+distribution should be consulted for example configuration files
+that use this mode. Note that most of the modem control configuration
+options do not make sense in this mode, and are simply ignored.
+.TP
+.B -m \fI<m>
+This is a synonym for the
+.B mode
+command.
+
+.TP
+.B keepalive \fI<t>
+This option tells diald to set the SLIP keepalive timer to \fI<t>\fR
+seconds. This will only work if your kernel has been compiled with
+the SLIP keepalive option enabled. With this option turned on the
+kernel will hang up any SLIP line that does not see a packet
+arrive within \fI<t>\fR seconds. If the remote slip can do outfilling,
+then this can be used to test for lines that are having hardware problems.
+Alternatively, if you can arrange that whenever you are connected the
+remote side will regularly try to send packets, you can get the
+same effect. One way to do this is to configure diald to ignore ping
+packets and send ping packets to your gateway machine once a second.
+If it stops responding the keepalive option will cause a hangup
+after \fI<t>\fR seconds. Note that \fI<t>\fR must be in the range 0-255.
+
+.TP
+.B outfill \fI<t>
+This option tells diald to set the SLIP outfill timer to \fI<t>\fR
+seconds. This will only work if your kernel has been compiled with
+the SLIP outfill option enabled. With this option turned on the kernel
+will send an empty SLIP packet every \fI<t>\fR seconds if no other traffic
+has been sent within \fI<t>\fR seconds. This can be used in conjunction
+with the keepalive option to have both ends of a SLIP connection test
+to be sure that the link is still active, even if there is currently
+no IP traffic.
+
+.TP
+.B accounting-log \fI<f>
+Name the file that diald should append accounting information to.
+This command allows diald to log connection start and end times
+and the amount of data transferred during each connection.
+This is intended to be used to aid company accounting departments
+track phone usage. Note that \fI<t>\fR must be in the range 0-255.
+
+.TP
+.B pidfile \fI<f>
+Changes the name of the file that diald uses to store its own PID
+from diald.pid to the given file. This file is normally put into
+the directory /var/run, although on some systems it will be
+found in /etc.
+
+.TP
+.B fifo \fI<f>
+Turns on the FIFO command channel. Diald will attempt to open a named pipe
+with the pathname <f>. External programs can write commands to the pipe
+and diald will react. See the section on signals and FIFO commands
+below for the commands that can be issued to a running diald.
+If the named pipe already exists diald will simply attempt to open it.
+If it does not exist it will be created. Diald will create it
+as owned by the user running diald (usually root) and with
+permission modes "0600". Note that it is generally a bad idea
+to allow too many users access to the control FIFO for diald.
+Also, the best security is probably obtained by creating
+the FIFO's ahead of time and choosing appropriate owners and permissions
+rather than letting diald create them.
+.TP
+.B debug \fI<mask>\fR
+Set the debugging mask. The mask is the binary OR of the following
+hex value flags:
+.IP
+	0x0001		FILTER_MATCH
+.br
+	0x0004		PROXYARP
+.br
+	0x0008		VERBOSE
+.br
+	0x0010		STATE_CONTROL
+.br
+	0x0020		TICK
+.br
+	0x0040		CONNECTION_QUEUE
+.IP
+The FILTER_MATCH flag tells diald to dump information showing which packets are
+matched by which filtering rule.
+The PROXYARP flag tells diald to dump information on the proxyarp setup.
+The VERBOSE flag tells diald to dump details on various normal operations.
+The STATE_CONTROL flag tells diald to output changes in the finite state
+control for the link status.
+The TICK flag tells diald to dump a heartbeat message every second.
+The CONNECTION_QUEUE flag tells diald to dump information detailing every
+change to the connection queue.
+A value of 0 turns off debugging output. Debugging is off by default.
+.TP
+.B -daemon
+Don't run in daemon mode. This means that the
+the standard input, standard output,
+and standard error output are not closed, that all messages
+are logged to the standard error as well as the syslog facility,
+and that the diald program does not fork itself into the background.
+This is mostly useful when you are running the debugging mode and
+you want to see what is happening.
+.TP
+.B pppd-options \fI<arg1> ...
+When \fBdiald\fR is being used in PPP mode extra commands can be
+passed on to
+.B pppd
+by specifying them after a pppd-options command, or
+after "--" on the command line.
+This should not normally be necessary as default commands can
+be placed into the /etc/ppp/options file. But, if you need
+to run multiple instances of diald with different pppd options,
+then you will have to make use of this ability. \fB WARNING:\fR
+Note that some pppd commands should not be specified, not
+even in the /etc/ppp/options file, because they will interfere
+with the proper operation of diald.
+In particular you should not specify
+the tty device, the baud rate, nor any of the options
+\fBcrtscts\fR, \fBxonxoff\fR, \fB-crtscts\fR, \fBdefaultroute\fR,
+\fBlock\fR, \fBnetmask\fR, \fB-detach\fR,
+\fBmodem\fR, \fBlocal\fR, \fBmtu\fR and \fBproxyarp\fR.
+Use the equivalent diald commands to control these pppd settings.
+.TP
+.B lock-prefix \fI<path>
+Set the pathname prefix to use for modem device lock files.
+By default this is "/var/lock/LCK..".
+.TP
+.B pidstring
+Write lock files as an ASCII string representing the process identifier
+of the locking program. This is the default.
+.TP
+.B -pidstring
+Write lock files in binary format.
+.TP
+.B run-prefix \fI<path>
+Set the directory where diald writes out its PID file.
+By default this is "/var/run".
+.TP
+.B path-route \fI<path>
+Set the path to the route command. By default this is "/sbin/route".
+Diald must have the correct setting for this path in order to function.
+.TP
+.B path-ifconfig \fI<path>
+Set the path to the ifconfig command. By default this is
+"/sbin/ifconfig".
+Diald must have the correct setting for this path in order to function.
+.TP
+.B path-pppd \fI<path>
+Set the path to the pppd command. By default this is
+"/usr/sbin/pppd".
+Diald must have the correct setting for this path in order to function
+in PPP mode.
+.TP
+.B path-bootpc \fI<path>
+Set the path to the bootpc command. By default this is
+"/usr/sbin/bootpc".
+Diald must have the correct setting for this path in order to use
+the "bootp" setting for the "dslip-mode" option.
+.TP
+.B buffer-packets
+Tells
+.B diald
+to buffer packets while waiting for a link to come up.
+This is the default.
+.TP
+.B -buffer-packets
+Tells
+.B diald
+not to buffer packets while waiting for a link to come up.
+.TP
+.B buffer_size \fI<n>
+Sets the size of the buffer for saving packets while waiting
+for a link to come up. This defaults to 65536 bytes.
+.TP
+.B buffer-fifo-dispose
+Tells
+.B diald
+to dispose of packets in a first in first out order if it
+runs out of room on the packet buffer while waiting for a link to come up.
+This is the default.
+.TP
+.B -buffer-fifo-dispose
+Tells diald not to dispose of old packets when the buffer becomes full.
+I can't imagine why you would want to do this, but I've put the option
+in here anyway.
+.TP
+.B buffer-timeout \fI<n>
+Set the timeout for throwing away packets in the buffer.
+This defaults to 600 seconds (10 minutes). This is a good idea,
+since you don't want packets that are a few hours old to get sent
+out when diald comes up for some other reason.
+
+.SS Device Configuration
+The commands in the following section control the device(s) that
+diald uses for the external IP link.
+.TP
+.B device \fI<f>\fR
+Add the device \fI<f>\fR to the list of devices that
+can be used for the outgoing connection. For SLIP and PPP
+modes these should be serial devices. For the "dev" mode this
+should be the name of an Ethernet device.
+
+If you specify more than one device then
+when attempting to establish an outside connection
+.B diald
+will try each device in turn until it finds one that is not locked.
+It will then attempt to dial out on that device. If it fails
+to dial out it will relinquish its lock and go through the
+device list again the next time it tries to establish the connection.
+
+.TP
+.B rotate-devices
+In normal operation diald attempts to open each of the possible
+devices listed on its command line in the order they are given.
+If the first device on this fails in such a way that it can
+still be opened, but it will not be able to connect (e.g.
+someone tripped over the modem cable), then diald will not
+be able to make a connection until the problem is corrected.
+This command forces diald to rotate the list of devices each time
+a device is opened. Thus, in the above scenario diald would
+fail to make the connection on the damaged device, but would
+then try the second device first on the next attempt.
+
+.TP
+.B connect \fI<p>\fR
+Use the executable or shell script \fI<p>\fR to set up the
+serial line. This normally dials the modem and starts up
+the remote SLIP or PPP session.
+The command \fI<p>\fR
+is started with the standard output and input directed
+at the modem device.
+In addition the environment variables MODEM and FIFO are set.
+The MODEM environment variable will contain
+the name of the device. This is useful in those cases
+where the script might have to behave differently depending
+on the device it is operating.
+The FIFO environment variable will contain the
+name of the command fifo used by diald. This allows
+connect scripts to pass information back to diald over
+the command fifo. Note that the FIFO environment variable
+will not be set if diald is not configured to use a command fifo.
+
+The
+.B chat
+program that comes with
+.B pppd
+is generally used to perform the task of the connect script.
+For purposes where chat is insufficient, an sh, csh, perl or expect script
+might meet your needs.
+This command is not optional unless the mode option is set to "dev",
+in which case any connect option will be ignored.
+.TP
+.B disconnect \fI<p>
+Use the executable or shell script \fI<p>\fR to shut down
+serial line. This could be used to hang up the modem on
+systems that don't do hardware hang-ups.
+As with the connect script, the script is run with the
+standard input and output redirected to the modem,
+and the environment variable MODEM set to the name of
+the device that the script is connected to.
+.TP
+.B lock
+Perform UUCP style locking of the serial line.
+.TP
+.B speed \fI<baud-rate>\fR
+Set the baud rate to use on the serial line.
+The default value is 38400.
+.TP
+.B modem
+Treat the serial device as a modem.
+This command will also
+be passed on to
+.B pppd
+in PPP mode.
+.TP
+.B crtscts
+Use the hardware flow control lines (RTS and CTS) to control
+the serial line. This command will also
+be passed on to
+.B pppd
+in PPP mode.
+You almost certainly want to use this command.
+
+.SS Network Configuration
+The following commands specify how diald should configure its
+network interfaces and what entries it places into the routing table.
+.TP
+.B local \fI<a>
+Sets the local IP address for the link established by
+.B diald.
+This option is not optional.
+If you are not using the dynamic option then this address must
+match the local IP address assigned to you by your provider.
+.TP
+.B remote \fI<a>
+Sets the remote IP address for the link established by
+.B diald.
+This option is also not optional.
+If you are not using the dynamic option then this address should
+match the remote IP address of your provider. (Note that due
+to the nature of IP routing this is not actually necessary,
+but your routing tables will appear confusing to you if the
+addresses don't match).
+.TP
+.B dynamic
+Dynamically change the local and remote IP addresses to match
+those obtained when an actual connection (either SLIP or PPP)
+is made. Note that in dynamic mode initial local and remote IP addresses must
+still be specified, but it is not necessary that either address be correct.
+Normally this means that you should use address from the range of
+IP numbers reserved for private networks that cannot be routed onto the
+Internet at large. These include addresses in the networks
+10.0.0.0/255.0.0.0, 172.16.0.0/255.240.0.0, and 192.168.0.0/255.255.0.0.
+If you are not already using them, the addresses 192.168.0.1 and
+192.168.0.2 are convenient lies for your local and remote address.
+Note that it is possible that you will know one of either the local or
+the remote address, even though you do not know the other.
+In this case you might as well specify the one that you do know.
+.TP
+.B dslip-mode \fI<mode>
+Set the interpretation of dynamic address information for SLIP mode.
+The possible settings are: \fBbootp\fR, \fBremote\fR, \fBlocal\fR,
+\fBremote-local\fR, and \fBlocal-remote\fR.
+If the mode is \fBbootp\fR, then the BOOTP protocol is
+used to determine the dynamic slip address.
+Otherwise dynamic slip addresses are determined by reading a banner
+string that is produced by the remote SLIP server when it starts.
+The string produced might be something like:
+.IP
+Annex address is 137.130.1.14. Your local address is 137.130.2.44.
+.IP
+The \fBdslip-mode\fR specifies which IP addresses should be
+read from the servers initial output, and in which order they
+will appear. The default mode is \fBremote-local\fR.
+.TP
+.B netmask \fI<a>
+Set the netmask to be used for the interface.
+.TP
+.B mtu \fI<m>
+Set the MTU (Maximum Transmission Unit) to \fI<m>\fR.
+The default is 1500. This is the maximum size packet that
+the networking layer will send over your physical link.
+Useful values are between 296 and 3000.
+If you choose a small value you will get better
+interactive response, larger values will get better
+throughput, at the expense of interactive response.
+Note that pppd may negotiate a value other than that you ask for.
+If you are using SLIP mode then this setting exactly the
+same as the MTU setting required by your SLIP provider.
+If the MTU settings do not match on both ends of the SLIP link
+you will experience severe performance problems.
+
+If you are using pppd, and pppd negotiates a value smaller
+than that you asked for, then diald will attempt to adjust the
+MTU to the setting negotiated by pppd.
+This is not guaranteed to work without causing errors,
+since adjusting the MTU of an interface that is already
+up is not supported by the kernel.
+Hopefully a future version of the kernel will support this.
+If a readjustment is necessary diald will issue a warning in the
+system logs. To be sure that no problems will occur you should
+probably restart diald with an MTU setting matching that reported by 
+diald in the system logs.
+.TP
+.B mru \fI<m>
+Set the MRU (Maximum Receive Unit) to \fI<m>\fR.
+This only makes sense in PPP mode. This sets the size that pppd
+will ask the remote size to choose for its MTU. This may be useful
+to help obtain matching MTU settings on both ends of the PPP link.
+.TP
+.B  window \fI<s>
+This option specifies a TCP window size to place in routing table entries.
+Choosing a window size limits the number of bytes that a TCP connection
+will place into the send queue at any one time.
+This can make a substantial difference to interactive performance.
+In theory, the window size should be not much more than the bandwidth-delay
+product, and larger window sizes can negatively impact performance.
+For a 33.2 kbps modem with a round trip time 120ms, the bandwidth
+delay product is only 576 bytes!
+This is a bit too small for practical purposes, but a window size
+between 2048 and 4096 is not out of line with an MTU between 296 and 1500.
+You should also keep the window size to a multiple of the MTU, otherwise
+there will always be a portion of the window that cannot be used.
+.TP
+.B reroute
+This command asks diald to change the system routes to point to
+the real link when it brings it up, rather than forwarding packets
+from the proxy to the real link. This is the default behavior of diald.
+.TP
+.B -reroute
+This command asks diald to forward packets from the proxy link to the
+real link, rather than change the system routes to point to the real route.
+This may be necessary to avoid locking up TCP sessions if you are running
+versions of the Linux kernel older than 2.0.0 and you have multiple
+outgoing SLIP or PPP links.
+It may also be necessary if you have other software running that will be
+confused by the constant changing of the outgoing network device.
+(It has been reported that the SOCKS Internet service proxy package has
+problems with this.)
+
+Generally this option should be avoided if at all possible, since
+its use can impose a performance penalty of up to 20% on outgoing traffic.
+.TP
+.B defaultroute
+Tell
+.B diald
+to set up a default route to the SLIP link.
+.TP
+.B proxyarp
+Tell diald to add an entry to this system's ARP [Address Resolution Protocol]
+table with the IP address of the remote system, and the Ethernet address
+of this system.
+.TP
+.B addroute \fI<script-name>\fR
+The designated script or executable
+is called by \fBdiald\fR once it has established
+the proxy device. The script is passed five arguments:
+\fI<iface> <netmask> <local-ip> <remote-ip> <metric>\fR.
+The \fI<iface>\fR argument designates the interface
+that the proxy device is using, and the next three
+arguments give the current netmask,
+local ip address and remote ip address of that interface.
+The \fI<metric>\fR argument gives the route metric that
+diald would like the routes to have.
+Diald will set this parameter to 1 for routes on the
+proxy link, and 0 for routes on a physical link.
+Some care should be taken in setting up routes for these
+two cases. Routes for the proxy link should have "0.0.0.0" as the gateway.
+Routes for the physical link should have <remote-ip> as the gateway.
+If you do not do this you will open a window during which there
+will be no network route during the transition between the proxy
+and physical links. This can cause TCP connections to be reset
+when using Linux 1.3.X or greater kernels.
+
+Note that the routing parameters may get changed between the time
+that your addroute script is first called, and the time diald
+manages to establish dynamic connection. This will result in
+the addroute script being called again.
+.TP
+.B delroute \fI<script-name>\fR
+The designated script or executable
+is called by \fBdiald\fR just before it deletes the
+proxy device (when \fBdiald\fR is about to terminate).
+The script receives the same arguments as the addroute script.
+This command is here for symmetry, it is unlikely you will need
+to use it, since the kernel will delete routes that go through
+an interface that has been taken down.
+.TP
+.B ip-up \fI<script-name>\fR
+The designated script or executable
+is called by \fBdiald\fR whenever the IP layer is brought up.
+The script receives the same arguments as the addroute script.
+Diald does not wait for this script to terminate before proceeding
+with other actions. This means that it is possible to have more than
+one copy of the script running at the same time. You should consider
+this when writing your script.
+.TP
+.B ip-down \fI<script-name>\fR
+The designated script or executable
+is called by \fBdiald\fR whenever the IP layer is brought down.
+The script receives the same arguments as the addroute script.
+Diald does not wait for this script to terminate before proceeding
+with other actions. This means that it is possible to have more than
+one copy of the script running at the same time. You should consider
+this when writing your script.
+
+.SS Timeout Commands
+The following options configure how long diald will wait for a variety
+of events, and to some extent what actions it will take when a timeout occurs.
+.TP
+.B connect-timeout \fI<t>\fR
+Set the maximum amount of time to wait for the connect script to complete
+to \fI<t>\fR seconds. The default is 60 seconds.
+.TP
+.B disconnect-timeout \fI<t>\fR
+Set the maximum amount of time to wait for the disconnect script to complete
+to \fI<t>\fR seconds. The default is 60 seconds.
+.TP
+.B redial-timeout \fI<t>\fR
+Set the delay between dialing attempts to \fI<t>\fR seconds. The default is
+30 seconds.
+.TP
+.B nodev-retry-timeout \fI<t>\fR
+Set the delay between dialing attempts when no free modem device
+is available to \fI<t>\fR seconds. The default is 1 second.
+.TP
+.B stop-dial-timeout \fI<t>\fR
+Set the maximum amount of time to wait for connect to die after
+sending a SIGINT to \fI<t>\fR seconds. The default is 60 seconds.
+.TP
+.B kill-timeout \fI<t>\fR
+Set the maximum amount of time to wait for a subprocess to
+die after sending a SIGKILL to \fI<t>\fR seconds. After
+this diald will assume there is something permanently wedge
+and terminate. (This should never happen). The default is 60 seconds.
+.TP
+.B start-pppd-timeout \fI<t>\fR
+Set the maximum amount of time to wait for
+.B pppd
+to choose
+a PPP device to \fI<t>\fR seconds. The default is 60 seconds.
+.TP
+.B stop-pppd-timeout \fI<t>\fR
+Set the maximum amount of time to wait for
+.B pppd
+to die
+after sending it SIGINT to \fI<t>\fR seconds. The default is 60 seconds.
+.TP
+.B first-packet-timeout \fI<t>\fR
+Set the first packet timeout to \fI<t>\fR seconds.
+After the link has been established there may be some delay
+before the first packet is actually sent, for example
+while
+.B pppd
+negotiates the link parameters.
+If no packets have crossed the link after \fI<t>\fR seconds
+then
+.B diald
+will assume something went wrong and shut the link down.
+The default timeout is 120 seconds.
+.TP
+.B retry-count \fI<n>\fR
+Set the maximum number of times diald should attempt to make the initial
+connection without falling back and waiting for more network traffic.
+The default is 0.
+.TP
+.B died-retry-count \fI<n>\fR
+Set the maximum number of times diald should attempt to restore a
+connection that was severed before it should fall back and
+wait for more network traffic.
+The default is 1.
+.TP
+.B redial-backoff-start
+Specifies the number of consecutive failures to connect
+allowed before diald starts doubling the delay between
+dialing attempts after each attempt. This command can be
+used to prevent diald from overwhelming the phone lines
+when the remote side is extremely busy. If this command
+is not specified redial-backoff-start is taken to be infinity,
+which effectively turns off the backoff algorithm.
+When redial-backoff-start is set,
+diald will use redial-timeout as the delay between each of
+the first redial-backoff-start unsuccessful calls.
+After this diald will double the timeout after each
+failure, up to a limit of redial-backoff-limit seconds.
+A successful connection resets the backoff algorithm.
+.TP
+.B redial-backoff-limit
+Set the maximum number of seconds diald will delay between
+failed calls when it invokes the backoff algorithm. The
+default value is 600 seconds (10 minutes).
+.TP
+.B dial-fail-limit
+Sets the maximum number of consecutive failed connection attempts
+diald will allow.
+If this limit is exceeded diald will block further connections
+until an "unblock" command is issued on the command FIFO.
+If this is set to 0 diald will not enforce any limit.
+The default value is 0.
+When this condition occurs diald will issue the following
+message to the system logs:
+
+"Too many dialing failures in a row. Blocking connection."
+
+This command is intended for use at sites that need
+to avoid the possibility of diald attempting a large
+number of long distance phone calls to a machine that is
+not operating correctly. Once diald blocks the connection
+an operator can investigate the cause, correct the problem,
+and then issue the "unblock" command to allow diald to
+continue.
+.TP
+.B route-wait\fR
+On some badly configured PPP servers, traffic will not flow until
+a routing daemon notices that the PPP link has come up, at which
+time a routing packet will cross the link from the server to the
+local side.  This option tells diald that it is interoperating with
+server that is broken in this way, and that it should not consider
+the IP layer to have come up until it sees at least one packet come
+from the remote side. Hopefully almost no-one will need this option.
+.TP
+.B two-way
+Normally if the connection is broken by the other end hanging up
+diald will immediately re-dial the other end. This command forces
+diald to re-dial only if there is some outgoing traffic.
+This is intended to be used when the other end of the link is
+also running some sort of demand dialer (possibly even diald).
+.TP
+.B give-way
+Normally if a FIFO connect request comes in while a connection script
+is running, the FIFO connect request shell is terminated. This command reverses
+this behavior so the connect script will be terminated and the FIFO request
+honoured. This is intended to be used at one (or even both) ends of a
+two-way link, to avoid problems with both ends attempting to connect
+simultaneously.
+
+.SS Packet Filter Policy Commands
+.B Diald
+maintains a virtual link to the remote site
+at all times. This link is in one of two modes.
+Either the corresponding physical link is expected to be up,
+or it is expected to be down.
+When the physical link is expected to be up
+.B diald
+will attempt to maintain
+the physical link, dialing and re-dialing if necessary.
+It will also monitor any packets passing over the virtual
+link to determine if the physical link should be brought down.
+When the physical link is expected to be down
+.B diald
+will monitor packets that are sent to the virtual link to determine
+if the physical link should be brought up.
+The general approach used by
+.B diald
+to determine when to change between these two modes is to
+keep a \fIconnection set\fR of \fIconnection identities\fR,
+each with an associated timeout.
+When a timeout associated with a connection identity
+expires, it is removed from the set.
+When the connection set is empty
+.B diald
+expects the physical link to be down,
+otherwise
+.B diald
+expects the physical link to be up.
+.LP
+This section describes the configuration options that control how
+diald constructs entries for the connection set. The
+.B diald-examples
+manual page gives some examples of how these options can be used.
+.TP
+.B prule \fI<name> <protocol> <spec>
+Define a new protocol rule called \fI<name>\fR to be used
+in filter statements. The \fI<protocol>\fR field
+must either be the name of a protocol defined in /etc/protocols,
+the special keyword "any", or an integer between 0 and 254 inclusive.
+The \fI<spec>\fR field is a list of 16 colon separated offset
+codes that specify the bytes to be extracted from a packet
+to build a \fIconnection identifier\fR.
+Each offset code is an integer, possibly prefixed with a '+'.
+Values that are not prefixed are offsets into the ip header,
+values with the '+' prefix are offsets into the data segment
+of the ip packet. 
+.TP
+.B var \fI<name> <spec>\fR
+Define a new variable called \fI<name>\fR to be used in filter
+statements. The \fI<spec>\fR portion of the definition
+defines how to construct the value of the variable from a packet.
+It consists of a byte offset to a 4 byte word, possibly prefixed with a '+', 
+optionally followed by a right shift value in brackets,
+optionally followed by a '&' character and a bit mask value.
+Offsets prefixed with '+' are offsets into the data segment
+of the ip packet, otherwise they are offsets into the ip header
+of the packet. For example, the ip source address of a packet is
+defined by
+.IP
+	var ip.saddr 12
+.IP
+which means to get the four bytes located starting at an
+offset of 12 into the packet header.
+Similarly, the ip protocol of a packet is defined by
+.IP
+	var ip.protocol 9(24)&0xff
+.IP
+which means to get the four bytes located starting at an
+offset of 9 bytes into the header, right shift the obtained
+value by 24 bits, and mask it with 0xff.
+As a final example, the source port in a tcp header is defined as
+.IP
+	var tcp.source +0(16)&0xffff
+.IP
+which says to obtain the four bytes starting at the beginning
+of the ip data segment, shift the value right by 16 bits,
+and mask it with 0xffff.
+.TP
+.B accept \fI<protocol-rule> <timeout> <packet-rule>\fR
+Define a packet matching rule to control the link.
+Packets that match an accept rule will cause the link to
+come up and stay up for at least <timeout> seconds.
+The \fI<protocol-rule>\fR must refer to a protocol rule defined
+by a previous \fBprule\fR statement.
+The value \fI<timeout>\fR must be a non negative integer.
+A \fI<timeout>\fR of zero means the connection associated with
+the packet will be killed immediately.
+.IP
+The \fI<packet-rule>\fR parameter is a list of one or
+more conditions that the packet must meet.
+As a special case the rule "any" matches all packets.
+Otherwise, a rule is written as a list of terms,
+separated by commas and no white space. Each term specifies
+either a test on some field of the packet.
+Basic terms are written as
+.IP
+	<variable-name><op><value>
+.IP
+or
+.IP
+	<variable-name>&<bitmask><op><value>
+.IP
+Where the <bitmask> is an optional binary bitmask to logical and with
+the variable value before the comparison and <op> is one of
+"=", "!=", "<=" or ">=".
+As well there are two short forms:
+"<variable-name>" and "!<variable-name>",
+which are short for "<variable-name>!=0" and "<variable-name>=0".
+.IP
+Only variable names defined by previous \fBvar\fR statements
+may be used in packet rules.
+Comparison values and bitmask values can be specified
+as decimal numbers, octal numbers, hex numbers, dots and numbers
+style ip addresses, or by symbolic names.
+The symbolic names of the form "tcp.<service>", "udp.<service>"
+match the values defined in /etc/services.
+Symbolic names can also match any protocol defined in /etc/protocols.
+.IP
+See the discussion on controlling link uptime below for further explanation
+of how accept rules are applied.
+.TP
+.B bringup \fI<protocol-rule> <timeout> <packet-rule>
+Define a packet matching rule to control the link.
+Packets that match a bringup rule will cause attempts to bring the
+link up for at least <timeout> seconds.
+These rules are ignored if the link is currently up.
+The parameters are exactly as described for the accept command.
+.IP
+See the discussion on controlling link uptime below for further explanation
+of how bringup rules are applied.
+.TP
+.B keepup \fI<protocol-rule> <timeout> <packet-rule>
+Define a packet matching rule to control the link.
+Packets that match a keepup rule will cause the link to stay
+up, if it is already up, for at least <timeout> seconds.
+These rules are ignored if the link is currently down.
+The parameters are exactly as described for the accept command.
+.IP
+See the discussion on controlling link uptime below for further explanation
+of how keepup rules are applied.
+.TP
+.B ignore \fI<protocol-rule> <packet-rule>
+Define a packet matching rule to control the link.
+Packets that match an ignore rule will be ignored and
+will not match any later rules.
+Except for the lack of a <timeout> parameter,
+the parameters are exactly as described for the accept command.
+.IP
+See the discussion on controlling link uptime below for further explanation
+of how ignore rules are applied.
+.TP
+.B restrict \fI<start> <end> <weekdays> <monthdays> <months>
+.TP
+.B or-restrict \fI<start> <end> <weekdays> <monthdays> <months>
+Normally filter rules apply at all times. The restrict statement
+makes all filter rules following the restrict statement, up
+to the next restrict statement, apply only at the times indicated
+by the restrict statement. A restrict statement provides five numeric
+fields. The first two fields indicate a starting time and an ending
+time, given in the form "HH:MM:SS". If "*" is given for the
+start time it is taken as meaning "00:00:00". Similarly
+if "*" is given for the end time it is taken as meaning "23:59:59".
+For the remaining three fields, each field is either "*",
+to indicate all possible values, or a comma separated list
+of numbers and number ranges.
+The \fI<weekdays>\fR field specifies the days of the week
+Acceptable numbers are in the range 0-6, where the number 0
+is Sunday, the number 1 is Monday, and so forth.
+The \fI<monthdays>\fR field specifies the days of the month.
+Acceptable numbers are in the range 1-31.
+The \fI<months>\fR field specifies the months of the year.
+Acceptable numbers are in the range 1-12.
+A restrict command specifies an range of times.
+The or-restrict command expands the immediately preceding restrict
+to include the range of times specified by the or-restrict command.
+As an example, to restrict the following filter rules to
+be applicable from 2-3 AM and 5-6 PM every Sunday one
+would use the statements:
+.IP
+	restrict 2:00:00 3:00:00 0 * *
+.br
+	or-restrict 17:00:00 18:00:00 0 * *
+.IP
+WARNING: this interface is experimental and the syntax may change in future 
+versions of diald.
+.TP
+.B up
+The up rule forces the link to be up at all times, regardless of
+the packet filtering that is in force. The application of this rule
+can be limited by the use of a restrict statement.
+For example, the sequence of commands
+.IP
+	restrict 12:00:00 13:00:00 * * *
+.br
+	up
+.IP
+would force the link to be up from 12:00-1:00 PM every day.
+.TP
+.B down                           
+The down rule forces the link to be down at all times, regardless
+of the packet filtering that is in force. The application of this
+rule can be limited by the use of a restrict statement.
+For example, the sequence of commands
+.IP
+	restrict 12:00:00 13:00:00 * * *
+.br
+	down
+.IP
+would force the link to be down from 12:00-1:00 PM every day.
+.IP
+NOTE: Up and down rules with overlapping restrictions are applied
+in the order they are given. For example, The sequence
+.IP
+	restrict 12:30:00 12:39:00 * * *
+.br
+	down
+.br
+	restrict 12:00:00 13:00:00 * * *
+.br
+	up
+.IP
+would bring the link up at 12:00 PM, bring it back down at
+12:30, back up at 12:40, and let the line float up or down
+depending upon traffic after 1:00 PM.
+.TP
+.B impulse \fI<duration>,<fuzz>
+.TP
+.B impulse \fI<initial-duration>,<secondary-duration>,<fuzz>
+The impulse command is used to control the link up time in
+units larger than a single second. This is intended to be
+used in areas where phone connections are charged in impulses.
+In the two argument form, the \fI<duration>\fR
+parameter indicates the number of seconds that diald will
+keep the line up before checking to see if it is idle.
+The \fI<fuzz>\fR parameter is the number of seconds that diald
+will continue to monitor the idle state before waiting
+for \fI<duration>\fR seconds again.
+In the three argument form, the \fI<initial-duration>\fR
+parameter indicates the minimum number of seconds diald will keep the
+line up once a call has been initiated. After this timer expires
+diald will proceed as for the two argument case using the
+\fI<secondary-duration>\fR parameter in place of the \fI<duration>\fR
+parameter.  Zero values for \fI<duration>\fR and
+\fI<fuzz>\fR turn off the impulses feature.
+
+For example, if on Sundays your phone connections are charged
+in units of $1 per 1 hour chunk, and no matter how much of
+each chunk you use you pay the full $1, then you might as well
+keep the connection up for 1 hour once you've made it.
+To accomplish this you might use the following commands.
+.IP
+	restrict * * 0 * *
+.br
+	impulse 3570,30
+.IP
+This will keep the link up for 3570 seconds at a time, with a 30 second
+leeway to account for the time required to make and break the connection.
+Note that the \fI<fuzz>\fR factor should not be made to small, since otherwise
+diald may not be able to hang up the connection before your call is
+being billed in the next impulse.
+
+Similarly, if you're calls are billed by the second, but there is a
+minimum charge for the first 10 minutes, then you might use the
+following command.
+.IP
+	impulse 600,0,0
+.TP
+.B flushfilters
+Remove all existing filter rule definitions.
+.TP
+.B flushprules
+Remove all existing protocol rule definitions.
+.TP
+.B flushvars
+Remove all existing variable definitions.
+
+.SH DIAGNOSTICS
+.LP
+Exits with status 1 if something causes diald to terminate
+abnormally.
+Error and information messages are logged to the syslog daemon
+under the LOCAL2 facility. If diald is not running in daemon
+mode, then they are also printed on stderr.
+Setting the debugging mask flags can greatly increase the amount
+of this output. If you turn debugging on watch your log files!
+
+.SH FILES
+.TP
+/etc/diald.conf
+Default configuration file.
+.TP
+/etc/diald.defs
+Default protocol rules and variable definitions.
+.TP
+/var/lock/LCK..*
+UUCP style lock files for serial devices.
+.TP
+/var/run/*
+Logging for the pid of a running diald. By default the file
+diald.pid is used. This can be changed with the pidfile command.
+
+.SH SEE ALSO
+.LP
+dctrl(1), diald-examples(5), diald-control(5), diald-monitor(5),
+pppd(8), chat(8), expect(1)
+
+.SH AUTHOR
+.LP
+Eric Schenk (Eric.Schenk@dna.lth.se)
+.SH BUGS AND LIMITATIONS
+.LP
+There are some known problems and limitations.
+.LP
+Lines in configuration files can contain at most 1024 characters.
+Longer lines are silently truncated.
+.LP
+If there are no filter rules specified then no packets will
+be matched and the daemon won't do anything. It should
+probably match all packets by default in this case.
+.LP
+Diald attempts to automatically adjust the MTU of the proxy
+to match the MTU of the actual connection negotiated by ppp,
+but this is not guaranteed to work, since changing the MTU
+on an active interface is not supported by the kernel.
+It is possible that an auto adjusted MTU will cause some long
+packets to get dropped on the floor.
+If you are having problems you should match these values manually.
+Diald will report the negotiated MTU in the system logs and
+warn you that you should adjust the settings.
+.LP
+The monitor command represents a security risk as anyone who has
+access to a diald control FIFO can ask diald to write to any
+named pipe in the system. Be careful with the permissions on your
+FIFO's.

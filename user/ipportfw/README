@@ -1,0 +1,184 @@
+Port Forwarding
+http://www.monmouth.demon.co.uk/ipsubs/portforwarding.html
+
+This is my first attempt at documenting the code I wrote to expand 
+on the functionality of the IP Masquerading code included in Linux 
+2.0.* kernels.
+
+Port Forwarding - What is it?
+
+The easiest way to imagine Port Forwarding is a combination of
+routing by port combined with packet rewriting. A convention router
+examines the packet header and dispatches the packet on one of it's other
+interfaces, depending on the packet's destination address. Port
+Forwarding examines the packet header and forwards it on to another
+host (after a little header rewriting) depending on the destination
+port.
+
+In more detail: Port forwarding forwards all packets intended
+for one forwarding port on the gateway from the external networks to
+routed on a specified port on one of the internal machines (after a little
+rewriting of headers). This is (in some ways) a reverse of masquerading and
+uses many of the maquerading functions - particularly the packet header
+rewriting code.
+
+
+Confused? Here's an example:
+
+On the gateway, we setup the rule that all connections to port 80/tcp
+should be redirected to port 80 on 10.0.0.2 (an internal machine).
+The incoming web connection would be labelled:
+
+Source: 163.158.1.2/7890  Dest: 194.160.1.1/80
+
+This would be forwarded on to the internal host as:
+
+Source: 163.158.1.2/7890  Dest: 10.0.0.2/80
+
+Replies would be labelled:
+
+Source: 10.0.0.2/80       Dest: 163.158.1.2/7890
+
+and would be rewritten by the gateway to:
+
+Source 194.160.1.1        Dest: 163.158.1.2/7890
+
+This has a number of advantages over using tools like nc and
+plug-gw to do the forwarding:
+
+
+
+As there is less copying of packets in memory, it's much faster.
+
+Internal hosts see the original connection source so so logs are
+meaningful.
+
+It's easy to load split between the internal hosts. The
+choice of host can also depend on live feedback such as which
+machine has the lower load average. This decision making is done
+entirely in userspace so is easy to implement.
+
+As redirection is done at a packet level, you don't need
+different gatewaying tools for different services.
+
+It's very stable. Our gateway machine has been crashed many times (it's
+not difficult to crash a machine with only 4Mb of memory) but it's carried
+on forwarding/masquerading although someone notices that they can't log in
+and reboots it. 
+
+
+Port Forwarding - How does it work?
+
+[This section is optional reading and is not necessary to use Port
+Forwarding]
+
+Port forwarding uses the existing masquerading scheme to do all the
+rewriting of packets. The masquerading table (what you see when you
+type netstat -M or ipfwadm -M -l) is setup as if the connection started
+internally. When the existing masquerading code receives a packet from the
+external interface, it checks whether the destination port is in the range
+61000-64999 and, if so, checks for any current entries in the masquerading
+table. If there is a matching entry, it rewrites the packet header and
+forwards it onto its new desintation. Port forwarding performs an
+additional check on the destination port if it isn't in the masquerading
+range to see whether it's a forwarding port. If it is, we let the
+existing code check for an entry in the masquerading table. If a
+corresponding entry exists in the masquerading table, the existing
+masquerading code rewrites the header and sends the packet out. If the
+destination port is a forwarding port but doesn't have an entry in
+the masquerading table, we create a suitable entry in the table
+before rewriting the packet and sending it out. 
+
+
+Port Forwarding - How do I use it?
+
+The code was original written for Linux 2.0.27-29 and worked with many
+other 2.0.* kernel. Changes were made to the kerne's masquerading code in
+2.0.30 and this provoked me to improve and upgrade my patches while
+converting them for 2.0.30. The new patches use 17k less memory when in
+use and are smaller, neater and better integrated into the kernel
+distribution and with a Makefile option.
+
+
+Port Forwarding - Anything else?
+
+When I wrote this code, I didn't imagine anyone else ever using this code
+other than the computer group I mentioned. I would appreciate all comments
+on the idea of port forwarding and its implementation, whether it's
+"didn't you know there's a much easier way of doing it" or "I liked
+the idea but I extended it by doing ...". If there are any mistakes or
+areas that aren't clear in the above documentation, please also let me
+know. My email address is:
+steven@monmouth.demon.co.uk
+
+
+First FAQ: I now know what port forwarding is but what's IP
+Substitution or IPSubs?
+
+Answer: IP Substitution was the original name I gave to the
+code I wrote. I subsequently decided I didn't like the name and changed it
+to Port Forwarding instead.
+
+Lastly...
+
+
+Last updated on 24th January, 2000
+www.monmouth.demon.co.uk
+
+
+--------------------------------------------------------------
+
+Patch the kernel, configure the kernel (remember to enable the
+CONFIG_IP_MASQUERADE_IPPORTFW option) and recompile (replace x with
+appropriate
+version):
+
+cd /usr/src/linux
+zcat subs-patch-1.3x.gz | patch -p1
+
+Compile the configuration utility:
+
+gcc ipportfw.c -o ipportfw
+chmod a+x ipportfw
+
+Before attempting to setup Port forwarding, set up and use IP
+Masquerading. Until it's enabled with ipportfw, Port forwarding will
+not affect IP Masquerading in
+any way.
+
+To configure redirection of a local port (local refers to the machine
+running the masquerading), you need to use ipportfw. It's options can
+be described as:
+
+ipportfw -h
+ipportfw
+
+Usage: ipportfw -A -[t|u] l.l.l.l/lport -R a.a.a.a/rport  add entry
+       ipportfw -D -[t|u] l.l.l.l/lport                   delete entry
+       ipportfw -C                                        clear table
+       ipportfw -L                                        list table
+
+l.l.l.l is the local interface receiving packets to be forwarded.
+a.a.a.a is the remote address.
+lport is the port being redirected.
+rport is the port being redirected to.
+
+You need an example? ok.
+
+/sbin/ipfwadm -I -f
+/sbin/ipfwadm -O -f
+/sbin/ipfwadm -F -f
+
+/sbin/ipfwadm -F -p deny
+/sbin/ipfwadm -F -a masquerade -S 10.0.0.0/8 -D 0.0.0.0/0
+ 
+/usr/local/sbin/ipportfw -C
+/usr/local/sbin/ipportfw -A -t194.160.1.1/80 -R 10.0.0.2/80
+/usr/local/sbin/ipportfw -A -u194.160.1.1/525 -R 10.0.0.2/525
+ 
+/usr/local/sbin/ipportfw -L
+Prot Local Addr/Port > Remote Addr/Port                        
+
+TCP 194.160.1.1/80 > 10.0.0.2/80
+
+UDP 194.160.1.1/525 > 10.0.0.2/525

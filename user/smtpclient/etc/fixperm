@@ -1,0 +1,31 @@
+#!/bin/sh
+##
+##  fixperm -- Fix File Permission inside Sourcetree
+##  Copyright (c) Ralf S. Engelschall, All Rights Reserved.
+##
+
+for p in $*; do
+    for file in `find $p -depth -print`; do
+    	if [ -f $file ]; then
+    	    if [ -x $file ]; then
+    	        echo "    $file (FILE/EXEC)"
+    			chmod 775 $file
+				chown rse.users $file
+    		else
+    	        echo "    $file (FILE/REGULAR)"
+    			chmod 664 $file
+				chown rse.users $file
+    		fi
+    		continue
+    	fi
+    	if [ -d $file ]; then
+    	    echo "    $file (DIR)"
+    		chmod 775 $file
+		    chown rse.users $file
+    		continue
+    	fi
+    	echo "    $file (UNKNOWN)"
+    done
+done
+
+##EOF##

@@ -1,0 +1,15 @@
+hostname IXDPG425 
+expand /etc/ramfs.img /dev/ram1
+mount -t proc proc /proc
+mount -t ext2 /dev/ram1 /var
+#mount -o remount,rw /dev/root /
+mkdir /var/config/ /var/tmp /var/log /var/run /var/lock /var/empty
+> /etc/config/start
+> /etc/config/inittab
+ifconfig lo 127.0.0.1
+insmod ixp400.o
+insmod ixp425_eth.o
+setmac -n 2 -m "RedBoot config" -r "npe_eth%d_esa"
+route add -net 127.0.0.0 netmask 255.255.255.0 lo
+dhcpcd -t 0 eth0 &
+cat /etc/motd

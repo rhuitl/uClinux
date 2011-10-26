@@ -1,0 +1,55 @@
+# Makefile for uClibc
+#
+# Copyright (C) 2000-2005 Erik Andersen <andersen@uclibc.org>
+#
+# Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
+#
+
+CFLAGS-ldso := -DNOT_IN_libc -DIS_IN_rtld $(SSP_DISABLE_FLAGS)
+
+# This stuff will not work with -fomit-frame-pointer
+CFLAGS-ldso += -fno-omit-frame-pointer
+
+CFLAGS-ldso += -I$(top_srcdir)ldso/ldso/$(TARGET_ARCH) -I$(top_srcdir)ldso/include -I$(top_srcdir)ldso/ldso
+CFLAGS-ldso += -DUCLIBC_RUNTIME_PREFIX=\"$(RUNTIME_PREFIX)\" -DUCLIBC_LDSO=\"$(UCLIBC_LDSO)\"
+
+CFLAGS-ldso/ldso/$(TARGET_ARCH)/ := $(CFLAGS-ldso)
+
+CFLAGS-ldso.c := -DLDSO_ELFINTERP=\"$(TARGET_ARCH)/elfinterp.c\"
+
+ifneq ($(SUPPORT_LD_DEBUG),y)
+LDFLAGS-$(UCLIBC_LDSO_NAME).so := $(LDFLAGS)
+else
+LDFLAGS-$(UCLIBC_LDSO_NAME).so := $(LDFLAGS_NOSTRIP) -z defs
+endif
+LDFLAGS-$(UCLIBC_LDSO_NAME).so += -e _start -z now -Bsymbolic --export-dynamic --sort-common --discard-locals --discard-all --no-undefined
+
+ldso_FULL_NAME := $(UCLIBC_LDSO_NAME)-$(VERSION).so
+
+$(UCLIBC_LDSO_NAME)_DIR := $(top_srcdir)ldso/ldso
+$(UCLIBC_LDSO_NAME)_OUT := $(top_builddir)ldso/ldso
+
+$(UCLIBC_LDSO_NAME)_CSRC := $($(UCLIBC_LDSO_NAME)_DIR)/ldso.c
+$(UCLIBC_LDSO_NAME)_COBJ := $(patsubst $($(UCLIBC_LDSO_NAME)_DIR)/%.c,$($(UCLIBC_LDSO_NAME)_OUT)/%.o,$($(UCLIBC_LDSO_NAME)_CSRC))
+
+$(UCLIBC_LDSO_NAME)_SSRC := $(wildcard $($(UCLIBC_LDSO_NAME)_DIR)/$(TARGET_ARCH)/*.S)
+$(UCLIBC_LDSO_NAME)_SOBJ := $(patsubst $($(UCLIBC_LDSO_NAME)_DIR)/$(TARGET_ARCH)/%.S,$($(UCLIBC_LDSO_NAME)_OUT)/$(TARGET_ARCH)/%.o,$($(UCLIBC_LDSO_NAME)_SSRC))
+
+$(UCLIBC_LDSO_NAME)_OBJS := $($(UCLIBC_LDSO_NAME)_COBJ) $($(UCLIBC_LDSO_NAME)_SOBJ)
+
+ldso-y := $($(UCLIBC_LDSO_NAME)_OBJS:.o=.oS)
+
+lib-so-y += $(ldso)
+objclean-y += $(UCLIBC_LDSO_NAME)_clean
+
+$(ldso): $(ldso:.$(MAJOR_VERSION)=)
+$(ldso:.$(MAJOR_VERSION)=): $($(UCLIBC_LDSO_NAME)_OUT)/$(UCLIBC_LDSO_NAME)_so.a
+	$(call link.so,$(ldso_FULL_NAME),$(MAJOR_VERSION))
+
+$($(UCLIBC_LDSO_NAME)_OUT)/$(UCLIBC_LDSO_NAME)_so.a: $(ldso-y)
+	$(Q)$(RM) $@
+	$(do_strip)
+	$(do_ar)
+
+$(UCLIBC_LDSO_NAME)_clean:
+	$(RM) $($(UCLIBC_LDSO_NAME)_OUT)/*.{o,os,oS,a} $($(UCLIBC_LDSO_NAME)_OUT)/*/*.{o,os,oS}

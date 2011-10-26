@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# To: mgetty@muc.de
+# Date: Sat, 4 Apr 1998 19:33:40 +0200
+# From: "Markus Hövekamp" <mh@adson.westfalen.de>
+# Message-ID: <352660E4.253ECA61@adson.westfalen.de>
+# Organization: Private Linux-Site in Muenster/Westfalia
+# Subject: Re: Yet another way to handle incoming fax
+# Status: RO
+#
+# After reading the articles in this thread I decided to change my new_fax
+# script. The following script combines all received pages to one
+# tiff-file which is sent to all recipients beeing in the alias for fax.
+# Reading the fax is quite easy with Netscape when the tiffsurf-plugin is
+# installed.
+#
+# As the script may be usefull for someone I'll post it here. It's quite
+# short (and perhaps not that elegant...), but for me it works great.
+#
+# Bye,
+# Markus.
+#
+# -----
+#
+#!/bin/sh
+#
+MAILTO="Faxverteiler <fax>"
+SENDER="$2"
+
+case $4 in
+  /var/spool/fax/incoming/fn*) STRETCH=-s ;; # find out resolution
+  *) STRETCH=
+esac
+
+FAX=`echo $1|sed 's/...$//'`
+FAX_BASENAME=`basename $FAX`
+
+fax2tiff $STRETCH -M -4 -o /tmp/$FAX_BASENAME.tiff $FAX.*
+metasend -b -F "Fax Getty <root>" -f /tmp/$FAX_BASENAME.tiff \ 
+  -m image/tiff -s "fax from $SENDER" -S 4000000 -t $MAILTO 
+rm /tmp/$FAX_BASENAME.tiff
+
+exit 0
+

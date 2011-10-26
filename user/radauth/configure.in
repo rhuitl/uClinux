@@ -1,0 +1,52 @@
+AC_INIT(conf/acgeneral.m4)
+
+dnl AC_ARG_PROGRAM
+
+AC_ARG_ENABLE(debug,[ --enable-debug	Enable debug mode. (Default=no)],,enable_debug="no")
+
+
+AC_PROG_MAKE_SET
+AC_PROG_CC
+AC_SUBST(CC)
+
+AC_MSG_CHECKING(this systems operating system)
+AC_CACHE_VAL(box_sys_os,
+[
+if test "$uname_prog" != "no"; then
+  box_sys_os="`uname`"
+
+  case "$box_sys_os" in
+    SunOS)
+      case "`uname -r`" in
+        5.*) box_sys_os="Solaris";
+      esac
+      DEFINES="$DEFINES -DSUNOS"
+    ;;
+    *BSD)
+	DEFINES="$DEFINES -DBSD"
+    ;;
+  esac
+fi
+])
+AC_MSG_RESULT($box_sys_os)
+
+AC_CHECK_LIB(socket, socket, LIBS="$LIBS -lsocket")
+AC_CHECK_LIB(nsl, inet_addr, LIBS="$LIBS -lnsl")
+
+AC_MSG_CHECKING(if to compile in debug mode)
+
+AC_MSG_RESULT($enable_debug)
+
+if test "x$enable_debug" = "xyes" ; then
+	DEFINES="$DEFINES -DDEBUG"
+	DEBUG="-g"
+else
+	DEBUG="-O3"
+fi
+
+AC_SUBST(LIBS)
+AC_SUBST(DEFINES)
+AC_SUBST(DEBUG)
+AC_SUBST(DELETE)
+
+AC_OUTPUT(Makefile)

@@ -1,0 +1,231 @@
+.TH faxspool 1 "23 Nov 02" "greenie" "mgetty+sendfax manual"
+.IX faxspool
+.SH NAME
+faxspool \- queue and convert files for faxing with sendfax(8)
+.SH SYNOPSIS
+.B faxspool
+.RB [options]
+.RI phone-number
+.RI files...
+.SH DESCRIPTION
+Queue the named files for later transmission with
+.I sendfax(8).
+The input files are converted to G3 fax files, spooled to
+@FAX_SPOOL_OUT@/<dir>/f*.g3, and queued for transmsssion to the
+fax address "phone-number".
+
+On top of each page,
+.I faxspool
+puts a header line, telling the other
+side the number of pages, your fax id, ..., whatever you like. The
+format of this line is configurable via the file
+.B @CONFDIR@/faxheader
+and per-user via the file
+.B $HOME/.faxheader.
+(you can select another one with the "-h" option, for example, one for
+your business faxes and one for the private stuff).
+
+This file should contain a few lines of text, normally only one line,
+but more than one line is permitted. The text may use the tokens
+@T@ for the remote telephone number, @U@ for the sending user
+name, @N@ for his full name (fifth field of /etc/passwd, if not given
+with "-F"), @P@ for the page number and @M@ for the total number of
+pages. @D@ will be replaced by the string specified with the "-D"
+option (see below), @DATE@ will be substituted by the output of the
+`date` command, and @ID@ stands for the sender's fax number
+(FAX_STATION_ID).
+
+If "phone-number" contains non-numeric characters,
+.I faxspool
+interprets it as an alias and tries to look it up in the files
+.B @CONFDIR@/faxaliases
+and
+.B $HOME/.faxnrs.
+These files have a very simple format: one line per alias, alias name
+first, whitespace (tab or blank), phone number. Optionally, you can place
+a short description of the receiver after the phone number, this will be
+used as if it had been specified with "-D" (an explicit "-D" flag
+overrides this).
+
+Example: gert 0893244814 Gert Doering
+
+.sp
+Access control is handled similar to the way "crontab" does it: if a file
+@CONFDIR@/fax.allow exists, only those users listed
+in that file (one name per line) may use the fax service. If it does not
+exist, but a file @CONFDIR@/fax.deny exists, all users
+but those listed in that file may use faxspool(1), and if neither file
+exists, only root may send faxes. (Note: if the user name in the
+fax.allow file is followed by a blank, the rest of that line is
+ignored. Some other fax spooling software uses this to store
+additional information about the user sending the request).
+
+.sp
+Optionally,
+.I faxspool
+can generate user-customizable fax cover pages. It is quite easy to set
+up: if a file @LIBDIR@/make.coverpg exists and is executable, it is run
+with all relevant source/destination data on the command line, and its
+output is sent as the first page of the resulting fax. If $HOME/.make.coverpg
+exists, this file is used instead. See coverpg(1) for
+details.
+
+.IX fax
+.SH OPTIONS
+.TP
+.B -n
+Tells
+.I faxspool
+to use normal resolution (as opposed to the default, fine resolution) both
+when converting files to G3 format and when transmitting (no effect on pbm
+files)
+.TP
+.B -h <text file>
+Use
+.B <text file>
+for the FAX header line(s).  The default format file for
+.I faxspool
+is
+.B @CONFDIR@/faxheader. '-' means 'no header line'.
+.TP
+.B -q
+do not output progress messages (file ... is format ..., spooling to ...).
+Error messages will be seen anyway.
+.TP
+.B -f <mail address>
+Use the address given for the status mail that faxrunq(1) sends after
+completing / dequeueing the request. If no mail address is specified,
+the requesting user (on the local machine) gets the mail.
+.TP
+.B -u <user name>
+Do not use the current user ID for authentication purposes but the
+user name specified. Since this can lead to easy breach of security,
+only "trusted" users may use this flag. Currently, those users are
+"root", "lp" and "daemon" (hardwired into the code). Note: the status mail
+will still go to the user running faxspool(1) unless changed with "-f".
+.TP
+.B -D <destination>
+Verbose form of the fax's destination. Used only for informational
+purposes, that is, faxq(1) will show it, faxrunq(1) will put it
+into the return mail ("Subject: your fax to ..."), and a @D@ in the
+page header will be replaced by it.
+.TP
+.B -F <description>
+Full name or similar description of the sending user (if not specified,
+the full name field from /etc/passwd will be used). Used only for
+informational purposes, that is, faxspool(1) will substitute a @N@ in the
+page header file with it, and it will be passed to the cover page program
+(if used) as <sender-NAME>.
+.TP
+.B -P <priority>
+Sets the priority of the fax in the queue. 9 is highest (meaning: faxes
+get sent out first), 1 is lowest. If nothing is specified, a default
+value of 5 is used. Right now, only
+.I faxrunqd
+understands priority,
+.I faxrunq
+will silently ignore it.
+.TP
+.B -C <cover page program>
+Specify that the named program is to be used to generate a cover page for
+the fax that is being queued. How the program is called is described in the
+coverpg(1) manpage.
+
+The special program name "-" is used to specify "no coverpage at all".
+
+No message is issued if the program isn't found, or cannot be executed,
+faxspool will simply queue the fax without cover page.
+
+The default cover page program used is $HOME/.make.coverpg; if this file
+doesn't exist @LIBDIR@/make.coverpg is used. (However, if $HOME/.make.coverpg
+exists, but is not executable, no coverpage is used at all.)
+.TP
+.B -p
+Spool a request that will try polling (see "sendfax -p"). The
+implementation isn't too smart yet, the polled files will simply go
+into the job's spool directory.
+.TP
+.B -t <hh:mm>
+Don't send the fax before the time given. It may not be sent exactly at
+<hh:mm>, but the first time
+.I faxrunq
+runs after that time. If the fax cannot be sent successfully before
+midnight, it won't be sent on the next day until <hh:mm>!
+.TP
+.B -t <hh:mm>-<hh:mm>
+Only send the fax in the time range between those two times.  This is only
+implemented in 
+.I faxrunqd.
+If the second time specified is 'earlier' than the first time, it is 
+interpreted as a time range crossing midnight.
+.TP
+.B -A <data>
+pass faxspool a chunk of data that is ignored (so you can put anything you
+want here), but written to all the log files (acct.log, sendfax.log).  
+This can be used to tag faxes as private/corporate, to tag faxes with 
+the customer ID to use for billing, or something along that lines.
+.TP
+.B -m <phone1> <phone2> <phone3> ... --
+Multicasting - send the specified files to all phone numbers in the
+list given after "-m". The list is terminated with "--". "-m" has to
+be the last option on the command line.
+.TP
+.B -M <file name>
+Multicasting - read a list of telephone numbers to send the fax to
+from the given file. Do not use in conjunction with "-m".
+.TP
+.B -c
+Copy source files to a sub directory ".source-files/" in the fax queue
+directory (most likely, you won't ever need this - I needed it for one
+project, so it's here and documented. Don't ask what it's good for).
+.SH FILES
+.TP
+.B @FAX_SPOOL_OUT@/*
+fax spool directory
+.TP
+.B @CONFDIR@/faxaliases
+global fax alias file
+.TP
+.B $HOME/.faxnrs
+private fax alias file
+.TP
+.B @CONFDIR@/fax.allow
+list of allowed users
+.TP
+.B @CONFDIR@/fax.deny
+list of denied users
+.TP
+.B @CONFDIR@/faxheader
+default fax page header
+.TP
+.B @LIBDIR@/make.coverpg
+program to create fax cover page (see coverpg(1)).
+.TP
+.B @CONFDIR@/faxspool.rules
+program to control which file extentions are recognized (.txt, .ps, ...)
+and how those file formats should be converted to G3.
+.TP
+.B @LIBDIR@/faxq-helper
+this a small C helper program that facilitates access to the fax spool
+queue (which is since mgetty 1.1.29 no longer world-writeable)
+.fi
+
+.SH BUGS
+.I faxspool
+is not too smart about recognizing file types
+
+Use of
+.I faxspool -n
+with bitmap files may give wrong results, depending on the aspect ratio of 
+the input files.
+
+Multicasting with the -m and -M options is not implemented yet.
+
+.SH "SEE ALSO"
+g3cat(1), pbm2g3(1), sendfax(8), faxrunq(1), faxrunqd(8), faxq(1), faxqueue(5),
+coverpg(1)
+.SH AUTHOR
+.I faxspool
+is Copyright (C) 1993-2002 by Gert Doering, <gert@greenie.muc.de>.  Access
+control and alias handling suggested by Caz Yokoyama,
+<caz@shoki.osk.psq.mei.co.jp>.

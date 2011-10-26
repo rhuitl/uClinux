@@ -1,0 +1,41 @@
+file: README.disk
+date: 01-Oct-2000
+
+The LILO source directory contains the source code to produce a diag-
+nostic floppy disk for determining the BIOS capabilities of your sys-
+tem, as well as the disk geometry of each of your hard drives.
+
+Creating the floppy
+===================
+Change into the LILO source code directory.  Insert a formatted floppy
+disk into the A: drive (/dev/fd0).  Type the command "make floppy". 
+After the files have assembled, the bootable floppy disk will be created.
+
+Running the diagnostic
+======================
+Use CTRL-ALT-DELETE to re-boot your system from the floppy disk.  This
+allows the diagnostic program, disk.com, to interrogate your BIOS with-
+out having an operating system between it and your BIOS and hardware.
+The diagnostic program will report on the EBDA (Extended BIOS DATA Area),
+as the size of this area affects where LILO loads into memory.  It will
+also report on your disk geometry:  the number of cylinders, heads, and
+sectors that LILO will see in trying to boot your machine.  Sometimes
+the diagnostic will report two different sets of geometry for the same
+hard drive.  This happens when the old BIOS call (fn=0x08, int=0x13),
+which is limited to 1024 cylinders, is unable to address all sectors
+on your disk.  The second line is from the new BIOS call (the EDD packet
+interface on int=0x13), which allows addressing all sectors on the 
+disk.
+
+Caution
+=======
+If you have an older system, and run a "soft" BIOS, such as EZ-DRIVE,
+MaxBlast, or Disk Manager, you must allow the soft BIOS to install first
+from your hard drive, then follow the instructions to boot from floppy.
+Remember, LILO will see the soft BIOS in booting from the hard drive, 
+so you must be sure that the diagnostic utility booted from floppy also
+sees the soft BIOS.  If you boot from the A: drive ahead of the C: drive
+in this case, the diagnostic floppy report may be misleading.
+
+John Coffman  <johninsd@san.rr.com>
+(end)

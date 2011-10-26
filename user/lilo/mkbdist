@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+MINOR=`grep VERSION_MINOR <version.h | sed -e "s/.*VERSION_MINOR *//" `
+MAJOR=`grep VERSION_MAJOR <version.h | sed -e "s/.*VERSION_MAJOR *//" `
+MEDIT=`grep <version.h VERSION_EDIT | sed -e "s/.*VERSION_EDIT *\"//" -e "s/\" *//"`
+VERSION=$(echo $MAJOR.$MINOR)
+VERSNUM=$(echo $MAJOR.$MINOR$MEDIT)
+SBIN=sbin
+BOOT=boot
+DOS=dos
+MAN=man
+USR=usr
+MAN_DIR=$USR/$MAN
+USRSBIN_DIR=$USR/$SBIN
+
+BINARY=lilo-$VERSNUM.bin.tar.gz
+STATIC=lilo-$VERSNUM.bin.static.tar.gz
+
+DIR=$(pwd)
+echo VERSION = $VERSION
+echo VERSNUM = $VERSNUM
+
+make alles
+make tidy
+
+	if [ ! -d $SBIN ]; then mkdir $SBIN; fi
+	if [ ! -d $BOOT ]; then mkdir $BOOT; fi
+	if [ ! -d $USR ]; then mkdir $USR; fi
+	if [ ! -d $USRSBIN_DIR ]; then mkdir $USRSBIN_DIR; fi  
+	if [ ! -d $MAN_DIR ]; then mkdir $MAN_DIR; fi  
+	if [ ! -d $MAN_DIR/man5 ]; then \
+	  mkdir $MAN_DIR/man5; fi  
+	if [ ! -d $MAN_DIR/man8 ]; then \
+	  mkdir $MAN_DIR/man8; fi  
+	if [ -f diag1.img ]; then \
+	  cp -f diag1.img $BOOT; fi
+	if [ -f diag2.img ]; then \
+	  cp -f diag2.img $BOOT; fi
+	cp mkrescue $SBIN
+	cp lilo $SBIN
+	strip $SBIN/lilo
+	cp keytab-lilo.pl $USRSBIN_DIR
+	cp manPages/lilo.8 $MAN_DIR/man8
+	cp manPages/mkrescue.8 $MAN_DIR/man8
+	cp manPages/lilo.conf.5 $MAN_DIR/man5
+	gzip -9 $MAN_DIR/man8/lilo.8
+	gzip -9 $MAN_DIR/man8/mkrescue.8
+	gzip -9 $MAN_DIR/man5/lilo.conf.5
+
+pushd ..
+DISTDIR=$(pwd)
+popd
+
+
+tar cvf - COPYING \
+  $SBIN/* $BOOT/* $USRSBIN_DIR/* $MAN_DIR/* $DOS/lilo.com |
+  gzip -9 > $BINARY
+
+cp -f lilo.static $SBIN/lilo
+strip $SBIN/lilo
+tar cvf - COPYING \
+  $SBIN/* $BOOT/* $MAN_DIR/* $USRSBIN_DIR/* $DOS/lilo.com |
+  gzip -9 > $STATIC
+
+mv -fv $BINARY $STATIC $DISTDIR
+
+echo ""
+echo $BINARY is in $DISTDIR
+echo $STATIC is in $DISTDIR
+
+# make tidy

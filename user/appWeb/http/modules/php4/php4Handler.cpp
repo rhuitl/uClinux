@@ -1,0 +1,556 @@
+///
+///	@file 	php4Handler.cpp
+/// @brief 	PHP content handler
+///
+///	The PHP handler provides an efficient way to process PHP content in-process.
+///
+//  +----------------------------------------------------------------------+
+//  | PHP Version 4                                                        |
+//  +----------------------------------------------------------------------+
+//  | Portions Copyright (c) 1997-2002 The PHP Group.                      |
+//	| Portions Copyright (c) Mbedthis Software LLC, 2003-2004.             |
+//  +----------------------------------------------------------------------+
+//  | This source file is subject to version 2.02 of the PHP license,      |
+//  | that is bundled with this package in the documentation, and is       |
+//  | available at through the world-wide-web at                           |
+//  |                                                                      |
+//  |     http://www.php.net/license/2_02.txt.                             |
+//  |                                                                      |
+//  | If you did not receive a copy of the PHP license and are unable to   |
+//  | obtain it through the world-wide-web, please send a note to          |
+//  | license@php.net so we can mail you a copy immediately.               |
+//  +----------------------------------------------------------------------+
+//  | Authors: Michael O'Brien                                             |
+//  |          Eric Colinet <ecolinet@php.net>                             |
+//  +----------------------------------------------------------------------+
+//
+/////////////////////////////////// Includes ///////////////////////////////////
+
+#include	"php4Handler.h"
+
+#if BLD_FEATURE_PHP4_MODULE
+
+///////////////////////////////// SAPI Module //////////////////////////////////
+#if UNUSED
+//
+//	This file can be built as an AppWeb module that links in the PHP library.
+//	It can also be built to be a SAPI module so that when PHP is built, it
+//	creates an appWeb module. 
+//	
+//	The following is the PHP module linkage required to create a SAPI module
+//
+PHP_MINIT_FUNCTION(appWeb);
+PHP_MSHUTDOWN_FUNCTION(appWeb);
+PHP_RINIT_FUNCTION(appWeb);
+PHP_RSHUTDOWN_FUNCTION(appWeb);
+PHP_MINFO_FUNCTION(appWeb);
+PHP_FUNCTION(appWeb_virtual);
+PHP_FUNCTION(appWeb_request_headers);
+PHP_FUNCTION(appWeb_response_headers);
+
+function_entry appWeb_functions[] = {
+	{0, 0, 0}
+};
+
+zend_module_entry appWeb_module_entry = {
+	STANDARD_MODULE_HEADER,
+	BLD_PRODUCT,
+	appWeb_functions,   
+	PHP_MINIT(appWeb),
+	PHP_MSHUTDOWN(appWeb),
+	NULL,
+	NULL,
+	PHP_MINFO(appWeb),
+	NO_VERSION_YET,
+	STANDARD_MODULE_PROPERTIES
+};
+
+PHP_MINIT_FUNCTION(appWeb)
+{
+	return SUCCESS;
+}
+
+PHP_MSHUTDOWN_FUNCTION(appWeb)
+{
+	return SUCCESS;
+}
+
+PHP_MINFO_FUNCTION(appWeb)
+{
+	php_info_print_table_start();
+	php_info_print_table_row(2, "Mbedthis AppWeb Module Revision", 
+		BLD_VERSION);
+	php_info_print_table_row(2, "Server Version", mprGetMpr()->getVersion());
+	php_info_print_table_end();
+}
+
+#endif
+/////////////////////////////// SAPI Interface /////////////////////////////////
+//
+//	NOTE: php_ functions are supplied by PHP, whereas phpCapital functions 
+//	are local to this handler.
+//
+static void php4LogMessage(char *message);
+static char	*php4ReadCookies(TSRMLS_D);
+static int	php4ReadPostData(char *buffer, uint len TSRMLS_DC);
+static void	php4RegisterVariables(zval *track_vars_array TSRMLS_DC);
+static int	php4SapiStartup(sapi_module_struct *sapi_module);
+static int	php4SendHeaders(sapi_headers_struct *sapi_headers TSRMLS_DC);
+static int	php4Write(const char *str, uint str_length TSRMLS_DC);
+static int	php4WriteHeader(sapi_header_struct *sapi_header, 
+				sapi_headers_struct *sapi_headers TSRMLS_DC);
+
+//
+//	PHP Server API Module Structure
+//
+static sapi_module_struct php4SapiBlock = {
+	BLD_PRODUCT,					// name 
+	BLD_NAME,						// long name
+	php4SapiStartup,				// startup 
+	php_module_shutdown_wrapper,	// shutdown 
+	0,								// activate 
+	0,								// deactivate 
+	php4Write,		   		 		// unbuffered write 
+	0,								// flush
+	0,								// get uid
+	0,								// getenv 
+	php_error,						// error handler 
+	php4WriteHeader,				// header handler 
+	php4SendHeaders,					// send headers 
+	0,								// send header 
+	php4ReadPostData,				// read POST data
+	php4ReadCookies,					// read Cookies 
+	php4RegisterVariables,			// register server variables 
+	php4LogMessage,					// Log message
+	NULL,							// php_ini_path_override (set below)
+	0,								// Block interruptions 
+	0,								// Unblock interruptions 
+	STANDARD_SAPI_MODULE_PROPERTIES
+};
+
+////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// MaPhp4Module /////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Called when the PHP module is first loaded as a DLL
+//
+
+int mprPhp4Init(void *handle)
+{
+	if (maGetHttp() == 0) {
+		return MPR_ERR_NOT_INITIALIZED;
+	}
+	new MaPhp4Module(handle);
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Create the PHP Handler service
+//
+
+MaPhp4Module::MaPhp4Module(void *handle) : MaModule(MA_PHP_MODULE_NAME, handle)
+{
+	phpHandlerService = new MaPhp4HandlerService();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MaPhp4Module::~MaPhp4Module()
+{
+	delete phpHandlerService;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void MaPhp4Module::unload()
+{
+	ts_free_thread();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////// MaPhp4HandlerService //////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//	One PHP Handler service for them all
+//
+
+MaPhp4HandlerService::MaPhp4HandlerService() :
+	MaHandlerService(MA_PHP_HANDLER_NAME)
+{
+#if BLD_FEATURE_LOG
+	log = new MprLogModule(MA_PHP_LOG_NAME);
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MaPhp4HandlerService::~MaPhp4HandlerService()
+{
+#if BLD_FEATURE_LOG
+	delete log;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int MaPhp4HandlerService::start()
+{
+	char					*serverRoot;
+	void 					***tsrm_ls;
+	php_core_globals 		*core_globals;
+	sapi_globals_struct 	*sapi_globals;
+	zend_llist				global_vars;
+	zend_compiler_globals 	*compiler_globals;
+	zend_executor_globals 	*executor_globals;
+
+	tsrm_startup(128, 1, 0, 0);
+	compiler_globals = (zend_compiler_globals*) 
+		ts_resource(compiler_globals_id);
+	executor_globals = (zend_executor_globals*) 
+		ts_resource(executor_globals_id);
+	core_globals = (php_core_globals*) ts_resource(core_globals_id);
+	sapi_globals = (sapi_globals_struct*) ts_resource(sapi_globals_id);
+	tsrm_ls = (void***) ts_resource(0);
+
+	//
+	//	Define the php.ini location to be the ServerRoot
+	//
+	serverRoot = MaServer::getDefaultServer()->getServerRoot();
+	php4SapiBlock.php_ini_path_override = serverRoot;
+
+	sapi_startup(&php4SapiBlock);
+
+	if (php_module_startup(&php4SapiBlock, 0, 0) == FAILURE) {
+		mprLog(0, log, "Can't startup PHP\n");
+		return -1;
+	}
+
+	zend_llist_init(&global_vars, sizeof(char *), 0, 0);  
+
+	//
+	//	Set PHP defaults. As AppWeb buffers output, we don't want PHP
+	//	to call flush.
+	//
+	SG(options) |= SAPI_OPTION_NO_CHDIR;
+	zend_alter_ini_entry("register_argc_argv", 19, "0", 1, PHP_INI_SYSTEM, 
+		PHP_INI_STAGE_ACTIVATE);
+	zend_alter_ini_entry("html_errors", 12, "0", 1, PHP_INI_SYSTEM, 
+		PHP_INI_STAGE_ACTIVATE);
+	zend_alter_ini_entry("implicit_flush", 15, "0", 1, PHP_INI_SYSTEM, 
+		PHP_INI_STAGE_ACTIVATE);
+	zend_alter_ini_entry("max_execution_time", 19, "0", 1, PHP_INI_SYSTEM, 
+		PHP_INI_STAGE_ACTIVATE);
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int MaPhp4HandlerService::stop()
+{
+	TSRMLS_FETCH();
+	php_module_shutdown(TSRMLS_C);
+
+    tsrm_shutdown();
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Create a new handler for a new connection (accept)
+//
+
+MaHandler *MaPhp4HandlerService::newHandler(MaServer *server, MaHost *host, 
+	char *extensions)
+{
+	return new MaPhp4Handler(log, extensions);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// MaPhp4Handler //////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//	One handler per request
+//
+
+MaPhp4Handler::MaPhp4Handler(MprLogModule *serviceLog, char *extensions) : 
+	MaHandler(MA_PHP_HANDLER_NAME, extensions, 
+		MPR_HANDLER_GET | MPR_HANDLER_POST | 
+		MPR_HANDLER_HEAD | MPR_HANDLER_NEED_ENV | MPR_HANDLER_TERMINAL)
+{
+	log = serviceLog;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MaPhp4Handler::~MaPhp4Handler()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Clone a new handler for a new request on this connection (keep-alive)
+//
+
+MaHandler *MaPhp4Handler::cloneHandler()
+{
+	return new MaPhp4Handler(log, extensions);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Service a new request
+//
+ 
+int MaPhp4Handler::run(MaRequest *rq)
+{
+	MaDataStream		*dynBuf;
+	MprHashTable		*env;
+	MprStringHashEntry	*vp;
+	int					flags, contentLength;
+
+	hitCount++;
+
+	flags= rq->getFlags();
+	dynBuf = rq->getDynBuf();
+	rq->insertDataStream(dynBuf);
+	rq->setResponseCode(200);
+	rq->setHeaderFlags(MPR_HTTP_DONT_CACHE);
+	rq->setPullPost();
+
+	//
+	//	Initialize PHP
+	//
+ 	TSRMLS_FETCH();
+
+	zend_first_try {
+		phpInitialized = 0;
+		func_data = rq;
+		var_array = 0;
+
+		SG(server_context) = rq;
+		SG(request_info).path_translated = rq->getFileName();
+		SG(request_info).request_method = rq->getMethod();
+		SG(request_info).request_uri = rq->getUri();
+		SG(request_info).query_string = rq->getQueryString();
+		SG(request_info).content_type = rq->getRequestContentMimeType();
+		SG(request_info).content_length = rq->getContentLength();
+		SG(sapi_headers).http_response_code = 200;
+		SG(request_info).auth_user = rq->getUser();
+		SG(request_info).auth_password = rq->getPassword();
+
+		php_request_startup(TSRMLS_C);
+		CG(zend_lineno) = 0;
+
+	} zend_catch {
+
+		mprLog(1, log, "PHP startup failed\n");
+		zend_try {
+			php_request_shutdown(0);
+		} zend_end_try();
+		rq->requestError(MPR_HTTP_INTERNAL_SERVER_ERROR, 
+			"PHP initialization failed");
+		return MPR_HTTP_HANDLER_FINISHED_PROCESSING;
+
+	} zend_end_try();
+
+	phpInitialized = 1;
+	
+	//
+	//	Copy the environment variables to the PHP script engine
+	//
+	env = rq->getEnv();
+	vp = (MprStringHashEntry*) env->getFirst();
+	while (vp) {
+		php_register_variable(vp->getKey(), vp->getValue(), 
+			var_array TSRMLS_CC);
+		vp = (MprStringHashEntry*) env->getNext(vp);
+	}
+
+
+	//
+	//	Execute the PHP script
+	//
+	if (execScript(rq) < 0) {
+		zend_try {
+			php_request_shutdown(0);
+		} zend_end_try();
+
+		rq->requestError(MPR_HTTP_INTERNAL_SERVER_ERROR, 
+			"PHP script execution failed");
+		return MPR_HTTP_HANDLER_FINISHED_PROCESSING;
+	}
+
+	contentLength = dynBuf->buf.getLength();
+	if (contentLength > 0) {
+		dynBuf->setSize(contentLength);
+	}
+
+	zend_try {
+		php_request_shutdown(0);
+	} zend_end_try();
+
+	//
+	// Flush the output and write the headers
+	//
+	rq->flushOutput(MPR_HTTP_BACKGROUND_FLUSH, MPR_HTTP_FINISH_REQUEST);
+	return MPR_HTTP_HANDLER_FINISHED_PROCESSING;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int MaPhp4Handler::execScript(MaRequest *rq)
+{
+	zend_file_handle file_handle;
+
+	TSRMLS_FETCH();
+
+	file_handle.filename = rq->getFileName();
+	file_handle.free_filename = 0;
+	file_handle.type = ZEND_HANDLE_FILENAME;
+	file_handle.opened_path = 0;
+
+	zend_try {
+		php_execute_script(&file_handle TSRMLS_CC);
+		if (!SG(headers_sent)) {
+			sapi_send_headers(TSRMLS_C);
+		}
+	} zend_catch {
+		mprLog(1, log, "PHP exec failed\n");
+		return FAILURE;
+	} zend_end_try();
+
+	return SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// PHP Support Functions ////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Write data back to the client. NOTE: this uses the AppWeb DataStream
+//	buffering mechanism.
+//
+
+static int php4Write(const char *str, uint str_length TSRMLS_DC)
+{
+	MaRequest		*rq = (MaRequest*) SG(server_context);
+	long 			written;
+
+	if (rq == 0) {
+		return -1;
+	}
+
+	written = rq->write((char*) str, str_length);
+	if (written <= 0) {
+		php_handle_aborted_connection();
+	}
+	return written;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static void php4RegisterVariables(zval *track_vars_array TSRMLS_DC)
+{
+	MaRequest		*rq = (MaRequest*) SG(server_context);
+	MaPhp4Handler	*hp = (MaPhp4Handler*) rq->getHandler();
+
+	php_import_environment_variables(track_vars_array TSRMLS_CC);
+
+	if (SG(request_info).request_uri) {
+		php_register_variable("PHP_SELF", SG(request_info).request_uri, 
+			track_vars_array TSRMLS_CC);
+	}
+	hp->var_array = track_vars_array;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Log a message
+//
+
+static void php4LogMessage(char *message)
+{
+   mprLog(0, "phpModule: %s", message);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	Read the cookie associated with this request.
+//
+static char *php4ReadCookies(TSRMLS_D)
+{
+#if BLD_FEATURE_COOKIE
+	MaRequest	*rq = (MaRequest*) SG(server_context);
+	return (char*) rq->getCookie();
+#else
+	return 0;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+//	AppWeb will automatically flush headers before the output when flushOutput
+//	is called.
+//
+
+static int php4SendHeaders(sapi_headers_struct *sapi_headers TSRMLS_DC)
+{
+	MaRequest	*rq = (MaRequest*) SG(server_context);
+
+	rq->setResponseCode(sapi_headers->http_response_code);
+
+    if (SG(sapi_headers).send_default_content_type) {
+		rq->setResponseMimeType("text/html");
+    }
+
+	return SAPI_HEADER_SENT_SUCCESSFULLY;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static int php4WriteHeader(sapi_header_struct *sapi_header, 
+	sapi_headers_struct *sapi_headers TSRMLS_DC)
+{
+	MaRequest	*rq = (MaRequest*) SG(server_context);
+
+	rq->setHeader(sapi_header->header, !sapi_header->replace); 
+	//
+	//	This causes a crash
+	// 		efree(sapi_header->header);
+	//
+	// sapi_free_header(sapi_header);
+	//
+	return SAPI_HEADER_ADD;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static int php4ReadPostData(char *buffer, uint len TSRMLS_DC)
+{
+	MaRequest	*rq = (MaRequest*) SG(server_context);
+
+	return rq->readPostData(buffer, len);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static int php4SapiStartup(sapi_module_struct *sapi_module)
+{
+	return php_module_startup(sapi_module, 0, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+#else
+void mprPhp4HandlerDummy() {}
+
+#endif // BLD_FEATURE_PHP4_MODULE
+
+//
+// Local variables:
+// tab-width: 4
+// c-basic-offset: 4
+// End:
+// vim:tw=78
+// vim600: sw=4 ts=4 fdm=marker
+// vim<600: sw=4 ts=4
+//

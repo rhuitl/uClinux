@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# skeleton      Example file to build /etc/init.d scripts.
+#
+# Version:      @(#) /etc/init.d/skeleton 1.01 26-Oct-1993
+#
+# Author:       Miquel van Smoorenburg, <miquels@drinkel.nl.mugnet.org>
+#
+
+# Source function library.
+
+LOCAL_NUMBER="2" # My MSN / EAZ
+REMOTE_NUMBER="06313166xxx"
+LOCAL_IP="194.77.xxx.a"
+REMOTE_IP="194.77.xxx.bb"
+DEVICE="isdn0"
+
+VERSION=`cat /proc/version | awk '{ print $3 }' `
+SYSPATH="/sbin/"
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ ${NETWORKING} = "no" ] && exit 0
+
+# [ -f /sbin/diald ] || exit 0
+[ -f /sbin/ipppd ] || exit 0
+
+
+# See how we were called.
+case "$1" in
+  start)
+        # load VJ-compression module
+        # $SYSPATH\/insmod /lib/modules/$VERSION\/net/slhc.o
+        #
+        # /sbin/modprobe ppp
+        #
+        # $SYSPATH\/insmod /lib/modules/$VERSION\/misc/isdn.o
+        $SYSPATH\/modprobe /lib/modules/$VERSION\/misc/teles.o io=0xd8000,12,0xd80,1 teles_id=Teles1
+	sleep 2
+        $SYSPATH\/rmmod teles
+	sleep 2
+        $SYSPATH\/modprobe /lib/modules/$VERSION\/misc/teles.o io=0xd8000,12,0xd80,1 teles_id=Teles1
+        # $SYSPATH\/modprobe /lib/modules/$VERSION\/misc/teles.o io=0xd8000,12,0xd80,1 id=Teles1
+        telesctrl Teles1 1 4             # Get some messages on /dev/isdnctrl
+        $SYSPATH\/isdnctrl addif  $DEVICE            # Create new interface 'DEVICE'
+        $SYSPATH\/isdnctrl verbose 1
+        $SYSPATH\/isdnctrl addphone $DEVICE in $REMOTE_NUMBER  # Set incoming phone-number
+        ##
+	## Phone Number gets inserted by diald
+	##
+	## $SYSPATH\/isdnctrl addphone $DEVICE out $REMOTE_NUMBER   # Set outgoung phone-number
+        $SYSPATH\/isdnctrl eaz $DEVICE $LOCAL_NUMBER             # Set local EAZ ..
+        $SYSPATH\/isdnctrl l2_prot $DEVICE hdlc      # for sync PPP: set Level 2 to HDLC
+        $SYSPATH\/isdnctrl l3_prot $DEVICE trans     # not really necessary, 'trans' is defau
+
+        $SYSPATH\/isdnctrl encap $DEVICE rawip
+        $SYSPATH\/isdnctrl huptimeout $DEVICE 600   # Hangup-Timeout is 600 sec.
+        $SYSPATH\/isdnctrl chargehup $DEVICE off     # Hangup before next Charge-Info
+        $SYSPATH\/isdnctrl ihup $DEVICE off          # Hangup incoming call
+        $SYSPATH\/isdnctrl secure $DEVICE on         # Accept only configured phone-number
+
+        $SYSPATH\/ifconfig $DEVICE $LOCAL_IP pointopoint $REMOTE_IP metric 1 -arp
+
+	/sbin/telesctrl Teles1 1 4             # Get some messages on /dev/isdnctrl
+
+	# /sbin/route add default $DEVICE
+
+	$SYSPATH\/isdnlog -Dv -m1015 -l1015 -x1015 -C8 /dev/isdnctrl0 
+	
+ 	sleep 10
+	daemon /sbin/diald device /dev/$DEVICE mode dev &
+	sleep 10
+
+        touch /var/lock/subsys/isdn
+        ;;
+  stop)
+
+	route del default 
+        killproc diald
+
+	sleep 1
+
+	ifconfig $DEVICE down
+	isdnctrl delif $DEVICE
+
+	sleep 1
+
+        killproc isdnlog
+	rmmod teles
+	rmmod isdn
+        rm -f /var/lock/subsys/isdn
+        ;;
+  *)
+        echo "Usage: isdn {start|stop}"
+        exit 1
+esac
+
+exit 0

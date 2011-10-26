@@ -1,0 +1,256 @@
+#!/bin/bash
+PATH=${PATH}:/usr/sbin:/usr/local/sbin:/usr/kerberos/sbin
+principal=`id -nu`
+
+testdir=${1:-`/bin/pwd`}
+testdir=`cd $testdir; /bin/pwd`
+
+PATH=${PATH}:${testdir}/tools
+export KRB5_BINDIR=${2:-.}
+
+pam_krb5=${testdir}/../src/pam_krb5.so
+if ! test -x $pam_krb5 ; then
+	pam_krb5=${testdir}/../src/.libs/pam_krb5.so
+fi
+export KRB5_CONFIG=$testdir/config/krb5.conf
+export KRBCONFDIR=$testdir/config
+export KRB_CONF=$testdir/config/krb.conf
+export KRB_REALMS=$testdir/config/krb.realms
+export KRB5_KDC_PROFILE=$testdir/config/kdc.conf
+export KRB5CCNAME=/dev/bogus-missing-file
+export KRBTKFILE=/dev/bogus-missing-file
+flags=unsecure_for_debugging_only
+
+settle() {
+	sleep 1
+}
+
+k524start() {
+	if test x$K524DPID != x ; then
+		kill $K524DPID
+		unset K524DPID
+	fi
+
+	krb524d -m -r EXAMPLE.COM -nofork &
+	K524DPID=$!
+
+	kill -CONT $K524DPID
+}
+
+kdcstart() {
+	if test x$KDCPID != x ; then
+		kill $KDCPID
+		unset KDCPID
+	fi
+
+	test -d $testdir/kdc || mkdir -p $testdir/kdc
+	(echo .; echo .) | kdb5_util create -s 2> /dev/null > /dev/null
+
+	kadmin.local -q 'addpol -minlength 6 minimum_six' 2> /dev/null > /dev/null
+	kadmin.local -q 'ank -pw foo '$principal 2> /dev/null > /dev/null
+	kadmin.local -q 'modprinc -maxrenewlife "1 day" krbtgt/EXAMPLE.COM' 2> /dev/null > /dev/null
+	kadmin.local -q 'modprinc -maxrenewlife "1 day" '$principal 2> /dev/null > /dev/null
+	rm -f $testdir/kdc/krb5kdc.log
+	rm -f $testdir/kdc/kadmind.log
+	rm -f $testdir/kdc/krb5libs.log
+	krb5kdc -r EXAMPLE.COM -n -port 8002 &
+	KDCPID=$!
+
+	if test x$KADMINDPID != x ; then
+		kill $KADMINDPID
+		unset KADMINDID
+	fi
+
+	kadmind -r EXAMPLE.COM -nofork &
+	KADMINDPID=$!
+
+	k524start
+
+	settle
+
+	kill -CONT $KDCPID
+	kill -CONT $KADMINDPID
+	trap kdcstop EXIT
+}
+
+k524stop() {
+	if test x$K524DPID != x ; then
+		kill $K524DPID
+		unset K524DPID
+	else
+		echo "echo error: no running krb524d"
+		exit 1
+	fi
+}
+
+kdcstop() {
+	trap true EXIT
+	k524stop
+	if test x$KADMINDPID != x ; then
+		kill $KADMINDPID
+		unset KADMINDID
+	else
+		echo "echo error: no running kadmind"
+		exit 1
+	fi
+	if test x$KDCPID != x ; then
+		kill $KDCPID
+		unset KDCPID
+		kdb5_util destroy -f 2> /dev/null > /dev/null
+	else
+		echo "echo error: no running KDC"
+		exit 1
+	fi
+}
+
+run() {
+	# Filter out the module path.
+	pam_harness "$@" 2>&1 | sed s,"\`.*pam",'\`pam',g
+}
+
+# Start the KDC.
+for script in ${testdir}/tools/klist_* ; do
+	test -r $script && chmod +x $script 2> /dev/null
+done
+
+kdcstart
+
+# First, a wrong password, then the right one, then a wrong one.
+
+echo "";echo Setting password to \"foo\".
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+
+echo "";echo Fail: incorrect password.
+run -auth $principal $pam_krb5 $flags -- bar
+
+echo "";echo Fail: incorrect password.
+run -auth $principal $pam_krb5 $flags -- foolong
+
+echo "";echo Succeed: correct password.
+run -auth -setcred -session $principal $pam_krb5 $flags -- foo
+
+echo "";echo Fail: cannot read password.
+run -auth $principal $pam_krb5 $flags use_first_pass -- foo
+
+echo "";echo Succeed: correct password, incorrect first attempt.
+run -auth -setcred $principal $pam_krb5 $flags try_first_pass -- foo
+
+echo "";echo Succeed: correct password, maybe use incorrect second attempt.
+run -auth -session $principal $pam_krb5 $flags -authtok foo -- bar
+
+echo "";echo Succeed: correct password, ignore second attempt.
+run -auth -setcred -session $principal $pam_krb5 $flags -authtok foo use_first_pass -- bar
+
+echo "";echo Succeed: correct password, maybe use incorrect second attempt.
+run -auth $principal $pam_krb5 $flags -authtok foo try_first_pass -- bar
+
+# Check for expired password detection (both right and wrong), and "nowarn".
+
+echo "";echo Expiring password.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'modprinc -pwexpire now '$principal 2> /dev/null > /dev/null
+settle
+
+echo "";echo Fail: incorrect password.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'modprinc -pwexpire now '$principal 2> /dev/null > /dev/null
+settle
+run -auth -account $principal $pam_krb5 $flags -- bar
+
+echo "";echo Succeed: correct password, warn about expiration.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'modprinc -pwexpire now '$principal 2> /dev/null > /dev/null
+settle
+run -auth -account $principal $pam_krb5 $flags -- foo bar bar
+
+echo "";echo Succeed: correct password, do not warn about expiration.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'modprinc -pwexpire now '$principal 2> /dev/null > /dev/null
+settle
+run -auth -account $principal $pam_krb5 $flags no_warn -- foo
+
+echo "";echo Succeed: correct password, expired, change.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'modprinc -pwexpire now '$principal 2> /dev/null > /dev/null
+settle
+run -auth -account -chauthtok -setcred -session $principal $pam_krb5 $flags no_warn -- foo bar bar bar baz baz
+
+# Check password changing.
+echo "";echo Resetting password to \"foo\".
+
+echo "";echo Succeed.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal $pam_krb5 $flags -- foo bar bar
+
+echo "";echo Fail: wrong initial password. 
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal $pam_krb5 $flags -- Foo bar bar
+
+echo "";echo Fail: mismatched new password. 
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal $pam_krb5 $flags -- foo bar bAr
+
+echo "";echo Fail: unacceptable password.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'modprinc -policy minimum_six '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal $pam_krb5 $flags -- foo bar bar
+kadmin.local -q 'modprinc -clearpolicy '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'delprinc '$principal 2> /dev/null > /dev/null
+kadmin.local -q 'ank -pw foo '$principal 2> /dev/null > /dev/null
+
+echo "";echo Succeed: use_authtok
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal -oldauthtok foo -authtok bar $pam_krb5 $flags use_authtok
+
+# Check for being able to set particular options.
+echo "";echo Checking handling of options.
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+
+echo "";echo FPI or FPRI
+run -auth -setcred $principal -run klist_f $pam_krb5 $flags renewable proxiable forwardable -- foo
+
+echo "";echo I or RI
+run -auth -setcred $principal -run klist_f $pam_krb5 $flags not_renewable not_proxiable not_forwardable -- foo
+
+echo "";echo No addresses.
+run -auth -setcred $principal -run klist_a $pam_krb5 $flags renewable proxiable forwardable addressless -- foo
+
+echo "";echo With local addresses.
+run -auth -setcred $principal -run klist_a $pam_krb5 $flags renewable proxiable forwardable not_addressless -- foo
+
+echo "";echo With local and extra addresses.
+run -auth -setcred $principal -run klist_a $pam_krb5 $flags renewable proxiable forwardable hosts="localhost" -- foo
+
+echo "";echo Without krb4.
+run -auth -setcred $principal -run klist_4 $pam_krb5 $flags renewable proxiable forwardable not_addressless no_krb4_convert -- foo
+
+echo "";echo With krb4 via krb524.
+run -auth -setcred $principal -run klist_4 $pam_krb5 $flags renewable proxiable forwardable not_addressless krb4_convert -- foo
+
+k524stop
+echo "";echo With krb4 via kdc.
+run -auth -setcred $principal -run klist_4 $pam_krb5 $flags renewable proxiable forwardable not_addressless krb4_convert -- foo
+k524start ; settle
+
+echo "";echo Renewable lifetime 0.
+run -auth -setcred $principal -run klist_t $pam_krb5 $flags proxiable forwardable not_addressless renew_lifetime=0 -- foo
+
+echo "";echo Renewable lifetime 1 hour.
+run -auth -setcred $principal -run klist_t $pam_krb5 $flags proxiable forwardable not_addressless renew_lifetime=3600 -- foo
+
+echo "";echo Default ccache directory.
+run -auth -setcred $principal -run klist_c $pam_krb5 $flags -- foo
+
+echo "";echo Ccache directory = testdir/kdc.
+run -auth -setcred $principal -run klist_c $pam_krb5 $flags ccache_dir=${testdir}/kdc -- foo
+
+echo "";echo Banner = K3RB3R05 S
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal $pam_krb5 $flags banner="K3RB3R05 S" -- foo bar bar
+
+echo "";echo Password-change Help Text
+kadmin.local -q 'cpw -pw foo '$principal 2> /dev/null > /dev/null
+run -chauthtok $principal $pam_krb5 $flags pwhelp=$testdir/pwhelp.txt -- foo bar bar
+
+# Stop the KDC.
+kdcstop

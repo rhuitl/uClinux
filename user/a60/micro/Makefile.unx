@@ -1,0 +1,375 @@
+##
+## Makefile for the NASE A60 interpreter.
+## Copyright (C) 1991 Erik Schoenfelder (schoenfr@ibr.cs.tu-bs.de)
+##
+## This file is part of NASE A60.
+## 
+## NASE A60 is free software; you can redistribute it and/or modify it
+## under the terms of the GNU General Public License as published by
+## the Free Software Foundation; either version 2, or (at your option)
+## any later version.
+##
+## NASE A60 is distributed in the hope that it will be useful, but
+## WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+## General Public License for more details.
+## 
+## You should have received a copy of the GNU General Public License
+## along with NASE A60; see the file COPYING.  If not, write to the Free
+## Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+##
+##
+## Makefile.unx:				aug '90
+##
+## Makefile for the a60 interpreter (un*x version)
+##
+
+##
+## Installation environment:
+##
+BINDIR = /usr/local/bin
+LIBDIR = /usr/local/lib
+MANDIR = /usr/local/man/man1
+MANSUFF = 1
+
+##
+## Libdirpath is used in mkc.c; comment to exclude:
+##
+LIBDIRPATH = -DLIBDIRPATH=\"$(LIBDIR)\"
+
+##
+## Compiler environment:
+##
+## CC describes the compiler.
+## (add -mnognu-stdarg for a gcc on a pyramid)
+## XCC is the compiler used for X11. choose $(CC) for default, cc on a sun.
+##
+CC = gcc 
+XCC = cc
+
+##
+## warn flags for gcc compiler:
+##
+# GWARN = -W -Wcomment -Wpointer-arith -Wcast-qual
+GWAR2 = -Wall
+WARN = $(GWARN) $(GWAR2)
+
+##
+## system dependent flags:
+##
+## define USG if compiling for a SystemV like machine (sorry).
+##
+## define VPRINTF_MISSING if vprintf is not avail.
+## define REALLOC_MISSING if realloc is not avail.
+## define ALLOCA_MISSING if alloca is not avail (used by bison only).
+## define NO_LIMITS_H if the header limits.h is not avail.
+## define NO_ENUMS if you have used `chenums' on *.h (see ENUM.README).
+## define DEBUG for including general debug-code.
+## define PARSEDEBUG for including parser debug-code.
+## define MEMORY_STATISTICS for including runtime statistics code.
+##
+## appropriate DEFS for a sun:
+DEFS = -DDEBUG
+##
+## appropriate DEFS for a pyramid:
+# DEFS = -DVPRINTF_MISSING -DNO_LIMITS_H
+
+##
+## Flags for debugging and production:
+##
+FLAGS = -g -pipe
+# FLAGS = -O
+LDFLAGS = -g
+# LDFLAGS = -s
+
+## Uncomment for profiling:
+# PROF = -pg
+
+##
+## library for math stuff:
+##
+LIBS = -lm
+
+##
+## Mainly used parser generator:
+## (if you use bison, your compiler/libc must provide alloca)
+##
+# BISONFLAGS = -v
+BISON = bison -y
+# BISON = byacc
+# BISON = yacc
+
+##
+## Flags for lint:
+##
+LINTFLAGS = -q
+
+##
+## The target:
+##
+PRG = a60
+
+##
+## And more:
+##
+## Anything else below here should be independent.
+##
+IOBJS = main.o util.o tree.o symtab.o type.o stmt.o check.o expr.o\
+	err.o run.o eval.o bltin.o doeval.o mkc.o a60-scan.o
+ISRCS = main.c util.c tree.c symtab.c type.c stmt.c check.c expr.c\
+	err.c run.c eval.c bltin.c doeval.c mkc.c a60-scan.c
+MOBJS = a60-ptab.o ## a60-ltab.o
+MSRCS = a60-ptab.c ## a60-ltab.c
+EXTRA = a60-parse.y
+MHDRS = a60-ptab.h
+MPEXT = a60-pbis.c a60-pyac.c a60-pbya.c a60-pbis.h a60-pyac.h a60-pbya.h
+IHDRS = a60.h block.h symtab.h tree.h type.h util.h version.h expr.h\
+	run.h eval.h bltin.h conv.h comm.h a60-scan.h mkc.h\
+	a60-mkc.inc config.h
+
+MAKF = Makefile
+MICR = micro/*
+UTIL = README ENUM.README $(MAKF) $(MICR) TODO a60.man xa60.man\
+	chenums.c xa60.c ChangeLog COPYING a60-lex.l INSTALL make-dist.sh\
+	extrerrm.l make-errmsgs.sh
+TDOC = RRA60.texinfo a60.texinfo
+TEXT = texinfo.tex
+DOCS = $(TDOC)
+MDOC = RRA60.info a60.info
+TESA = test examples
+
+OBJS = $(IOBJS) $(MOBJS)
+SRCS = $(ISRCS) $(MSRCS)
+HDRS = $(IHDRS) $(MHDRS)
+
+CFLAGS = $(FLAGS) $(PROF) $(WARN) $(DEFS) $(LIBDIRPATH)
+XCFLAGS = $(FLAGS) $(PROF) $(DEFS) $(LIBDIRPATH)
+
+##
+## commonly used binaries:
+##
+SHELL = /bin/sh
+RM = rm
+
+##
+## How to build the target:
+##
+all:		$(PRG)
+
+$(PRG):		$(OBJS)
+	$(CC) $(LDFLAGS) $(PROF) -o $(PRG) $(OBJS) $(LIBS)
+
+a60-ptab.c:	a60-parse.y
+	$(RM) -f y.tab.c y.tab.h
+	@echo '** expect 1 reduce/reduce conflict:'
+	$(BISON) $(BISONFLAGS) -d a60-parse.y
+	if [ -f y.tab.c ] ; then mv y.tab.c a60-ptab.c ; fi
+	if [ -f y.tab.h ] ; then mv y.tab.h a60-ptab.h ; fi
+
+##
+## make the standalone xa60:
+##
+
+XINCLUDE = -I/usr/local/X11R4/include
+XLIB = -L/usr/local/X11R4/lib  -lXaw -lXt -lXext -lXmu -lX11
+
+xa60:		xa60.c
+	$(XCC) $(XCFLAGS) $(XINCLUDE) -o xa60 xa60.c $(XLIB)
+
+##
+## the 'const' substitution prevents a 'keyword redefined' (for flex).
+## the 'YYLMAX' is increased (for lex).
+##
+## (** a60-lex.l is replaced by a60-scan.c **)
+##
+LEX = flex
+# LEX = lex
+#
+a60-ltab.c:		a60-lex.l
+	$(LEX) a60-lex.l
+	sed -e '1,$$s/^#define const/\/* #define const *\//'\
+		-e '1,$$s/ const / /g'\
+		-e '1,$$s/# define YYLMAX.*/# define YYLMAX 8192/'\
+		< lex.yy.c > a60-ltab.c
+	$(RM) -f lex.yy.c
+
+a60-ptab.h:	a60-ptab.c
+
+a60-scan.o:	a60-parse.y
+
+msrc:		$(MSRCS)
+
+##
+## this was for testing; create the parser with bison/yacc/byacc:
+##
+mpext:		$(MPEXT)
+
+a60-pbis.c:	a60-parse.y
+	bison -l -d a60-parse.y
+	mv a60-parse.tab.c a60-pbis.c
+	mv a60-parse.tab.h a60-pbis.h
+
+a60-pbis.h:	a60-pbis.c
+
+a60-pyac.c:	a60-parse.y
+	yacc -l -d a60-parse.y
+	mv y.tab.c a60-pyac.c
+	mv y.tab.h a60-pyac.h
+
+a60-pyac.h:	 a60-pyac.c
+
+a60-pbya.c:	a60-parse.y
+	byacc -l -d a60-parse.y
+	mv y.tab.c a60-pbya.c
+	mv y.tab.h a60-pbya.h
+
+a60-pbya.h:	a60-pbya.c
+
+##
+## installation:
+##
+inst-bin:	$(PRG)
+	cp $(PRG) $(BINDIR)
+
+inst-man:
+	cp a60.man $(MANDIR)/$(PRG).$(MANSUFF)
+
+inst-lib:
+	if [ ! -d $(LIBDIR) ] ; then mkdir -p $(LIBDIR); fi
+	if [ -d $(LIBDIR) ] ; then cp a60-mkc.inc $(LIBDIR); fi
+
+install:	inst-man inst-bin inst-lib
+
+xa60-install:	xa60
+	cp xa60 $(BINDIR)
+	cp xa60.man $(MANDIR)/xa60.$(MANSUFF)
+
+##
+## test suite:
+##
+test:		$(PRG) maketest
+
+maketest:
+	(cd test; runtest.sh)
+
+##
+## And more stuff:
+##
+gp:		pg
+
+pg:
+	gprof -b $(PRG) | sed -e '1,/^.$$/d' | head -22
+
+TAGS:	tags
+
+tags:
+	etags $(EXTRA) $(ISRCS) $(IHDRS)
+
+lint:
+	lint $(LINTFLAGS) $(DEFS) $(SRCS)
+
+##
+## extract error messages (internal use - my fun):
+##
+extrerrm:	extrerrm.l
+	-rm extrerrm.c
+	lex -t extrerrm.l > extrerrm.c
+	$(CC) -o extrerrm extrerrm.c -ll
+	rm extrerrm.c
+	
+
+errmsgs:	extrerrm
+	make-errmsgs.sh $(SRCS)
+
+##
+## some possible ``clean'' targets:
+## 
+shady:
+	$(RM) -f *.cp *.fn *.ky *.pg *.log *.toc *.tp *.vr *.aux
+
+clean:		shady
+	$(RM) -f $(OBJS) gmon.out *.output RRA60.?? *.TMP extrerrm \
+	extrerrm.c
+
+clobber:	clean
+	$(RM) -f $(PRG) $(PRG).bak core Makefile.bak a60.zoo \
+		RRA60.?? RRA60.aux RRA60.log RRA60.toc \
+	a60.tar.Z chenums RRA60.dvi RRA60.info a60.info a60.dvi \
+		*.output xa60 */core */a.out a.out
+
+realclean:	clobber
+	$(RM) -f err $(MSRCS) $(MHDRS) $(MPEXT) TAGS a60-*.tar.Z
+
+distclean:	realclean
+
+##
+## make a distribution
+##
+dist:
+	make-dist.sh $(UTIL) $(EXTRA) $(SRCS) $(HDRS) \
+		$(DOCS) $(MDOC) test/* examples/* \
+		micro/* $(TEXT)
+
+##
+## save targets:
+##
+zoo:		$(MDOC) msrc
+	$(RM) -f $(PRG).zoo
+	zoo a $(PRG).zoo $(UTIL) $(EXTRA) $(SRCS) $(HDRS) $(DOCS) \
+		$(MDOC) *.a60 test/* examples/* micro/*
+	$(RM) -f $(PRG).bak
+
+tar:		$(MDOC) msrc
+	gtar -cvzf $(PRG).tar.Z $(UTIL) $(EXTRA) $(SRCS) $(HDRS) \
+		$(DOCS) $(MDOC) *.a60 $(TESA) $(TEXT) 
+
+save:		tar
+	mv $(PRG).tar.Z ../TAR
+
+##
+## text-formatting fun:
+##
+doc:
+	latex RRA60.texinfo
+	tex a60.texinfo
+
+##
+## depend:
+##	makedepend -- $(FLAGS) -- $(SRCS)
+depend:
+	cp Makefile Makefile.bak
+	sed -e '/^# DO NOT DELETE THIS LINE/,$$d' < Makefile.bak > Makefile
+	echo '# DO NOT DELETE THIS LINE' >> Makefile
+	echo ' ' >> Makefile
+	$(CC) -MM $(FLAGS) $(DEFS) $(SRCS) >> Makefile
+
+# DO NOT DELETE THIS LINE
+ 
+main.o : main.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  version.h eval.h run.h util.h mkc.h 
+util.o : util.c comm.h util.h a60.h tree.h block.h symtab.h type.h expr.h \
+  config.h 
+tree.o : tree.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  run.h eval.h 
+symtab.o : symtab.c comm.h util.h a60.h tree.h block.h symtab.h type.h \
+  expr.h run.h eval.h 
+type.o : type.c type.h 
+stmt.o : stmt.c comm.h util.h tree.h block.h symtab.h type.h expr.h run.h \
+  eval.h 
+check.o : check.c comm.h util.h tree.h block.h symtab.h type.h expr.h a60.h 
+expr.o : expr.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h 
+err.o : err.c comm.h a60.h tree.h block.h symtab.h type.h expr.h 
+run.o : run.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  eval.h conv.h run.h 
+eval.o : eval.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  run.h eval.h conv.h 
+bltin.o : bltin.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  run.h eval.h conv.h bltin.h a60-mkc.inc 
+doeval.o : doeval.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  util.h conv.h run.h eval.h 
+mkc.o : mkc.c comm.h a60.h tree.h block.h symtab.h type.h expr.h util.h \
+  version.h config.h 
+a60-scan.o : a60-scan.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  util.h a60-ptab.h a60-scan.h 
+a60-ptab.o : a60-ptab.c comm.h a60.h tree.h block.h symtab.h type.h expr.h \
+  util.h run.h eval.h bltin.h 

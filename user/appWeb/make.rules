@@ -1,0 +1,171 @@
+#
+#	make.rules -- Mbedthis Build System Makefile rules
+#
+#	This file expects that the per-directory Makefiles will have included
+#	their make.dep files which will in-turn include config.make and this
+#	file.
+#
+################################################################################
+#
+#	Copyright (c) Mbedthis Software LLC, 2003-2004. All Rights Reserved.
+#	The latest version of this code is available at http://www.mbedthis.com
+#
+#	This software is open source; you can redistribute it and/or modify it 
+#	under the terms of the GNU General Public License as published by the 
+#	Free Software Foundation; either version 2 of the License, or (at your 
+#	option) any later version.
+#
+#	This program is distributed WITHOUT ANY WARRANTY; without even the 
+#	implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+#	See the GNU General Public License for more details at:
+#	http://www.mbedthis.com/downloads/gplLicense.html
+#	
+#	This General Public License does NOT permit incorporating this software 
+#	into proprietary programs. If you are unable to comply with the GPL, a 
+#	commercial license for this software and support services are available
+#	from Mbedthis Software at http://www.mbedthis.com
+#
+################################################################################
+#
+#	The following Make Variables Used:
+#
+#		BLD_TOP			Relative path to the top of the source tree
+#		COMPILE_SHARED	Create objects that are suitable for shared libraries
+#		EXPORT_OBJECTS	Create objects in top level object directories. Used 
+#						in config.make and config.sh
+#		PRE_DIRS		Directories to recurse before the current directory
+#		POST_DIRS		Directories to recurse after the current directory
+#		MAKE_IFLAGS
+#
+################################################################################
+
+BLDOUT		= $(shell if [ -x $(BLD_TOOLS_DIR)/bldout ]; then echo bldout; else echo cat; fi)
+
+ifneq (,)
+Error. This Makefile requires GNU make.
+endif
+
+.NOTPARALLEL:
+.PHONY:			always test
+
+#
+#	These exports may be defined by users make files and are passed to bld
+#
+export 	MAKE_LDFLAGS COMPILE_SHARED EXPORT_OBJECTS
+
+#
+#	Auto subdirectory recursion
+#
+RECURSE=\
+set -e ; \
+for i in $$D "" ; \
+do [ -z "$$i" ] && continue ;\
+	[ -d "$$i" ] || continue ;\
+	home=`pwd` ; \
+	cd "$$i" >/dev/null ; \
+	if [ -f Makefile ] ; then \
+		echo ; \
+		echo "    cd $$i" ; \
+		set +e ; \
+		unset COMPILE_SHARED EXPORT_OBJECTS _LDPATH ; \
+		set -e ; \
+		echo "    \# $(MAKE) $$T" ; \
+		$(MAKE) --no-print-directory -S $$T ; \
+		code=$$? ; \
+		if [ $$code != 0 ] ; then \
+			echo "\#WARNING: Makefile error in `pwd`" ; \
+			exit 255 ; \
+		fi ; \
+		echo "    cd $$home" ; \
+	fi ; \
+	cd $$home >/dev/null ;\
+done
+
+DO_RECURSE=[ -z "$$D" ] || $(RECURSE)
+ADO_RECURSE=[ -z "$$D" ] || $(RECURSE)
+
+#
+#	Compile files
+#
+compile: $(BUILD_CHECK) compileDirs $(FILES) compileExtra \
+	compileAdirs compileFinal 
+
+$(BUILD_CHECK):
+
+compileExtra:
+
+compileFinal:
+
+compileDirs:
+	@+T=compile ; D="$(PRE_DIRS)" ; $(DO_RECURSE) 
+
+compileAdirs:
+	@+T=compile ; D="$(POST_DIRS)" ; $(ADO_RECURSE) 
+
+
+depend: $(BUILD_CHECK) dependExtra dependDirs dependCwd dependAdirs
+
+dependCwd:
+	@echo -e "    genDepend -q $(MAKE_IFLAGS) $(BLD_IFLAGS) $(_IFLAGS) $(COMPILE)" | $(BLDOUT)
+	@genDepend -q $(MAKE_IFLAGS) $(BLD_IFLAGS) $(_IFLAGS) $(COMPILE)
+
+dependDirs:
+	@+T=depend ; D="$(PRE_DIRS)" ; $(DO_RECURSE)
+
+dependAdirs:
+	@+T=depend ; D="$(POST_DIRS)" ; $(ADO_RECURSE)
+
+dependExtra:
+
+
+test: $(BUILD_CHECK) testDirs testExtra
+
+testDirs:
+	@+T=test ; D="$(PRE_DIRS)" ; $(DO_RECURSE) ; D="$(POST_DIRS)" ; \
+		$(DO_RECURSE)
+
+testExtra:
+
+
+clean: $(BUILD_CHECK) cleanDirs cleanExtra
+	@echo "    rm -f $(CLEANIT)" | $(BLDOUT)
+	@rm -f $(CLEANIT)
+
+cleanExtra:
+
+cleanDirs:
+	@+T=clean ; D="$(PRE_DIRS)" ; $(DO_RECURSE) ; D="$(POST_DIRS)" ; \
+		$(DO_RECURSE)
+
+
+package: $(BUILD_CHECK) packageDirs packageExtra
+
+packageDirs:
+	@+T=package ; D="$(PRE_DIRS)" ; $(DO_RECURSE) ; D="$(POST_DIRS)" ; \
+		$(DO_RECURSE)
+
+packageExtra:
+
+
+projects: $(BUILD_CHECK) projectsDirs projectsExtra
+
+projectsDirs:
+	@+T=projects ; D="$(PRE_DIRS)" ; $(DO_RECURSE) ; D="$(POST_DIRS)" ; \
+		$(DO_RECURSE)
+
+projectsExtra:
+
+#
+#	Used to suppress make warning that there is "Nothing to be done for target"
+#
+dummy:
+	@true
+
+#
+#  Local variables:
+#  tab-width: 4
+#  c-basic-offset: 4
+#  End:
+#  vim600: sw=4 ts=4 fdm=marker
+#  vim<600: sw=4 ts=4
+#

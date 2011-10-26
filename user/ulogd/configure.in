@@ -1,0 +1,284 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(ulogd.c)
+
+dnl Checks for programs.
+AC_PROG_MAKE_SET
+AC_PROG_CC
+AC_CHECK_TOOL(LD, ld)
+AC_PROG_INSTALL
+
+dnl Checks for libraries.
+AC_CHECK_LIB(dl, dlopen)
+AC_CHECK_HEADER(pcap.h,HAVE_PCAP_H=true)
+
+dnl Checks for header files.
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_CHECK_HEADERS(fcntl.h unistd.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+
+dnl Checks for library functions.
+AC_FUNC_VPRINTF
+AC_CHECK_FUNCS(socket strerror)
+
+DATABASE_DIR=""
+DATABASE_LIB=""
+DATABASE_LIB_DIR=""
+
+DATABASE_DRIVERS=""
+
+dnl
+dnl test for MySQL
+dnl
+AC_ARG_WITH(mysql,
+ --with-mysql=<directory>		mysql installed in <directory>,[
+if test $withval != yes
+then
+        dir=$withval
+else
+        dir="/usr/local"
+fi
+mysqldir=""
+AC_MSG_CHECKING(for MySQL files)
+for d in $dir /usr /usr/local /usr/local/mysql /opt/mysql /opt/packages/mysql
+do
+        if test -f $d/lib/mysql/libmysqlclient.so
+        then
+                AC_MSG_RESULT(found mysql in $d)
+                mysqldir=$d
+                mysqldir_suffix=/mysql
+                break
+        elif test -f $d/lib/libmysqlclient.so
+        then
+                AC_MSG_RESULT(found mysql in $d)
+                mysqldir=$d
+                mysqldir_suffix=
+                break
+        fi
+done
+
+if test x$mysqldir = x
+then
+        AC_MSG_WARN(MySQL backend not used)
+else
+        AC_DEFINE(HAVE_MYSQL)
+        MYSQLINCLUDES=${mysqldir}/include${mysqldir_suffix}
+        MYSQLLIBS=${mysqldir}/lib${mysqldir_suffix}
+
+	DATABASE_DIR="${DATABASE_DIR} mysql"
+
+	MYSQL_LIB="${DATABASE_LIB} -lmysqlclient " 
+	DATABASE_LIB_DIR="${DATABASE_LIB_DIR} -L${MYSQLLIBS} "
+
+	DATABASE_DRIVERS="${DATABASE_DRIVERS} ../mysql/mysql_driver.o "
+
+	DB_DEF="${DB_DEF} -DHAVE_MYSQL "
+
+
+	AC_SUBST(MYSQLINCLUDES)
+	AC_SUBST(MYSQL_LIB)
+
+        if test -f $MYSQLLIBS/libmystrings.so
+        then
+                DATABASE_LIB="${DATABASE_LIB} -lmystrings "
+        else
+                MYSQLEXTRALIBS=
+        fi
+
+	dnl Here we check whether we have an old MySQL client library
+	dnl installed, which does not support the mysql_real_escape_string(),
+	dnl but the real_escape_string() function.
+	dnl Having a look in the libary itself should be more reliable than
+	dnl parsing the output of mysql --version.
+
+	AC_MSG_CHECKING(for mysql_real_escape_string support)
+
+	MYSQL_FUNCTION_TEST=`strings ${MYSQLLIBS}/libmysqlclient.so | grep mysql_real_escape_string`
+
+	if test "x$MYSQL_FUNCTION_TEST" = x
+	then
+                EXTRA_MYSQL_DEF="-DOLD_MYSQL=1 "
+                AC_MSG_RESULT(found old MySQL)
+	else
+		AC_MSG_RESULT(found new MySQL)
+	fi
+
+fi      
+])      
+
+
+dnl
+dnl Check whether the user wants log IP-addresses as strings rather
+dnl than as unsigned long-integers to his MySQL-database. Since this
+dnl feature is only used in ulogd_MYSQL.c, there are no checks in any
+dnl way.
+dnl
+
+AC_ARG_WITH(mysql-log-ip-as-string,
+ --with-mysql-log-ip-as-string		log IPs as string rather than as
+					unsigned long-integer.
+,[
+   EXTRA_MYSQL_DEF="${EXTRA_MYSQL_DEF} -DIP_AS_STRING=1"
+   AC_MSG_WARN(the use of --with-mysql-log-ip-as-string is discouraged)
+])
+
+
+dnl
+dnl test for PostgreSQL
+dnl
+AC_ARG_WITH(pgsql,
+ --with-pgsql=<directory>		pgsql installed in <directory>,[
+if test $withval != yes
+then
+        dir=$withval
+else
+        dir="/usr/local"
+fi
+pgsqldir=""
+AC_MSG_CHECKING(for PGSQL files)
+for d in $dir /usr /usr/local /usr/local/pgsql /opt/pgsql /opt/packages/pgsql
+do
+        if test -f $d/lib/pgsql/libpq.so
+        then
+                AC_MSG_RESULT(found pgsql in $d)
+                pgsqldir=$d
+                break
+        elif test -f $d/lib/libpq.so
+        then
+                AC_MSG_RESULT(found pgsql in $d)
+                pgsqldir=$d
+                break
+        fi
+done
+
+if test x$pgsqldir = x
+then
+        AC_MSG_WARN(PGSQL backend not used)
+else
+        AC_DEFINE(HAVE_PGSQL)
+	for i in include include/postgresql include/pgsql
+	do
+		if test -f ${pgsqldir}/$i/libpq-fe.h
+		then
+			PGSQLINCLUDES=${pgsqldir}/$i
+			break
+		fi
+	done
+	PGSQLLIBS=${pgsqldir}/lib
+
+	DATABASE_DIR="${DATABASE_DIR} pgsql"
+
+	PGSQL_LIB="${DATABASE_LIB} -lpq " 
+	DATABASE_LIB_DIR="${DATABASE_LIB_DIR} -L${PGSQLLIBS} "
+
+	DB_DEF="${DB_DEF} -DHAVE_PGSQL "
+
+	AC_SUBST(PGSQLINCLUDES)
+	AC_SUBST(PGSQL_LIB)
+
+fi      
+])      
+
+dnl
+dnl Check whether the user wants to log IP-addresses as strings rather
+dnl than integers to his pgsql-database.
+dnl
+
+AC_ARG_WITH(pgsql-log-ip-as-string,
+ --with-pgsql-log-ip-as-string		log IPs as string rather than as interger
+,[
+   EXTRA_PGSQL_DEF="-DIP_AS_STRING=1"
+])
+
+
+dnl
+dnl test for sqlite3
+dnl
+AC_ARG_WITH(sqlite3,
+ --with-sqlite3=<directory>		sqlite3 installed in <directory>,[
+if test $withval != yes
+then
+        dir=$withval
+else
+        dir="/usr/local"
+fi
+mysqldir=""
+AC_MSG_CHECKING(for sqlite3 files)
+for d in $dir /usr /usr/local /usr/local/sqlite3
+do
+        if test -f $d/lib/sqlite3/libsqlite3.so
+        then
+                AC_MSG_RESULT(found sqlite3 in $d)
+                sqlite3dir=$d
+                sqlite3dir_suffix=/sqlite3
+                break
+        elif test -f $d/lib/libsqlite3.so
+        then
+                AC_MSG_RESULT(found sqlite in $d)
+                sqlite3dir=$d
+                sqlite3dir_suffix=
+                break
+        fi
+done
+
+if test x$sqlite3dir = x
+then
+        AC_MSG_WARN(sqlite3 backend not used)
+else
+        AC_DEFINE(HAVE_SQLITE3)
+        SQLITE3INCLUDES=${sqlite3dir}/include${sqlite3dir_suffix}
+        SQLITE3LIBS=${sqlite3dir}/lib${sqlite3dir_suffix}
+
+	DATABASE_DIR="${DATABASE_DIR} sqlite3"
+
+	SQLITE3_LIB="${DATABASE_LIB} -lsqlite3 " 
+	DATABASE_LIB_DIR="${DATABASE_LIB_DIR} -L${SQLITE3LIBS} "
+
+dnl	DATABASE_DRIVERS="${DATABASE_DRIVERS} ../sqlite3/mysql_driver.o "
+
+	DB_DEF="${DB_DEF} -DHAVE_SQLITE3 "
+
+
+	AC_SUBST(SQLITE3INCLUDES)
+	AC_SUBST(SQLITE3_LIB)
+
+fi      
+])      
+
+
+dnl
+dnl Check whether the user wants log IP-addresses as strings rather
+dnl than as unsigned long-integers to his sqlite3-database. Since this
+dnl feature is only used in ulogd_SQLITE3.c, there are no checks in any
+dnl way.
+dnl
+
+AC_ARG_WITH(sqlite3-log-ip-as-string,
+ --with-sqlite3-log-ip-as-string		log IPs as string rather than as
+						unsigned long-integer.
+,[
+   EXTRA_SQLITE3_DEF="${EXTRA_SQLITE3_DEF} -DIP_AS_STRING=1"
+   AC_MSG_WARN(the use of --with-sqlite3-log-ip-as-string is discouraged)
+])
+
+
+AC_SUBST(DATABASE_DIR)
+AC_SUBST(DATABASE_LIB)
+AC_SUBST(DATABASE_LIB_DIR)
+AC_SUBST(DB_DEF)
+AC_SUBST(EXTRA_MYSQL_DEF)
+AC_SUBST(EXTRA_PGSQL_DEF)
+AC_SUBST(EXTRA_SQLITE3_DEF)
+
+AC_SUBST(DATABASE_DRIVERS)
+AC_SUBST(HAVE_PCAP_H)
+
+AM_CONDITIONAL(HAVE_MYSQL, test x$mysqldir != x)
+AM_CONDITIONAL(HAVE_PGSQL, test x$pgsqldir != x)
+AM_CONDITIONAL(HAVE_SQLITE3, test x$sqlite3dir != x)
+
+AC_OUTPUT(extensions/Makefile doc/Makefile conffile/Makefile libipulog/Makefile mysql/Makefile pgsql/Makefile sqlite3/Makefile pcap/Makefile Makefile Rules.make)

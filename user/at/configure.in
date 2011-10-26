@@ -1,0 +1,319 @@
+dnl Process this file with autoconf to produce a configure script.
+
+AC_INIT(at.c)
+AC_PREFIX_DEFAULT(/usr)
+AC_CONFIG_HEADER(config.h)
+AC_PREREQ(2.7)
+
+
+VERSION="3.1.7"
+if test "X$CFLAGS" = "X"; then
+CFLAGS=-O
+fi
+
+AC_SUBST(VERSION)
+
+AC_CANONICAL_HOST
+
+dnl Checks for programs.
+
+AC_C_CROSS
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_YACC
+AC_PROG_LEX
+
+
+AC_MSG_CHECKING(Checking for HP-UX -Aa)
+
+case "$host" in
+  *-*-hpux*)
+    # HPUX flags from jgotts@engin.umich.edu
+    if test -z "$GCC"; then
+      CFLAGS="$CFLAGS -Aa -D_HPUX_SOURCE"
+    fi
+    AC_MSG_RESULT(yes)
+    ;;
+  *)
+    AC_MSG_RESULT(no)
+    ;;
+esac
+AC_MSG_CHECKING(Trying to compile a trivial ANSI C program)
+AC_TRY_RUN([ main(int ac, char **av) { return 0; } ],
+    AC_MSG_RESULT(yes),
+    AC_MSG_RESULT(no)
+    AC_MSG_ERROR(Could not compile and run even a trivial ANSI C program - check CC.),
+    AC_MSG_ERROR(Could not compile and run even a trivial ANSI C program - check CC.))
+
+AC_MSG_CHECKING(__attribute__((noreturn)))
+AC_TRY_COMPILE([], [void __attribute__((noreturn)) panic(void);],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_ATTRIBUTE_NORETURN),
+    AC_MSG_RESULT(no)
+)
+dnl Checks for libraries.
+
+AC_CHECK_LIB(fl,yywrap,
+	[],
+	AC_DEFINE(NEED_YYWRAP)
+)
+
+dnl Checks for header files.
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(fcntl.h syslog.h unistd.h errno.h sys/fcntl.h getopt.h)
+AC_CHECK_HEADERS(stdarg.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIGNAL
+AC_TYPE_UID_T
+AC_TYPE_MODE_T
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+
+
+dnl Checks for library functions.
+AC_FUNC_VPRINTF
+AC_FUNC_GETLOADAVG
+AC_CHECK_FUNCS(getcwd mktime strftime setreuid setresuid sigaction)
+AC_CHECK_FUNCS(waitpid)
+
+dnl Checking for programs
+
+AC_PATH_PROG(MAILX, mailx)
+if test "$ac_cv_path_MAILX" != "" ; then
+AC_DEFINE_UNQUOTED(MAILX,"$ac_cv_path_MAILX")
+MAIL_CMD="$ac_cv_path_MAILX"
+fi
+
+AC_PATH_PROG(MAILC, mail)
+if test "$ac_cv_path_MAILC" != "" ; then
+AC_DEFINE_UNQUOTED(MAILC,"$ac_cv_path_MAILC")
+MAIL_CMD="$ac_cv_path_MAILC"
+fi
+
+AC_PATH_PROG(SENDMAIL, sendmail, , $PATH:/usr/lib:/usr/sbin )
+if test "$ac_cv_path_SENDMAIL" != "" ; then
+AC_DEFINE_UNQUOTED(SENDMAIL,"$ac_cv_path_SENDMAIL")
+MAIL_CMD="$ac_cv_path_SENDMAIL"
+fi
+
+AC_SUBST(MAIL_CMD)
+
+AC_MSG_CHECKING(etcdir)
+AC_ARG_WITH(etcdir,
+[  --with-etcdir=PATH      Directory containing permission files (default /etc).],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need ETCDIR.)
+    ;;
+  yes)
+    ETCDIR=/etc
+    AC_MSG_RESULT(/etc)
+    ;;
+  *)
+    ETCDIR="$withval"
+    AC_MSG_RESULT($withval)
+    ;;
+  esac ],
+  ETCDIR="/etc"
+  AC_MSG_RESULT(/etc)
+)
+AC_SUBST(ETCDIR)
+
+AC_MSG_CHECKING(location of pid file)
+if test -d /var/run ; then
+    AC_DEFINE_UNQUOTED(PIDFILE, "/var/run/atd.pid")
+    AC_MSG_RESULT(/var/run)
+elif test -d /usr/run ; then
+    AC_DEFINE_UNQUOTED(PIDFILE, "/usr/run/atd.pid")
+    AC_MSG_RESULT(/usr/run)
+else
+    AC_DEFINE_UNQUOTED(PIDFILE, "$ETCDIR/atd.pid")
+    AC_MSG_RESULT(/etc)
+fi
+
+AC_MSG_CHECKING(location of spool directory)
+if test -d /var/spool/atjobs ; then
+  sp=/var/spool
+  AC_DEFINE(SPOOLDIR, "/var/spool")
+  AC_MSG_RESULT(Using existing /var/spool/at{jobs|run})
+elif  test -d /var/spool/cron ; then
+  sp=/var/spool/cron
+  AC_DEFINE(SPOOLDIR, "/var/spool/cron")
+  AC_MSG_RESULT(/var/spool/cron)
+elif test -d /usr/spool/cron ; then
+  sp=/usr/spool/cron
+  AC_DEFINE(SPOOLDIR, "/usr/spool/cron")
+  AC_MSG_RESULT(/usr/spool/cron)
+else
+  AC_ERROR(Cannot determine value for spool directory)
+fi
+
+AC_MSG_CHECKING(jobdir)
+AC_ARG_WITH(jobdir,
+[  --with-jobdir=PATH      Directory containing at jobs (default SPOOLDIR/atjobs).],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need JOBDIR.)
+    ;;
+  yes)
+    AC_DEFINE_UNQUOTED(ATJOB_DIR, "$sp/atjobs")
+    AC_MSG_RESULT($ATJOB_DIR)
+    ATJBD="$sp/atjobs"
+    ;;
+  *)
+    AC_DEFINE_UNQUOTED(ATJOB_DIR, "$withval")
+    AC_MSG_RESULT($withval)
+    ATJBD="$withval"
+    ;;
+  esac ],
+  AC_DEFINE_UNQUOTED(ATJOB_DIR, "$sp/atjobs")
+  AC_MSG_RESULT($sp/atjobs)
+  ATJBD="$sp/atjobs"
+)
+AC_SUBST(ATJBD)
+
+AC_MSG_CHECKING(atspool)
+AC_ARG_WITH(atspool,
+[  --with-atspool=PATH    Directory containing at spool (default SPOOLDIR/atspool).],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need ATSPOOL.)
+    ;;
+  yes)
+    AC_DEFINE_UNQUOTED(ATSPOOL_DIR, "$sp/atspool")
+    AC_MSG_RESULT($sp/atspool)
+    ATSPD=$sp/atspool
+    ;;
+  *)
+    AC_DEFINE_UNQUOTED(ATSPOOL_DIR, "$withval")
+    AC_MSG_RESULT($withval)
+    ATSPD=$withval
+    ;;
+  esac ],
+  AC_DEFINE_UNQUOTED(ATSPOOL_DIR, "$sp/atspool")
+  AC_MSG_RESULT($sp/atspool)
+  ATSPD=$sp/atspool
+)
+AC_SUBST(ATSPD)
+
+AC_MSG_CHECKING(default at queue)
+AC_ARG_WITH(atqueue,
+[ --with-atqueue=DEFAULT_AT_QUEUE	Default queue for at (default a). ],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need DEFAULT_AT_QUEUE.)
+    ;;
+  yes)
+    AC_DEFINE_UNQUOTED(DEFAULT_AT_QUEUE, 'a')
+    AC_MSG_RESULT(a)
+    DEFATQ=a
+    ;;
+  *)
+    AC_DEFINE_UNQUOTED(DEFAULT_AT_QUEUE, "$withval")
+    AC_MSG_RESULT($withval)
+    DEFATQ=$withval
+    ;;
+    esac ],
+    AC_DEFINE_UNQUOTED(DEFAULT_AT_QUEUE, 'a')
+    AC_MSG_RESULT(a)
+    DEFATQ=a
+)
+
+AC_SUBST(DEFATQ)
+
+AC_MSG_CHECKING(default batch queue)
+AC_ARG_WITH(batchqueue,
+[ --with-batchqueue=DEFAULT_BATCH_QUEUE	Default queue for batch (default b). ],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need DEFAULT_BATCH_QUEUE.)
+    ;;
+  yes)
+    AC_DEFINE_UNQUOTED(DEFAULT_BATCH_QUEUE, 'b')
+    AC_MSG_RESULT(b)
+    DEFBQ=b
+    ;;
+  *)
+    AC_DEFINE_UNQUOTED(DEFAULT_BATCH_QUEUE, "$withval")
+    AC_MSG_RESULT($withval)
+    DEFBQ=$withval
+    ;;
+    esac ],
+    AC_DEFINE_UNQUOTED(DEFAULT_BATCH_QUEUE, 'b')
+    AC_MSG_RESULT(b)
+    DEFBQ=b
+)
+
+AC_SUBST(DEFBQ)
+
+AC_MSG_CHECKING(maximum load average for batch to start jobs)
+AC_ARG_WITH(loadavg_mx,
+[ --with-loadavg_mx=LOADAVG_MX	Default max. load average for batch (default 0.8). ],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need LOADAVG_MX.)
+    ;;
+  yes)
+    LOADAVG_MX=0.8
+    AC_MSG_RESULT(0.8)
+    ;;
+  *)
+    LOADAVG_MX="$withval";
+    AC_MSG_RESULT($withval)
+    ;;
+    esac ],
+    LOADAVG_MX=0.8
+    AC_MSG_RESULT(0.8)
+)
+AC_SUBST(LOADAVG_MX)
+
+AC_MSG_CHECKING(username to run under)
+AC_ARG_WITH(daemon_username,
+[ --with-daemon_username=DAEMON_USERNAME	Username to run under (default daemon) ],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need DAEMON_USERNAME.)
+    ;;
+  yes)
+    DAEMON_USERNAME=daemon
+    AC_MSG_RESULT(daemon)
+    ;;
+  *)
+    DAEMON_USERNAME="$withval";
+    AC_MSG_RESULT($withval)
+    ;;
+    esac ],
+    DAEMON_USERNAME=daemon
+    AC_MSG_RESULT(daemon)
+)
+AC_SUBST(DAEMON_USERNAME)
+
+AC_MSG_CHECKING(groupname to run under)
+AC_ARG_WITH(daemon_groupname,
+[ --with-daemon_groupname=DAEMON_GROUPNAME	Groupname to run under (default daemon) ],
+[ case "$withval" in
+  no)
+    AC_MSG_ERROR(Need DAEMON_GROUPNAME.)
+    ;;
+  yes)
+    DAEMON_GROUPNAME=daemon
+    AC_MSG_RESULT(daemon)
+    ;;
+  *)
+    DAEMON_GROUPNAME="$withval";
+    AC_MSG_RESULT($withval)
+    ;;
+    esac ],
+    DAEMON_GROUPNAME=daemon
+    AC_MSG_RESULT(daemon)
+)
+AC_SUBST(DAEMON_GROUPNAME)
+
+AC_OUTPUT(Makefile atrun atd.8 atrun.8 at.1 batch)

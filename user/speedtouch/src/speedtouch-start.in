@@ -1,0 +1,168 @@
+#!/bin/sh
+
+# Author: Benoit PAPILLAULT <benoit.papillault@free.fr>
+# Creation: 12/05/2004
+
+# Goal: Start the connection
+
+# Ensure to have a working PATH
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin:@sbindir@:@bindir@
+
+# check for root privileges
+
+if [ "`whoami`" != "root" ]; then
+  echo "You must launch this script with root privileges. Enter root password."
+  exec su -c "$0 $@"
+  exit -1
+fi
+
+echo "Starting ADSL connection..."
+
+# load usbcore if needed
+if [ ! -d /proc/bus/usb ]; then
+    echo -n "Loading USB support... "
+    modprobe usbcore
+    sleep 1
+    if [ ! -d /proc/bus/usb ]; then
+        echo "KO";
+        exit -1;
+    else
+        echo "OK";
+    fi
+fi
+
+# mount usbdevfs is this is not the case
+if [ ! -f /proc/bus/usb/devices ]; then
+    echo -n "Loading preliminary USB device filesystem support... "
+    mount -t usbdevfs usbdevfs /proc/bus/usb
+    sleep 1
+    if [ ! -f /proc/bus/usb/devices ]; then
+        echo "KO";
+        exit -1
+    else
+        echo "OK";
+    fi
+fi
+
+case `uname -r` in
+    2.4.*)
+        UHCI=usb-uhci
+        UHCI_BIS=uhci
+        OHCI=usb-ohci
+        EHCI=ehci-hcd
+        ;;
+    2.5.*)
+        UHCI=uhci-hcd
+        UHCI_BIS=
+        OHCI=ohci-hcd
+        EHCI=ehci-hcd
+        ;;
+    2.6.*)
+        UHCI=uhci-hcd
+        UHCI_BIS=
+        OHCI=ohci-hcd
+        EHCI=ehci-hcd
+        ;;
+esac
+
+# check for UHCI
+
+if ! grep "^S:  Product=" /proc/bus/usb/devices |grep -q UHCI; then
+    if lspci -v | grep "USB Controller" | grep -q UHCI; then
+        echo -n "Loading UHCI support... "
+        modprobe $UHCI
+        if [ "${UHCI_BIS}" ]; then modprobe $UHCI_BIS; fi
+        sleep 1
+        if ! grep "^S:  Product=" /proc/bus/usb/devices |grep -q UHCI; then
+            echo "KO";
+        else
+            echo "OK";
+        fi
+    fi
+fi
+
+# check for OHCI
+
+if ! grep "^S:  Product=" /proc/bus/usb/devices |grep -q OHCI; then
+    if lspci -v | grep "USB Controller" | grep -q OHCI; then
+        echo -n "Loading OHCI support... "
+        modprobe $OHCI
+        sleep 1
+        if ! grep "^S:  Product=" /proc/bus/usb/devices |grep -q OHCI; then
+            echo "KO";
+        else
+            echo "OK";
+        fi
+    fi
+fi
+
+# check for EHCI
+
+if ! grep "^S:  Product=" /proc/bus/usb/devices |grep -q EHCI; then
+    if lspci -v | grep "USB Controller" | grep -q EHCI; then
+        echo -n "Loading EHCI support... "
+        modprobe $EHCI
+        sleep 1
+        if ! grep "^S:  Product=" /proc/bus/usb/devices |grep -q EHCI; then
+            echo "KO";
+        else
+            echo "OK";
+        fi
+    fi
+fi
+
+# if one configuration file exists, read it. This file should define :
+# 
+# FIRMWARE_LOADER_FILE
+# FIRMWARE_FILE
+# PPPD_PEER
+#
+
+# At this point, USB is properly configured (/proc/bus/usb/devices can
+# be used)
+
+if [ -f /etc/speedtouch/speedtouch.conf ]; then
+  . /etc/speedtouch/speedtouch.conf
+fi
+
+if [ "$FIRMWARE_LOADER_FILE" ]; then
+  MODEM_RUN_OPTIONS="$MODEM_RUN_OPTIONS -a $FIRMWARE_LOADER_FILE"
+fi
+
+if [ "$FIRMWARE_FILE" ]; then
+    MODEM_RUN_OPTIONS="$MODEM_RUN_OPTIONS -f $FIRMWARE_FILE"
+else
+    echo "FIRMWARE_FILE undefined"
+    exit -1
+fi
+
+# convention : when modem_run returns, meaning that the DSL line is
+# up, we create the file /var/run/speedtouch-up. This file is removed
+# when the modem is removed (in the hotplug script).
+
+# Of course, this does not work when several modems are connected (we
+# should write a small executable that get the mac addresse from the
+# modem and use it as a key)
+
+if ! modem_run $MODEM_RUN_OPTIONS; then
+    exit 1
+fi
+
+#
+# for PPPoA connections :
+#
+# pppd call speedtouch-pppoa updetach
+#
+# for PPPoE connections :
+#
+# pppd call speedtouch-pppoe updetach
+#
+
+if [ "${PPPD_PEER}" == "" ]; then
+    echo "PPPD_PEER undefined"
+    exit -1
+fi
+
+pppd call "${PPPD_PEER}" updetach

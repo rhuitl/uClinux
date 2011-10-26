@@ -1,0 +1,63 @@
+#! /usr/bin/make -f
+#
+#	debian/rules file for elvis-tiny
+#
+
+# Name.
+package = elvis-tiny
+tmp     = $(shell pwd)/debian/tmp
+
+define checkdir
+	test -f cmd1.c
+endef
+
+build:
+# Builds the binary package.
+	$(checkdir)
+	make
+	touch build
+
+# Architecture independant files.
+binary-indep:   build
+	$(checkdir)
+
+# Make a binary package (.deb file)
+binary-arch:	build checkroot
+	-rm -rf $(tmp)
+	install -d -g root -m 755 -o root $(tmp)
+	install -d -g root -m 755 -o root $(tmp)/{DEBIAN,usr}
+	install -d -g root -m 755 -o root $(tmp)/usr/{doc,bin,man}
+	install -d -g root -m 755 -o root $(tmp)/usr/man/man1
+	install -d -g root -m 755 -o root $(tmp)/usr/doc/$(package)
+	install -g root -s -m 755 elvis $(tmp)/usr/bin/elvis-tiny
+	install -g root -m 644 debian/changelog \
+		$(tmp)/usr/doc/$(package)/changelog.Debian
+	install -g root -m 644 KNOWN.BUGS \
+		$(tmp)/usr/doc/$(package)/changelog
+	install -g root -m 644 debian/elvis-tiny.1 $(tmp)/usr/man/man1
+	gzip -9f $(tmp)/usr/man/man1/*
+	gzip -9f $(tmp)/usr/doc/$(package)/*
+
+	install -g root -m 644 README $(tmp)/usr/doc/$(package)/copyright
+
+	install -g root -m 755 debian/postinst $(tmp)/DEBIAN
+	install -g root -m 755 debian/prerm $(tmp)/DEBIAN
+
+	dpkg-shlibdeps elvis
+	dpkg-gencontrol
+	dpkg --build $(tmp) ..
+	rm -rf $(tmp)
+
+clean:	checkroot
+	-make clobber
+	rm -f build debian/{files,substvars}
+	rm -rf $(tmp)
+	find . -name '*.bak' -o -name '*~' | xargs -r rm -f --
+
+binary: binary-indep binary-arch
+
+checkroot:
+	$(checkdir)
+	test root = "`whoami`"
+
+.PHONY: binary binary-arch binary-indep clean checkroot

@@ -1,0 +1,17 @@
+/*
+ * drem() wrapper for remainder().
+ *
+ * Written by J.T. Conklin, <jtc@wimsey.com>
+ * Placed into the Public Domain, 1994.
+ */
+
+#include <math.h>
+
+libm_hidden_proto(remainder)
+
+double
+drem(x, y)
+	double x, y;
+{
+	return remainder(x, y);
+}

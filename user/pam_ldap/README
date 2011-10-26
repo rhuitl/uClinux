@@ -1,0 +1,223 @@
+
+This is yet another pam_ldap module. 
+
+The advantages of this particular version are:
+
+   o Support for changing passwords in LDAP, optionally
+     with NDS or Active Directory servers
+
+   o Support for the V3 client API and protocol (to minimize
+     rebinds)
+
+   o Support for Netscape's SSL API and proprietary extensions
+
+   o Compatibility with the nss_ldap configuration file format
+     and POSIX configuration profile semantics
+
+   o Supports ypldapd LDAP locator for plug-and-play installation
+
+   o Supports Netscape Directory Server 3.x password policies and
+     password expiration controls
+
+   o Supports access authorization on the "host" attribute of the
+     account objectclass, and on group membership
+
+   o Supports generating crypted hashes locally for use with
+     OpenLDAP and other University of Michigan derived LDAP 
+     servers
+
+   o Bundled with Debian (Potato) and RedHat (Rawhide)
+     distributions.
+
+The module builds under both Linux 2.x and Solaris 2.x (see note below
+regarding Solaris 7 - aka Solaris 2.7 - and above).  NOTE - you MUST
+use GNU Make (Solaris Make will not work).
+
+Thanks to fellow Aussie Chris Albone who wrote the initial
+pam_ldap_auth module.
+
+I am indebted to Doug Nazar for his contributions to
+this software.
+
+I've tested this with Netscape Directory Server 3.1 under NT and
+Solaris, the University of Michigan LDAP server, and Microsoft's
+Exchange Server.
+
+pam_ldap is only secure if used with a secure SASL mechanism (like
+CRAM-MD5) or with transport security (like SSL/TLS). With simple
+authentication, it is less secure than using UNIX hashed passwords,
+because the LDAP bind request sends the password in the clear.
+
+Here are some possible deployment scenarios:
+
+   o pam_ldap with account information in /etc flat files,
+     kept manually in sync with LDAP
+
+   o pam_ldap with account information in LDAP, using 
+     nss_ldap
+
+   o pam_ldap with account information in NIS, using
+     ypldapd
+
+FAQS
+====
+
+Don't forget to ensure that pam_ldap's link dependencies are
+satisfied after installation (you can verify this by doing
+ldd /usr/lib/security/pam_ldap.so.1). You must ensure that
+any libraries that it depends on (such as the LDAP client
+library) can be located by the dynamic linker. Otherwise,
+libpam may fail to load the pam_ldap module.
+
+Q: Using the Netscape LDAP library with pam_ldap on Solaris 8
+- aka Solaris 2.8 - fails to link properly! David Begley writes:
+
+There are two releases of the Netscape LDAP library, one marked
+for Solaris 8 and the other marked for Solaris 2.6 - the additional
+catch is that the Solaris 8 library is a 64-bit library (this is marked
+on Netscape's site) whilst the other is a 32-bit library.
+
+It doesn't matter if you have a 64-bit UltraSPARC processor running
+the 64-bit Solaris kernel, if your compiler only works with 32-bit
+objects then it won't successfully link the 64-bit Solaris 8
+Netscape LDAP library.
+
+GCC (up to version 2.95.2) does not work properly with 64-bit objects
+under Solaris, so just use the Solaris 2.6 (32-bit) Netscape LDAP
+library and everything should be fine.
+
+Q: Can I use a third-party client LDAP library (such as Netscape's)
+on Solaris 7? David Begley writes:
+
+Yes, but if you have the Solaris 7 LDAP library installed (package
+SUNWlldap or SUNWldapx) configure will find it before the third-party
+library - in this case, you can't rely on the auto-lib-type detection of
+configure and must use the "--with-ldap-lib=" parameter.
+
+Q: Why does linking fail on Solaris 2.6 (complaining about
+relocations remaining against libcrypt)? David Begley
+writes:
+
+In short, the problem is that GCC is looking for a shared libcrypt
+(in response to the "--shared" parameter) which doesn't exist on
+Solaris 2.6 (but does on Solaris 7).  The fix is quite simple, use
+"-G" instead of "--shared" (could this be a GCC bug?).  This change
+should already be included in newer versions of pam_ldap.
+
+It doesn't look like libcrypt is even needed if you're using the
+Netscape LDAP client library (maybe it's required for OpenLDAP?).
+
+Q: Where is ldap_ssl.h? It's in the Netscape LDAP
+C SDK. Download it from developer.netscape.com. If you
+don't want to use SSL, removed -DSSL from CFLAGS. I
+don't have any experience building with the SSL/TLS
+support in OpenLDAP.
+
+Q: I get an undefined symbol "re_comp" under
+FreeBSD. Try linking against libgnuregex (set
+LDFLAGS=-lgnuregex before configuring).
+
+Q: I get undefined symbols "pam_sm_authenticate"
+&c. Make sure that you compile with -DPIC, eg:
+CFLAGS=-DPIC LDFLAGS=-lgnuregex ./configure
+
+Q: The pam_nds_passwd, pam_ad_passwd, and 
+pam_crypt options don't seem to work anymore. Why?
+These have been replaced with the pam_password
+attribute, which takes the values:
+
+pam_password [clear|crypt|md5|nds|ad|exop]
+
+clear -- send the new password in cleartext to
+         the server. Use with Netscape
+         Directory Server, others.
+
+crypt -- crypt the password using the UNIX
+         crypt(3) library call before updating
+         userPassword.
+
+md5   -- use inbuilt MD5 code to hash password
+
+nds   -- do the right thing for updating 
+         NDS passwords
+
+ad    -- do the right thing for updating
+         Active Directory passwords
+
+exop  -- use the password change extended
+         operation, used by OpenLDAP
+
+Q: Connecting to my LDAPv2 server used to 
+work, but doesn't anymore. Why?
+LDAPv3 is now the default protocol. To
+use LDAPv2, if your client library doesn't
+fall back automatically, set
+
+ldap_version 2
+
+in /etc/ldap.conf.
+
+Scott M. Stone <sstone@foo3.com> writes:
+Your openldap libs *and* your SSL/RSAREF libs must be DYNAMIC LIBRARIES
+or neither nss_ldap nor pam_ldap will work.
+
+Q: Solaris stdio bug
+
+Mark Blackman <mark.blackman@netscalibur.co.uk> writes:
+
+Our problem was trigged by the Solaris bug where stdio can
+only open 256 STREAMS (fopen), i.e. 
+>From http://www.science.uva.nl/pub/solaris/solaris2.html
+
+"Programs using stdio or even library calls that use stdio may break when they
+have more than 256 files open as that is the stdio limit. Programs using many
+filedescriptors should try and reserve a number of low numbered file
+descriptors for use by stdio."
+
+We are running a large application from Critical Path (imsd) and they open
+thousands of file descriptors under load. This is not a problem, however after
+all these descriptors are open and when pam_ldap is loadedp/called and it
+attempts to open its config file '/etc/ldap.conf', it fails because of the
+stdio bug that internally casts the 'int' file descriptor to a 'char'
+representation in the FILEHANDLE structure.
+
+To remedy this, we recommend that pam_ldap either keeps a set of compile time
+specified defaults in the binary and harmless ignore the absence
+of '/etc/ldap.conf' or to rewrite config file routines to use
+open/close instead of the STREAMS version fopen/fclose or
+to make it easy to link against SFIO
+(http://www.research.att.com/sw/tools/sfio/)
+
+Q: On Solaris, the following error was reported when OpenLDAP was
+compiled shared but OpenSSL not:
+
+fatal: relocation error: file /opt/lib/libldap.so.2: symbol
+SSL_load_error_strings: referenced symbol not found
+
+The workaround was to remove -M mapfile from the Makefile.
+
+SUPPORT
+=======
+
+To discuss pam_ldap and related technologies, you may
+subscribe to the following mailing lists:    
+
+        <URL:mailto:pamldap-request@padl.com>
+and
+        <URL:mailto:ldap-nis-request@padl.com>
+
+Send an electronic mail message with "subscribe" in the
+message body to join the list.
+
+Note that PADL now offer commercial support on a
+per-incident basis.      
+
+To request a support incident, send email to:
+
+	<URL:mailto:pamldap-support@padl.com>
+
+--
+PADL Software Pty Ltd
+pamldap-support@padl.com
+http://www.padl.com/
+

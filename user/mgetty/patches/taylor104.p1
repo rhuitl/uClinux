@@ -1,0 +1,160 @@
+Hi,
+
+this is a small patch to make taylor uucico 1.04 accept a "-L username"
+switch. It's similar to the "-l" switch (look into the documentation...)
+except that it will read the login name from the command line and not from
+stdin. Use it with taylor uucp "passwd" files and mgetty.login, calling
+"/usr/lib/uucp/uucico -L" directly.
+
+For Taylor UUCP 1.05, you don't need this patch anymore.
+
+gert
+
+*** uucico.c.orig	Sat Nov  6 23:46:03 1993
+--- uucico.c	Sun Nov  7 11:31:05 1993
+***************
+*** 128,134 ****
+  			   boolean *pfcalled, enum tstatus_type *pterr));
+  static int iuport_lock P((struct uuconf_port *qport, pointer pinfo));
+  static boolean flogin_prompt P((pointer puuconf,
+! 				struct sconnection *qconn));
+  static boolean faccept_call P((pointer puuconf, const char *zlogin,
+  			       struct sconnection *qconn,
+  			       const char **pzsystem));
+--- 128,135 ----
+  			   boolean *pfcalled, enum tstatus_type *pterr));
+  static int iuport_lock P((struct uuconf_port *qport, pointer pinfo));
+  static boolean flogin_prompt P((pointer puuconf,
+! 				struct sconnection *qconn,
+! 				char *zuser));
+  static boolean faccept_call P((pointer puuconf, const char *zlogin,
+  			       struct sconnection *qconn,
+  			       const char **pzsystem));
+***************
+*** 161,166 ****
+--- 162,169 ----
+    const char *zconfig = NULL;
+    /* -l: Whether to give a single login prompt.  */
+    boolean flogin = FALSE;
++   /* -L: similar to -l, but prompt only for password, login name in optarg */
++   char *zloginuser = NULL;
+    /* -P port: port to use; in master mode, call out on this port.  In
+       slave mode, accept logins on this port.  If port not specified,
+       then in master mode figure it out for each system, and in slave
+***************
+*** 185,191 ****
+  #endif
+  
+    while ((iopt = getopt_long (argc, argv,
+! 			      "cDefI:lp:qr:s:S:u:x:X:w",
+  			      asLongopts, (int *) NULL)) != EOF)
+      {
+        switch (iopt)
+--- 188,194 ----
+  #endif
+  
+    while ((iopt = getopt_long (argc, argv,
+! 			      "cDefI:lL:p:qr:s:S:u:x:X:w",
+  			      asLongopts, (int *) NULL)) != EOF)
+      {
+        switch (iopt)
+***************
+*** 222,227 ****
+--- 225,236 ----
+  	  flogin = TRUE;
+  	  break;
+  
++ 	case 'L':
++ 	  /* prompt for password only */
++           flogin = TRUE;
++           zloginuser = zbufcpy(optarg);
++ 	  break;
++ 
+  	case 'p':
+  	  /* Port to use  */
+  	  zport = optarg;
+***************
+*** 558,564 ****
+  	  if (fendless)
+  	    {
+  	      while (! FGOT_SIGNAL ()
+! 		     && flogin_prompt (puuconf, &sconn))
+  		{
+  		  /* Now ignore any SIGHUP that we got.  */
+  		  afSignal[INDEXSIG_SIGHUP] = FALSE;
+--- 567,573 ----
+  	  if (fendless)
+  	    {
+  	      while (! FGOT_SIGNAL ()
+! 		     && flogin_prompt (puuconf, &sconn, zloginuser))
+  		{
+  		  /* Now ignore any SIGHUP that we got.  */
+  		  afSignal[INDEXSIG_SIGHUP] = FALSE;
+***************
+*** 576,582 ****
+  	  else
+  	    {
+  	      if (flogin)
+! 		fret = flogin_prompt (puuconf, &sconn);
+  	      else
+  		{
+  #if DEBUG > 1
+--- 585,591 ----
+  	  else
+  	    {
+  	      if (flogin)
+! 		fret = flogin_prompt (puuconf, &sconn, zloginuser);
+  	      else
+  		{
+  #if DEBUG > 1
+***************
+*** 666,671 ****
+--- 675,682 ----
+    fprintf (stderr,
+  	   " -l: prompt for login name and password\n");
+    fprintf (stderr,
++ 	   " -L user: set login name to user, prompt for password\n");
++   fprintf (stderr,
+  	   " -e: Endless loop of login prompts and daemon execution\n");
+    fprintf (stderr,
+  	   " -w: After calling out, wait for incoming calls\n");
+***************
+*** 1495,1512 ****
+  /* Prompt for a login name and a password, and run as the slave.  */
+  
+  static boolean
+! flogin_prompt (puuconf, qconn)
+       pointer puuconf;
+       struct sconnection *qconn;
+  {
+!   char *zuser, *zpass;
+    boolean fret;
+    int iuuconf;
+  
+    DEBUG_MESSAGE0 (DEBUG_HANDSHAKE, "flogin_prompt: Waiting for login");
+  
+!   zuser = NULL;
+!   do
+      {
+        ubuffree (zuser);
+        if (! fconn_write (qconn, "login: ", sizeof "login: " - 1))
+--- 1506,1524 ----
+  /* Prompt for a login name and a password, and run as the slave.  */
+  
+  static boolean
+! flogin_prompt (puuconf, qconn, zuser)
+       pointer puuconf;
+       struct sconnection *qconn;
++      char *zuser;
+  {
+!   char *zpass;
+    boolean fret;
+    int iuuconf;
+  
+    DEBUG_MESSAGE0 (DEBUG_HANDSHAKE, "flogin_prompt: Waiting for login");
+  
+!   if ( zuser == NULL || *zuser == '\0')
+!     do
+      {
+        ubuffree (zuser);
+        if (! fconn_write (qconn, "login: ", sizeof "login: " - 1))

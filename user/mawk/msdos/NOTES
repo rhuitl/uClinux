@@ -1,0 +1,150 @@
+
+Version 1.3:
+   The new array design will fail under msdos if you put more than
+   16K items into an array and then walk it with for(i in A).
+   Unfortunately things will probably fail ungracefully.  The new 
+   array design runs into 64K limits at 16K elements in an array and
+   there are no checks in the code.  This is fixable, but tedious and
+   1.2.2 works well on DOS.
+
+   If this is a problem use version 1.2.2. 
+
+   You can get updated source and executables (1.2.2) for DOS from
+       ftp.wustl.edu ~/systems/msdos/gnuish/mawk122[sx].zip
+
+
+Version 1.2:
+
+   I no longer have a dos machine so must count on others to verify that
+   things work under msdos.
+
+   1.2 has been ported to TCC, but not MSC (I wouldn't expect this to
+   be too hard).
+
+   You now have to compile large model.  Code will no longer fit in
+   64K and code ptr and data ptrs must be both fit in a void* hence
+   large model required.
+
+   Installation instructions are in file INSTALL.
+
+
+Notes for 1.1.2d
+
+  Three changes specific to DOS.
+
+  (1) Internal conversions from doubles to strings that are integers
+  use internal conversion to long so DOS and unix now give the same
+  output.  E.g.
+
+	  '{ print 2^30 }'
+
+           1073741824  
+
+  (2) Large model uses 8K as opposed to 4K I/O buffers.
+
+  (3) MAWKSHELL is no longer required.  If not set in the 
+  environment, MAWKSHELL defaults to %COMSPEC% /c, e.g., if
+  comspec is
+
+	   c:\system\command.com
+
+  then this has the effect of setting MAWKSHELL to
+
+	   c:\system\command.com /c
+
+  Comspec should give a full drive-path specification.
+
+
+Notes for MsDOS (mawk 1.1)
+---------------
+
+command.com doesn't understand ' so if you use command.com as your
+shell (the norm under DOS) then on the command line (and NOT from
+files) the meanings of " and ' are reversed.
+
+	mawk "{ print 'hello world' }"
+
+If this seems too weird, use
+
+	mawk -f con
+	{ print "hello world" }
+	^Z
+
+If you use a DOS shell that gives you a Unix style command line, to use 
+it you'll need to provide a C function reargv() that retrieves argc and 
+argv[] from your shell.
+
+To enable system and pipes you need to tell mawk about your shell by
+setting the environment variable MAWKSHELL.  E.g, with command.com
+
+      set MAWKSHELL=c:\sys\command.com /c
+
+or with a unix like shell
+
+      set MAWKSHELL=c:\bin\sh.exe -c
+
+in your autoexec.bat.  The full path with drive and extension and
+appropriate switch is required.  (Small model is a tight squeeze
+and there's not enought room for PATH searching code.)
+
+If you want to use a ram disk for the pipes, set MAWKTMPDIR.
+
+      set MAWKTMPDIR=d:\
+
+The trailing backslash is required.  You have to set MAWKSHELL,
+MAWKTMPDIR is optional -- defaulting to the current directory.
+
+
+For compatibility with Unix, CR are silently stripped from input and LF 
+silently become CRLF on output.  Also ^Z indicates EOF on input (
+evidently for compatibility with CPM!!!).
+
+CR control can be turned off, with a new variable BINMODE.
+BINMODE defaults to 0.
+
+     BINMODE = 1 gives binary input.
+     BINMODE = 2 gives binary output.
+     BINMODE = 3 gives both.
+
+Setting BINMODE with -v or in the BEGIN section affects all
+files, otherwise it only affects files opened after the 
+assignment to BINMODE.  Once a file is open, later assignment to
+BINMODE does not affect it.  Note that with binary output, printf
+will behave strangely -- you'll need to explicitly use \r
+
+  Eg    mawk -v BINMODE=2 '{ printf "%d %s\r\n", NR, $0}'
+
+Assignment to BINMODE does not change RS or ORS; however there is
+a -W feature 
+
+   -W BINMODE=1   is the same as
+   -v BINMODE=1 -v RS="\r\n" or BEGIN{BINMODE=1 ; RS = "\r\n" }
+
+   -W BINMODE=2   is the same as
+   -v BINMODE=2 -v ORS="\r\n" or BEGIN{BINMODE=2 ; ORS = "\r\n" }
+
+   -W BINMODE=3  is the same as
+   -v BINMODE=3 -v RS=ORS="\r\n" or BEGIN{BINMODE=2 ; RS=ORS = "\r\n" }
+
+
+Setting MAWKBINMODE in the environment is the same as using -W,
+except its permanent.
+If you rarely have to deal with text files that contain ^Z,
+then setting MAWKBINMODE=1 in the environment would speed up input
+slightly.
+
+
+----------------------------------------------------------
+WARNING: If you write an infinite loop that does not print to the 
+screen, then you will have to reboot.  For example 
+
+	x = 1 
+	while( x < 10 )  A[x] = x
+	x++
+
+By mistake the x++ is outside the loop.  What you need to do is type 
+control break and the keyboard hardware will generate an interrupt and 
+the operating system will service that interrupt and terminate your 
+program, but unfortunately MsDOS does not have such a feature.  
+
+
