@@ -147,14 +147,16 @@ extern "C"
  * standard int or a short.
  */
 #ifndef MHD_LONG_LONG
-#define MHD_LONG_LONG long long
+//#define MHD_LONG_LONG long long
+#define MHD_LONG_LONG long
 #endif
 #ifndef MHD_LONG_LONG_PRINTF
 /**
  * Format string for printing a variable of type 'MHD_LONG_LONG'.
  * You should only redefine this if you also define MHD_LONG_LONG.
  */
-#define MHD_LONG_LONG_PRINTF "ll"
+//#define MHD_LONG_LONG_PRINTF "ll"
+#define MHD_LONG_LONG_PRINTF "l"
 #endif
 
 
