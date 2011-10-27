@@ -244,6 +244,16 @@ dep_pwlib = STLport
 dir_$(CONFIG_LIB_LIBOPENH323) += libopenh323
 dep_libopenh323 = pwlib
 
+dir_$(CONFIG_LIB_LIBMICROHTTPD) += libmicrohttpd
+lib_libmicrohttpd = \
+	src/daemon/.libs/*.a* \
+	src/daemon/.libs/*.so* \
+	libmicrohttpd.pc
+inc_libmicrohttpd = \
+	src/include/*.h,. \
+	src/include/plibc,.
+
+
 #
 # dir 6, 7 and 8 reserved for Makefile.local
 #
