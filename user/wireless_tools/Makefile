@@ -107,7 +107,9 @@ endif
 #CFLAGS=-O2 -W -Wall -Wstrict-prototypes -I.
 DEPFLAGS=-MMD
 XCFLAGS=$(CFLAGS) $(WARN) $(HEADERS) $(WELIB_FLAG) $(WEDEF_FLAG)
-PICFLAG=-fPIC
+
+#PICFLAG=-fPIC
+PICFLAG=
 
 # Standard compilation targets
 all:: $(IWLIB) $(PROGS)
