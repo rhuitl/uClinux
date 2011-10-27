@@ -17,6 +17,7 @@ romfs:
 	chmod 777 $(ROMFSDIR)/bin/init
 	chmod 777 $(ROMFSDIR)/bin/init.late
 	[ -d $(ROMFSDIR)/dev ] || sudo tar jxvf $(PRODUCTDIR)/rootfs/dev.tar.bz2 -C $(ROMFSDIR)/
+	cp $(PRODUCTDIR)/rootfs/etc/*     $(ROMFSDIR)/etc/
 image:
 	[ -d $(IMAGEDIR) ] || mkdir -p $(IMAGEDIR)
 	cp $(PWD)/$(LINUXDIR)/arch/arm/boot/Image $(IMAGEDIR)
