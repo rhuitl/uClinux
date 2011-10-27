@@ -13,7 +13,7 @@
 #
 
 ifeq (.config,$(wildcard .config))
-all: tools automake subdirs romfs image
+all: tools automake subdirs romfs image romfs.img
 else
 all: config_error
 endif
@@ -171,6 +171,10 @@ romfs.post:
 	. $(LINUXDIR)/.config; if [ "$$CONFIG_INITRAMFS_SOURCE" != "" ]; then \
 		$(MAKEARCH_KERNEL) -j$(HOST_NCPU) -C $(LINUXDIR) $(LINUXTARGET) || exit 1; \
 	fi
+
+romfs.img: romfs/ romfs/* romfs/*/*
+	genromfs -f romfs.img -d romfs
+	@echo "The ROMFS image romfs.img is ready"
 
 .PHONY: image
 image:
