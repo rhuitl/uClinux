@@ -179,6 +179,7 @@ romfs.img: romfs/ romfs/* romfs/*/*
 .PHONY: image
 image:
 	[ -d $(IMAGEDIR) ] || mkdir $(IMAGEDIR)
+	make linux
 	$(MAKEARCH) -C vendors image
 
 .PHONY: release
