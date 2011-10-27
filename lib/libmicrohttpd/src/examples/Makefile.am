@@ -15,15 +15,15 @@ endif
 
 # example programs
 noinst_PROGRAMS = \
-authorization_example \
 minimal_example \
 minimal_example_comet \
-post_example \
 querystring_example \
 fileserver_example \
 fileserver_example_dirs \
-fileserver_example_external_select \
-refuse_post_example
+fileserver_example_external_select
+#authorization_example \
+#post_example \
+#refuse_post_example
 
 if ENABLE_HTTPS
 noinst_PROGRAMS += https_fileserver_example 
