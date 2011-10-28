@@ -161,6 +161,7 @@ dir_$(CONFIG_USER_LOAD_LOAD)                += load
 dir_$(CONFIG_USER_HOSTAP_HOSTAP)            += hostap
 dir_$(CONFIG_USER_HOSTAP_HOSTAP)            += hostap/utils
 dir_$(CONFIG_USER_HOSTAP_HOSTAPD)           += hostap/hostapd
+dir_$(CONFIG_USER_WPA_SUPPLICANT)           += hostap-07/wpa_supplicant
 dir_$(CONFIG_USER_HPING_HPING)              += hping
 dir_$(CONFIG_USER_HTTPD_HTTPD)              += httpd
 dir_$(CONFIG_USER_HTTPTUNNEL_CLIENT)        += httptunnel
