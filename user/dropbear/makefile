@@ -15,8 +15,9 @@ makefile:
 	@echo dummy target to avoid % catching us
 
 clean:
-	$(MAKE) -f Makefile distclean
-	rm -f dropbearkey-host dropbear_rsa_host_key dropbear_dss_host_key
+	-$(MAKE) -f Makefile distclean
+	-$(MAKE) -f Makefile.host distclean
+	-rm -f dropbearkey-host dropbear_rsa_host_key dropbear_dss_host_key
 
 dropbear_rsa_host_key dropbear_dss_host_key:
 	make -f Makefile clean ; \
