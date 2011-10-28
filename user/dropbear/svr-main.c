@@ -262,7 +262,7 @@ void main_noinetd() {
 #ifdef DEBUG_NOFORK
 			fork_ret = 0;
 #else
-			fork_ret = fork();
+			fork_ret = vfork();
 #endif
 			if (fork_ret < 0) {
 				dropbear_log(LOG_WARNING, "Error forking: %s", strerror(errno));
