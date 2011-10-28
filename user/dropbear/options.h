@@ -21,10 +21,10 @@
 
 /* Default hostkey paths - these can be specified on the command line */
 #ifndef DSS_PRIV_FILENAME
-#define DSS_PRIV_FILENAME "/etc/dropbear/dropbear_dss_host_key"
+#define DSS_PRIV_FILENAME "/etc/dropbear_dss_host_key"
 #endif
 #ifndef RSA_PRIV_FILENAME
-#define RSA_PRIV_FILENAME "/etc/dropbear/dropbear_rsa_host_key"
+#define RSA_PRIV_FILENAME "/etc/dropbear_rsa_host_key"
 #endif
 
 /* Set NON_INETD_MODE if you require daemon functionality (ie Dropbear listens
@@ -52,21 +52,21 @@ much traffic. */
 /*#define DROPBEAR_SMALL_CODE*/
 
 /* Enable X11 Forwarding - server only */
-#define ENABLE_X11FWD
+//#define ENABLE_X11FWD
 
 /* Enable TCP Fowarding */
 /* 'Local' is "-L" style (client listening port forwarded via server)
  * 'Remote' is "-R" style (server listening port forwarded via client) */
 
-#define ENABLE_CLI_LOCALTCPFWD
-#define ENABLE_CLI_REMOTETCPFWD
+//#define ENABLE_CLI_LOCALTCPFWD
+//#define ENABLE_CLI_REMOTETCPFWD
 
-#define ENABLE_SVR_LOCALTCPFWD
-#define ENABLE_SVR_REMOTETCPFWD
+//#define ENABLE_SVR_LOCALTCPFWD
+//#define ENABLE_SVR_REMOTETCPFWD
 
 /* Enable Authentication Agent Forwarding */
-#define ENABLE_SVR_AGENTFWD
-#define ENABLE_CLI_AGENTFWD
+//#define ENABLE_SVR_AGENTFWD
+//#define ENABLE_CLI_AGENTFWD
 
 
 /* Note: Both ENABLE_CLI_PROXYCMD and ENABLE_CLI_NETCAT must be set to
@@ -74,11 +74,11 @@ much traffic. */
 
 /* Allow using -J <proxycommand> to run the connection through a 
    pipe to a program, rather the normal TCP connection */
-#define ENABLE_CLI_PROXYCMD
+//#define ENABLE_CLI_PROXYCMD
 
 /* Enable "Netcat mode" option. This will forward standard input/output
  * to a remote TCP-forwarded connection */
-#define ENABLE_CLI_NETCAT
+//#define ENABLE_CLI_NETCAT
 
 /* Encryption - at least one required.
  * Protocol RFC requires 3DES and recommends AES128 for interoperability.
@@ -144,7 +144,7 @@ much traffic. */
 #endif
 
 /* Whether to do reverse DNS lookups. */
-#define DO_HOST_LOOKUP
+//#define DO_HOST_LOOKUP
 
 /* Whether to print the message of the day (MOTD). This doesn't add much code
  * size */
