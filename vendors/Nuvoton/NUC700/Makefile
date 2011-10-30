@@ -2,7 +2,7 @@
 #	Makefile -- Build instructions for NUVOTON/NUC700
 #
 
-ROMFS_DIRS = bin etc home lib mnt proc sbin usr var
+ROMFS_DIRS = bin etc home lib mnt proc sbin usr var tmp
 
 clean:
 
