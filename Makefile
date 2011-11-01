@@ -13,7 +13,7 @@
 #
 
 ifeq (.config,$(wildcard .config))
-all: tools automake subdirs romfs image romfs.img
+all: tools automake subdirs romfs image romfs.img squashfs.img
 else
 all: config_error
 endif
@@ -175,6 +175,14 @@ romfs.post:
 romfs.img: romfs/ romfs/* romfs/*/*
 	genromfs -f romfs.img -d romfs
 	@echo "The ROMFS image romfs.img is ready"
+
+#cramfs.img: romfs.img
+#	mkcramfs romfs/ cramfs.img
+#	@echo "The CRAMFS image cramfs.img is ready"
+
+squashfs.img: romfs.img
+	mksquashfs romfs/ squashfs.img -no-exports -no-xattrs -all-root -noappend
+	@echo "The SQUASHFS image squashfs.img is ready"
 
 .PHONY: image
 image:
