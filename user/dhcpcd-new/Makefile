@@ -23,7 +23,8 @@ $(EXEC): $(OBJS)
 
 romfs:
 	$(ROMFSINST) /bin/$(EXEC)
+	$(ROMFSINST) -d /dev/null /etc/dhcpc/.keep
+	$(ROMFSINST) -d /dev/null /var/run/dhcpcd/.keep
 
 clean:
 	-rm -f $(EXEC) *.elf *.gdb *.o
-
