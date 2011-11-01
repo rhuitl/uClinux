@@ -1,8 +1,31 @@
 #!/bin/sh
-echo starting..........
-mount -t proc proc /proc
-echo 1024 >/proc/sys/vm/min_free_kbytes
-ifconfig eth0 down
-ifconfig eth0 hw ether 48:54:e8:00:00:00
-ifconfig eth0 10.38.50.222 netmask 255.255.255.0
-/bin/busybox sh
+
+echo
+echo "ipcam starting..."
+echo
+
+# Create SquashFS + tmpfs overlay for root filesystem using unionfs
+
+mount -t tmpfs   tmpfs  /tmp
+
+# When booting with initramfs, the bind will fail. Don't panic!
+if  mount -o bind      /     /mnt/root ; then
+	echo "Booting from ROM"
+	mount -t unionfs   none  /mnt/union -o dirs=/tmp:/mnt/root=ro
+	mount -t proc      proc  /mnt/union/proc
+	mount -t devtmpfs  dev   /mnt/union/dev
+	mkdir -p /mnt/union/dev/pts
+	mount -t devpts    pts   /mnt/union/dev/pts
+
+	# Change-root to the prepared root filesystem and execute the late init script
+	chroot /mnt/union /bin/sh /bin/init.late
+else
+	# We're on initramfs
+	echo "Booting from INITRAMFS"
+	mount -t proc      proc  /proc
+	mount -t devtmpfs  dev   /dev
+	mkdir -p /dev/pts
+	mount -t devpts    pts   /dev/pts
+
+	/bin/init.late
+fi
