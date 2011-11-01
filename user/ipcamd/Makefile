@@ -1,8 +1,12 @@
 EXEC = ipcamd
 OBJS += ipcamd.o
+OBJS += config.o
+OBJS += system.o
 OBJS += jpegsign.o
 OBJS += jpegdecode.o
 OBJS += v4l2_control.o
+
+CFLAGS += -I../../linux-3.0/include
 
 LDLIBS += -lmicrohttpd -lpthread -ljpeg -lcrypto
 CFLAGS += -MD -std=gnu99

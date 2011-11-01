@@ -1,7 +1,8 @@
 /*
- *  V4L2 video capture example
+ * ipcamd, an ipcamera application to fetch MJPEG data from a V4L2 device and
+ *         publish it to attached HTTP clients.
  *
- *  This program can be used and distributed without restrictions.
+ * Author: Robert Huitl <robert@huitl.de> (2011)
  */
 
 #include "config.h"
@@ -23,6 +24,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <stdint.h>
+#include <signal.h>
 
 #include <asm/types.h>          /* for videodev2.h */
 
@@ -57,6 +59,7 @@
 #endif
 
 #include "v4l2_control.h"
+#include "system.h"
 
 #define CLEAR(x) memset (&(x), 0, sizeof (x))
 
@@ -74,6 +77,8 @@ static unsigned int count = 100;
 static unsigned int width = 640;
 static unsigned int height = 480;
 static int frame_counter = 0;
+static char dhcp = 0;
+static pid_t dhcp_pid;
 static char verbose = 0;
 static char restart_cam = 0;
 
@@ -90,9 +95,52 @@ struct buffer_t {
 	char http_multipart_header[sizeof(http_multipart_header_template)-1];
 #endif
 	char queued;
+	char invalid_parameters;      /* used to disable buffers upon cam restart */
 };
 
 struct buffer_t ringbuffer[BUFFER_COUNT];
+struct cam_config g_config;
+
+
+/*******************************************************************************
+ *** Watchdog
+ ******************************************************************************/
+
+static int g_watchdog;
+
+void watchdog_open()
+{
+	g_watchdog = open("/dev/watchdog", O_WRONLY);
+	if(g_watchdog == -1)
+		perror("Watchdog");
+	else
+		printf("Watchdog enabled. Woof-Woof!\n");
+}
+
+void watchdog_close(char silent)
+{
+	if(g_watchdog != -1) {
+		// Send the magic close character to disable the watchdog
+		// see Documentation/watchdog/watchdog-api.txt
+		if(write(g_watchdog, "V", 1) != 1)
+			perror("Watchdog close failed :( Time's ticking...\n");
+		else if(!silent)
+			printf("Watchdog disabled.\n");
+		close(g_watchdog);
+		g_watchdog = -1;
+	}
+}
+
+void watchdog_ping()
+{
+	if(write(g_watchdog, "\0", 1) != 1)
+		perror("Watchdog ping failed :(\n");
+}
+
+
+/*******************************************************************************
+ *** Helper functions
+ ******************************************************************************/
 
 static void errno_exit(const char * s)
 {
@@ -100,11 +148,17 @@ static void errno_exit(const char * s)
 	exit(EXIT_FAILURE);
 }
 
+
+/*******************************************************************************
+ *** Core
+ ******************************************************************************/
+
 static void init_buffers()
 {
 	for(int i=0; i<BUFFER_COUNT; i++) {
 		ringbuffer[i].refcount = 0;
 		ringbuffer[i].queued = 0;
+		ringbuffer[i].invalid_parameters = 0;
 
 #ifdef HTTPD
 		memcpy(ringbuffer[i].http_multipart_header,
@@ -302,6 +356,10 @@ static int read_frame(void)
 	// At last, release the buffer into the wild...
 	buf->queued = 0;
 
+	// Keep invalid_parameters set if camera restart is scheduled.
+	if(!restart_cam)
+		buf->invalid_parameters = 0;
+
 	return 1;
 }
 
@@ -349,6 +407,8 @@ static void mainloop(void)
 #ifdef BUFFER_DEBUG
 		dump_ringbuffer("after a frame has been read");
 #endif
+
+		watchdog_ping();
 
 		while(queued_buffers < MIN_QUEUED) {
 			// Locate the oldest unqueued buffer that has refcount == 0.
@@ -781,6 +841,7 @@ static ssize_t http_frame_reader(void *cls, uint64_t pos, char *send_buf, size_t
 					s->frame_id, frame_id, ringbuffer[i].frame_id);*/
 			// this will overflow after ~2 years at 30 fps...
 			if(!ringbuffer[i].queued &&
+			   !ringbuffer[i].invalid_parameters &&
 			   s->frame_id < ringbuffer[i].frame_id &&
 				  frame_id < ringbuffer[i].frame_id)
 			{
@@ -935,6 +996,12 @@ static int process_get_param_resolution(struct MHD_Connection* connection, int* 
 			width = w;
 			height = h;
 			restart_cam = 1;     // triggers mainloop exit & camera restart
+
+			// Mark all buffers invalid until the first frame after the camera
+			// has been restarted. This ensures that no frames with the old
+			// resolution will be delivered once a new resolution has been set.
+			for(int i=0; i<BUFFER_COUNT; i++)
+				ringbuffer[i].invalid_parameters = 1;
 		}
 	}
 	return 0;
@@ -1057,11 +1124,12 @@ static void usage(FILE * fp, int argc, char ** argv) {
 #ifdef JPEG_SIGN
 					"-s | --sign-jpeg     Sign SHA1 hash of JPEG data\n"
 #endif
+					"-D | --dhcp          Start dhcpcd to handle network setup\n"
 					"-v | --verbose       Be verbose, e.g., print video frames\n"
 					, argv[0]);
 }
 
-static const char short_options[] = "d:hmrupc:w:jsv";
+static const char short_options[] = "d:hmrupc:w:jsDv";
 
 static const struct option long_options[] = {
 	{ "device", required_argument, NULL, 'd' },
@@ -1078,12 +1146,15 @@ static const struct option long_options[] = {
 #ifdef JPEG_SIGN
 	{ "sign-jpeg", no_argument, NULL, 's' },
 #endif
+	{ "dhcp", no_argument, NULL, 'D' },
 	{ "verbose", no_argument, NULL, 'v' },
 	{ 0, 0, 0, 0 }
 };
 
 int main(int argc, char ** argv)
 {
+	watchdog_open();
+
 	for (;;) {
 		int index;
 
@@ -1094,7 +1165,7 @@ int main(int argc, char ** argv)
 		switch (c) {
 		case 0: /* getopt_long() flag */                                  break;
 		case 'd': dev_name = optarg;                                      break;
-		case 'h': usage(stdout, argc, argv);                 exit(EXIT_SUCCESS);
+		case 'h': usage(stdout, argc, argv); watchdog_close(0);         exit(0);
 		case 'm': io = IO_METHOD_MMAP;                                    break;
 		case 'r': io = IO_METHOD_READ;                                    break;
 		case 'u': io = IO_METHOD_USERPTR;                                 break;
@@ -1122,10 +1193,27 @@ int main(int argc, char ** argv)
 			}
 			break;
 
+		case 'D': dhcp = 1;                                               break;
 		case 'v': verbose = 1;                                            break;
 		default: usage(stderr, argc, argv);                  exit(EXIT_FAILURE);
 		}
 	}
+
+	printf("Loading configuration\n");
+	if(read_config(&g_config)) {
+		fprintf(stderr, "Cannot read configuration\n");
+		bzero(&g_config, sizeof(g_config));
+	}
+	print_config(&g_config);
+
+	if(dhcp) {
+		// Start dhcpcd on eth0
+		char* const args[] = { "/bin/dhcpcd", "-d", "eth0", NULL };
+		dhcp_pid = run_bg_process("/bin/dhcpcd", args);
+		printf("DHCP pid is %d\n", dhcp_pid);
+	} else
+		dhcp_pid = -1;
+
 
 #ifdef JPEG_SIGN
 	const char* priv_key = "/etc/private.pem";
@@ -1154,8 +1242,6 @@ int main(int argc, char ** argv)
 
 	// camera restart loop (apply configuration changes)
 	do {
-		restart_cam = 0;
-
 		printf("init_device\n");
 		init_device();
 
@@ -1167,6 +1253,10 @@ int main(int argc, char ** argv)
 		enumerate_controls();
 #endif
 
+		// Reset start_cam when it is guaranteed that the next frame from V4L
+		// will have the correct settings (e.g., resolution).
+		restart_cam = 0;
+
 		printf("mainloop\n");
 		mainloop();
 		if(!verbose) printf("\n");
@@ -1176,6 +1266,10 @@ int main(int argc, char ** argv)
 		uninit_device();
 
 	} while(restart_cam);
+
+	printf("Saving configuration\n");
+	if(write_config(&g_config))
+		fprintf(stderr, "Cannot write configuration\n");
 
 	destroy_buffers();
 	close_device();
@@ -1187,5 +1281,11 @@ int main(int argc, char ** argv)
 	RSA_free(rsa_key);
 #endif
 
+	if(dhcp_pid != -1) {
+		printf("Killing DHCP client (pid %d)\n", dhcp_pid);
+		kill(dhcp_pid, SIGKILL);
+	}
+
+	watchdog_close(0);
 	return 0;
 }
