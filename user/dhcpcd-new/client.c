@@ -48,7 +48,7 @@
 #include "pathnames.h"
 #include "confdefs.h"
 
-#include <linux/autoconf.h>
+//#include <linux/autoconf.h>
 #ifdef CONFIG_LEDMAN
 #include <linux/ledman.h>
 void ledman_on(void);

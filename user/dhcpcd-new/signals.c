@@ -31,7 +31,7 @@
 #include "client.h"
 #include "pathnames.h"
 
-#include <linux/autoconf.h>
+//#include <linux/autoconf.h>
 #ifdef CONFIG_LEDMAN
 #include <linux/ledman.h>
 #endif
