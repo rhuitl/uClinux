@@ -34,6 +34,7 @@ romfs:
 	$(ROMFSINST) -e CONFIG_USER_DROPBEAR_DROPBEAR /etc/dropbear_rsa_host_key
 	$(ROMFSINST) -e CONFIG_USER_DROPBEAR_DROPBEAR \
 		-a "ssh     stream tcp nowait root /bin/dropbear -i" /etc/inetd.conf
+	$(ROMFSINST) -e CONFIG_USER_DROPBEAR_DROPBEAR -a "/bin/sh" /etc/shells
 
 %: Makefile
 	$(MAKE) -f Makefile $@
