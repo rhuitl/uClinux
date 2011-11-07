@@ -886,7 +886,7 @@ static ssize_t http_frame_reader(void *cls, uint64_t pos, char *send_buf, size_t
 
 		pthread_mutex_lock(&ringbuffer[s->frame_idx].mutex);
 		// might have been queued since above (probably rare)
-		if(ringbuffer[i].queued) {
+		if(ringbuffer[s->frame_idx].queued) {
 			pthread_mutex_unlock(&ringbuffer[s->frame_idx].mutex);
 			usleep(1000);
 			return 0;
