@@ -71,10 +71,10 @@ int decode_jpeg(void* jpeg_data, size_t jpeg_sz, int scale_denom,
 	jpeg_mem_src(&cinfo, jpeg_data, jpeg_sz);     // read data from memory
 	jpeg_read_header(&cinfo, TRUE);
 
-	printf( "JPEG File Information: \n" );
+/*	printf( "JPEG File Information: \n" );
 	printf( "Image width and height: %d pixels and %d pixels.\n", cinfo.image_width, cinfo.image_height );
 	printf( "Color components per pixel: %d.\n", cinfo.num_components );
-	printf( "Color space: %d.\n", cinfo.jpeg_color_space );
+	printf( "Color space: %d.\n", cinfo.jpeg_color_space );*/
 
 	// decompress as grayscale image, possibly subsampled
 	cinfo.out_color_space = JCS_GRAYSCALE;
@@ -87,9 +87,9 @@ int decode_jpeg(void* jpeg_data, size_t jpeg_sz, int scale_denom,
 	// according to the scaling parameters.
 	jpeg_start_decompress(&cinfo);
 
-	printf("Output image: %d x %d x %d\n",
+/*	printf("Output image: %d x %d x %d\n",
 		cinfo.output_width, cinfo.output_height, cinfo.output_components);
-	printf("Recommended height: %d\n", cinfo.rec_outbuf_height);
+	printf("Recommended height: %d\n", cinfo.rec_outbuf_height);*/
 	*width  = cinfo.output_width;
 	*height = cinfo.output_height;
 	*comps  = cinfo.output_components;
