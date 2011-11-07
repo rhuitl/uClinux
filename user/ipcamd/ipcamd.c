@@ -365,6 +365,10 @@ static int read_frame(void)
 
 static void mainloop(void)
 {
+	int fps_counter = 0;
+	struct timeval begin;
+	gettimeofday(&begin, NULL);
+
 	while (count-- > 0 && !restart_cam) {
 		for (;;) {
 			fd_set fds;
@@ -407,6 +411,21 @@ static void mainloop(void)
 #ifdef BUFFER_DEBUG
 		dump_ringbuffer("after a frame has been read");
 #endif
+
+		fps_counter++;
+
+		struct timeval now;
+		gettimeofday(&now, NULL);
+
+		unsigned int delta_t = (now.tv_sec*1000 + now.tv_usec/1000) -
+		                     (begin.tv_sec*1000 + begin.tv_usec/1000);
+		if(delta_t > 4000) {
+			float fps = (float)fps_counter / delta_t * 1000.f;
+			fps_counter = 0;
+			begin = now;
+			printf("FPS: %.1f\n", fps);
+		}
+
 
 		watchdog_ping();
 
