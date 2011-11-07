@@ -130,3 +130,19 @@ int write_pgm(const char* filename, unsigned char* data, int width, int height)
 	fclose(f);
 	return 0;
 }
+
+int write_pgm_scaled(const char* filename, unsigned short* data,
+                     int width, int height, int scale)
+{
+	FILE* f = fopen(filename, "wb");
+	if(!f) {
+		printf("Cannot open file %s: %s\n", filename, strerror(errno));
+		return 1;
+	}
+
+	fprintf(f, "P5\n%d %d\n255\n", width, height);
+	for(int i=0; i<width*height; i++)
+		fputc((*data++ + scale/2) / scale, f);
+	fclose(f);
+	return 0;
+}

@@ -9,9 +9,10 @@
 #define HTTPD
 #define JPEG_SIGN
 #define JPEG_DECODE
+#define MOTION_DETECTION
 
 //#define BUFFER_DEBUG
-#define PROFILING
+//#define PROFILING
 #define ENUM_CONTROLS
 
 

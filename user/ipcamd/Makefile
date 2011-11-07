@@ -4,6 +4,7 @@ OBJS += config.o
 OBJS += system.o
 OBJS += jpegsign.o
 OBJS += jpegdecode.o
+OBJS += motion.o
 OBJS += v4l2_control.o
 
 CFLAGS += -I../../linux-3.0/include

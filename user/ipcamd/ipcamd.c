@@ -53,13 +53,14 @@
 	static char jpeg_decode = 0;
 #endif
 
+#include "profiling.h"
 #ifdef PROFILING
-#	include "profiling.h"
 	int g_profileDepth;
 #endif
 
 #include "v4l2_control.h"
 #include "system.h"
+#include "motion.h"
 
 #define CLEAR(x) memset (&(x), 0, sizeof (x))
 
@@ -333,7 +334,7 @@ static int read_frame(void)
 	if(jpeg_decode) {
 		PROFILE_BEGIN(jpeg_decode)
 
-		printf("Decoding subsampled JPEG frame...\n");
+		//printf("Decoding subsampled JPEG frame...\n");
 
 		// Decode the JPEG into a subsampled grayscale image
 		unsigned char* img;
@@ -341,15 +342,20 @@ static int read_frame(void)
 		decode_jpeg(buf->start, buf->buf.bytesused, 8,
 					&img, &width, &height, &comps);
 
-		printf("Decoded a %d x %d x %d image\n", width, height, comps);
+		//printf("Decoded a %d x %d x %d image\n", width, height, comps);
 
 		// Write out decoded image to a PGM file for inspection
 		if(img && jpeg_decode > 1)
 			write_pgm("/tmp/test.pgm", img, width, height);
-		free(img);
 
 		PROFILE_END(jpeg_decode)
 		/* 120 ms for a 640x480 image on a NUC745 */
+
+#ifdef MOTION_DETECTION
+		detect_motion(img, width, height);
+#endif
+
+		free(img);
 	}
 #endif
 
@@ -1064,7 +1070,6 @@ int http_request_handler(void *cls, struct MHD_Connection *connection,
 		return ret;
 
 	} else if(!strcmp(url, "/snapshot.cgi")) {
-		// TODO on resolution change, don't deliver old frames
 		if(process_get_param_resolution(connection, &ret))
 			return ret;
 
@@ -1285,6 +1290,8 @@ int main(int argc, char ** argv)
 		uninit_device();
 
 	} while(restart_cam);
+
+	save_reference_image("/tmp/ref.pgm");
 
 	printf("Saving configuration\n");
 	if(write_config(&g_config))
