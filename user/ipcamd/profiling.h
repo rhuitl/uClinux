@@ -3,7 +3,7 @@
 #include "config.h"
 
 #include <stdio.h>
-#include <time.h>
+#include <sys/time.h>
 
 extern int g_profileDepth;
 
