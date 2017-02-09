@@ -711,7 +711,7 @@ static void diag_show_bbp(const char *dev)
 	res = hostap_ioctl_readmif(dev, 17);
 	if (res >= 0) {
 		printf("CR17 (AGC Update Control): %d\n", res);
-		printf("    AGC update during CIR injest: %s\n",
+		printf("    AGC update during CIR ingest: %s\n",
 		       res & BIT(7) ? "enable" : "disable");
 		printf("    AGC timer count: %d (must be >31)\n",
 		       res & (BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1) |
